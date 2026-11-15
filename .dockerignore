@@ -1,0 +1,12 @@
+﻿# Server-only build context: no client, local database or credentials.
+*
+!Cargo.toml
+!Cargo.lock
+!build.rs
+!src/
+!src/**
+!deploy/
+!deploy/Caddyfile
+!deploy/Caddyfile.native
+!deploy/mines.service
+!deploy/mines.env

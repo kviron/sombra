@@ -1,0 +1,6 @@
+﻿Build: npm run build passed (TypeScript + Vite).
+Browser social checks: two accounts, messages, reactions, stickers, friends, bots, reload persistence, settings and devices passed.
+Browser voice checks: two connected peers, audio RTP reception, video, mute, leaving a room and media cleanup passed using simulated media devices.
+Fresh screenshots: social-qa/chat.png, social-qa/settings.png, voice-qa/room-empty.png, voice-qa/room-connected.png.
+All three images in ../reference were inspected and compared with fresh screenshots. Main panel structure and voice gradient are present; slate glass backgrounds, settings dimensions and text channel icons still differ from references.
+Source edits blocked: writing ui/app/live-chat.tsx and ui/app/glass.css returns Access denied, including through apply_patch. No source changes were applied.

@@ -1,0 +1,67 @@
+{
+    "version":  1,
+    "values":  [
+                   {
+                       "name":  "initial window width",
+                       "group":  "window",
+                       "value":  1080,
+                       "unit":  "px",
+                       "source":  "tauri.conf.json: app.windows[0].width"
+                   },
+                   {
+                       "name":  "initial window height",
+                       "group":  "window",
+                       "value":  720,
+                       "unit":  "px",
+                       "source":  "tauri.conf.json: app.windows[0].height"
+                   },
+                   {
+                       "name":  "default session lifetime",
+                       "group":  "authentication",
+                       "value":  2592000,
+                       "unit":  "seconds",
+                       "source":  "src/backend.rs: session_lifetime; remember-me sessions last 31536000 seconds"
+                   },
+                   {
+                       "name":  "password hash iterations",
+                       "group":  "authentication",
+                       "value":  600000,
+                       "source":  "src/backend.rs: hash and login verification"
+                   },
+                   {
+                       "name":  "maximum message length",
+                       "group":  "chat",
+                       "value":  2000,
+                       "unit":  "characters",
+                       "source":  "src/backend.rs: message action"
+                   },
+                   {
+                       "name":  "maximum dialog participants",
+                       "group":  "chat",
+                       "value":  10,
+                       "source":  "src/backend.rs: create_dialog action"
+                   },
+                   {
+                       "name":  "poll interval",
+                       "group":  "chat",
+                       "value":  2000,
+                       "unit":  "ms",
+                       "source":  "ui/app/live-chat.tsx: useEffect interval"
+                   },
+                   {
+                       "name":  "startup screen",
+                       "group":  "interface",
+                       "value":  "Login required; authenticated users see persisted chats",
+                       "source":  "ui/app/App.tsx"
+                   },
+                   {
+                       "name":  "voice calls connected",
+                       "group":  "implementation status",
+                       "value":  true,
+                       "source":  "ui/app/use-voice.ts; src/backend.rs: voice_action; check-voice-browser.mjs (local simulated devices verified)"
+                   }
+               ],
+    "unverified_comparisons":  [
+                                   "Discord internal backend and voice mechanics have not been measured; this is an independently implemented simplified model based on public channel documentation."
+                               ]
+}

@@ -1,0 +1,9 @@
+api.example.com {
+    @api path /api /health
+    handle @api {
+        reverse_proxy 127.0.0.1:3847
+    }
+    handle {
+        respond "Not found" 404
+    }
+}

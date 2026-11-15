@@ -1,0 +1,12 @@
+﻿{$MINES_DOMAIN} {
+    encode zstd gzip
+    handle /api {
+        reverse_proxy backend:3847
+    }
+    handle /health {
+        reverse_proxy backend:3847
+    }
+    handle {
+        respond "Not found" 404
+    }
+}

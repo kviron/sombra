@@ -1,0 +1,97 @@
+/* Preserve reference geometry; apply macOS-inspired materials to surfaces only. */
+.app-surface {
+  --title-bar-height: 2.5rem;
+  --glass-panel: rgba(244,247,252,.72);
+  --glass-line: rgba(255,255,255,.6);
+  --glass-shadow: 0 12px 36px #0a12231f, inset 0 1px 0 #ffffff33;
+  background: radial-gradient(ellipse at 5% 10%, #cdd8e7, transparent 65%), var(--background);
+}
+.chat-window { --title-bar-height: 32px; }
+.dark .app-surface, .app-surface.chat-window {
+  --glass-panel: rgba(27,30,38,.68);
+  --glass-line: rgba(225,235,255,.13);
+  --glass-shadow: 0 12px 36px #0000003d, inset 0 1px 0 #ffffff12;
+  background: radial-gradient(ellipse at 0% 15%, #243143, transparent 60%), radial-gradient(ellipse at 95% 100%, #25243c, transparent 55%), #090b10;
+}
+.app-surface > header, .app-surface .channel-sidebar,
+.app-surface .chat-header, .app-surface .member-list,
+.app-surface .voice-messages, .auth-window > main > section {
+  background: var(--glass-panel);
+  border-color: var(--glass-line);
+  -webkit-backdrop-filter: blur(24px) saturate(125%);
+  backdrop-filter: blur(24px) saturate(125%);
+}
+.chat-shell { background: transparent; color: #dce0e8; }
+.server-rail { background: #0c0f1652; }
+.channel-sidebar { box-shadow: inset 1px 1px 0 #ffffff0d; }
+.conversation { background: #05070c61; }
+.channel-sidebar > header, .profile, .account-modal article header,
+.account-modal > aside, .voice-messages h3 { border-color: var(--glass-line); }
+.app-surface .profile, .app-surface .composer,
+.app-surface .chat-notice, .app-surface .pin-panel {
+  background: var(--glass-panel);
+  border-color: var(--glass-line);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  backdrop-filter: blur(20px) saturate(120%);
+}
+.composer { border-radius: 14px; }
+.chat-shell .server, .chat-shell .small-button, .welcome-icon {
+  background-color: #cddcf512;
+  box-shadow: inset 0 1px 0 #ffffff17, 0 3px 10px #0000001f;
+  border-color: var(--glass-line);
+}
+.chat-shell .channel.selected, .account-modal aside button.selected {
+  background: #d2e0fa24; color: #f5f7fc;
+  box-shadow: inset 0 1px 0 #ffffff21, 0 2px 6px #0000001f;
+}
+.channel, .category, .profile button, .header-actions { color: #a5acba; }
+.chat-shell button:hover { background-color: #d2e0fa21; }
+.chat-shell button:disabled:hover { background-color: transparent; }
+.chat-search, .group-modal input, .channel-kind select {
+  background: #05080f4d; border-color: var(--glass-line); border-radius: 9px;
+  box-shadow: inset 0 1px 3px #0000001f;
+}
+.composer:focus-within, .chat-search:focus-within {
+  border-color: #8fa9d4; box-shadow: 0 0 0 2px #8fa9d429;
+}
+.composer input::placeholder, .composer textarea::placeholder { color: #9ba3b2; }
+.chat-shell textarea:focus-visible, .chat-shell select:focus-visible {
+  outline: 2px solid #8fa9d4; outline-offset: 2px;
+}
+/* The composer provides one shared focus indicator around the entire field. */
+.chat-shell .composer input:focus-visible,
+.chat-shell .composer textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.modal-backdrop {
+  inset-block-start: var(--title-bar-height);
+  background: #00030a7a;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.app-surface .account-modal, .app-surface .group-modal {
+  background: rgba(25,28,36,.86); border-color: #e6eeff33; border-radius: 16px;
+  box-shadow: 0 28px 90px #00000080, inset 0 1px 0 #ffffff1a;
+  -webkit-backdrop-filter: blur(32px) saturate(130%);
+  backdrop-filter: blur(32px) saturate(130%);
+}
+.account-modal > aside { background: #c8d7f009; }
+.account-modal aside button { background: #dce6fa14; }
+.account-modal p, .group-modal p { color: #b1b8c6; }
+.account-modal hr, .channel-list hr { border-color: var(--glass-line); }
+.voice-stage button {
+  background: #ffffffe0;
+  box-shadow: 0 5px 18px #0000002e, inset 0 1px 0 white;
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+}
+.chat-shell .voice-stage button:hover { background: #fff; color: #111; }
+.auth-window > main > section { border-radius: 18px; box-shadow: var(--glass-shadow); }
+.auth-window .login-input { background: color-mix(in srgb, var(--background) 45%, transparent); }
+@media (prefers-reduced-transparency: reduce) {
+  .app-surface {
+  --glass-panel: #edf1f7; }
+  .dark .app-surface, .app-surface.chat-window { --glass-panel: #1b1e26; }
+  .app-surface .account-modal, .app-surface .group-modal { background: #191c24; }
+  .app-surface * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+}

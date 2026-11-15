@@ -1,0 +1,40 @@
+﻿import {preview} from 'vite';
+import {spawn} from 'node:child_process';
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import assert from 'node:assert/strict';
+mkdirSync('voice-qa',{recursive:true});
+const server=await preview({preview:{host:'127.0.0.1',port:4193,strictPort:true}});
+const chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--no-sandbox','--disable-gpu','--no-first-run','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required','--remote-debugging-port=9334','--user-data-dir='+process.cwd()+'/voice-qa/browser-profile','about:blank'],{windowsHide:true,stdio:'ignore'});
+const sockets=[];
+async function connect(url){const ws=new WebSocket(url);sockets.push(ws);await new Promise(r=>ws.addEventListener('open',r,{once:true}));let id=0;const pending=new Map();ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(pending.has(m.id)){const [resolve,reject]=pending.get(m.id);pending.delete(m.id);m.error?reject(m.error):resolve(m.result)}});const send=(method,params={})=>new Promise((resolve,reject)=>{const n=++id;pending.set(n,[resolve,reject]);ws.send(JSON.stringify({id:n,method,params}))});const ev=async expression=>{const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value};const wait=async expression=>{for(let i=0;i<160;i++){if(await ev(expression))return;await new Promise(r=>setTimeout(r,100))}throw new Error('Timeout '+expression+' '+await ev('document.body.innerText'))};await send('Page.enable');await send('Page.addScriptToEvaluateOnNewDocument',{source:`window.pcs=[];window.media=[];const Original=window.RTCPeerConnection;window.RTCPeerConnection=class extends Original{constructor(...args){super(...args);window.pcs.push(this)}};const gum=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);navigator.mediaDevices.getUserMedia=async(...args)=>{const s=await gum(...args);window.media.push(s);return s}`});return {send,ev,wait};}
+try{
+ let pages;for(let i=0;i<80;i++){try{pages=await(await fetch('http://127.0.0.1:9334/json')).json();break}catch{await new Promise(r=>setTimeout(r,100))}}
+ const a=await connect(pages.find(p=>p.type==='page').webSocketDebuggerUrl);
+ await a.send('Emulation.setDeviceMetricsOverride',{width:1920,height:1028,deviceScaleFactor:1,mobile:false});
+ await a.send('Page.navigate',{url:'http://127.0.0.1:4193/#login'});await a.wait("!!document.querySelector('#email')");
+ const text=readFileSync('data/FIRST-USER.txt','utf8');const email=text.match(/Email: (.+)/)[1].trim(),password=text.match(/Password: (.+)/)[1].trim();
+ await a.ev(`document.querySelector('#email').value=${JSON.stringify(email)};document.querySelector('#password').value=${JSON.stringify(password)};document.querySelector('form').requestSubmit()`);await a.wait("!!document.querySelector('.profile-name strong')");
+ const shot=async(name)=>{await a.ev('document.fonts.ready');const result=await a.send('Page.captureScreenshot',{format:'png'});writeFileSync('voice-qa/'+name+'.png',Buffer.from(result.data,'base64'))};
+ await shot('chat');
+ await a.ev("document.querySelector('[title=\"Настройки пользователя\"]').click()");await a.wait("!!document.querySelector('.account-modal')");
+ await a.ev("[...document.querySelectorAll('.settings-sidebar button')].find(b=>b.textContent.includes('Голос и видео')).click()");await a.wait("!!document.querySelector('.voice-settings')");
+ const before=await a.ev("document.querySelector('[role=switch]').getAttribute('aria-checked')");
+ await a.ev("document.querySelector('[role=switch]').click()");
+ await a.wait(`document.querySelector('[role=switch]').getAttribute('aria-checked')!==${JSON.stringify(before)}`);
+ await a.ev("document.querySelector('[role=switch]').click();document.querySelector('[role=slider]').focus()");
+ await a.send('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowLeft',code:'ArrowLeft',windowsVirtualKeyCode:37});
+ await a.send('Input.dispatchKeyEvent',{type:'keyUp',key:'ArrowLeft',code:'ArrowLeft',windowsVirtualKeyCode:37});
+ await a.wait("document.querySelector('[role=slider]').getAttribute('aria-valuenow')==='99'");
+ await a.send('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
+ await a.send('Input.dispatchKeyEvent',{type:'keyUp',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
+ console.log('shadcn switch and keyboard slider: passed');
+ for (const [width,height,name] of [[1700,914,'spacing-desktop'],[1080,720,'spacing-compact'],[390,844,'spacing-mobile']]) {
+  await a.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
+  await shot(name);
+  console.log(name, await a.ev(`JSON.stringify({padding:getComputedStyle(document.querySelector('.account-modal article > div')).padding,labelMargin:getComputedStyle(document.querySelector('.voice-settings label')).margin,labelGap:getComputedStyle(document.querySelector('.voice-settings label')).gap,overflow:document.querySelector('.account-modal').scrollWidth>document.querySelector('.account-modal').clientWidth})`));
+ }
+ await a.send('Emulation.setDeviceMetricsOverride',{width:1920,height:1028,deviceScaleFactor:1,mobile:false});
+ await a.ev("[...document.querySelectorAll('.settings-sidebar button')].find(b=>b.textContent.includes('Учётная запись')).click()");await shot('spacing-account');
+ await a.ev("document.querySelector('[title=\"Закрыть настройки\"]').click()");
+ await a.ev("[...document.querySelectorAll('.channel')].find(e=>e.textContent.includes('Команда 1')).click()");await a.wait("!!document.querySelector('.voice-stage')");await shot('spacing-room');
+}finally{sockets.forEach(s=>s.close());chrome.kill();await new Promise(r=>server.httpServer.close(r))}

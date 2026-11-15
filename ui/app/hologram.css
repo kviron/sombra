@@ -1,0 +1,15 @@
+﻿/* The holographic brand mark leaves the three reference layouts intact. */
+.sombra-mark{filter:drop-shadow(0 0 3px #a657ff99) drop-shadow(1px 0 1px #63f5ed44)}
+.auth-window section>div:first-child{flex-direction:column;gap:14px}
+.auth-window section>div:first-child .sombra-mark{width:100px;height:100px;background:repeating-linear-gradient(0deg,#be7aff09 0 1px,transparent 1px 4px);filter:drop-shadow(0 0 10px #a657ff77) drop-shadow(1px 0 1px #63f5ed55)}
+.sombra-logo{display:inline-flex;align-items:center;gap:10px;max-width:100%;color:#e5ceff;vertical-align:middle}
+.sombra-wordmark{display:block;width:141px;height:auto;flex-shrink:1;overflow:visible;filter:drop-shadow(1px 2px 4px #a657ff30)}
+.sombra-logo--compact{gap:7px}
+.sombra-logo--compact .sombra-mark{width:20px;height:20px}
+.sombra-logo--compact .sombra-wordmark{width:94px}
+.sombra-logo--auth{flex-direction:column;gap:18px}
+.sombra-logo--auth .sombra-wordmark{width:220px;max-width:100%}
+.sombra-logo--hero .sombra-mark{width:64px;height:64px}
+.sombra-logo--hero .sombra-wordmark{width:320px}
+:root:not(.dark) .sombra-logo{color:#63339a}
+:root .chat-window .sombra-logo{color:#e5ceff}

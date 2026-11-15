@@ -1,0 +1,23 @@
+[Unit]
+Description=Mines API server
+After=network.target
+
+[Service]
+Type=simple
+User=mines
+Group=mines
+StateDirectory=mines
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/mines
+EnvironmentFile=/etc/mines/mines.env
+ExecStart=/usr/local/bin/mines-server
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
