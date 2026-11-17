@@ -1,4 +1,4 @@
-п»їexport const paper = "bg-background border border-border/60 dark:bg-popover";
+export const paper = "bg-background border border-border/60 dark:bg-popover";
 
 export const floating = "bg-background border border-border/60 dark:bg-popover";
 
