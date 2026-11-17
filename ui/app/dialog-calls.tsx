@@ -69,19 +69,19 @@ export function useDialogCalls({state,voice,refresh,onOpenDialog}:{state:ChatSta
   finally{finish(op)}
  }
  async function decline(requested:DialogCall){
-  const call=latest.current.state?.dialogCalls?.find(item=>item.id===requested.id);
-  if(!call)return;
-  if(declinePending.current)return;
+  // Closing is a local user decision, never conditional on network/server progress.
+  // Retain this ID for the account lifetime so stale polls cannot reopen it.
+  scope.current.handled.add(requested.id);tick(n=>n+1);
   const pending=scope.current.pending;
-  if(pending?.id===call.id){
-   if(pending.kind!=='join')return;
-   // Invalidate identity before leave so late permission/join completion cannot navigate.
+  if(pending?.id===requested.id&&pending.kind==='join'){
    scope.current.pending=null;setOperation(null);voice.leave();
   }
+  const call=latest.current.state?.dialogCalls?.find(item=>item.id===requested.id);
+  if(!call||declinePending.current?.id===call.id)return;
   const op={id:call.id,epoch:scope.current.epoch};declinePending.current=op;setDeclining(op);setError('');
   const valid=()=>scope.current.epoch===op.epoch&&declinePending.current===op&&latest.current.state?.me.id===account;
   try{await api('dialog_call_decline',{call:call.id});if(!valid())return;scope.current.handled.add(call.id);update()}
-  catch(reason){if(valid())setError((reason as Error).message||'Не удалось отклонить звонок. Повторите попытку.')}
+  catch{if(valid())setError('Приглашение закрыто на этом устройстве. Сервер не подтвердил отклонение звонка.')}
   finally{if(valid()){declinePending.current=null;setDeclining(null)}}
  }
  return {calls,incoming,busy,incomingBusy,incomingDeclining:!!(declineBusy&&declining?.id===incoming?.id),error,start,join,decline,clearError:()=>setError('')};
@@ -94,8 +94,8 @@ export function IncomingDialogCall({call,state,busy,declining=busy,error,hasOthe
  const caller=state.users.find(user=>user.id===call.caller);
  const dialog=state.dialogs.find(item=>item.id===call.dialog);
  const group=!!dialog&&dialog.members.length>2;
- return <DialogPrimitive.Root open onOpenChange={open=>{if(!open&&!declining)onDecline()}}><DialogPrimitive.Portal><DialogPrimitive.Overlay className="dialog-call-overlay"/><DialogPrimitive.Content className="incoming-dialog-call" data-call-id={call.id} aria-busy={busy} onInteractOutside={event=>event.preventDefault()} onEscapeKeyDown={event=>{event.preventDefault();if(!declining)onDecline()}}>
-  <button type="button" className="incoming-call-close" aria-label="Отклонить звонок" disabled={declining} onClick={onDecline}>×</button>
+ return <DialogPrimitive.Root open modal={false} onOpenChange={open=>{if(!open)onDecline()}}><DialogPrimitive.Portal><DialogPrimitive.Content className="incoming-dialog-call" data-call-id={call.id} aria-busy={busy} onOpenAutoFocus={event=>event.preventDefault()} onCloseAutoFocus={event=>event.preventDefault()} onInteractOutside={event=>event.preventDefault()} onEscapeKeyDown={event=>{event.preventDefault();onDecline()}}>
+  <button type="button" className="incoming-call-close" aria-label="Отклонить звонок" onClick={onDecline}>×</button>
    {caller?<UserAvatar user={caller} size="xl"/>:<Users size={48}/>}
   <DialogPrimitive.Title>{caller?.name||'Участник Sombra'}</DialogPrimitive.Title>
   <DialogPrimitive.Description>{group?'Входящий групповой ': 'Входящий '}{call.video?'видеозвонок':'аудиозвонок'}{group&&dialog?.name?` · ${dialog.name}`:''}</DialogPrimitive.Description>
