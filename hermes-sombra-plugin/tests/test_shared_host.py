@@ -1,5 +1,8 @@
 """Shared gateway offline/loopback contracts, no provider/model/service calls."""
 import asyncio
+import base64
+import hashlib
+import logging
 import contextvars
 from contextlib import asynccontextmanager, contextmanager
 import importlib.util
@@ -269,6 +272,174 @@ class SharedHostContracts(unittest.IsolatedAsyncioTestCase):
                     await asyncio.to_thread(secret.get_secret_str, "HERMES_CODEX_BASE_URL", "")
         finally:
             shared.INVOCATION.reset(token)
+
+    async def test_public_reset_handle_is_local_no_model_and_only_current_actor_history(self):
+        calls = []
+        async def public(payload, history):
+            calls.append((payload["update"]["update_id"], list(history)))
+            return {"text": "ok", "media": []}
+        self.adapter.public_runner = public
+        scopes = {}
+        for number, actor, text in ((1, "actor-a", "first"), (2, "actor-b", "other"), (3, "actor-a", "/reset@hermes")):
+            event, canonical = self.event(number, actor=actor, trusted=False, text=text)
+            _, scope = self.adapter._new_scope(canonical)
+            scopes[actor] = scope
+            await self.adapter._run_scope(scope, event, canonical)
+        self.assertEqual([item[0] for item in calls], [1, 2])
+        self.assertEqual(scopes["actor-a"]["journal"].db.execute("SELECT COUNT(*) FROM public_history").fetchone()[0], 0)
+        self.assertEqual(scopes["actor-b"]["journal"].db.execute("SELECT COUNT(*) FROM public_history").fetchone()[0], 2)
+        event, canonical = self.event(4, trusted=False, text="next")
+        await self.adapter._run_scope(scopes["actor-a"], event, canonical)
+        self.assertEqual(calls[-1], (4, []))
+        self.assertEqual(fixtures.Fixture.acked, {1, 2, 3, 4})
+
+    async def test_native_producer_worker_manifest_stages_and_delivers_once_without_media_tag(self):
+        token, scope = self.bind()
+        try:
+            home = self.root / "profiles" / "sombra"
+            cache = home / "cache" / "images"
+            cache.mkdir(parents=True)
+            source = cache / "native.png"
+            raw = b"\x89PNG\r\n\x1a\nfixture-produced"
+            source.write_bytes(raw)
+            scope["artifact_roots"].append(cache.resolve())
+            self.adapter._public_profile_home = home
+            payload = {"success": True, "image": str(source), "provider": "fixture"}
+            for _ in range(2):
+                await asyncio.to_thread(shared.observe_generated_artifact, tool_name="image_generate", result=json.dumps(payload), tool_call_id="native-call-1")
+            records = self.adapter.current.get("generated_artifacts", {})
+            self.assertEqual(len(records), 1)
+            row = self.adapter.journal.db.execute("SELECT update_id,tool_call_id,sha256,staged_path,tool_result_hash,response_ref FROM generated_artifacts").fetchone()
+            self.assertEqual(row[:3], ("1", "native-call-1", hashlib.sha256(raw).hexdigest()))
+            self.assertEqual(Path(row[3]).read_bytes(), raw)
+            self.assertEqual(row[4], fixtures.plugin.digest(payload))
+            self.assertIsNone(row[5])
+            await self.adapter.send(self.adapter.channel, "Готово: [скачать](" + source.as_uri() + ")")
+            event = types.SimpleNamespace(platform_update_id=1)
+            await self.adapter._deliver_generated_outputs(event)
+            await self.adapter._deliver_generated_outputs(event)
+            replies = [call for call in fixtures.Fixture.calls if call["op"] == "bot_reply"]
+            self.assertEqual(len(replies), 2)
+            self.assertNotIn("file://", replies[0]["text"])
+            self.assertNotIn(str(home), replies[0]["text"])
+            self.assertEqual(base64.b64decode(replies[1]["attachment"]["data"]), raw)
+            self.assertEqual(replies[1]["attachment"]["mime"], "image/png")
+            self.assertTrue(self.adapter.current["attachments_complete"])
+            self.assertIsNotNone(self.adapter.journal.db.execute("SELECT response_ref FROM generated_artifacts").fetchone()[0])
+        finally:
+            shared.INVOCATION.reset(token)
+
+    async def test_unproven_file_uri_never_reads_or_exports_other_actor_cache(self):
+        token, scope = self.bind()
+        try:
+            self.adapter._public_profile_home = self.root / "profiles" / "sombra"
+            other = self.root / "telegram" / "cache" / "images"
+            other.mkdir(parents=True)
+            source = other / "private.png"
+            source.write_bytes(b"\x89PNG\r\n\x1a\nprivate")
+            scope["artifact_roots"].append(other.resolve())  # even an erroneous operator root is insufficient
+            with patch.object(shared, "safe_file", side_effect=AssertionError("unproven source must not be read")) as read:
+                await self.adapter.send(self.adapter.channel, "[скачать](" + source.as_uri() + ")")
+                await self.adapter._deliver_generated_outputs(types.SimpleNamespace(platform_update_id=1))
+                read.assert_not_called()
+                # Exercise the SAME egress SDK automatic local-media delivery uses, not just
+                # the post-tool observer: a bad configured root cannot bypass provenance.
+                result = await self.adapter._media(self.adapter.channel, str(source))
+                self.assertFalse(result.success)
+                read.assert_not_called()
+                await asyncio.to_thread(shared.observe_generated_artifact, tool_name="image_generate", tool_call_id="bad-call", result=json.dumps({"success": True, "image": str(source)}))
+                read.assert_not_called()
+                ordinary = self.adapter.state_dir / "artifacts" / "report.txt"
+                ordinary.parent.mkdir(exist_ok=True)
+                ordinary.write_text("own generated report", encoding="utf-8")
+                self.assertFalse((await self.adapter._media(self.adapter.channel, str(ordinary))).success)
+                read.assert_not_called()
+            self.assertFalse(self.adapter.current.get("generated_artifacts"))
+            self.assertTrue(self.adapter.current.get("generated_errors"))
+            replies = [call for call in fixtures.Fixture.calls if call["op"] == "bot_reply"]
+            self.assertTrue(all(not call.get("attachment") for call in replies))
+            self.assertIn("файл не отправлен", replies[0]["text"])
+            self.assertNotIn(str(source), replies[0]["text"])
+        finally:
+            shared.INVOCATION.reset(token)
+
+    async def test_slash_callback_body_runs_in_captured_full_sdk_scope_and_restores_poll(self):
+        from test_startup_contract import function
+        token, scope = self.bind()
+        home = self.root / "profiles" / "sombra"
+        sdk_home = contextvars.ContextVar("stub_sdk_control_home", default=self.root)
+        sdk_secrets = contextvars.ContextVar("stub_sdk_control_secrets", default=None)
+        observed = []
+        @asynccontextmanager
+        async def official_scope(path):
+            h = sdk_home.set(path)
+            s = sdk_secrets.set({"MODEL_KEY": "runtime-only-dummy"})
+            try:
+                yield
+            finally:
+                sdk_secrets.reset(s)
+                sdk_home.reset(h)
+        async def callback(choice):
+            await asyncio.sleep(0)  # prove BODY after a suspension, not coroutine creation
+            observed.append((choice, sdk_home.get(), sdk_secrets.get() is not None,
+                             shared.get_current_adapter() is self.adapter, self.adapter.current["id"]))
+            return "reset complete"
+        pending = {"sdk-session": {"confirm_id": "sdk-reset-1", "command": "reset", "handler": callback, "created_at": 0}}
+        slash = types.ModuleType("tools.slash_confirm")
+        slash.get_pending = lambda session: pending.get(session)
+        slash.clear_if_stale = lambda session: False
+        slash.resolve = function("tools/slash_confirm.py", "resolve", {"DEFAULT_TIMEOUT_SECONDS": 300, "Optional": typing.Optional,
+                                   "_lock": fixtures.threading.RLock(), "_pending": pending, "_is_stale": lambda entry, timeout: False,
+                                   "logger": logging.getLogger("strict_scope_fixture")})
+        tools = types.ModuleType("tools")
+        tools.slash_confirm = slash
+        runtime = types.ModuleType("gateway.run")
+        runtime._async_profile_runtime_scope = official_scope
+        try:
+            with patch.dict(sys.modules, {"tools": tools, "tools.slash_confirm": slash, "gateway.run": runtime}), patch.object(self.adapter, "_public_home", lambda: home):
+                result = await self.adapter.send_slash_confirm(self.adapter.channel, "Reset", "Confirm", "sdk-session", "sdk-reset-1")
+                self.assertTrue(result.success)
+                nonce = next(iter(self.adapter._prompts))
+                serialized = self.adapter.journal.db.execute("SELECT payload FROM prompts WHERE nonce=?", (nonce,)).fetchone()[0]
+                self.assertNotIn("runtime_context", serialized)
+                self.assertNotIn("runtime-only-dummy", serialized)
+                self.assertEqual(sdk_home.get(), self.root)
+                self.assertIsNone(sdk_secrets.get())
+                control, _ = self.event(2, text="/sombra-confirm@hermes " + nonce + " once")
+                self.assertTrue(await self.adapter.handle_control(control))
+                self.assertEqual(observed, [("once", home, True, True, 1)])
+                self.assertEqual(sdk_home.get(), self.root)
+                self.assertIsNone(sdk_secrets.get())
+                self.assertEqual(self.adapter.current["id"], 1)
+                self.assertEqual(fixtures.Fixture.acked, {2})
+                self.assertTrue(self.adapter.current["slash_waiters"][0].is_set())
+        finally:
+            shared.INVOCATION.reset(token)
+
+    async def test_supported_private_notice_route_suppresses_home_setup_without_public_fallback(self):
+        from test_startup_contract import function
+        config = types.SimpleNamespace(extra={"notice_delivery": "public"})
+        adapter = shared.SharedHostAdapter(config)
+        self.assertEqual(config.extra["notice_delivery"], "private")
+        self.assertFalse(adapter.supports_async_delivery)
+        runner = types.SimpleNamespace(config=None, _delivery_adapter_for=lambda source: adapter,
+                                       _thread_metadata_for_source=lambda source: {})
+        source = types.SimpleNamespace(platform="sombra", chat_id="chan-a", user_id="actor-a")
+        runtime = types.ModuleType("gateway.run")
+        runtime._is_slack_ignored_channel = lambda *args: False
+        @contextmanager
+        def suppressed(*args, **kwargs):
+            yield
+        deliver = function("gateway/run_notifications.py", "_deliver_platform_notice",
+                           {"Platform": types.SimpleNamespace(SLACK="slack"), "logging": logging,
+                            "logger": logging.getLogger("notice_fixture"), "_log_suppressed": suppressed}, "GatewayNotificationsMixin")
+        previous = len(fixtures.Fixture.calls)
+        with patch.dict(sys.modules, {"gateway.run": runtime}), patch.object(sys.modules["gateway.config"], "_normalize_choice", lambda value, choices, default: value if value in choices else default, create=True):
+            await deliver(runner, source, "No home channel is set. Type /sethome")
+        self.assertEqual(len(fixtures.Fixture.calls), previous)
+        result = await adapter.send_private_notice("chan-a", "actor-a", "No home channel")
+        self.assertTrue(result.raw_response["suppressed"])
+        self.assertIsNone(result.message_id)
 
     async def test_public_normal_sdk_fallback_tool_executor_always_blocked(self):
         token, scope = self.bind(trusted=False)

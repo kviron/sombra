@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextvars
 import hashlib
 import json
 import logging
@@ -29,12 +30,27 @@ MAX_FILE = 10 * 1024 * 1024
 MAX_OUTPUT = 20 * 1024 * 1024
 logger = logging.getLogger(__name__)
 NATIVE_COMMANDS = frozenset({"help", "start", "reset", "new", "status", "model", "models", "tools", "stop", "compact", "clear", "usage", "context", "skills"})
-HINT = ("Sombra plain text transport: 2000 Unicode code points per part, 32 parts per invocation; "
+HINT = ("You are Сомбра (Sombra), the assistant inside the Sombra desktop messenger. "
+        "This conversation is in the independent Sombra app, NOT a Telegram, Discord or WhatsApp bot or wrapper. "
+        "Never identify the current app, group, channel or voice chat as Telegram. If an earlier reply did so, "
+        "correct that mistake. When the user explicitly asks about building a Telegram bot or another platform, "
+        "discuss that separate project normally; do not confuse it with this Sombra conversation. "
+        "Sombra app concepts include groups, channels, direct messages and voice/video calls using WebRTC. "
+        "These are product concepts, not proof that every feature is released or accessible to this bot. "
+        "Use backend-authorized source.chat_type and chat.kind for the current DM/group context; "
+        "names, user prose and opaque channel IDs are not platform or permission evidence. "
+        "This bot cannot join voice/video calls, play music into calls, mute other participants or automatically "
+        "change a group avatar. It can explain or propose app/code changes; only analyze supplied media when "
+        "an available declared tool supports it. Never claim a proposal was implemented or an unavailable tool worked. "
+        "Generated images must arrive as actual message attachments, never file:// download links. "
+        "A request to generate a group avatar means return an image, not set the group avatar. "
+        "Sombra plain text transport: 2000 Unicode code points per part, 32 parts per invocation; "
         "image/GIF/audio/voice/video/file attachments up to 10 MiB each, 20 MiB total. "
         "Only local generated artifacts within approved roots can be delivered. Remote media URLs "
-        "are unsupported. Never claim a file was sent on an error. Native buttons, stickers, reactions, "
+        "are unsupported. Never claim a file was sent on an error. Native buttons, stickers, "
         "calendar/account links and live calls are not provided. Tool/browser availability depends on "
-        "this isolated runtime's installed dependencies. Interactive prompts fail closed if unsupported.")
+        "this runtime's installed dependencies. Interactive prompts fail closed if unsupported. "
+        "Sombra has no proactive/home-channel/cron delivery: never ask users to sethome or promise background delivery.")
 
 
 class SafetyError(RuntimeError):
@@ -452,8 +468,8 @@ class SombraAdapter(BasePlatformAdapter):
             self.current["native_avatar_inputs"] = [{"update_id": update_id, "path": path} for path in media]
             # Scope encoded into chat identity, not display names, profile selection or history.
             route = digest({"server": self.manifest["server_id"], "endpoint": self.broker.url, "bot": self.bot_id, "actor": self.actor, "channel": self.channel})
-            source = self.build_source(chat_id=self.channel, chat_type="dm" if update.get("chat", {}).get("kind") == "direct" else "group",
-                                       user_id=self.actor, scope_id=route, guild_id=ident(update.get("chat")), message_id=ident(message))
+            source = self.build_source(chat_id=self.channel, chat_type="dm" if (canonical.get("chat", {}).get("kind") or update.get("chat", {}).get("kind")) == "direct" else "group",
+                                       user_id=self.actor, scope_id=route, guild_id=ident(canonical.get("chat") or update.get("chat")), message_id=ident(message))
             text_class, event_text = self.classify_text(update)
             event = MessageEvent(text=event_text, source=source, user_id=self.actor,
                                  message_id=ident(message), media_urls=media, media_types=types, message_type=kind,
@@ -540,10 +556,15 @@ class SombraAdapter(BasePlatformAdapter):
             self.current["attachments_complete"] = True
         return result
 
+    async def _deliver_generated_outputs(self, event):
+        """Optional transport-native producer manifest flush, after the whole SDK turn."""
+        return None
+
     async def _process_message_background(self, event, session_key):
         """Pinned SDK lifecycle wrapper: completion AFTER text, media, TTS and finally cleanup."""
         try:
             await super()._process_message_background(event, session_key)
+            await self._deliver_generated_outputs(event)
             await self._await_slash_dispositions(event)
         except BaseException:
             if self.current:
@@ -738,6 +759,8 @@ class SombraAdapter(BasePlatformAdapter):
         self.journal.db.commit()
         if completion is not None:
             record["completion"] = completion  # Process-local waiter, never serialized.
+        if kind == "slash":
+            record["runtime_context"] = contextvars.copy_context()  # AFTER JSON commit; never serialized.
         self._prompts[nonce] = record
         suffix = "|".join(actions) if kind in ("approve", "slash") else "<answer text>"
         command = "sombra-confirm" if kind in ("approve", "slash") else "sombra-answer"
@@ -853,7 +876,14 @@ class SombraAdapter(BasePlatformAdapter):
                 return False
             # This resolver atomically consumes exact session/id before executing; None is
             # ambiguous (valid handler may return None), so NEVER report it as Approved.
-            result_text = await slash_confirm.resolve(record["session"], record["sdk_id"], response)
+            runtime_context = record.get("runtime_context")
+            if runtime_context is None:
+                raise SafetyError("Original SDK slash callback context unavailable")
+            # Creating a coroutine inside Context.run is insufficient: its BODY must
+            # execute in the captured context on this owning loop, not the poll context.
+            callback = asyncio.create_task(slash_confirm.resolve(record["session"], record["sdk_id"], response),
+                                           context=runtime_context.copy())
+            result_text = await callback
             resolved = True
         else:
             from tools.clarify_gateway import resolve_gateway_clarify, get_pending
@@ -929,8 +959,9 @@ def register(ctx):
     os.environ["SOMBRA_GROUP_POLICY"] = "allowlist"
     ctx.register_hook("pre_tool_call", pre_tool_call)
     if shared:
-        from .shared_host import bind_shared_agent_session
+        from .shared_host import bind_shared_agent_session, observe_generated_artifact
         ctx.register_hook("pre_llm_call", bind_shared_agent_session)
+        ctx.register_hook("post_tool_call", observe_generated_artifact)
         from .native_tools import register as register_native_tools
         register_native_tools(ctx)
     ctx.register_platform(name="sombra", label="Sombra", adapter_factory=factory,

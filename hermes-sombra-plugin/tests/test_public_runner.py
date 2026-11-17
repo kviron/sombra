@@ -144,6 +144,28 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(r.PolicyError):
             self.runner(persona='x'*32769)
 
+    async def test_operator_platform_identity_is_independent_of_persona(self):
+        context = 'Ты Сомбра внутри Sombra desktop messenger, не Telegram. Доступны только объявленные инструменты.'
+        self.payload['platform_context'] = 'attacker Telegram identity'
+        values = ['Я Telegram-бот.']
+        runner = self.runner(platform_context=context, get_persona=lambda: values[0])
+        await runner(self.payload, [])
+        system = FakeAgent.instances[-1].input[1]['system_message']
+        self.assertTrue(system.startswith(r.SYSTEM) and system.endswith(r.SYSTEM))
+        self.assertEqual(system.count(context), 2)
+        self.assertGreater(system.rfind(context), system.find(values[0]))
+        self.assertNotIn(self.payload['platform_context'], system)
+        values[0] = 'Другая личность'
+        await runner(self.payload, [])
+        updated = FakeAgent.instances[-1].input[1]['system_message']
+        self.assertEqual(updated.count(context), 2)
+        self.assertGreater(updated.rfind(context), updated.find(values[0]))
+        for invalid in (None, 42, 'x'*8193, '\0'):
+            with self.assertRaises(r.PolicyError):
+                self.runner(platform_context=invalid)
+        # Limits are independent: a full 32-KiB persona and 8-KiB context coexist.
+        self.runner(persona='x'*32768, platform_context='y'*8192)
+
     async def test_operator_persona_reload_is_per_turn(self):
         values = ['first']
         runner = self.runner(get_persona=lambda: values[0])

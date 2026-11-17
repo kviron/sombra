@@ -52,6 +52,7 @@ def main():
     parser.add_argument('--build',action='store_true');parser.add_argument('--run',action='store_true')
     parser.add_argument('--shared-host',action='store_true',help='Test new same-process shared-host plugin, not a deployment runtime')
     parser.add_argument('--full-ingress',action='store_true',help='Run actual Gateway startup, native admission and durable trusted turns')
+    parser.add_argument('--confirm-reset',action='store_true',help='Run separate default-on real nonce confirmation consumer regression')
     args=parser.parse_args()
     if args.acquire:
         QA.mkdir(parents=True,exist_ok=True)
@@ -59,7 +60,8 @@ def main():
         shutil.copyfile(SOURCES/'acquire.py',QA/'acquire.py')
         run(sys.executable,str(QA/'acquire.py'))
     if args.build:
-        context=prepare(args.shared_host or args.full_ingress,args.full_ingress)
+        full=args.full_ingress or args.confirm_reset
+        context=prepare(args.shared_host or full,full)
         run('docker','build','--label',LABEL,'-t',IMAGE,str(context))
     if args.run:
         # Entire agent and fake HTTP service run inside network-none private container.
@@ -67,7 +69,7 @@ def main():
         run('docker','run','--rm','--name','sombra-hermes-qa-integration','--label',LABEL,
             '--network','none','--memory','512m','--cpus','1','--pids-limit','128',
             '--cap-drop','ALL','--cap-add','SETUID','--cap-add','SETGID','--cap-add','CHOWN',
-            '--security-opt','no-new-privileges',IMAGE)
+            '--security-opt','no-new-privileges',*(['-e','QA_INTERACTIVE_CONFIRM=1'] if args.confirm_reset else []),IMAGE)
     if not args.acquire and not args.build and not args.run:parser.print_help()
 
 if __name__=='__main__':main()

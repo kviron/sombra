@@ -427,16 +427,30 @@ def sdk_public_wrappers(inbound_paths=(), provider_snapshot=None):
 
 def create_public_callback(*, authorize, artifact_base='/var/lib/sombra-hermes/public-artifacts',
                            resolve_provider=None, confined_tools=None, agent_class=None, registry=None, persona=None,
-                           get_persona=None, provider_snapshot=None):
+                           get_persona=None, provider_snapshot=None, platform_context=''):
     """Return async (canonical_update, history)->{text, media} for adapter use.
 
     `authorize(payload)` returns fresh canonical metadata, not a trust boolean.
     Neither payload text nor model arguments can install wrappers or permissions.
     """
+    if (not isinstance(platform_context, str) or '\0' in platform_context
+            or len(platform_context.encode('utf-8')) > 8192):
+        raise PolicyError('Invalid operator platform context')
     def persona_system(value):
         if value is not None and (not isinstance(value, str) or len(value.encode('utf-8')) > 32768):
             raise PolicyError('Invalid operator persona')
-        return SYSTEM if not value else SYSTEM+'\n\nОбщая личность Sombra:\n'+value+'\n\n'+SYSTEM
+        parts = [SYSTEM]
+        if platform_context:
+            parts.append('Контекст текущей платформы:\n'+platform_context)
+        if value:
+            parts.append('Общая личность Sombra:\n'+value)
+        # Operator transport identity is independent of editable SOUL style.
+        # Reassert it after persona, with the non-overridable tool policy last.
+        if platform_context:
+            parts.append('Фактическая платформа этого разговора:\n'+platform_context)
+        if len(parts) > 1:
+            parts.append(SYSTEM)
+        return '\n\n'.join(parts)
     if get_persona is not None and not callable(get_persona):
         raise PolicyError('Invalid operator persona loader')
     system = persona_system(persona)

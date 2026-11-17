@@ -8,8 +8,9 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextvars
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, closing
 import importlib
+import hashlib
 import json
 import logging
 import os
@@ -17,15 +18,17 @@ from pathlib import Path
 import re
 import secrets
 import shlex
+import sqlite3
 import stat
+import threading
 import sys
 import types
 from urllib.parse import urlsplit
 
 from gateway.config import Platform
 from gateway.platforms.base import BasePlatformAdapter
-from .adapter import (Broker, Journal, MAX_FILE, SafetyError, SombraAdapter, digest,
-                      ident, packed, sniff)
+from .adapter import (Broker, Journal, HINT, MAX_FILE, SafetyError, SombraAdapter, SendResult, digest,
+                      ident, packed, safe_file, sniff)
 
 log = logging.getLogger(__name__)
 # Hermes can load one plugin package per logical profile. Those packages must share
@@ -101,6 +104,22 @@ class DirectAPI(Broker):
         return result
 
 
+def observe_generated_artifact(**kwargs):
+    """Observe actual native producer results, never model prose or arbitrary file URLs."""
+    if kwargs.get("tool_name") not in ("image_generate", "video_generate") or INVOCATION.get() is None:
+        return None
+    try:
+        adapter = get_current_adapter()
+        if not adapter._scope()["trusted"]:
+            return None
+        adapter.capture_generated_artifact(**kwargs)
+    except Exception:
+        binding = INVOCATION.get()
+        if binding and binding[0]._scope() is binding[1] and binding[1].get("current"):
+            binding[1]["current"].setdefault("generated_errors", []).append("artifact_provenance_unavailable")
+    return None
+
+
 def get_current_adapter():
     """Trusted extension-code accessor; never exposed as a generic model RPC tool."""
     binding = INVOCATION.get()
@@ -161,10 +180,14 @@ def shared_pre_tool_call(**kwargs):
 
 class SharedHostAdapter(SombraAdapter):
     """Many actor/channel scopes; every async turn has its own ContextVar binding."""
+    supports_async_delivery = False
     def __init__(self, config, public_runner=None):
         if os.environ.get("SOMBRA_SHARED_HOST_ACK") != HOST_ACK:
             raise SafetyError("Shared-host full tools require explicit operator host-access risk acknowledgement")
         BasePlatformAdapter.__init__(self, config, Platform("sombra"))
+        if isinstance(getattr(config, "extra", None), dict):
+            config.extra["notice_delivery"] = "private"
+        self._artifact_lock = threading.RLock()
         self.env = dict(os.environ)
         self.root = Path(self.env.get("SOMBRA_STATE_DIR", "/var/lib/sombra-hermes-platform"))
         if not self.root.is_absolute() or self.root.is_symlink():
@@ -344,6 +367,163 @@ class SharedHostAdapter(SombraAdapter):
         self._scopes[key] = scope
         return key, scope
 
+    def capture_generated_artifact(self, *, tool_name, result, tool_call_id="", **kwargs):
+        canonical = self.authorize()
+        if canonical.get("access", {}).get("trusted") is not True or not tool_call_id:
+            raise SafetyError("Native generated artifact needs exact trusted producer call")
+        if isinstance(result, str) and len(result) > 65536:
+            raise SafetyError("Native producer manifest exceeds bounded result size")
+        value = json.loads(result) if isinstance(result, str) else result
+        if not isinstance(value, dict) or value.get("success") is not True:
+            return
+        field = "image" if tool_name == "image_generate" else "video"
+        source = value.get("host_" + field) or value.get(field)
+        if not isinstance(source, str) or not Path(source).is_absolute():
+            raise SafetyError("Native producer did not return a supported local artifact")
+        home = self._public_profile_home or self._public_home()
+        resolved = Path(source).resolve()
+        workspace_roots = [root for root in self.artifact_roots if root.name == "artifacts"]
+        if not (resolved.is_relative_to(home / "cache") or any(resolved.is_relative_to(root) for root in workspace_roots)):
+            raise SafetyError("Producer path is not Sombra generated media")
+        data, _ = safe_file(source, self.artifact_roots)
+        mime, extension, _ = sniff(data)
+        expected = "image/" if field == "image" else "video/"
+        if not mime.startswith(expected):
+            raise SafetyError("Native producer artifact MIME is not the declared media kind")
+        sha = hashlib.sha256(data).hexdigest()
+        record_id = digest({"update": self.current["id"], "call": str(tool_call_id), "source": str(resolved)})
+        with self._artifact_lock:
+            records = self.current.setdefault("generated_artifacts", {})
+            if record_id in records:
+                if records[record_id]["sha256"] != sha:
+                    raise SafetyError("Native producer replay changed artifact bytes")
+                return
+            if len(records) >= 32 or sum(item["size"] for item in records.values()) + len(data) > 20 * 1024 * 1024:
+                raise SafetyError("Native generated output exceeds Sombra attachment budget")
+            folder = self.state_dir / "artifacts"
+            folder.mkdir(mode=0o700, exist_ok=True)
+            if folder.is_symlink():
+                raise SafetyError("Generated artifact staging symlink forbidden")
+            staged = folder / (record_id[:16] + "_" + sha[:16] + extension)
+            if not staged.exists():
+                with staged.open("xb") as stream:
+                    stream.write(data)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                if os.name == "posix":
+                    directory_fd = os.open(folder, os.O_RDONLY | os.O_DIRECTORY)
+                    try:
+                        os.fsync(directory_fd)
+                    finally:
+                        os.close(directory_fd)
+            staged_bytes, _ = safe_file(staged, [folder.resolve()])
+            if hashlib.sha256(staged_bytes).hexdigest() != sha:
+                raise SafetyError("Generated staged bytes differ from producer result")
+            record = {"id": record_id, "update_id": self.current["id"], "tool_call_id": str(tool_call_id),
+                      "source": str(resolved), "staged": str(staged), "sha256": sha, "mime": mime,
+                      "size": len(data), "tool_result_hash": digest(value), "delivered": False}
+            # Observer hooks run in SDK worker threads: use a distinct FULL-synchronous
+            # connection, never the event-loop-owned SQLite handle.
+            with closing(sqlite3.connect(self.state_dir / "journal.sqlite")) as database:
+                database.execute("PRAGMA synchronous=FULL")
+                database.execute("CREATE TABLE IF NOT EXISTS generated_artifacts(id TEXT PRIMARY KEY,update_id TEXT NOT NULL,tool_call_id TEXT NOT NULL,source_path TEXT NOT NULL,sha256 TEXT NOT NULL,staged_path TEXT NOT NULL,mime TEXT NOT NULL,size INTEGER NOT NULL,tool_result_hash TEXT NOT NULL,response_ref TEXT)")
+                previous = database.execute("SELECT sha256,tool_result_hash FROM generated_artifacts WHERE id=?", (record_id,)).fetchone()
+                if previous and previous != (sha, record["tool_result_hash"]):
+                    raise SafetyError("Durable native producer manifest conflict")
+                database.execute("INSERT OR IGNORE INTO generated_artifacts(id,update_id,tool_call_id,source_path,sha256,staged_path,mime,size,tool_result_hash) VALUES(?,?,?,?,?,?,?,?,?)",
+                                 (record_id, str(record["update_id"]), record["tool_call_id"], record["source"], sha, record["staged"], mime, len(data), record["tool_result_hash"]))
+                database.commit()
+            records[record_id] = record
+
+    def _scrub_local_references(self, content):
+        text = str(content)
+        # File URLs are NEVER download authority. Remove them even when unproven; only
+        # producer manifests below can cause a byte read/send.
+        known = set()
+        if self.current:
+            for record in list(self.current.get("generated_artifacts", {}).values()):
+                known.update((Path(record["source"]).as_uri(), Path(record["staged"]).as_uri()))
+        def replace_link(match):
+            label, uri = match.group(1) or "изображение", match.group(2)
+            canonical_uri = "file://" + uri[7:]
+            return label if canonical_uri in known else label + " (локальная ссылка недоступна; файл не отправлен)"
+        text = re.sub(r"!?\[([^\]]*)\]\(<?(file://[^\s)>]+)>?\)", replace_link, text, flags=re.IGNORECASE)
+        text = re.sub(r"file://[^\s<>)]*", "[локальная ссылка недоступна]", text, flags=re.IGNORECASE)
+        if self.current:
+            for record in list(self.current.get("generated_artifacts", {}).values()):
+                text = text.replace(record["source"], "[сгенерированный файл]").replace(record["staged"], "[сгенерированный файл]")
+        if self._public_profile_home is not None:
+            text = re.sub(re.escape(str(self._public_profile_home / "cache")) + r"[/\\][^\s<>)]*", "[локальный файл]", text)
+        return text
+
+    async def send(self, chat_id, content, reply_to=None, metadata=None):
+        return await super().send(chat_id, self._scrub_local_references(content), reply_to=reply_to, metadata=metadata)
+
+    async def edit_message(self, chat_id, message_id, content, *, finalize=False):
+        return await super().edit_message(chat_id, message_id, self._scrub_local_references(content), finalize=finalize)
+
+    async def _media(self, chat_id, path, caption=None):
+        record = None
+        if self.current:
+            record = next((item for item in list(self.current.get("generated_artifacts", {}).values())
+                           if str(path) in (item["source"], item["staged"])), None)
+        if self.current and self.current.get("generated_errors"):
+            return SendResult(success=False, error="Native producer provenance failed; fallback media export denied")
+        if record is None and self.current and Path(str(path)).is_absolute():
+            home = self._public_profile_home or self._public_home()
+            resolved = Path(path).resolve()
+            workspace_roots = [root for root in self.artifact_roots if root.name == "artifacts"]
+            if not (resolved.is_relative_to(home / "cache") or any(resolved.is_relative_to(root) for root in workspace_roots)):
+                self.current.setdefault("generated_errors", []).append("outside_sombra_media")
+                return SendResult(success=False, error="Media origin is outside Sombra artifacts; fallback export denied")
+            if resolved.is_relative_to(home / "cache") and Path(path).suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm"):
+                self.current.setdefault("generated_errors", []).append("unproven_cached_media")
+                return SendResult(success=False, error="Cached image/video lacks this invocation's producer manifest")
+        if record is not None:
+            if record["delivered"]:
+                return SendResult(success=True, message_id=record.get("response_ref"))
+            path = record["staged"]
+            data, _ = safe_file(path, [(self.state_dir / "artifacts").resolve()])
+            if hashlib.sha256(data).hexdigest() != record["sha256"]:
+                self.current["failed"] = True
+                return SendResult(success=False, error="Generated artifact changed after producer manifest")
+        result = await super()._media(chat_id, path, self._scrub_local_references(caption) if caption else caption)
+        if record is not None and result.success:
+            record["delivered"], record["response_ref"] = True, result.message_id
+            self.journal.db.execute("UPDATE generated_artifacts SET response_ref=? WHERE id=?", (result.message_id, record["id"]))
+            self.journal.db.commit()
+        return result
+
+    async def _deliver_generated_outputs(self, event):
+        if not self.current or getattr(event, "platform_update_id", None) != self.current["id"]:
+            return
+        for record in list(self.current.get("generated_artifacts", {}).values()):
+            if not record["delivered"]:
+                result = await self._media(self.channel, record["staged"])
+                if not result.success:
+                    self.current.setdefault("generated_errors", []).append("artifact_delivery_failed")
+        if self.current.get("generated_errors"):
+            # Explicit failure disposition, not a silent missing file or a fake Sent.
+            if not self.current["failed"]:
+                await self.send(self.channel, "Не удалось безопасно отправить сгенерированное вложение. Нужна проверка оператором; повторная генерация автоматически не запускается.")
+            self.current["failed"] = True
+        elif self.current.get("generated_artifacts"):
+            self.current["attachments_complete"] = True
+
+    async def send_slash_confirm(self, chat_id, title, message, session_key, confirm_id, metadata=None):
+        from gateway.run import _async_profile_runtime_scope
+        # The receiving transport's handler may still be scoped to its DEFAULT home.
+        # Bind the actual clean Sombra runtime (home+full secrets+terminal policy) before
+        # the base transport captures the process-local original callback context.
+        async with _async_profile_runtime_scope(self._public_home()):
+            return await super().send_slash_confirm(chat_id, title, message, session_key, confirm_id, metadata=metadata)
+
+    async def send_private_notice(self, chat_id, user_id, content, reply_to=None, metadata=None):
+        # Supported notice_delivery=private route: no private-destination backend API
+        # exists here, and proactive/setup notices are not user replies. Consume without
+        # a public fallback, without assigning a home/cron target, and without Sent text.
+        return SendResult(success=True, raw_response={"suppressed": True, "reason": "sombra_operational_notices_disabled"})
+
     def _public_home(self):
         from hermes_cli.profiles import get_profile_dir
         from hermes_constants import get_routing_process_hermes_home
@@ -465,7 +645,7 @@ class SharedHostAdapter(SombraAdapter):
                 persona = protected_persona(self.env.get("SOMBRA_SOUL_FILE"), self.profile)
                 self.public_runner = create_public_callback(authorize=self._public_authorize, artifact_base=self.root / "scopes", persona=persona,
                                                            get_persona=lambda: protected_persona(self.env.get("SOMBRA_SOUL_FILE"), self.profile),
-                                                           provider_snapshot=self._public_provider_snapshot)
+                                                           provider_snapshot=self._public_provider_snapshot, platform_context=HINT)
             except ImportError:
                 log.warning("Sombra public AI runner unavailable; local help/reset only")
         self._connected = True
@@ -580,7 +760,7 @@ class SharedHostAdapter(SombraAdapter):
             if local_response is not None:
                 result = await local_response(self, {"update": update, "authority": canonical})
             elif command in ("/help", "/start"):
-                result = {"text": "Я Hermes в Sombra. /ask вопрос, /help — помощь, /reset — очистить ваш контекст. Доступны только безопасные публичные инструменты, реально настроенные оператором; серверные команды и чужая память недоступны.", "media": []}
+                result = {"text": "Я Сомбра, ИИ-помощник мессенджера Sombra. /ask вопрос, /help — помощь, /reset — очистить ваш контекст. Доступны только безопасные публичные инструменты, реально настроенные оператором; серверные команды и чужая память недоступны.", "media": []}
             elif command in ("/reset", "/new", "/clear"):
                 self.journal.db.execute("DELETE FROM public_history")
                 self.journal.db.commit()

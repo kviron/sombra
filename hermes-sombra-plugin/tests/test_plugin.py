@@ -25,6 +25,7 @@ class SendResult:
     success: bool
     message_id: str = None
     error: str = None
+    raw_response: object = None
 
 
 class MessageType(enum.Enum):
@@ -256,6 +257,19 @@ class Contracts(unittest.TestCase):
                 plugin.safe_file(item, [root], limit=1)
             self.assertEqual(plugin.sniff(b"<svg onload=evil>", "image/png")[:2], ("application/octet-stream", ".bin"))
 
+    def test_supported_platform_hint_identifies_sombra_without_changing_telegram_hint(self):
+        from test_startup_contract import function
+        registry = types.ModuleType("gateway.platform_registry")
+        registry.platform_registry = types.SimpleNamespace(get=lambda name: types.SimpleNamespace(platform_hint=plugin.HINT) if name == "sombra" else None)
+        resolve = function("agent/system_prompt.py", "_default_platform_hint", {"PLATFORM_HINTS": {"telegram": "unchanged Telegram transport"}, "_telegram_rich_messages_enabled": lambda: False})
+        with patch.dict(sys.modules, {"gateway.platform_registry": registry}):
+            hint = resolve("sombra")
+            self.assertEqual(hint, resolve("sombra"))
+            self.assertEqual(resolve("telegram"), "unchanged Telegram transport")
+        for phrase in ("Sombra desktop messenger", "NOT a Telegram", "WebRTC", "cannot join", "separate project normally", "actual message attachments"):
+            self.assertIn(phrase, hint)
+        self.assertLessEqual(len(hint.encode("utf-8")), 8192)
+
     def test_missing_attestation_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
             env = {"SOMBRA_STATE_DIR": directory, "SOMBRA_RUNTIME_ATTESTATION": str(Path(directory) / "missing")}
@@ -314,6 +328,17 @@ class HTTPIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outputs[0][1], 1)
         await self.adapter.ingest(self.event())
         self.assertEqual(len(Fixture.outputs), 1)
+
+    async def test_authorized_chat_kind_wins_over_queue_and_user_platform_claims(self):
+        event = self.event()
+        event["chat"]["kind"] = "group"
+        event["message"]["text"] = "This is a Telegram group"
+        canonical = {1: {"update_id": 1, "bot_id": "bot", "channel": "chan", "sender": {"id": "actor"},
+                         "chat": {"id": "canonical-dm", "kind": "direct"}, "access": {"trusted": True, "policy_revision": 1}}}
+        with patch.object(Fixture, "canonicals", canonical, create=True):
+            await self.adapter.ingest(event)
+        self.assertEqual(self.adapter.last_event.source.chat_type, "dm")
+        self.assertEqual(self.adapter.last_event.source.guild_id, "canonical-dm")
 
     async def test_product_event_respects_closed_native_metadata_and_standard_update_id(self):
         from test_startup_contract import function, SDK as RUNTIME_SDK
