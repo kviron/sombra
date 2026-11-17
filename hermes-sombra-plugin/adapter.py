@@ -457,7 +457,7 @@ class SombraAdapter(BasePlatformAdapter):
             text_class, event_text = self.classify_text(update)
             event = MessageEvent(text=event_text, source=source, user_id=self.actor,
                                  message_id=ident(message), media_urls=media, media_types=types, message_type=kind,
-                                 metadata={"sombra_update_id": update_id}, allow_gateway_control=text_class == "native")
+                                 platform_update_id=update_id, metadata={}, allow_gateway_control=text_class == "native")
             await self._authorize()
             await self.handle_message(event)
             # handle_message enqueues; it does NOT await final generation or media delivery.
@@ -499,7 +499,7 @@ class SombraAdapter(BasePlatformAdapter):
             self.current = None
 
     async def _await_slash_dispositions(self, event):
-        if self.current and event.metadata.get("sombra_update_id") == self.current["id"]:
+        if self.current and getattr(event, "platform_update_id", None) == self.current["id"]:
             waiters = self.current.get("slash_waiters", [])
             if waiters and not self.current["failed"]:
                 deadline = time.monotonic() + 300
@@ -517,7 +517,7 @@ class SombraAdapter(BasePlatformAdapter):
         try:
             await super()._dispatch_inline_reply(event, log_cmd=log_cmd)
             await self._await_slash_dispositions(event)
-            if self.current and event.metadata.get("sombra_update_id") == self.current["id"]:
+            if self.current and getattr(event, "platform_update_id", None) == self.current["id"]:
                 if self.current["parts"] > before and not self.current["failed"]:
                     self.current["final"] = True
                 self.current["done"].set()
@@ -534,7 +534,7 @@ class SombraAdapter(BasePlatformAdapter):
 
     async def _deliver_attachments(self, event, extracted, metadata, *, anything_sent, record_delivery):
         result = await super()._deliver_attachments(event, extracted, metadata, anything_sent=anything_sent, record_delivery=record_delivery)
-        if self.current and event.metadata.get("sombra_update_id") == self.current["id"]:
+        if self.current and getattr(event, "platform_update_id", None) == self.current["id"]:
             # This native lifecycle method runs AFTER final TTS/text and before final cleanup.
             # A successful media-only turn still needs this boundary, not merely first send.
             self.current["attachments_complete"] = True
@@ -550,14 +550,14 @@ class SombraAdapter(BasePlatformAdapter):
                 self.current["failed"] = True
             raise
         finally:
-            if self.current and event.metadata.get("sombra_update_id") == self.current["id"]:
+            if self.current and getattr(event, "platform_update_id", None) == self.current["id"]:
                 if self.current.get("attachments_complete") and self.current.get("media_sent") and not self.current["failed"]:
                     self.current["final"] = True
                 self.current["done"].set()
 
     async def send_final_ledgered(self, event, session_key, text_content, metadata, *, reply_to, is_ephemeral_response=False):
         result = await super().send_final_ledgered(event, session_key, text_content, metadata, reply_to=reply_to, is_ephemeral_response=is_ephemeral_response)
-        if self.current and event.metadata.get("sombra_update_id") == self.current["id"]:
+        if self.current and getattr(event, "platform_update_id", None) == self.current["id"]:
             self.current["final"] = bool(result[0].success)
         return result
 

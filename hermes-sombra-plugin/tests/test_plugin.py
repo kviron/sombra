@@ -315,6 +315,22 @@ class HTTPIntegration(unittest.IsolatedAsyncioTestCase):
         await self.adapter.ingest(self.event())
         self.assertEqual(len(Fixture.outputs), 1)
 
+    async def test_product_event_respects_closed_native_metadata_and_standard_update_id(self):
+        from test_startup_contract import function, SDK as RUNTIME_SDK
+        await self.adapter.ingest(self.event())
+        event = self.adapter.last_event
+        self.assertEqual(event.metadata, {})
+        self.assertEqual(event.platform_update_id, 1)
+        event.source.platform = types.SimpleNamespace(value="sombra")
+        native_metadata = function("gateway/session_envelope.py", "_native_metadata", {})
+        self.assertEqual(native_metadata(event), {})
+        event.metadata = {"sombra_update_id": 1}
+        self.assertIsNone(native_metadata(event), "Old private metadata must reproduce actual SDK refusal")
+        envelope = ast.parse((RUNTIME_SDK / "gateway/session_envelope.py").read_text())
+        fields = next(node.value for node in envelope.body if isinstance(node, ast.Assign)
+                      and any(isinstance(target, ast.Name) and target.id == "_EVENT_FIELDS" for target in node.targets))
+        self.assertIn("platform_update_id", ast.literal_eval(fields))
+
     async def test_native_voice_only_final_boundary_ack(self):
         self.adapter.fixture_voice_only = True
         self.adapter.fixture_media = self.artifacts / "voice.ogg"
