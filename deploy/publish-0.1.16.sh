@@ -47,3 +47,5 @@ assert remote==json.loads(Path('/root/sombra-attachments-stage/latest-0.1.16.jso
 print('PASS stable HTTPS manifest version 0.1.16 matches signed local release')
 PY
 printf 'Previous manifest backup: %s\n' "$backup"
+# Retention runs only after installer and stable manifest HTTPS verification succeed.
+python3 /usr/local/lib/sombra-release-retention.py --apply
