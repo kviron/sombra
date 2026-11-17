@@ -1,7 +1,8 @@
 """Independent Hermes exact-pin Docker QA launcher (no production or real inference).
 
-Usage: python app/check-hermes-platform-integration.py --shared-host --build --run
-Omit --shared-host only to reproduce the earlier isolated-adapter fixture.
+Usage: python app/check-hermes-platform-integration.py --full-ingress --build --run
+Use --shared-host instead for the separate public/authorization/provider-scope contract suite.
+Omit both mode flags only to reproduce the earlier isolated-adapter fixture.
 Acquire public exact source first with --acquire; artifacts stay under ignored deploy-qa.
 Harness source is versioned in hermes-sombra-plugin/tests/sdk_smoke/.
 Docker context is an explicit clean allowlist; never send repository/home/.env.
@@ -20,7 +21,7 @@ def run(*args):
     # inherit handles: no captured subprocess pipes (Windows confinement-safe).
     subprocess.run(args, check=True)
 
-def prepare(shared_host=False):
+def prepare(shared_host=False, full_ingress=False):
     provenance = json.loads((QA/'provenance.json').read_text())
     assert provenance['commit'] == PIN
     # Ref and annotated tag are retained independently of archive provenance.
@@ -32,7 +33,8 @@ def prepare(shared_host=False):
     shutil.copyfile(archive,context/'hermes-clean.tar')
     shutil.copyfile(SOURCES/'Dockerfile',context/'Dockerfile')
     for name in ('smoke.py','entry.py'):
-        shutil.copyfile(SOURCES/(('shared-' if shared_host else '')+name),context/name)
+        prefix='full-' if full_ingress else ('shared-' if shared_host else '')
+        shutil.copyfile(SOURCES/(prefix+name),context/name)
     with tarfile.open(context/'plugin.tar','w') as target:
         files=['plugin.yaml','__init__.py','adapter.py']
         if shared_host:files.extend(['shared_host.py','public_runner.py','native_tools.py','persona/SOUL.md'])
@@ -49,6 +51,7 @@ def main():
     parser.add_argument('--acquire',action='store_true',help='Acquire public pinned framework source into ignored QA artifacts')
     parser.add_argument('--build',action='store_true');parser.add_argument('--run',action='store_true')
     parser.add_argument('--shared-host',action='store_true',help='Test new same-process shared-host plugin, not a deployment runtime')
+    parser.add_argument('--full-ingress',action='store_true',help='Run actual Gateway startup, native admission and durable trusted turns')
     args=parser.parse_args()
     if args.acquire:
         QA.mkdir(parents=True,exist_ok=True)
@@ -56,7 +59,7 @@ def main():
         shutil.copyfile(SOURCES/'acquire.py',QA/'acquire.py')
         run(sys.executable,str(QA/'acquire.py'))
     if args.build:
-        context=prepare(args.shared_host)
+        context=prepare(args.shared_host or args.full_ingress,args.full_ingress)
         run('docker','build','--label',LABEL,'-t',IMAGE,str(context))
     if args.run:
         # Entire agent and fake HTTP service run inside network-none private container.

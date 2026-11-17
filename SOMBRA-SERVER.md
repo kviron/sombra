@@ -46,6 +46,12 @@ Drop-in `/etc/systemd/system/roxy-hermes.service.d/sombra-platform.conf` доб�
 
 Локально пройдены 82 desktop / 63 server Rust-теста, 49 Node-регрессий, 80 проверок helper прав, 44 сценария просмотров и 41 сценарий бота/медиа. Отдельно проверены реальные pinned SDK startup/Authz, secret-scope/provider resolver, fake tool dispatch и 4334 символа → 3 части без потери. Реальные платные генерации видео/изображений и периферия пользователя здесь не объявляются проверенными. Подписанный установщик 0.1.17 и stable-манифест опубликованы; SHA-256 установщика `a2dfce6c70ab0b6b02de15ce50a799bf8b4fac9c4d73b2f6860ab89b64e038f4`. Предыдущий stable — `/root/sombra-backups/release-0.1.17-manifest-20261117T174327Z/`. GitHub tag `v0.1.17`, сведения — в `RELEASE-STATUS.md`.
 
+### Owner-ingress hotfix после публикации 0.1.17
+
+В 21:08 МСК обновлён только внешний adapter плагина: SHA-256 `4b2d4cd0569045b0a99283085c5acb5727aec67a4523542a81dfd027e173172b`, commit `aae58f1`. Приватная копия — `/root/sombra-backups/owner-ingress-hotfix-20261117T180838Z/`. Произвольный `metadata.sombra_update_id` отвергался настоящим native admission; теперь metadata пустая, корреляция использует штатное сохраняемое поле `platform_update_id`. Изменения Hermes core, downgrade владельца и новая установка не требуются; binary backend/Windows-установщик не менялись.
+
+После смены процесса проверены обе подключённые платформы. Владелец отправил два новых настоящих запроса: named-profile `state.db` подтверждает terminal/completed native admissions с сохранёнными `platform_update_id` и пустыми metadata; backend подтверждает доставку ответов/ACK без отказа. Тексты и секреты в диагностический вывод не копировались. Отдельный local pinned-SDK тест запускает настоящий runtime/authorities/control server и gateway до поступления событий: 6 native SQLite admissions, повторные DM/группа, вложение PNG и другой автор, реальный terminal dispatch с синтетическим HTTP-провайдером, final/ACK; без прямого AIAgent/handler bypass. Старая конструкция-only/direct-agent проверка этот контракт не покрывала.
+
 ## Клиент 0.1.16 / материалы переписки и настройки — 17 ноября 2026
 
 Опубликована правая панель вложений/ссылок и компактная компоновка всех настроек. Это клиентское изменение: используются прежние `state` и `attachment_file`, URL индексируются локально только из текущей переписки. Новый API, изменение данных и рестарт сервисов не требуются. Backend остаётся с SHA-256 версии 0.1.14, указанным ниже.
