@@ -20,4 +20,4 @@ RPC-тесты подтверждают: concurrent fresh cache hits не дел
 
 6 unit-тестов проверяют grace/лимиты/singleflight/URL cleanup/scope. 14 реальных React/CDP сценариев с24 изображениями в отдельной голосовой панели проверяют600px preload,10циклов туда-обратно без blinking/новых запросов, общий URL viewer/materials, concurrency3, реальные IndexedDB clear/limit wrappers и auth race. API/PNG boundary синтетическая; это не native GUI performance proof.
 
-Клиентский фикс пока не опубликован. Production Python-плагин не связан с этим изменением; требуется следующий Windows-клиент.
+Клиентский фикс опубликован в0.1.18. Production Python-плагин не связан с этим изменением; установленный0.1.17 нужно обновить.

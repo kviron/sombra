@@ -18,4 +18,4 @@ Join getUserMedia ограничен30с на устройство. Leave сра
 
 Проверено:14 synthetic-stream actualReact playback scenarios;8 real RTC navigation;9 actual useVoice deferred-permission scenarios (в timeout-тесте только30000мс timer ускорен до300мс);31 incoming actualhook/overlay scenarios с настоящим backend/тремя людьми и управляемой voice boundary, включая Escape/X/Decline при pending Accept. Всего62 проверки, без hardware-audio claim.
 
-Изменения ещё не опубликованы в клиенте0.1.17. Backend API звонков не менялся.
+Изменения опубликованы в клиенте0.1.18. Backend API звонков не менялся.

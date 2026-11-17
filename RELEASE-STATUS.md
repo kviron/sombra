@@ -1,5 +1,17 @@
 # Выпуски Sombra
 
+## Sombra 0.1.18 — 18 ноября 2026
+
+Опубликованы [GitHub v0.1.18](https://github.com/kviron/sombra/releases/tag/v0.1.18) и [Windows x64 установщик](https://sombra.mi-nerva.ru/updates/0.1.18/Sombra_0.1.18_x64-setup.exe). Источник/tag: `1d22b1e` / `v0.1.18`. SHA-256 `144589d8bbc1e7e5891f4406f317b4999cfdd98c33e46247eb6ae793386b503a`, размер13796351байт. Криптографически проверены primary Ed25519/BLAKE2b512 и trusted-comment подписи существующим updater key. Это не Authenticode.
+
+Срочный выпуск включает неблокирующую incoming-card с локальным X/Escape/Decline даже при hung RPC/503, cancel pending mic permission и voice ownership guards, устойчивый playback, cache poll/per-preview исправления, Markdown, assistant-ui composer, typing/DM header/relative activity, group-DM metadata/search и уведомления. Полный список — [0.1.18](<RELEASE-NOTES-0.1.18.md>). `/model` намеренно не включён: незавершённые два файла сохранены отдельным stash `fd5688dd7e21c5a06edd91398e59ef1ff48d5f14` и не попали в сборку.
+
+Windows assets `index-xdmrKVq0.js` / `index-C-xg8t8U.css`.98 desktop tests (1 ignored timing probe),75 server tests;62 call browser checks, включая настоящий двухсторонний RTC с fake devices;14 cache browser+6 unit, ранее отдельные composer/Markdown/metadata сценарии. Физическое аудио и единственная аппаратная причина пользовательского one-way audio не объявляются доказанными.
+
+Backend18 SHA `1e8f82251e9bfda37df9faae260c435329b0c03a3728a69c55b2f72610dd16ac`; приватная stopped-service копия `/root/sombra-backups/release-0.1.18-backend-20261117T221014Z/`. Новый PID2326129/HTTPS health200, unauthorized API401;6users/1group/9dialogs/155messages/4sessions без изменений. Roxy PID2321139 и critical Python94/633/156 не менялись. Текущие звонки могли прерваться при restart; модельный WIP не развёрнут.
+
+HTTPS установщик проверен до атомарной публикации stable; предыдущий манифест `/root/sombra-backups/release-0.1.18-manifest-20261117T221438Z/`. Retention оставил0.1.14–0.1.18, удалив0.1.13. Установка на ПК пользователя остаётся его явным действием.
+
 ## Sombra 0.1.17 — 17 ноября 2026
 
 Опубликованы [GitHub release v0.1.17](https://github.com/kviron/sombra/releases/tag/v0.1.17) и подписанный [Windows x64 установщик](https://sombra.mi-nerva.ru/updates/0.1.17/Sombra_0.1.17_x64-setup.exe). Stable `latest.json` переключён только после HTTPS-проверки SHA-256: `A2DFCE6C70AB0B6B02DE15CE50A799BF8B4FAC9C4D73B2F6860AB89B64E038F4`. Проверены подписи установщика и trusted comment действующим публичным ключом. Исходный commit/tag: `4beba6b` / `v0.1.17`.

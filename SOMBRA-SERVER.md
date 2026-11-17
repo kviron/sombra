@@ -66,6 +66,14 @@ Native image/video producer result привязывается к текущем�
 
 Новые клиентские исправления и следующие API (typing/group-DM metadata/search/command registration) пока только в коде для следующего согласованного выпуска. `/model` находится в отдельной подготовке и этим hotfix не объявляется развёрнутым.
 
+## Срочный выпуск 0.1.18 — 18 ноября 2026
+
+Backend обновлён на SHA `1e8f82251e9bfda37df9faae260c435329b0c03a3728a69c55b2f72610dd16ac` (PID2326129), с stopped-service private backup `/root/sombra-backups/release-0.1.18-backend-20261117T221014Z/`. HTTPS health200, unauthorized search/update_dialog/set_typing/bot_register_commands401; исходные6 пользователей,1 группа,9 диалогов,155 сообщений,4 сессии сохранены. Добавлены capability-gated group-DM metadata/member search/human typing и append-only регистрация команд собственного v2 бота. Настройки сервиса/защиты/nginx/учётные данные не менялись. Temporary voice connections сбрасывались restart и требуют повторного подключения.
+
+Подписанный Windows18 SHA `144589d8bbc1e7e5891f4406f317b4999cfdd98c33e46247eb6ae793386b503a` опубликован на `/updates/0.1.18/Sombra_0.1.18_x64-setup.exe`, stable переключён после проверки HTTPS/SHA/signature. Предыдущий manifest `/root/sombra-backups/release-0.1.18-manifest-20261117T221438Z/`. Retention0.1.14–0.1.18. GitHub/tagv0.1.18 соответствует source1d22b1e.
+
+Живой Python-плагин остаётся94/633/156; Roxy2321139, Telegram/Sombra подключены. Незавершённый `/model` НЕ развёрнут и НЕ входит в18: WIPfd5688dd сохранён отдельно. Предыдущие утверждения о новых клиентских/API изменениях «только в коде» выше описывают состояние до этого выпуска.
+
 ## Клиент 0.1.16 / материалы переписки и настройки — 17 ноября 2026
 
 Опубликована правая панель вложений/ссылок и компактная компоновка всех настроек. Это клиентское изменение: используются прежние `state` и `attachment_file`, URL индексируются локально только из текущей переписки. Новый API, изменение данных и рестарт сервисов не требуются. Backend остаётся с SHA-256 версии 0.1.14, указанным ниже.

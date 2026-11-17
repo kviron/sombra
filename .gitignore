@@ -31,6 +31,7 @@ __pycache__/
 /.env
 /deploy-qa/
 /server-release/
+/server-release-*/
 /tauri.release.local.json
 /latest.json
 *.key
