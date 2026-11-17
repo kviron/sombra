@@ -34,7 +34,7 @@ import type {AttachmentDraft} from '@/shared/api/backend';
 
 import {useVoice} from './use-voice';
 import {VoiceParticipants} from './voice-participants';
-import {VoiceStage,VoiceSettings,Media} from './voice';
+import {VoiceStage,VoiceSettings,VoicePlayback} from './voice';
 import {AccountSidebar,accountSections,type AccountSection} from './account-sidebar';
 import {Button} from '@/shared/ui/button';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
@@ -325,11 +325,8 @@ export function LiveChat(){
  const visibleMessages=state?.messages.filter(m=>m.channel===channel?.id&&(m.text+' '+userName(m.user)).toLowerCase().includes(search.toLowerCase()))||[];
  return <UserActionsProvider value={{me:state?.me,openProfile:id=>{setHeaderProfile(false);setProfileId(id)}, messageUser:id=>void messageUser(id),editOwnProfile:openOwnProfile,friendStatus,addFriend:id=>void requestFriend(id),acceptFriend:id=>void acceptFriend(id),removeFriend:id=>void removeFriend(id)}}>
  <main className="chat-shell">
- <div className="voice-playback">{Object.entries(call.streams).map(([id,stream])=>{
-  const peer=call.peers.find(peer=>peer.client===id);
-  const volume=call.preferences.volume*(peer?volumeForUser(peer.user)/100:1);
-  return stream.getAudioTracks().length?<Media key={id} stream={stream} muted={call.deaf} volume={volume} speaker={call.preferences.speaker} audioOnly/>:null;
- })}</div>
+ {/* Playback belongs to the joined session, never Home/DM/channel navigation. */}
+ <VoicePlayback voice={call} volumeForUser={volumeForUser}/>
  <nav className="server-rail" aria-label="Группы">
   <button className={'server '+(home?'active':'')} title="Личные сообщения" onClick={()=>{setHome(true);setChannelId('')}}><Home size={22} aria-hidden="true"/></button>
   <div className="rail-line"/>
@@ -365,7 +362,7 @@ export function LiveChat(){
  <MemberList members={group.members} users={state.users} meId={state.me.id} group={group}/>:<p className="member-empty">Загрузка участников…</p>}</aside>}{materialsOpen&&channel&&!showFriends&&state&&<ConversationMaterials key={`${channel.id}:${materialsEpoch}`} initialCategory={materialsCategory} channel={channel.id} title={title} messages={state.messages} userName={userName} onClose={closeMaterials} onJump={jumpToMessage}/>}</div></AttachmentDropZone>
  {settings&&<div className="modal-backdrop" onClick={()=>setSettings(false)}><section role="dialog" aria-modal="true" aria-label="Учётная запись" className="account-modal dark" onClick={e=>e.stopPropagation()}><AccountSidebar avatar={state?.me.avatar} name={state?.me.name||''} section={accountSection} onSection={setAccountSection} onLogout={()=>{void logout().catch(e=>setError(e.message))}}/><article><header><span>{accountSections.find(item=>item.id===accountSection)?.label}</span><Button variant="ghost" size="icon-sm" title="Закрыть настройки" aria-label="Закрыть настройки" onClick={()=>setSettings(false)}><X/></Button></header><div id="account-panel" ref={settingsMotion}>{accountSection==='updates'?<UpdateSettings inCall={!!call.room||call.busy}/>:accountSection==='notifications'?<NotificationSettings preferences={state?.chatPreferences} ready={!!state} onSaved={preferences=>{if(state)applyChatPreferences(state.me.id,preferences)}}/>:accountSection==='storage'?<AttachmentCacheSettings key={state?.me.id||'loading'} ready={!!state} onChanged={refresh}/>:accountSection==='voice'?<VoiceSettings voice={call}/>:accountSection==='stickers'&&state?<StickerLibrary stickers={state.stickers} user={state.me.id} refresh={refresh}/>:<AccountSecurity state={state} refresh={refresh} section={accountSection}/>}</div></article></section></div>}
  {modal==='dialog'&&state&&<NewDialogDialog state={state} refresh={refresh} onClose={()=>setModal('')} onCreated={dialog=>{setHome(true);setChannelId(dialog.id);setModal('')}}/>}
- {dialogCalls.incoming&&state&&<IncomingDialogCall call={dialogCalls.incoming} state={state} busy={dialogCalls.busy||call.busy} error={dialogCalls.error} onAccept={video=>void dialogCalls.join(dialogCalls.incoming!,video)} onDecline={()=>void dialogCalls.decline(dialogCalls.incoming!)}/>}
+ {dialogCalls.incoming&&state&&<IncomingDialogCall call={dialogCalls.incoming} state={state} busy={dialogCalls.incomingBusy} declining={dialogCalls.incomingDeclining} hasOtherVoice={!!call.room&&call.room!==dialogCalls.incoming.id} error={dialogCalls.error} onAccept={video=>void dialogCalls.join(dialogCalls.incoming!,video)} onDecline={()=>void dialogCalls.decline(dialogCalls.incoming!)}/>}
  {modal&&modal!=='dialog'&&modal!=='edit-group'&&<div className="modal-backdrop"><form className="group-modal" role="dialog" aria-modal="true" aria-label={modal==='delete-channel'?'Удалить канал':modal==='edit-group'?'Настройки группы':'Управление чатами'} onSubmit={create}><h2>{{group:'Создать группу',join:'Вступить в группу',dialog:'Новый диалог',channel:'Создать канал','edit-channel':'Настроить канал','delete-channel':'Удалить канал','edit-group':'Настройки группы','group-stickers':'Стикеры группы',invite:'Пригласить участников',bots:'Подключения'}[modal]}</h2>{modal==='group-stickers'&&state&&editingGroup?(permits(editingGroupData,'stickers.manage')?<StickerLibrary stickers={state.stickers} user={state.me.id} group={editingGroup.id} refresh={refresh}/>:<p role="status">Нет права управлять стикерами этой группы.</p>):modal==='bots'&&state&&channel?<Bots state={state} refresh={refresh} onError={setError} channel={channel.id} group={group?.id} owner={permits(group,'bots.manage')}/>:modal==='invite'?<>
  {permits(group,'members.invite')&&<>
   <label htmlFor="invite-email">Email аккаунта Sombra</label>

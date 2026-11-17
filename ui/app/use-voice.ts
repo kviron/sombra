@@ -70,10 +70,11 @@ export function useVoice(){
  const [micVolume,setMicVolumeValue]=useState(100);
  const preferredMicVolume=useRef(100);
  useEffect(()=>{if(room&&preferredMicVolume.current!==100)setMicVolume(preferredMicVolume.current)},[room]);
- const current=useRef<Call|null>(null),pending=useRef(false),changingMedia=useRef(false),generation=useRef(0);
+ const current=useRef<Call|null>(null),pending=useRef<symbol|null>(null),changingMedia=useRef(false),generation=useRef(0);
  const preferred=useRef(preferences);
  function leave(){
   generation.current++;
+  pending.current=null;setBusy(false);
   const c=current.current;
   current.current=null;
   if(c){
@@ -88,16 +89,31 @@ export function useVoice(){
   setRoom('');setLocal(null);setPeers([]);setStreams({});setConnections({});setCamera(false);setMicVolumeValue(preferredMicVolume.current);
  }
  useEffect(()=>()=>{leave()},[]);
- async function join(destination:string,withVideo=false){if(pending.current||changingMedia.current)return false;pending.current=true;leave();const epoch=generation.current;setBusy(true);setError('');let acquired:MediaStream|null=null;
+ async function join(destination:string,withVideo=false){if(pending.current||changingMedia.current)return false;leave();const operation=Symbol('voice-join');pending.current=operation;const epoch=generation.current;setBusy(true);setError('');let acquired:MediaStream|null=null;
+  // Permission prompts may never settle. Bound our operation, and dispose of
+  // any device track returned after timeout/cancellation without touching a newer call.
+  const capture=(kind:TrackKind)=>new Promise<MediaStreamTrack>((resolve,reject)=>{
+   let settled=false;
+   const timer=setTimeout(()=>{settled=true;reject(new Error('Истекло время ожидания доступа к устройству. Повторите подключение.'))},30000);
+   void captureTrack(kind,preferred.current).then(track=>{
+    clearTimeout(timer);
+    if(settled||epoch!==generation.current){stopCapturedTrack(track);if(!settled)reject(new Error('Подключение отменено.'));return}
+    settled=true;resolve(track);
+   },error=>{clearTimeout(timer);if(!settled){settled=true;reject(error)}});
+  });
  try{
   if(!navigator.mediaDevices)throw new Error('Для доступа к устройствам откройте приложение через HTTPS или localhost.');
-  acquired=new MediaStream([await captureTrack('audio',preferred.current)]);
-  if(withVideo)acquired.addTrack(await captureTrack('video',preferred.current));
+  acquired=new MediaStream([await capture('audio')]);
+  if(withVideo)acquired.addTrack(await capture('video'));
   if(epoch!==generation.current){acquired.getTracks().forEach(stopCapturedTrack);return false}
   const c:Call={room:destination,client:crypto.randomUUID(),stream:acquired,pcs:new Map(),stop:false,microphone:acquired.getAudioTracks()[0]};current.current=c;
   setCapturedTrackEnabled(c.microphone,!latestAvailability.current.muted&&!latestAvailability.current.deaf);
   const request=(op:string,data={})=>api<Poll>(op,{room:c.room,client:c.client,...data});
-  const first=await request('voice_join',latestAvailability.current);if(c.stop)return false;
+  const first=await request('voice_join',latestAvailability.current);if(c.stop){
+   // Cancellation can race server admission; retire only this abandoned client.
+   void api('voice_leave',{room:c.room,client:c.client}).catch(()=>{});
+   return false;
+  }
   c.members=otherMembers(first.peers,c.client);
   setRoom(destination);setLocal(acquired);setCamera(withVideo);let cursor=0;
   let lastPoll=performance.now();
@@ -107,7 +123,13 @@ export function useVoice(){
    if(initiator){pc.addTransceiver(c.stream.getAudioTracks()[0],{direction:'sendrecv'});
    pc.addTransceiver(c.stream.getVideoTracks()[0]||'video',{direction:'sendrecv'});}
    const remote=new MediaStream();
-   pc.ontrack=e=>{remote.addTrack(e.track);setStreams(old=>({...old,[id]:remote}))};
+   pc.ontrack=e=>{
+    if(c.stop||c.pcs.get(id)!==pc)return;
+    // Replace the receiver kind without stopping tracks owned by WebRTC.
+    // Keeping an older live audio track first would leave playback on stale input.
+    for(const previous of remote.getTracks())if(previous.kind===e.track.kind&&previous!==e.track)remote.removeTrack(previous);
+    remote.addTrack(e.track);setStreams(old=>({...old,[id]:remote}));
+   };
    pc.onicecandidate=e=>{if(e.candidate&&!c.stop)void signal(id,{candidate:e.candidate.toJSON()}).catch(e=>setError(e.message))};
    pc.onconnectionstatechange=()=>{if(!c.stop)setConnections(old=>({...old,[id]:pc.connectionState}))};
    return pc;
@@ -143,7 +165,7 @@ export function useVoice(){
   }catch(e){if(!c.stop){leave();setError(mediaError(e))}}finally{if(!c.stop)setTimeout(()=>void poll(),700)}}
   void poll();
   return true;
- }catch(e){acquired?.getTracks().forEach(stopCapturedTrack);leave();setError(mediaError(e));return false}finally{pending.current=false;setBusy(false)}}
+ }catch(e){acquired?.getTracks().forEach(stopCapturedTrack);if(epoch===generation.current){leave();setError(mediaError(e))}return false}finally{if(pending.current===operation){pending.current=null;setBusy(false)}}}
  function updateAvailability(next:VoiceAvailability){
   latestAvailability.current=next;
   setAvailability(next);

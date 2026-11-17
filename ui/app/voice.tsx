@@ -22,8 +22,17 @@ type PlaybackGain={context:AudioContext;source:MediaStreamAudioSourceNode;gain:G
 export function Media({stream,muted,volume,speaker,audioOnly=false}:{stream:MediaStream;muted:boolean;volume:number;speaker?:string;audioOnly?:boolean}){
  const ref=useRef<HTMLMediaElement>(null);const [blocked,setBlocked]=useState(false),[error,setError]=useState('');
  const processing=useRef<PlaybackGain|null>(null),[gainError,setGainError]=useState('');
- const audioTrack=stream.getAudioTracks()[0];
- const input=useMemo(()=>audioOnly?new MediaStream(audioTrack?[audioTrack]:[]):stream,[audioOnly,audioTrack,stream]);
+ // Receiver streams can gain/replace audio without changing their MediaStream identity.
+ const [,refreshAudio]=useState(0);
+ const audioTrack=stream.getAudioTracks().find(track=>track.readyState==='live');
+ useEffect(()=>{
+  const sync=()=>refreshAudio(value=>value+1);
+  stream.addEventListener('addtrack',sync);stream.addEventListener('removetrack',sync);
+  return()=>{stream.removeEventListener('addtrack',sync);stream.removeEventListener('removetrack',sync)};
+ },[stream]);
+ // Video-only updates must not detach an otherwise unchanged audio receiver.
+ const audioInput=useMemo(()=>new MediaStream(audioTrack?[audioTrack]:[]),[audioTrack]);
+ const input=audioOnly?audioInput:stream;
  function playbackFailed(failure:unknown){
   if(failure instanceof DOMException&&failure.name==='AbortError')return;
   if(speaker!==undefined)recordDesktopDiagnostic('voice_playback',
@@ -105,6 +114,15 @@ export function Media({stream,muted,volume,speaker,audioOnly=false}:{stream:Medi
  const onError=()=>playbackFailed(ref.current?.error);
  return <>{audioOnly?<audio ref={attach} autoPlay muted={muted} onError={onError}/>:<video ref={attach} autoPlay playsInline muted={muted} onError={onError}/>}
   {blocked&&<Button variant="secondary" onClick={()=>void resumePlayback()}>Включить воспроизведение</Button>}{(error||gainError)&&<small role="alert">{error||gainError}</small>}</>
+}
+// This is call-session infrastructure, not part of the selected conversation/stage.
+// Keep one audible element per room/client; visual tiles always remain muted.
+export function VoicePlayback({voice,volumeForUser}:{voice:Voice;volumeForUser:(id:string)=>number}){
+ return <div className="voice-playback" data-voice-room={voice.room}>{Object.entries(voice.streams).map(([client,stream])=>{
+  const peer=voice.peers.find(peer=>peer.client===client);
+  const volume=voice.preferences.volume*(peer?volumeForUser(peer.user)/100:1);
+  return <Media key={`${voice.room}:${client}`} stream={stream} muted={voice.deaf} volume={volume} speaker={voice.preferences.speaker} audioOnly/>;
+ })}</div>;
 }
 export function hasVisibleVideo(stream?:MediaStream):boolean{
  return !!stream?.getVideoTracks().some(track=>track.readyState==='live'&&track.enabled&&!track.muted);
