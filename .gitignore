@@ -21,6 +21,7 @@
 /attachment-draft-qa/
 /assistant-composer-qa/
 /dialog-info-qa/
+/message-markdown-qa/
 /composer-audit.json
 __pycache__/
 *.pyc

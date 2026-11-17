@@ -1,4 +1,23 @@
-.message-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.message-text{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.6}
+.message-text>:first-child{margin-top:0}.message-text>:last-child{margin-bottom:0}
+.message-text p{white-space:pre-wrap;margin:0 0 .65em;line-height:inherit}
+/* CommonMark emits a newline after hard <br>; pre-wrap already renders it. */
+.message-text br{display:none}
 .message-text a{color:#a9ccff;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
 .message-text a:hover{color:#d2e5ff}
-.message-text a:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:2px}
+.message-text a:focus-visible,.message-text .message-table-scroll:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:2px}
+.message-text strong{font-weight:700}.message-text em{font-style:italic}.message-text del{text-decoration:line-through}
+.message-text h1,.message-text h2,.message-text h3,.message-text h4,.message-text h5,.message-text h6{margin:1em 0 .4em;font-weight:650;line-height:1.35;overflow-wrap:anywhere}
+.message-text h1,.message-text h2{font-size:1.2em}.message-text h3,.message-text h4,.message-text h5,.message-text h6{font-size:1.05em}
+.message-text ul,.message-text ol{margin:.4em 0 .75em;padding-left:1.65em;list-style-position:outside}
+.message-text ul{list-style-type:disc}.message-text ol{list-style-type:decimal}.message-text ul ul{list-style-type:circle}
+.message-text li{white-space:pre-wrap;margin:.18em 0;padding-left:.15em}.message-text li>p{margin:.3em 0}.message-text li>ul,.message-text li>ol{margin:.2em 0}
+.message-text .contains-task-list{list-style:none;padding-left:.25em}.message-text .task-list-item input{display:inline-block;width:14px;height:14px;min-height:0;margin:0 .55em 0 0;vertical-align:middle;accent-color:#a9ccff}
+.message-text blockquote{margin:.6em 0;padding:.2em 0 .2em 1em;border-left:3px solid #ffffff38;color:#c0c1cc}.message-text blockquote>:last-child{margin-bottom:0}
+.message-text code{font-family:'Geist Mono Variable','Geist Mono',ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9em;background:#0003;border:1px solid #ffffff12;border-radius:4px;padding:.12em .35em;white-space:break-spaces;overflow-wrap:anywhere}
+.message-text pre{max-width:100%;min-width:0;overflow-x:auto;margin:.65em 0;padding:12px 16px;border:1px solid #ffffff14;border-radius:10px;background:#111217;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2}
+.message-text pre code{display:block;padding:0;border:0;border-radius:0;background:none;font-size:12px;line-height:inherit;white-space:inherit;overflow-wrap:inherit}
+.message-text .message-table-scroll{display:block;max-width:100%;overflow-x:auto;margin:.65em 0;border:1px solid #ffffff18;border-radius:8px}
+.message-text table{width:100%;border-collapse:collapse;white-space:normal;font-size:.95em}.message-text th,.message-text td{min-width:90px;max-width:28rem;padding:8px 12px;border:1px solid #ffffff14;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;vertical-align:top}.message-text th{font-weight:600;background:#ffffff06}.message-text tr:first-child th{border-top:0}
+.message-text hr{border:0;border-top:1px solid #ffffff24;margin:1em 0}
+.message-text .message-markdown-image{color:#b9bdc9;white-space:normal;overflow-wrap:anywhere;font-size:.95em}
