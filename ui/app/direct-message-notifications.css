@@ -1,4 +1,5 @@
 .direct-message-toast {
+  position: relative;
   box-sizing: border-box;
   display: grid;
   width: min(322px, calc(100vw - 32px));
@@ -38,6 +39,8 @@
 .direct-message-toast button { display: grid; place-items: center; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #aebed2; cursor: pointer; }
 .direct-message-toast button:hover { background: #dce6fa18; color: #eef3fc; }
 .direct-message-toast button:focus-visible { outline: 2px solid #aebed2; }
+.direct-message-toast .direct-message-open { position:absolute; inset:0 32px 0 0; width:auto; height:auto; border-radius:12px; }
+.direct-message-toast .direct-message-open:focus-visible { outline-offset:-3px; }
 
 .direct-message-popup {
   width: 340px;

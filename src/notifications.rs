@@ -12,7 +12,7 @@ use std::{
 };
 #[cfg(windows)]
 use tauri::{
-    webview::PageLoadEvent, Emitter, Manager, PhysicalPosition, PhysicalRect, PhysicalSize,
+    webview::PageLoadEvent, PhysicalPosition, PhysicalRect, PhysicalSize,
     WebviewUrl, WebviewWindowBuilder,
 };
 #[cfg(windows)]
@@ -28,6 +28,66 @@ use windows::{
 
 const POPUP: &str = "direct-message-popup";
 
+use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+use tauri::{Emitter, Manager};
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Target {
+    pub account: String,
+    pub channel: String,
+    pub message: String,
+}
+
+impl Target {
+    fn validate(&self) -> Result<(), String> {
+        if [&self.account, &self.channel, &self.message].into_iter().all(|id| {
+            !id.is_empty() && id.len() <= 128
+                && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        }) {
+            Ok(())
+        } else {
+            Err("Invalid notification target".into())
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct NotificationTargets(Mutex<Option<Target>>);
+
+fn require_window(label: &str, expected: &str) -> Result<(), String> {
+    if label == expected { Ok(()) } else { Err("Invalid notification window".into()) }
+}
+
+// The event is a wake-up hint; only take_notification_target consumes navigation.
+// Keeping one latest target bridges a not-yet-mounted/reloading main frontend.
+fn activate_target(app: &tauri::AppHandle, target: Target) -> Result<(), String> {
+    target.validate()?;
+    *app.state::<NotificationTargets>().0.lock().map_err(|_| "Notification queue unavailable")? = Some(target.clone());
+    let main = app.get_webview_window("main").ok_or("Main window unavailable")?;
+    let shown = main.show();
+    let restored = main.unminimize();
+    let focused = main.set_focus();
+    // Even if Windows refuses foreground focus, deliver navigation to the resident UI.
+    let emitted = main.emit("notification-activate", target);
+    shown.and(restored).and(focused).and(emitted).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn activate_message_notification(window: tauri::WebviewWindow, target: Target) -> Result<(), String> {
+    require_window(window.label(), POPUP)?;
+    activate_target(window.app_handle(), target)
+}
+
+#[tauri::command]
+pub fn take_notification_target(window: tauri::WebviewWindow) -> Result<Option<Target>, String> {
+    require_window(window.label(), "main")?;
+    let state = window.state::<NotificationTargets>();
+    let result = state.0.lock().map_err(|_| "Notification queue unavailable")?.take();
+    Ok(result)
+}
+
 #[cfg(windows)]
 #[derive(Default)]
 struct PopupReady(AtomicBool);
@@ -40,7 +100,7 @@ pub fn setup_popup(app: &tauri::App) -> tauri::Result<()> {
         .inner_size(340.0, 88.0)
         .visible(false)
         .focused(false)
-        .focusable(false)
+        .focusable(true)
         .skip_taskbar(true)
         .always_on_top(true)
         .decorations(false)
@@ -111,10 +171,13 @@ pub async fn notify_direct_message(
     sender: String,
     text: String,
     avatar: Option<String>,
+    target: Target,
+    silent: Option<bool>,
 ) -> Result<(), String> {
     if window.label() != "main" {
         return Err("Only the main window can send notifications".into());
     }
+    target.validate()?;
     #[cfg(windows)]
     {
         let app = window.app_handle();
@@ -124,9 +187,10 @@ pub async fn notify_direct_message(
                 "sender": sender,
                 "text": text,
                 "avatar": avatar,
+                "target": target,
             })).is_ok()
         {
-            play_message_sound();
+            if !silent.unwrap_or(false) { play_message_sound(); }
             return Ok(());
         }
         let app_id = app.config().identifier.clone();
@@ -136,13 +200,14 @@ pub async fn notify_direct_message(
             .ok()
             .map(|dir| dir.join("notification-avatars"));
 
+        let handle = app.clone();
         tauri::async_runtime::spawn_blocking(move || {
             let avatar_url = cache
                 .zip(avatar)
                 .and_then(|(cache, avatar)| cache_avatar(&cache, &avatar));
-            show_toast(&app_id, &toast_xml(&sender, &text, avatar_url.as_deref()))
+            show_toast(&app_id, &toast_xml(&sender, &text, avatar_url.as_deref()), handle, target)
                 .map_err(|error| error.to_string())?;
-            play_message_sound();
+            if !silent.unwrap_or(false) { play_message_sound(); }
             Ok(())
         })
         .await
@@ -150,7 +215,7 @@ pub async fn notify_direct_message(
     }
     #[cfg(not(windows))]
     {
-        let _ = (sender, text, avatar);
+        let _ = (sender, text, avatar, target, silent);
         Err("Desktop message notifications are available on Windows".into())
     }
 }
@@ -163,16 +228,35 @@ fn play_message_sound() {
 }
 
 #[cfg(windows)]
-fn show_toast(app_id: &str, xml: &str) -> windows::core::Result<()> {
+fn show_toast(app_id: &str, xml: &str, app: tauri::AppHandle, target: Target) -> windows::core::Result<()> {
     // A blocking worker has no UI apartment. Balance every successful WinRT initialization.
     unsafe { RoInitialize(RO_INIT_MULTITHREADED)? };
     let result = (|| {
         let document = XmlDocument::new()?;
         document.LoadXml(&HSTRING::from(xml))?;
         let notification = ToastNotification::CreateToastNotification(&document)?;
+        // Capture trusted typed data, never toast arguments or an externally supplied URL.
+        notification.Activated(&windows::Foundation::TypedEventHandler::new(move |_, _| {
+            let ui_app = app.clone();
+            let target = target.clone();
+            let _ = app.run_on_main_thread(move || {
+                if let Err(error) = activate_target(&ui_app, target) {
+                    eprintln!("Could not activate Sombra notification: {error}");
+                }
+            });
+            Ok(())
+        }))?;
         // The NSIS installer stamps the same identifier on the Sombra Start Menu shortcut.
         let notifier = ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(app_id))?;
-        notifier.Show(&notification)
+        notifier.Show(&notification)?;
+        // Keep live COM event sources for the latest notifications. This is resident-process
+        // activation, not a registered cold-start COM/protocol activator.
+        static LIVE_TOASTS: Mutex<std::collections::VecDeque<ToastNotification>> = Mutex::new(std::collections::VecDeque::new());
+        if let Ok(mut live) = LIVE_TOASTS.lock() {
+            live.push_back(notification);
+            while live.len() > 128 { live.pop_front(); }
+        }
+        Ok(())
     })();
     unsafe { RoUninitialize() };
     result
@@ -286,6 +370,39 @@ fn cache_avatar(cache: &Path, avatar: &str) -> Option<String> {
 #[cfg(all(windows, test))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn target_is_bounded_typed_data_not_a_url() {
+        let target = Target { account: "user-1".into(), channel: "legacy_DM-2".into(), message: "a".repeat(128) };
+        assert!(target.validate().is_ok());
+        assert_eq!(serde_json::from_str::<Target>(&serde_json::to_string(&target).unwrap()).unwrap(), target);
+        for invalid in ["", "../main", "https://example.com", "has space", "a:b", "用户", &"x".repeat(129)] {
+            let mut bad = target.clone();
+            bad.channel = invalid.into();
+            assert!(bad.validate().is_err(), "accepted {invalid:?}");
+        }
+        assert!(serde_json::from_str::<Target>(r#"{"account":"a","channel":"c","message":"m","url":"x"}"#).is_err());
+    }
+
+    #[test]
+    fn notification_commands_have_exact_window_boundaries() {
+        assert!(require_window(POPUP, POPUP).is_ok());
+        assert!(require_window("main", "main").is_ok());
+        assert!(require_window("main", POPUP).is_err());
+        assert!(require_window(POPUP, "main").is_err());
+        assert!(require_window("other", "main").is_err());
+    }
+
+    #[test]
+    fn pending_target_is_latest_and_consumed_once() {
+        let pending = NotificationTargets::default();
+        let first = Target { account: "a".into(), channel: "c".into(), message: "one".into() };
+        let latest = Target { message: "two".into(), ..first.clone() };
+        *pending.0.lock().unwrap() = Some(first);
+        *pending.0.lock().unwrap() = Some(latest.clone());
+        assert_eq!(pending.0.lock().unwrap().take(), Some(latest));
+        assert_eq!(pending.0.lock().unwrap().take(), None);
+    }
 
     #[test]
     fn popup_stays_inside_a_scaled_work_area_with_negative_coordinates() {

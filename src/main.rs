@@ -54,7 +54,8 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updates::UpdateStore::default())
-        .invoke_handler(tauri::generate_handler![audio_device_context::audio_device_context, screenshot::capture, remote::remote_api, remote::attachment_cache_info, remote::set_attachment_cache_limit, remote::clear_attachment_cache, attachment_download::save_message_attachment, remote::record_desktop_diagnostic, notifications::notify_direct_message, notifications::notification_popup_ready, notifications::resize_notification_popup, updater_configured, updates::check_update, updates::download_update, updates::install_update, updates::restart_app])
+        .manage(notifications::NotificationTargets::default())
+        .invoke_handler(tauri::generate_handler![audio_device_context::audio_device_context, screenshot::capture, remote::remote_api, remote::attachment_cache_info, remote::set_attachment_cache_limit, remote::clear_attachment_cache, attachment_download::save_message_attachment, remote::record_desktop_diagnostic, notifications::notify_direct_message, notifications::notification_popup_ready, notifications::resize_notification_popup, notifications::activate_message_notification, notifications::take_notification_target, updater_configured, updates::check_update, updates::download_update, updates::install_update, updates::restart_app])
         .setup(move |app| {
             app.manage(remote::Remote::new(app.path().app_data_dir()?.join("session.dpapi"))?);
             #[cfg(windows)]

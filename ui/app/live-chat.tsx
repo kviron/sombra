@@ -18,6 +18,7 @@ import {DialogListRow} from './dialog-list-row';
 import {StickerLibrary} from './sticker-library';
 import {StickerSuggestions} from './sticker-suggestions';
 import {useDirectMessageNotifications} from './direct-message-notifications';
+import {useNotificationActivation} from './use-notification-activation';
 import {UserActionsProvider,type FriendStatus} from './user-actions';
 import {UserProfile} from './user-profile';
 import {MemberList} from './member-list';
@@ -52,6 +53,7 @@ export function LiveChat(){
  useEffect(()=>{const open=()=>{setAccountSection('updates');setSettings(true)};window.addEventListener('sombra:open-updates',open);return()=>window.removeEventListener('sombra:open-updates',open)},[]);
  const [state,setState]=useState<ChatState|null>(null),[groupId,setGroupId]=useState(''),[channelId,setChannelId]=useState(''),[home,setHome]=useState(true),[error,setError]=useState(''),[search,setSearch]=useState(''),[settings,setSettings]=useState(false),[modal,setModal]=useState(''),[name,setName]=useState(''),[selected,setSelected]=useState<string[]>([]),[busy,setBusy]=useState(false),[members,setMembers]=useState(false),[profileId,setProfileId]=useState('');
  const [materialsOpen,setMaterialsOpen]=useState(false),[jumpTarget,setJumpTarget]=useState('');
+ const notificationJump=useRef<{channel:string;message:string}|null>(null);
  const materialsTrigger=useRef<HTMLButtonElement>(null);
  const infoTrigger=useRef<HTMLButtonElement>(null);
  const [infoOpen,setInfoOpen]=useState(false),[headerProfile,setHeaderProfile]=useState(false),[materialsCategory,setMaterialsCategory]=useState<MaterialCategory|'all'>('all'),[materialsEpoch,setMaterialsEpoch]=useState(0);
@@ -171,7 +173,12 @@ export function LiveChat(){
  const group=state?.groups.find(g=>g.id===groupId)||state?.groups[0];
  const canShowMembers=!home&&!!group;
  const channel=home?state?.dialogs.find(d=>d.id===channelId):(group?.channels.find(c=>c.id===channelId)||group?.channels.find(c=>c.name==='games')||group?.channels[0]);
- useDirectMessageNotifications(state,{activeChannel:channel?.id,settingsOpen:settings||!!modal||!!profileId||infoOpen});
+ const activateNotification=useNotificationActivation(state,(next,route)=>{
+  applyState(next);setSettings(false);setModal('');setProfileId('');setInfoOpen(false);setHeaderProfile(false);setBotSettingsId('');setRolesGroupId('');setMaterialsOpen(false);setSearch('');setError('');
+  notificationJump.current={channel:route.channel,message:route.message||''};
+  setHome(route.home);if(route.group)setGroupId(route.group);setChannelId(route.channel);setJumpTarget(route.message||'');
+ });
+ useDirectMessageNotifications(state,{activeChannel:channel?.id,settingsOpen:settings||!!modal||!!profileId||infoOpen,onActivate:activateNotification});
  const {draft,setDraft,clearSent}=useChatDraft(channel?.id||'');
  const messageLink=useMessageLink({channel:channel?.id||'',draft,setDraft,disabled:busy||settings||!!modal||!!profileId||infoOpen||!!dialogCalls.incoming});
  const [attachments,setAttachments]=useState<Record<string,AttachmentDraft|undefined>>({});
@@ -288,7 +295,7 @@ export function LiveChat(){
  else if(modal==='channel'){if(!permits(group,channelKind==='voice'?'channels.create_voice':'channels.create_text'))throw new Error('Нет права создавать этот тип канала');const created=await api<Channel>('create_channel',{group:group?.id,name,kind:channelKind});setChannelId(created.id)}
  await refresh();setModal('');
  }catch(e){setError((e as Error).message)}finally{setBusy(false)}}
- useEffect(()=>{setSearch('');setError('');setJumpTarget('');setInfoOpen(false);setHeaderProfile(false);setMaterialsCategory('all')},[channel?.id]);
+ useEffect(()=>{setSearch('');setError('');setJumpTarget(notificationJump.current&&notificationJump.current.channel===channel?.id?notificationJump.current.message:'');notificationJump.current=null;setInfoOpen(false);setHeaderProfile(false);setMaterialsCategory('all')},[channel?.id]);
  useEffect(()=>{if(!jumpTarget)end.current?.scrollIntoView({block:'nearest'})},[channel?.id,state?.messages.length]);
  useEffect(()=>{if((!modal||modal==='dialog'||modal==='edit-group')&&!settings)return;const previous=document.activeElement as HTMLElement;const dialog=document.querySelector<HTMLElement>('[role=dialog]');dialog?.querySelector<HTMLElement>('input,button')?.focus();const handle=(e:KeyboardEvent)=>{if(e.defaultPrevented||document.querySelector('[data-image-crop-dialog]'))return;if(e.key==='Escape'&&!busy){setModal('');setSettings(false);setError('')}if(e.key==='Tab'&&dialog){const items=Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,a[href]'));const visible=items.filter(item=>item.getClientRects().length>0);const first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}};window.addEventListener('keydown',handle);return()=>{window.removeEventListener('keydown',handle);previous?.focus()}},[modal,settings,busy]);
  const profile=profileId&&state?(state.me.id===profileId?state.me:state.users.find(user=>user.id===profileId)):undefined;

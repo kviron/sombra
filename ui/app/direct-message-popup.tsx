@@ -4,6 +4,7 @@ import '@fontsource-variable/geist';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { DirectMessageToast, type DirectMessage } from './direct-message-toast';
+import {validNotificationTarget} from './notification-target';
 
 const container = document.getElementById('notifications')!;
 const root = createRoot(container);
@@ -13,7 +14,10 @@ let nextId = 0;
 function render() {
   flushSync(() => {
     root.render([...messages].map(([id, { message }]) => (
-      <DirectMessageToast key={id} {...message} onClose={() => {
+      <DirectMessageToast key={id} {...message} onOpen={validNotificationTarget(message.target)?()=>{
+        const target=message.target!;remove(id);render();
+        void invoke('activate_message_notification',{target}).catch(console.error);
+      }:undefined} onClose={() => {
         remove(id);
         render();
       }} />
