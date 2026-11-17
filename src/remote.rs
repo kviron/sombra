@@ -675,13 +675,15 @@ mod tests {
         use std::sync::atomic::{AtomicU32, Ordering};
         let mode = Arc::new(AtomicU32::new(0));
         let calls = Arc::new(AtomicU32::new(0));
+        let state_calls = Arc::new(AtomicU32::new(0));
+        let server_state_calls = state_calls.clone();
         let server_mode = mode.clone();
         let server_calls = calls.clone();
         let app=axum::Router::new().route("/",axum::routing::post(move |axum::Json(request):axum::Json<Value>| {
-            let mode=server_mode.clone();let calls=server_calls.clone();async move {
+            let mode=server_mode.clone();let calls=server_calls.clone();let state_calls=server_state_calls.clone();async move {
                 let current=mode.load(Ordering::SeqCst);
                 if current==1 {return (axum::http::StatusCode::UNAUTHORIZED,axum::Json(json!({"error":"AUTH_REQUIRED"})));}
-                let data=if request["op"]=="state" {json!({"me":{"id":"native-account"},"messages":if current==3 {json!([])} else {json!([{"id":"m","attachment":{"id":"a","name":"x","size":1,"mime":"application/octet-stream","expired":true}},{"id":"b","attachment":{"id":"b-attachment","name":"x","size":1,"mime":"application/octet-stream"}}])}})}else {
+                let data=if request["op"]=="state" {state_calls.fetch_add(1,Ordering::SeqCst);json!({"me":{"id":"native-account"},"messages":if current==3 {json!([])} else {json!([{"id":"m","attachment":{"id":"a","name":"x","size":1,"mime":"application/octet-stream","expired":true}},{"id":"b","attachment":{"id":"b-attachment","name":"x","size":1,"mime":"application/octet-stream"}}])}})}else {
                     calls.fetch_add(1,Ordering::SeqCst);
                     if current==5 {return (axum::http::StatusCode::BAD_REQUEST,axum::Json(json!({"error":"ATTACHMENT_EXPIRED"})));}
                     if current==4 {return (axum::http::StatusCode::BAD_REQUEST,axum::Json(json!({"error":"Сообщение не найдено"})));}
@@ -710,6 +712,26 @@ mod tests {
             true
         );
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(state_calls.load(Ordering::SeqCst), 1);
+        // Simultaneous views reuse the already accepted native snapshot, not a JS hint.
+        let (first, second) = tokio::join!(
+            remote.request(request.clone()),
+            remote.request(request.clone())
+        );
+        assert_eq!(first.unwrap()["cached"], true);
+        assert_eq!(second.unwrap()["cached"], true);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(state_calls.load(Ordering::SeqCst), 1);
+        // Even concurrent stale hits require exactly one refresh under the request gate.
+        remote.cache.lock().unwrap().accepted = Some(Instant::now() - Duration::from_secs(6));
+        let (first, second) = tokio::join!(
+            remote.request(request.clone()),
+            remote.request(request.clone())
+        );
+        assert_eq!(first.unwrap()["cached"], true);
+        assert_eq!(second.unwrap()["cached"], true);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(state_calls.load(Ordering::SeqCst), 2);
         // A cache miss's HTTP-400 visibility denial must revoke other cached entries.
         mode.store(5, Ordering::SeqCst);
         assert_eq!(

@@ -6,11 +6,18 @@ import {toast} from 'sonner';
 import {api,clearSession,type AttachmentFile,type MessageAttachmentMetadata} from '@/shared/api/backend';
 import {Button} from '@/shared/ui/button';
 import {session} from '@/shared/api/backend';
-import {attachmentCacheGeneration} from '@/shared/api/attachment-cache';
+import {attachmentCacheGeneration,attachmentCacheWriteEpoch} from '@/shared/api/attachment-cache';
+import {AttachmentPreviewCache} from './attachment-preview-cache';
 import {attachmentCategory} from '@/shared/lib/conversation-materials';
 import {verifiedMediaBlob} from '@/shared/lib/attachment-media';
 import './message-attachments.css';
 
+const previews=new AttachmentPreviewCache();
+const previewScope=()=>JSON.stringify([session(),attachmentCacheGeneration(),attachmentCacheWriteEpoch()]);
+let acceptedPreviewScope='';
+function syncPreviewScope(){const next=previewScope();if(next!==acceptedPreviewScope){acceptedPreviewScope=next;previews.clear()}return next}
+window.addEventListener('authchange',()=>{acceptedPreviewScope='';previews.clear()});
+window.addEventListener('attachmentcachechange',()=>{acceptedPreviewScope='';previews.clear()});
 const MAX_BYTES=10*1024*1024;
 const imageMimes=new Set(['image/gif','image/png','image/jpeg','image/webp']);
 // No history-wide payload cache. At most three requests decode concurrently.
@@ -44,27 +51,44 @@ function AttachmentView({messageId,attachment}:MessageAttachmentProps){
  const isImage=imageMimes.has(attachment.mime);
  const available=!attachment.expired||!!attachment.cached;
  const previewActive=visible||open;
+ const scope=previewScope();
+ const [previewIdentity,setPreviewIdentity]=useState('');
+ const lease=useRef<ReturnType<AttachmentPreviewCache['acquire']>|undefined>(undefined);
+ const [retry,setRetry]=useState(0),[inViewport,setInViewport]=useState(false);
+ const identity=JSON.stringify([scope,messageId,attachment.id,attachment.name,attachment.mime,attachment.size]);
+ const shownPreview=previewIdentity===identity?preview:undefined;
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[]);
  useEffect(()=>{
   if(!isImage||!available)return;
   const element=root.current;if(!element)return;
   if(typeof IntersectionObserver==='undefined'){setVisible(true);return;}
-  const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)),{rootMargin:'100px'});
-  observer.observe(element);return()=>observer.disconnect();
+  let scrollRoot:HTMLElement|null=element.parentElement;
+  while(scrollRoot&&!/(auto|scroll)/.test(getComputedStyle(scrollRoot).overflowY))scrollRoot=scrollRoot.parentElement;
+  const observer=new IntersectionObserver(entries=>setVisible(entries.some(entry=>entry.isIntersecting)),{root:scrollRoot,rootMargin:'600px 0px'});
+  const viewportObserver=new IntersectionObserver(entries=>setInViewport(entries.some(entry=>entry.isIntersecting)),{root:scrollRoot});
+  observer.observe(element);viewportObserver.observe(element);return()=>{observer.disconnect();viewportObserver.disconnect()};
  },[isImage,available]);
  useEffect(()=>{
-  if(!previewActive||!isImage||!available||error)return;
-  let cancelled=false,url:string|undefined;
-  void limited(async()=>{
-   if(cancelled)return;
-   const file=await api<AttachmentFile>('attachment_file',{message:messageId});
-   if(cancelled)return;
-   // Both server metadata AND fetched server MIME must be raster image MIME.
+  syncPreviewScope();setPreview(undefined);setError('');setPreviewIdentity(identity);
+  if(!isImage||!available)return;
+  let alive=true;
+  const owner={active:false,priority:0,notify:(url:string|undefined,reason?:unknown)=>{
+   if(!alive)return;
+   setPreview(url);
+   if(reason)setError(reason instanceof Error?reason.message:'Не удалось загрузить вложение.');
+  }};
+  const handle=previews.acquire(identity,owner,()=>api<AttachmentFile>('attachment_file',{message:messageId}),value=>{
+   const file=value as AttachmentFile;
+   // Preserve the fetched raster MIME gate; never cache SVG, HTML or external URLs.
    if(!imageMimes.has(file.mime))throw new Error('Предпросмотр этого файла недоступен.');
-   url=URL.createObjectURL(fileBlob(file));setPreview(url);
-  }).catch(reason=>{if(!cancelled)setError(reason instanceof Error?reason.message:'Не удалось загрузить вложение.')});
-  return()=>{cancelled=true;if(url)URL.revokeObjectURL(url);setPreview(undefined)};
- },[previewActive,isImage,available,messageId,error]);
+   return fileBlob(file);
+  },()=>previewScope()===scope);
+  lease.current=handle;
+  const reset=()=>{alive=false;handle.release();setPreview(undefined);setOpen(false)};
+  window.addEventListener('authchange',reset);window.addEventListener('attachmentcachechange',reset);
+  return()=>{alive=false;handle.release();if(lease.current===handle)lease.current=undefined;window.removeEventListener('authchange',reset);window.removeEventListener('attachmentcachechange',reset)};
+ },[identity,isImage,available,retry]);
+ useEffect(()=>{lease.current?.update(previewActive,open?3:inViewport?2:1)},[previewActive,open,inViewport,identity,isImage,available,retry]);
  useEffect(()=>{if(!available||!isImage)setOpen(false)},[available,isImage]);
  async function download(){
   if(busy||!available)return;
@@ -93,15 +117,15 @@ function AttachmentView({messageId,attachment}:MessageAttachmentProps){
   const downloadButton=<button type="button" className="attachment-image-download" disabled={busy} aria-label={`Скачать ${attachment.name}`} title="Скачать изображение" onClick={event=>{event.stopPropagation();void download()}}><Download size={18}/></button>;
   return <div ref={root} className="message-attachment message-attachment-image" aria-label="Изображение">
    <div className="attachment-image-surface">
-    <button ref={trigger} type="button" className="attachment-preview attachment-image-trigger" disabled={!available} aria-label={`Открыть фото ${attachment.name}`} onClick={()=>setOpen(true)}>{available&&preview&&!error?<img src={preview} alt="Изображение из переписки" onError={()=>setError('Не удалось показать изображение.')}/>:placeholder}</button>
+    <button ref={trigger} type="button" className="attachment-preview attachment-image-trigger" disabled={!available} aria-label={`Открыть фото ${attachment.name}`} onClick={()=>setOpen(true)}>{available&&shownPreview&&!error?<img src={shownPreview} alt="Изображение из переписки" onError={()=>setError('Не удалось показать изображение.')}/>:placeholder}</button>
     {available&&downloadButton}
-    {available&&error&&<button type="button" className="attachment-image-retry" aria-label="Повторить загрузку изображения" onClick={()=>setError('')}><RotateCw size={18}/></button>}
+    {available&&error&&<button type="button" className="attachment-image-retry" aria-label="Повторить загрузку изображения" onClick={()=>{setError('');setRetry(value=>value+1)}}><RotateCw size={18}/></button>}
    </div>
    {attachment.cached&&<p className="attachment-cache-status">{attachment.expired?'Локальная копия · файл очищен на сервере':'Сохранено на этом устройстве'}</p>}
    <Dialog.Root open={open&&available} onOpenChange={setOpen}><Dialog.Portal><Dialog.Overlay className="attachment-viewer-overlay"/><Dialog.Content className="attachment-viewer material-viewer" onCloseAutoFocus={event=>{event.preventDefault();trigger.current?.focus()}}>
     <Dialog.Title className="attachment-visually-hidden">Просмотр изображения</Dialog.Title><Dialog.Description className="attachment-visually-hidden">Изображение из переписки. Нажмите Escape, чтобы закрыть просмотр.</Dialog.Description>
     <Dialog.Close asChild><button type="button" className="attachment-viewer-close" aria-label="Закрыть просмотр фото"><X size={20}/></button></Dialog.Close>
-    <div className="attachment-viewer-image">{preview&&!error?<img src={preview} alt="Изображение из переписки" onError={()=>setError('Не удалось показать изображение.')}/>:placeholder}{downloadButton}{error&&<button type="button" className="attachment-image-retry" aria-label="Повторить загрузку изображения" onClick={()=>setError('')}><RotateCw size={18}/></button>}</div>
+    <div className="attachment-viewer-image">{shownPreview&&!error?<img src={shownPreview} alt="Изображение из переписки" onError={()=>setError('Не удалось показать изображение.')}/>:placeholder}{downloadButton}{error&&<button type="button" className="attachment-image-retry" aria-label="Повторить загрузку изображения" onClick={()=>{setError('');setRetry(value=>value+1)}}><RotateCw size={18}/></button>}</div>
    </Dialog.Content></Dialog.Portal></Dialog.Root>
   </div>;
  }

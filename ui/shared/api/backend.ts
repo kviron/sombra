@@ -1,10 +1,10 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import {attachmentCacheWriteEpoch,acceptAttachmentCacheState,attachmentCacheGeneration,attachmentCacheNeedsState,readAttachmentCache,writeAttachmentCache,resetAttachmentCacheAccess,getBrowserAttachmentCacheInfo,setBrowserAttachmentCacheLimit,clearBrowserAttachmentCache,type CacheInfo} from './attachment-cache';
+import {notifyAttachmentCacheChange,attachmentCacheWriteEpoch,acceptAttachmentCacheState,attachmentCacheGeneration,attachmentCacheNeedsState,readAttachmentCache,writeAttachmentCache,resetAttachmentCacheAccess,getBrowserAttachmentCacheInfo,setBrowserAttachmentCacheLimit,clearBrowserAttachmentCache,type CacheInfo} from './attachment-cache';
 export type {CacheInfo} from './attachment-cache';
 export {CacheUnavailable} from './attachment-cache';
 export const getAttachmentCacheInfo=():Promise<CacheInfo>=>isTauri()?invoke('attachment_cache_info'):getBrowserAttachmentCacheInfo();
-export const setAttachmentCacheLimit=(limitMiB:number):Promise<CacheInfo>=>isTauri()?invoke('set_attachment_cache_limit',{limitMiB}):setBrowserAttachmentCacheLimit(limitMiB);
-export const clearAttachmentCache=():Promise<CacheInfo>=>isTauri()?invoke('clear_attachment_cache'):clearBrowserAttachmentCache();
+export async function setAttachmentCacheLimit(limitMiB:number):Promise<CacheInfo>{const result=await (isTauri()?invoke<CacheInfo>('set_attachment_cache_limit',{limitMiB}):setBrowserAttachmentCacheLimit(limitMiB));attachmentRequests.clear();notifyAttachmentCacheChange();return result}
+export async function clearAttachmentCache():Promise<CacheInfo>{const result=await (isTauri()?invoke<CacheInfo>('clear_attachment_cache'):clearBrowserAttachmentCache());attachmentRequests.clear();notifyAttachmentCacheChange();return result}
 let stateRequest=0,acceptedStateRequest=0,rawStateRequest=0,acceptedRawStateRequest=0;
 const attachmentRequests=new Map<string,Promise<unknown>>();
 export const session = () => localStorage.getItem('mines-session') || '';
@@ -17,7 +17,7 @@ export async function api<T = any>(op:string,data:Record<string,unknown>={}):Pro
  if(op==='login'||op==='register'||op==='logout'){resetAttachmentCacheAccess();attachmentRequests.clear()}
  const scope=attachmentCacheGeneration();const stateSequence=op==='state'?++stateRequest:0;
  if(op==='attachment_file'){
-  const writeEpoch=attachmentCacheWriteEpoch();const key=JSON.stringify([scope,data]);const existing=attachmentRequests.get(key);if(existing)return existing as Promise<T>;
+  const writeEpoch=attachmentCacheWriteEpoch();const key=JSON.stringify([scope,writeEpoch,data]);const existing=attachmentRequests.get(key);if(existing)return existing as Promise<T>;
   const request=(async()=>{
    if(attachmentCacheNeedsState())await browserRaw<ChatState>('state').then(state=>acceptAttachmentCacheState(state,scope));
    if(scope!==attachmentCacheGeneration())throw new Error('Сессия изменилась. Повторите загрузку.');

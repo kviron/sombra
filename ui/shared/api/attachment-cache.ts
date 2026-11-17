@@ -7,6 +7,8 @@ type Entry={key:string;account:string;message:string;attachment:string;name:stri
 const MiB=1024*1024,limits=[0,256,512,1024,2048,4096];
 let writeEpoch=0;
 export function attachmentCacheWriteEpoch(){return writeEpoch}
+/** Invalidates decoded previews as well as late reads after a successful cache change. */
+export function notifyAttachmentCacheChange(){writeEpoch++;if(typeof window!=='undefined')window.dispatchEvent(new Event('attachmentcachechange'))}
 let generation=0,account='',accepted=0,visible=new Map<string,Metadata>(),dbPromise:Promise<IDBDatabase>|undefined;
 let queue:Promise<unknown>=Promise.resolve();
 const serial=<T>(run:()=>Promise<T>):Promise<T>=>{const next=queue.then(run,run);queue=next.catch(()=>{});return next};

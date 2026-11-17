@@ -364,7 +364,17 @@ impl Cache {
             for m in messages {
                 if let Some(id) = m["id"].as_str().map(str::to_owned) {
                     if m["attachment"].is_object() {
-                        let cached = self.read_inner(&id, false).is_some();
+                        // A UI availability hint, never permission to read bytes. State polls
+                        // must not decrypt/hash/base64-decode every attachment. The actual
+                        // read still checks fresh authorization and full DPAPI integrity.
+                        let cached = self.limit > 0
+                            && self.fresh()
+                            && self.path(&id).is_some_and(|path| {
+                                safe(&path)
+                                    && fs::metadata(path).is_ok_and(|meta| {
+                                        meta.is_file() && meta.len() <= (MAX * 2) as u64
+                                    })
+                            });
                         m["attachment"]["cached"] = json!(cached);
                     }
                 }
@@ -517,6 +527,73 @@ mod tests {
             key("a", "bc", &json!({"id":"d"})),
             key("ab", "c", &json!({"id":"d"}))
         );
+    }
+    #[test]
+    #[cfg(windows)]
+    #[ignore = "explicit 10 MiB native cache timing probe; uses only temporary files"]
+    fn attachment_cache_ten_mib_timing_probe() {
+        let mut c = cache();
+        let mut snapshot = state("timing-only");
+        snapshot["messages"][0]["attachment"]["size"] = json!(MAX);
+        c.accept(&snapshot);
+        let payload = json!({"name":"a.txt","mime":"application/octet-stream","data":STANDARD.encode(vec![b'x'; MAX])});
+        let message = snapshot["messages"][0].clone();
+        snapshot["messages"] = json!((0..10)
+            .map(|i| {
+                let mut message = message.clone();
+                message["id"] = json!(format!("m{i}"));
+                message
+            })
+            .collect::<Vec<_>>());
+        for i in 0..10 {
+            c.accept(&snapshot);
+            c.write(&format!("m{i}"), &payload, c.revision);
+        }
+        let start = Instant::now();
+        for i in 0..10 {
+            // Keep the real authorization policy; this probes the former poll work,
+            // not network freshness or a relaxation of its five-second bound.
+            c.accept(&snapshot);
+            assert!(c.read_inner(&format!("m{i}"), false).is_some());
+        }
+        let former_poll = start.elapsed();
+        c.accept(&snapshot);
+        let start = Instant::now();
+        c.decorate(&mut snapshot);
+        let decorate = start.elapsed();
+        assert!(snapshot["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|m| m["attachment"]["cached"] == true));
+        eprintln!("10 x 10 MiB DPAPI cache: former poll work={former_poll:?}, metadata decoration={decorate:?}");
+        fs::remove_dir_all(c.root).unwrap();
+    }
+    #[test]
+    #[cfg(windows)]
+    fn attachment_cache_decoration_is_hint_read_still_verifies_integrity() {
+        let mut c = cache();
+        let mut snapshot = state("one");
+        c.accept(&snapshot);
+        let payload = json!({"name":"a.txt","mime":"application/octet-stream","data":"eA=="});
+        c.write("m", &payload, c.revision);
+        c.decorate(&mut snapshot);
+        assert_eq!(snapshot["messages"][0]["attachment"]["cached"], true);
+        fs::write(c.path("m").unwrap(), b"corrupt").unwrap();
+        // Existence is deliberately optimistic, but it cannot publish any bytes.
+        c.decorate(&mut snapshot);
+        assert_eq!(snapshot["messages"][0]["attachment"]["cached"], true);
+        assert!(c.read("m").is_none());
+        c.decorate(&mut snapshot);
+        assert_eq!(snapshot["messages"][0]["attachment"]["cached"], false);
+        c.write("m", &payload, c.revision);
+        c.accepted = Some(Instant::now() - std::time::Duration::from_secs(6));
+        c.decorate(&mut snapshot);
+        assert_eq!(snapshot["messages"][0]["attachment"]["cached"], false);
+        c.invalidate();
+        c.decorate(&mut snapshot);
+        assert_eq!(snapshot["messages"][0]["attachment"]["cached"], false);
+        fs::remove_dir_all(c.root).unwrap();
     }
     #[test]
     #[cfg(windows)]
