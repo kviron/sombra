@@ -43,7 +43,7 @@ export function UserContextMenu({
     ? { label: 'Изменить профиль', icon: Pencil, onSelect: context.editOwnProfile }
     : { label: 'Личное сообщение', icon: MessageCircle, onSelect: () => context.messageUser(user.id) };
   return (
-    <EntityContextMenu controls={controls} actions={[profileItem, messageItem, ...friendAction(status, context, user.id), ...actions]}>
+    <EntityContextMenu controls={controls} actions={[profileItem, messageItem, ...(('bot' in user && user.bot) ? [] : friendAction(status, context, user.id)), ...actions]}>
       {children}
     </EntityContextMenu>
   );

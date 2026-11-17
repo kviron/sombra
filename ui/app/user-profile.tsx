@@ -68,7 +68,7 @@ export function UserProfile({
 
   const statusText = user.online ? 'В сети' : 'Не в сети';
   const friendNote = (() => {
-    if (isSelf) return null;
+    if (isSelf || user.bot) return null;
     if (status === 'friends') return <span className="user-profile-friend"><Check size={13} /> В друзьях</span>;
     if (status === 'outgoing') return <span className="user-profile-friend is-muted"><Clock3 size={13} /> Заявка отправлена</span>;
     if (status === 'incoming') return <span className="user-profile-friend is-waiting">Хочет добавить вас</span>;
@@ -95,7 +95,8 @@ export function UserProfile({
           <div className="user-profile-identity">
             <UserAvatar user={user} size="xl" decorative />
             <div className="user-profile-heading">
-              <h2 id="user-profile-name">{user.name}</h2>
+              <h2 id="user-profile-name">{user.name} {user.bot && <small className="bot-badge">БОТ</small>}</h2>
+              {user.username && <p>@{user.username}</p>}
               <p className="user-profile-status" data-online={user.online ? 'true' : 'false'}>
                 <span className="user-profile-status-dot" aria-hidden="true" />
                 {statusText}
@@ -115,22 +116,22 @@ export function UserProfile({
                 <button type="button" className="user-profile-primary" onClick={() => { actions?.messageUser(user.id); onClose(); }}>
                   <MessageCircle size={16} /> Сообщение
                 </button>
-                {status === 'none' && (
+                {!user.bot && status === 'none' && (
                   <button type="button" className="user-profile-secondary" onClick={() => actions?.addFriend(user.id)}>
                     <UserPlus size={16} /> Добавить в друзья
                   </button>
                 )}
-                {status === 'incoming' && (
+                {!user.bot && status === 'incoming' && (
                   <button type="button" className="user-profile-secondary is-accept" onClick={() => actions?.acceptFriend(user.id)}>
                     <Check size={16} /> Принять заявку
                   </button>
                 )}
-                {status === 'outgoing' && (
+                {!user.bot && status === 'outgoing' && (
                   <button type="button" className="user-profile-secondary" disabled>
                     <Clock3 size={16} /> Заявка отправлена
                   </button>
                 )}
-                {status === 'friends' && (
+                {!user.bot && status === 'friends' && (
                   <button type="button" className="user-profile-secondary" onClick={() => actions?.removeFriend(user.id)}>
                     <UserMinus size={16} /> Удалить из друзей
                   </button>
@@ -140,6 +141,7 @@ export function UserProfile({
           </div>
 
           {friendNote}
+          {user.bot && <section aria-label="Команды бота"><h3>Команды</h3>{user.commands?.length ? user.commands.map(command => <p key={command.command}><code>/{command.command.replace(/^\//, '')}</code> — {command.description}</p>) : <p>Введите /help в личном сообщении боту.</p>}<p>Бот работает через отдельный сервис. Не отправляйте ему пароли и ключи.</p></section>}
 
           <p className={user.bio ? 'user-profile-bio' : 'user-profile-bio is-empty'}>
             {user.bio || 'Пользователь пока ничего не рассказал о себе.'}

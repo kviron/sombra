@@ -42,7 +42,8 @@ export async function logout() {
 }
 export type SessionDto = {id:string;device:string;created_at:number;last_seen:number;expires_at:number;current:boolean};
 export type ProfileDto = {name:string;bio:string};
-export type User = {id:string;name:string;bio:string;avatar?:string;created_at:number;online?:boolean;last_seen?:number};
+export type BotCommand = {command:string;description:string};
+export type User = {id:string;name:string;bio:string;avatar?:string;created_at:number;online?:boolean;last_seen?:number;bot?:boolean;username?:string;commands?:BotCommand[]};
 export type Channel = {id:string;name:string;kind:string};
 export type Group = {id:string;name:string;owner:string;invite:string;members:string[];channels:Channel[];avatar?:string};
 export type Dialog = {id:string;name:string;members:string[]};
@@ -56,4 +57,4 @@ export type AttachmentFile = {data:string;mime:string;name:string};
 export type ChatMessage = {id:string;channel:string;user:string;text:string;time:number;sticker?:string;attachment?:MessageAttachmentMetadata;bot_name?:string;reactions?:{user:string;emoji:string}[]};
 export type Sticker = {id:string;owner:string;name:string;image?:string;group?:string;pack?:string;archived?:boolean;keywords?:string[]};
 export type Friend = {id:string;from:string;to:string;accepted:boolean};
-export type Bot = {id:string;name:string;channel:string;owner:string};
+export type Bot = {id:string;name:string;username?:string;channel?:string;group?:string;groups?:string[];owner:string;commands?:BotCommand[];privacy?:string|boolean;last_seen?:number;enabled?:boolean};

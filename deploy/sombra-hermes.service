@@ -1,0 +1,27 @@
+[Unit]
+Description=Sombra Hermes bot connector (no model tools)
+After=network-online.target sombra.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+WorkingDirectory=/var/lib/sombra-hermes
+EnvironmentFile=/etc/sombra-hermes/bot.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/sombra-hermes/sombra-hermes-worker.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/sombra-hermes /home/hermes/.hermes
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

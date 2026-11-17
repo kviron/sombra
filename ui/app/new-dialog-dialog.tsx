@@ -25,7 +25,7 @@ function SelectionRow({ user, checked, disabled, friend, onChange }: {
 }) {
   return <div className="new-dialog-selection" data-selected={checked || undefined}>
     <button type="button" className="new-dialog-person" disabled={disabled} onClick={onChange} aria-pressed={checked} aria-label={`${checked ? 'Убрать' : 'Выбрать'}: ${user.name}`}>
-      <UserRow identity={user} menu={false} selected={checked} subtitle={friend ? 'В друзьях' : 'Общая группа'} />
+      <UserRow identity={user} menu={false} selected={checked} subtitle={user.bot ? 'Бот · только личный диалог' : friend ? 'В друзьях' : 'Общая группа'} />
     </button>
     <Checkbox.Root className="new-dialog-checkbox" checked={checked} disabled={disabled} onCheckedChange={onChange} aria-label={`Выбрать: ${user.name}`}>
       <Checkbox.Indicator><Check size={14} aria-hidden="true" /></Checkbox.Indicator>
@@ -49,6 +49,8 @@ export function NewDialogDialog({ state, onClose, onCreated, refresh }: NewDialo
   const search = query.trim().toLocaleLowerCase('ru');
   const visible = people.filter(user => user.name.toLocaleLowerCase('ru').includes(search)).sort((a, b) => Number(friendIds.has(b.id)) - Number(friendIds.has(a.id)) || a.name.localeCompare(b.name, 'ru'));
   const locked = busy || !!created;
+  const selectedBot = selectedUsers.some(user=>user.bot);
+  const unavailable = (user:User) => locked || (!selected.includes(user.id) && (selected.length>=9 || selectedBot || (!!user.bot&&selected.length>0)));
 
   function toggle(userId: string) {
     if (locked) return;
@@ -101,7 +103,7 @@ export function NewDialogDialog({ state, onClose, onCreated, refresh }: NewDialo
             <p className="new-dialog-count" id={`${id}-limit`} aria-live="polite">Выбрано: {selected.length} из 9{selected.length === 9 ? ' · Достигнут лимит участников' : ' · До 10 участников вместе с вами'}</p>
             {selected.length > 1 && <div className="new-dialog-name"><label htmlFor={`${id}-name`}>Название группы <span>необязательно</span></label><Input id={`${id}-name`} maxLength={60} placeholder="Как назовём группу?" value={name} onChange={event => setName(event.target.value)} disabled={locked} /></div>}
             <div className="new-dialog-people" role="group" aria-label="Друзья и участники общих групп" aria-describedby={`${id}-limit`}>
-              {visible.map(user => <SelectionRow key={user.id} user={user} checked={selected.includes(user.id)} disabled={locked || (selected.length >= 9 && !selected.includes(user.id))} friend={friendIds.has(user.id)} onChange={() => toggle(user.id)} />)}
+              {visible.map(user => <SelectionRow key={user.id} user={user} checked={selected.includes(user.id)} disabled={unavailable(user)} friend={friendIds.has(user.id)} onChange={() => toggle(user.id)} />)}
               {!visible.length && <p className="new-dialog-empty">{search ? 'Никого не нашли. Попробуйте другое имя.' : 'Здесь появятся ваши друзья и участники общих групп.'}</p>}
             </div>
           </div>

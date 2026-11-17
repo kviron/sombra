@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 use std::{num::NonZeroU32, path::PathBuf, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 pub(crate) mod diagnostics;
 mod attachments;
+mod bots;
 mod dialog_calls;
 fn id()->String{uuid::Uuid::new_v4().to_string()}
 fn now()->u64{SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()}
@@ -32,7 +33,7 @@ fn validate_sticker(data:&str)->Result<(),String>{
  Ok(())
 }
 #[derive(Serialize, Deserialize)]
-struct UserDto { id:String, name:String, bio:String, avatar:String, created_at:u64, online:bool, last_seen:u64 }
+struct UserDto { id:String, name:String, bio:String, avatar:String, created_at:u64, online:bool, last_seen:u64, bot:bool, #[serde(skip_serializing_if="Option::is_none")] username:Option<String>, #[serde(skip_serializing_if="Option::is_none")] commands:Option<Value>, #[serde(skip_serializing_if="Option::is_none")] enabled:Option<bool>, #[serde(skip_serializing_if="Option::is_none")] active:Option<bool> }
 const PRESENCE_TTL:u64 = 45;
 #[derive(Serialize, Deserialize)]
 struct UserRecord { id:String, name:String, email:String, salt:String, hash:String, bio:String, created_at:u64, version:u64 }
@@ -74,10 +75,10 @@ impl Backend{
   let mut b=Self{db,path,failures:0,retry_at:0,voice:Vec::new(),signals:Vec::new(),voice_seq:0,dialog_calls:Vec::new(),diagnostics:Arc::default(),presence:Default::default()};
   if b.db["sessions"].is_null(){b.db["sessions"]=json!([]);}
   if !b.db["sessions"].is_array(){return Err("Invalid sessions".into())}
-  for key in ["stickers","friends","bots"] { if b.db[key].is_null(){b.db[key]=json!([]);} if !b.db[key].is_array(){return Err("Invalid collection".into())} }
+  for key in ["stickers","friends","bots","bot_updates"] { if b.db[key].is_null(){b.db[key]=json!([]);} if !b.db[key].is_array(){return Err("Invalid collection".into())} }
   b.db["schema_version"]=json!(3);
   for user in b.db["users"].as_array_mut().unwrap(){if user["created_at"].is_null(){user["created_at"]=json!(now());user["bio"]=json!("");}}
-  b.save()?;
+  b.migrate_bots();b.save()?;
   if arr(&b.db["users"]).is_empty(){
    let password=format!("Mines-{}",&id()[..18]);let u=b.new_user("HollyWood","owner@mines.local",&password);let uid=s(&u,"id").to_string();b.db["users"].as_array_mut().unwrap().push(u);
    let channels:Vec<_>=["text","id","games","help","⚓ Команда 1","Команда 2"].iter().enumerate().map(|(i,n)|json!({"id":id(),"name":n,"kind":if i<4{"text"}else{"voice"}})).collect();
@@ -86,7 +87,15 @@ impl Backend{
   }Ok(b)
  }
  fn new_user(&self,name:&str,email:&str,password:&str)->Value{let salt=id();serde_json::to_value(UserRecord{id:id(),name:name.into(),email:email.into(),hash:hash(password,&salt),salt,bio:String::new(),created_at:now(),version:0}).unwrap()}
- fn save(&self)->Result<(),String>{let tmp=self.path.with_extension("tmp");std::fs::write(&tmp,serde_json::to_vec_pretty(&self.db).unwrap()).map_err(|_|"STORAGE_UNAVAILABLE")?;std::fs::rename(tmp,&self.path).map_err(|_|"STORAGE_UNAVAILABLE".into())}
+ fn save(&self)->Result<(),String>{
+  let tmp=self.path.with_extension("tmp");
+  let mut file=std::fs::File::create(&tmp).map_err(|_|"STORAGE_UNAVAILABLE")?;
+  std::io::Write::write_all(&mut file,&serde_json::to_vec_pretty(&self.db).map_err(|_|"STORAGE_UNAVAILABLE")?).map_err(|_|"STORAGE_UNAVAILABLE")?;
+  file.sync_all().map_err(|_|"STORAGE_UNAVAILABLE")?;
+  std::fs::rename(&tmp,&self.path).map_err(|_|"STORAGE_UNAVAILABLE")?;
+  #[cfg(unix)] if let Some(parent)=self.path.parent(){std::fs::File::open(parent).and_then(|directory|directory.sync_all()).map_err(|_|"STORAGE_UNAVAILABLE")?;}
+  Ok(())
+ }
  fn token(&mut self,u:&Value,device:&str,remember_me:bool)->Result<String,String>{
   let token=format!("{}{}",id(),id());let timestamp=now();
   let sessions=self.db["sessions"].as_array_mut().unwrap();
@@ -96,7 +105,7 @@ impl Backend{
  }
  fn authenticate(&self,token:&str)->Result<Value,String>{
   let session=arr(&self.db["sessions"]).into_iter().find(|x|x["token_hash"]==token_hash(token)&&session_active(x,now())).ok_or("AUTH_REQUIRED")?;
-  arr(&self.db["users"]).into_iter().find(|u|u["id"]==session["user_id"]).ok_or("AUTH_REQUIRED".into())
+  arr(&self.db["users"]).into_iter().find(|u|u["id"]==session["user_id"]&&u["bot"]!=true).ok_or("AUTH_REQUIRED".into())
  }
  fn touch_presence(&mut self,uid:&str){
   let timestamp=now();
@@ -104,12 +113,14 @@ impl Backend{
   if self.presence.len()>64{self.presence.retain(|_,seen|timestamp.saturating_sub(*seen)<PRESENCE_TTL*4);}
  }
  fn public(&self,u:&Value)->Value{
-  let last_seen=self.presence.get(s(u,"id")).copied().unwrap_or(0);
+  let bot=arr(&self.db["bots"]).into_iter().find(|b|b["id"]==u["id"]);
+   let last_seen=self.presence.get(s(u,"id")).copied().unwrap_or_else(||bot.as_ref().and_then(|b|b["last_seen"].as_u64()).unwrap_or(0));
   serde_json::to_value(UserDto{
    id:s(u,"id").into(),name:s(u,"name").into(),bio:s(u,"bio").into(),avatar:s(u,"avatar").into(),
    created_at:u["created_at"].as_u64().unwrap_or(0),
    online:last_seen>0&&now().saturating_sub(last_seen)<PRESENCE_TTL,
-   last_seen,
+   last_seen,bot:u["bot"]==true,username:u["username"].as_str().map(str::to_string),
+    commands:bot.as_ref().map(|b|self.bot_commands(b)),enabled:bot.as_ref().map(|b|b["enabled"]!=false),active:if u["bot"]==true {Some(bot.as_ref().map_or(u["active"]!=false,|b|b["enabled"]!=false))}else{None},
   }).unwrap()
  }
  fn allowed(&self,uid:&str,cid:&str)->bool{arr(&self.db["groups"]).iter().any(|g|arr(&g["members"]).contains(&json!(uid))&&arr(&g["channels"]).iter().any(|c|c["id"]==cid))||arr(&self.db["dialogs"]).iter().any(|d|d["id"]==cid&&arr(&d["members"]).contains(&json!(uid)))}
@@ -197,7 +208,7 @@ impl Backend{
    sticker.as_object_mut().unwrap().remove("asset");
    Some(sticker)
   }).collect();
-  json!({"me":self.public(u),"email":u["email"],"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":arr(&self.db["bots"]).into_iter().filter(|x|self.allowed(uid,s(x,"channel"))).map(|x|json!({"id":x["id"],"name":x["name"],"channel":x["channel"],"owner":x["owner"]})).collect::<Vec<_>>(),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
+  json!({"me":self.public(u),"email":u["email"],"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
  }
  fn sticker_in_library(&self,sticker:&Value,uid:&str)->bool{
   if sticker["archived"]==true{return false}
@@ -290,20 +301,14 @@ impl Backend{
    if self.retry_at>now(){return Err("Слишком много попыток. Подождите минуту".into())}
    let dto:CredentialsDto=serde_json::from_value(v.clone()).map_err(|_|"Проверьте данные входа")?;let email=dto.email.trim().to_lowercase();let password=dto.password.as_str();if email.len()>254||!email.contains('@')||password.len()<8||password.len()>256{return Err("Проверьте почту и пароль (8–256 символов)".into())}
    let u=if op=="register"{let name=dto.name.trim();if name.chars().count()<2||name.chars().count()>32{return Err("Имя: от 2 до 32 символов".into())}if arr(&self.db["users"]).iter().any(|u|u["email"]==email){return Err("Эта почта уже зарегистрирована".into())}let u=self.new_user(name,&email,password);self.db["users"].as_array_mut().unwrap().push(u.clone());u}else{
-    let candidate=arr(&self.db["users"]).into_iter().find(|u|u["email"]==email);let salt=candidate.as_ref().map(|u|s(u,"salt")).unwrap_or("unknown-account");let expected=candidate.as_ref().and_then(|u|B64.decode(s(u,"hash")).ok()).unwrap_or(vec![0;32]);
+    let candidate=arr(&self.db["users"]).into_iter().find(|u|u["email"]==email&&u["bot"]!=true);let salt=candidate.as_ref().map(|u|s(u,"salt")).unwrap_or("unknown-account");let expected=candidate.as_ref().and_then(|u|B64.decode(s(u,"hash")).ok()).unwrap_or(vec![0;32]);
     if pbkdf2::verify(pbkdf2::PBKDF2_HMAC_SHA256,NonZeroU32::new(600_000).unwrap(),salt.as_bytes(),password.as_bytes(),&expected).is_err(){self.failures+=1;if self.failures>=8{self.retry_at=now()+60;self.failures=0}return Err("Неверная почта или пароль".into())}self.failures=0;candidate.ok_or("Неверная почта или пароль")?
    };let token=self.token(&u,&dto.device,dto.remember_me)?;self.touch_presence(s(&u,"id"));return Ok(json!({"token":token,"user":self.public(&u)}))
   }
-  if op=="bot_poll"||op=="bot_message" {
-   let bot=arr(&self.db["bots"]).into_iter().find(|b|b["token_hash"]==token_hash(s(&v,"bot_token"))).ok_or("AUTH_REQUIRED")?;
-   let channel=s(&bot,"channel");
-   if op=="bot_poll" {return Ok(json!({"messages":self.db["messages"].as_array().unwrap().iter()
-    .filter(|m|m["channel"]==channel).map(|message|self.public_message(message)).collect::<Vec<_>>()}))}
-   let text=s(&v,"text").trim();if text.is_empty()||text.chars().count()>2000{return Err("Сообщение: 1–2000 символов".into())}
-   self.db["messages"].as_array_mut().unwrap().push(json!({"id":id(),"channel":channel,"user":bot["id"],"bot_name":bot["name"],"text":text,"time":now()}));self.save()?;return Ok(json!({"ok":true}))
-  }
-  let u=self.authenticate(s(&v,"token"))?;let uid=s(&u,"id");
-  self.touch_presence(uid);
+  if ["bot_poll","bot_message","bot_get_me","bot_get_updates","bot_ack","bot_reply"].contains(&op){return self.bot_worker(&v)}
+   let u=self.authenticate(s(&v,"token"))?;let uid=s(&u,"id");
+  if ["create_bot","delete_bot","add_bot_to_group","remove_bot_from_group","bot_rotate_token","bot_set_commands"].contains(&op){return self.bot_management(&v,uid)}
+   self.touch_presence(uid);
   if op=="diagnostics_recent"{
    // The seeded owner is first. Registration only appends, and user IDs do not change.
    if self.db["users"][0]["id"]!=uid{return Err("DIAGNOSTICS_FORBIDDEN".into())}
@@ -387,9 +392,9 @@ impl Backend{
     return Ok(json!({"ok":true}))
    },
    "create_channel"=>{let name=s(&v,"name").trim();if name.is_empty()||name.chars().count()>40{return Err("Название канала: 1–40 символов".into())}let g=self.db["groups"].as_array_mut().unwrap().iter_mut().find(|g|g["id"]==v["group"]&&g["owner"]==uid).ok_or("Каналы создаёт владелец группы")?;let channel=json!({"id":id(),"name":name,"kind":if v["kind"]=="voice"{"voice"}else{"text"}});g["channels"].as_array_mut().unwrap().push(channel.clone());self.save()?;return Ok(channel)},
-   "create_dialog"=>{let mut members=vec![json!(uid)];for member in arr(&v["members"]){if !arr(&self.db["users"]).iter().any(|u|u["id"]==member){return Err("Пользователь не найден".into())}if !members.contains(&member){members.push(member)}}if members.len()<2||members.len()>10{return Err("Выберите от 1 до 9 собеседников".into())}if members.len()==2{if let Some(d)=arr(&self.db["dialogs"]).iter().find(|d|arr(&d["members"]).len()==2&&members.iter().all(|m|arr(&d["members"]).contains(m))){return Ok(d.clone())}}let name=s(&v,"name").trim();if name.chars().count()>60{return Err("Название слишком длинное".into())}let d=json!({"id":id(),"name":if name.is_empty(){"Личный диалог"}else{name},"members":members,"owner":uid});self.db["dialogs"].as_array_mut().unwrap().push(d.clone());self.save()?;return Ok(d)},
+   "create_dialog"=>{let mut members=vec![json!(uid)];for member in arr(&v["members"]){if !arr(&self.db["users"]).iter().any(|u|u["id"]==member){return Err("Пользователь не найден".into())}if let Some(bot)=arr(&self.db["bots"]).iter().find(|b|b["id"]==member){if bot["legacy"]==true||bot["enabled"]==false||arr(&v["members"]).len()!=1{return Err("Bot requires a direct dialog".into())}}if !members.contains(&member){members.push(member)}}if members.len()<2||members.len()>10{return Err("Выберите от 1 до 9 собеседников".into())}if members.len()==2{if let Some(d)=arr(&self.db["dialogs"]).iter().find(|d|arr(&d["members"]).len()==2&&members.iter().all(|m|arr(&d["members"]).contains(m))){return Ok(d.clone())}}let name=s(&v,"name").trim();if name.chars().count()>60{return Err("Название слишком длинное".into())}let d=json!({"id":id(),"name":if name.is_empty(){"Личный диалог"}else{name},"members":members,"owner":uid});self.db["dialogs"].as_array_mut().unwrap().push(d.clone());self.save()?;return Ok(d)},
    "friend_request"=>{
-    let target=s(&v,"user");if target==uid||!arr(&self.db["users"]).iter().any(|x|x["id"]==target){return Err("Выберите пользователя".into())}
+    let target=s(&v,"user");if target==uid||!arr(&self.db["users"]).iter().any(|x|x["id"]==target&&x["bot"]!=true){return Err("Выберите пользователя".into())}
     if arr(&self.db["friends"]).iter().any(|x|(x["from"]==uid&&x["to"]==target)||(x["from"]==target&&x["to"]==uid)){return Err("Заявка или дружба уже существует".into())}
     self.db["friends"].as_array_mut().unwrap().push(json!({"id":id(),"from":uid,"to":target,"accepted":false}));
    },
@@ -397,13 +402,6 @@ impl Backend{
     let rows=self.db["friends"].as_array_mut().unwrap();let i=rows.iter().position(|x|x["id"]==v["id"]&&(x["from"]==uid||x["to"]==uid)).ok_or("Заявка не найдена")?;
     if op=="friend_accept" {if rows[i]["to"]!=uid{return Err("Заявку принимает получатель".into())}rows[i]["accepted"]=json!(true);}else{rows.remove(i);}
    },
-   "create_bot"=>{
-    let channel=s(&v,"channel");if !arr(&self.db["groups"]).iter().any(|g|g["owner"]==uid&&arr(&g["channels"]).iter().any(|c|c["id"]==channel)){return Err("Бота подключает владелец группы".into())}
-    let name=s(&v,"name").trim();if name.is_empty()||name.chars().count()>32{return Err("Имя бота: 1–32 символа".into())}
-    if arr(&self.db["bots"]).iter().filter(|b|b["channel"]==channel).count()>=5{return Err("Не более 5 ботов в комнате".into())}
-    let token=format!("{}{}",id(),id());let bot=json!({"id":id(),"name":name,"channel":channel,"owner":uid,"token_hash":token_hash(&token)});self.db["bots"].as_array_mut().unwrap().push(bot);self.save()?;return Ok(json!({"token":token}));
-   },
-   "delete_bot"=>{self.db["bots"].as_array_mut().unwrap().retain(|b|!(b["id"]==v["id"]&&b["owner"]==uid));},
    "import_sticker_pack"=>return self.import_sticker_pack(&v,uid),
    "remove_sticker"|"remove_sticker_pack"=>{
     let group=self.editable_sticker_scope(&v,uid)?;
@@ -470,7 +468,7 @@ impl Backend{
      let attachment=attachment.map(|value|self.store_attachment(value)).transpose()?;
      let mut message=json!({"id":id(),"channel":channel,"user":uid,"text":text,"sticker":sticker,"time":now()});
      if let Some(ref attachment)=attachment{message["attachment"]=attachment.clone();}
-     self.db["messages"].as_array_mut().unwrap().push(message);
+     if let Err(error)=self.enqueue_bots(&message){if let Some(path)=attachment.as_ref().and_then(|value|self.attachment_path(value)){let _=std::fs::remove_file(path);}return Err(error)}self.db["messages"].as_array_mut().unwrap().push(message);
      if let Err(error)=self.save(){
       if let Some(path)=attachment.as_ref().and_then(|value|self.attachment_path(value)){let _=std::fs::remove_file(path);}
       return Err(error)

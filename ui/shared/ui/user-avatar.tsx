@@ -6,6 +6,7 @@ export type UserIdentity = {
   name: string;
   avatar?: string;
   online?: boolean;
+  bot?: boolean;
 };
 
 export type UserAvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';

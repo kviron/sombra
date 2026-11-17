@@ -21,6 +21,9 @@ try:
     client.save_host_keys(str(known))
     if sys.argv[1] == 'put':
         with client.open_sftp() as sftp: sftp.put(sys.argv[2], sys.argv[3])
+    elif sys.argv[1] == 'get':
+        Path(sys.argv[3]).parent.mkdir(parents=True, exist_ok=True)
+        with client.open_sftp() as sftp: sftp.get(sys.argv[2], sys.argv[3])
     else:
         command = Path(sys.argv[2]).read_text(encoding='utf-8-sig') if sys.argv[1] == 'script' else sys.argv[2]
         _, stdout, stderr = client.exec_command(command, timeout=900)

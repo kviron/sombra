@@ -11,6 +11,9 @@
 /user-qa/
 /attachments-qa/
 /dialog-calls-qa/
+/bots-qa/
+__pycache__/
+*.pyc
 /voice-qa/
 /.npm-cache/
 /.env

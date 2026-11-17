@@ -51,6 +51,7 @@ export function UserRow({
       <span className="user-row-main">
         <span className="user-row-title">
           <strong>{identity.name}</strong>
+          {identity.bot&&<small className="user-bot-badge">БОТ</small>}
           {meta}
         </span>
         {subtitle ? <span className="user-row-subtitle">{subtitle}</span> : null}
