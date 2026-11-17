@@ -1,4 +1,6 @@
 use super::*;
+#[path = "bot_command_registration.rs"]
+mod command_registration;
 impl Backend {
     /// Offline maintenance only: caller must stop the server before opening its database.
     /// This method is intentionally not exposed through the HTTP operation router.
@@ -495,7 +497,7 @@ impl Backend {
                 .find(|u| u["id"] == b["id"])
                 .ok_or("AUTH_REQUIRED")?;
             return Ok(
-                json!({"user":self.public(&u),"bot":self.bot_public(&b),"installs":b["groups"],"toolPolicy":self.bot_policy(&b)}),
+                json!({"commandRegistrationSupported":b["legacy"]!=true,"user":self.public(&u),"bot":self.bot_public(&b),"installs":b["groups"],"toolPolicy":self.bot_policy(&b)}),
             );
         }
         if op == "bot_poll" || op == "bot_message" {
@@ -517,6 +519,11 @@ impl Backend {
         }
         if b["legacy"] == true {
             return Err("Legacy tokens are room-only".into());
+        }
+        if op == "bot_register_commands" {
+            let commands = command_registration::merge(&b["commands"], v)?;
+            if b["commands"] != commands { self.db["bots"][i]["commands"] = commands.clone(); self.save()?; }
+            return Ok(json!({"commands":commands}));
         }
         if op == "bot_get_updates" {
             let after = v["after"].as_u64().unwrap_or(0);

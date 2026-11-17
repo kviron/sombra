@@ -841,6 +841,7 @@ impl Backend {
             "bot_poll",
             "bot_message",
             "bot_get_me",
+            "bot_register_commands",
             "bot_get_updates",
             "bot_ack",
             "bot_reply",
