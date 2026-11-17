@@ -18,6 +18,7 @@
 /menu-qa/
 /notifications-qa/
 /human-typing-qa/
+/attachment-draft-qa/
 __pycache__/
 *.pyc
 /voice-qa/

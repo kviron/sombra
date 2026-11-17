@@ -13,7 +13,7 @@ export function ConversationMaterials({channel,title,messages,userName,onClose,o
  const [limit,setLimit]=useState(60);
  const panel=useRef<HTMLElement>(null);
  useEffect(()=>{
-  const element=panel.current,body=element?.parentElement,composer=body?.querySelector<HTMLElement>('.composer');
+  const element=panel.current,body=element?.parentElement,composer=body?.querySelector<HTMLElement>('.composer-chrome, .composer');
   if(!element||!body||!composer)return;
   const measure=()=>element.style.setProperty('--materials-composer-inset',`${Math.max(0,body.getBoundingClientRect().bottom-composer.getBoundingClientRect().top+8)}px`);
   measure();const observer=new ResizeObserver(measure);observer.observe(body);observer.observe(composer);return()=>observer.disconnect();

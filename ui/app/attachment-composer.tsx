@@ -1,5 +1,5 @@
 import {useRef, type ClipboardEvent} from 'react';
-import {Paperclip, X} from 'lucide-react';
+import {Paperclip} from 'lucide-react';
 import {Button} from '@/shared/ui/button';
 import type {AttachmentDraft} from '@/shared/api/backend';
 import './message-attachments.css';
@@ -34,11 +34,10 @@ export type AttachmentComposerProps = {
  onFile: (file: File) => void;
  onRemove: () => void;
 };
-export function AttachmentComposer({draft,disabled,reading,onFile,onRemove}:AttachmentComposerProps){
+export function AttachmentComposer({disabled,reading,onFile}:AttachmentComposerProps){
  const input=useRef<HTMLInputElement>(null);
  return <div className="attachment-composer">
   <input ref={input} type="file" hidden disabled={disabled||reading} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)onFile(file)}}/>
   <Button type="button" variant="ghost" size="icon" disabled={disabled||reading} title="Прикрепить файл (до 10 МиБ)" aria-label="Прикрепить файл (до 10 МиБ)" onClick={()=>input.current?.click()}><Paperclip/></Button>
-  {reading?<span role="status">Читаем файл…</span>:draft&&<div className="attachment-draft"><span title={draft.name}>{draft.name}</span><Button type="button" variant="ghost" size="icon" disabled={disabled} aria-label="Убрать вложение" onClick={onRemove}><X/></Button></div>}
  </div>;
 }
