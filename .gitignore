@@ -17,6 +17,7 @@
 /drop-qa/
 /menu-qa/
 /notifications-qa/
+/human-typing-qa/
 __pycache__/
 *.pyc
 /voice-qa/

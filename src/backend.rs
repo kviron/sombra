@@ -16,6 +16,7 @@ mod chat_preferences;
 pub(crate) mod diagnostics;
 mod dialog_calls;
 mod group_roles;
+mod human_typing;
 mod message_reads;
 mod profile_covers;
 fn id() -> String {
@@ -198,6 +199,7 @@ pub struct Backend {
     diagnostics: Arc<diagnostics::Diagnostics>,
     presence: std::collections::HashMap<String, u64>,
     bot_typing: Vec<Value>,
+    human_typing: std::collections::HashMap<String, (String, u64)>,
 }
 #[cfg(feature = "desktop")]
 pub struct Store(pub Mutex<Backend>);
@@ -229,6 +231,7 @@ impl Backend {
             diagnostics: Arc::default(),
             presence: Default::default(),
             bot_typing: Vec::new(),
+            human_typing: Default::default(),
         };
         if b.db["sessions"].is_null() {
             b.db["sessions"] = json!([]);
@@ -592,7 +595,7 @@ impl Backend {
                 Some(sticker)
             })
             .collect();
-        json!({"readReceiptsSupported":true,"me":self.public(u),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|self.receipt_dialog(d,uid)).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
+        json!({"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":self.public(u),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|self.receipt_dialog(d,uid)).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
     }
     fn sticker_in_library(&self, sticker: &Value, uid: &str) -> bool {
         if sticker["archived"] == true {
@@ -728,6 +731,10 @@ impl Backend {
         Ok(json!({"ok":true}))
     }
     pub fn request(&mut self, v: Value) -> Result<Value, String> {
+        // Typing is strictly ephemeral: bypass even read-migration/session writes.
+        if v["op"] == "set_typing" {
+            return self.set_human_typing(&v);
+        }
         self.prepare_read_state()?;
         if v["op"] == "profile_cover" {
             return self.profile_cover(&v);
@@ -1055,10 +1062,13 @@ impl Backend {
       if let Some(path)=attachment.as_ref().and_then(|value|self.attachment_path(value)){let _=std::fs::remove_file(path);}
       return Err(error)
      }
-     return Ok(json!({"ok":true}));},
+     self.clear_human_typing(uid,channel);return Ok(json!({"ok":true}));},
    _=>return Err("Неизвестная команда".into())
   }
         self.save()?;
+        if matches!(op, "logout" | "logout_all" | "change_password") {
+            self.human_typing.remove(uid);
+        }
         Ok(json!({"ok":true}))
     }
 }
