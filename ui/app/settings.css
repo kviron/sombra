@@ -1,4 +1,4 @@
-﻿/* Settings uses the shared shadcn tokens; geometry follows reference/picture-3. */
+/* Settings uses the shared shadcn tokens; geometry follows reference/picture-3. */
 .app-surface .account-modal {
   width: 900px;
   height: min(580px, 100%);
@@ -161,3 +161,56 @@
 }
 
 .account-modal .voice-settings [data-slot="switch"] { justify-content: flex-start; padding: 0; --primary: #7278ed; --input: #34343b; --background: #eee; --ring: #7278ed; }
+
+/* Compact settings geometry. Explicit scopes isolate forms from legacy chat labels. */
+.app-surface .account-modal {
+  width: min(1200px, 100%);
+  height: min(720px, 100%);
+  font-size: 14px;
+}
+.app-surface .account-modal > aside.settings-sidebar { width: 220px; padding: 12px 8px; gap: 8px; }
+.app-surface .account-modal article > #account-panel { padding: 24px; margin: 0; min-height: 0; }
+.account-modal #account-panel > section:not([hidden]) { display: block; min-width: 0; max-width: 880px; margin: 0; padding: 0; }
+.account-modal #account-panel > section[hidden] { display: none; }
+.account-modal #account-panel label { margin: 0; padding: 0; min-width: 0; font-size: 14px; line-height: 20px; }
+.account-modal #account-panel h2 { font-size: 18px; line-height: 24px; margin: 0 0 16px; }
+.account-modal #account-panel p { margin: 8px 0 16px; }
+.account-modal #account-panel .settings-form { gap: 8px; max-width: 800px; }
+.account-modal #account-panel .settings-field { grid-template-columns: 160px minmax(0, 1fr); gap: 16px; min-height: 44px; }
+.account-modal #account-panel .settings-field > label { display: block; }
+.account-modal #account-panel [data-slot="input"],
+.account-modal #account-panel [data-slot="select-trigger"] { width: 100%; min-width: 0; height: 36px; min-height: 36px; padding: 0 12px; font-size: 14px; }
+.account-modal #account-panel [data-slot="input"][type="file"] { padding: 6px 8px; height: auto; min-height: 36px; }
+.account-modal #account-panel .settings-actions { min-height: 44px; align-items: center; margin: 0; padding-left: 176px; }
+.account-modal #account-panel [data-slot="button"] { min-height: 36px; font-size: 14px; }
+.account-modal #account-panel .email-form { margin-top: 24px; padding-top: 24px; }
+.account-modal #account-panel .settings-hint { font-size: 12px; line-height: 18px; margin: 4px 0 8px; }
+.account-modal #account-panel .avatar-editor { gap: 12px; }
+.account-modal #account-panel .avatar-editor > .avatar { width: 48px; height: 48px; }
+.account-modal #account-panel .session-row { padding: 12px; margin-bottom: 8px; gap: 16px; }
+.account-modal #account-panel .voice-field { gap: 8px; }
+.account-modal #account-panel .voice-field > label { display: block; }
+.account-modal #account-panel .voice-device-fields { gap: 16px; margin-top: 16px; }
+.account-modal #account-panel .voice-audio-fields { gap: 24px; margin: 24px 0; }
+.account-modal #account-panel .voice-processing { gap: 8px; }
+.account-modal #account-panel .voice-switch { min-height: 44px; }
+.account-modal #account-panel .voice-divider { margin: 24px 0; }
+.account-modal #account-panel .voice-test-actions { gap: 8px; margin-bottom: 8px; }
+.account-modal #account-panel [data-slot="switch"] { display: inline-flex; flex: 0 0 auto; width: 44px; min-width: 44px; height: 24px; min-height: 24px; padding: 0; gap: 0; justify-content: flex-start; }
+.account-modal #account-panel [data-slot="switch-thumb"] { flex: 0 0 auto; width: 20px; height: 20px; }
+.account-modal #account-panel .sticker-library > label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 16px 0; }
+.account-modal #account-panel .sticker-library input { height: 36px; min-height: 36px; padding: 6px 8px; font-size: 14px; }
+.app-surface .group-modal:has(.bot-settings), .app-surface .group-modal:has(.sticker-library) { width: min(640px, 100%); max-height: min(720px, 100%); padding: 24px; }
+.group-modal .bot-settings, .group-modal .sticker-library { min-width: 0; font-size: 14px; }
+.group-modal .bot-settings label, .group-modal .sticker-library > label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 16px 0; }
+.group-modal .bot-settings input, .group-modal .sticker-library input { width: 100%; min-width: 0; height: 36px; min-height: 36px; margin: 0; padding: 6px 8px; font-size: 14px; }
+.group-modal .bot-settings p { line-height: 1.5; margin: 8px 0 16px; }
+@media (max-width: 760px) {
+ .app-surface .account-modal > aside.settings-sidebar { width: 184px; }
+ .app-surface .account-modal article > #account-panel { padding: 16px; }
+ .account-modal #account-panel .settings-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+ .account-modal #account-panel .settings-actions { padding-left: 0; }
+}
+@media (max-width: 480px) {
+ .app-surface .account-modal > aside.settings-sidebar { width: 100%; }
+}
