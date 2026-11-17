@@ -20,6 +20,7 @@
 /human-typing-qa/
 /attachment-draft-qa/
 /assistant-composer-qa/
+/dialog-info-qa/
 /composer-audit.json
 __pycache__/
 *.pyc

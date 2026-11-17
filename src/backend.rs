@@ -15,6 +15,7 @@ mod bots;
 mod chat_preferences;
 pub(crate) mod diagnostics;
 mod dialog_calls;
+mod dialog_metadata;
 mod group_roles;
 mod human_typing;
 mod message_reads;
@@ -595,7 +596,7 @@ impl Backend {
                 Some(sticker)
             })
             .collect();
-        json!({"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":self.public(u),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|self.receipt_dialog(d,uid)).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
+        json!({"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":self.public(u),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|self.receipt_dialog(d,uid)).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
     }
     fn sticker_in_library(&self, sticker: &Value, uid: &str) -> bool {
         if sticker["archived"] == true {
@@ -734,6 +735,9 @@ impl Backend {
         // Typing is strictly ephemeral: bypass even read-migration/session writes.
         if v["op"] == "set_typing" {
             return self.set_human_typing(&v);
+        }
+        if v["op"] == "search_conversation_members" {
+            return self.search_conversation_members(&v);
         }
         self.prepare_read_state()?;
         if v["op"] == "profile_cover" {
@@ -904,6 +908,9 @@ impl Backend {
         }
         if ["mark_messages_read", "message_readers"].contains(&op) {
             return self.message_reads_action(&v, uid);
+        }
+        if op == "update_dialog" {
+            return self.update_dialog_metadata(&v, uid);
         }
         if ["set_notification_preferences", "set_dialog_preferences"].contains(&op) {
             return self.set_chat_preferences(&v, &u);
@@ -1785,6 +1792,8 @@ fn api_router(backend: Backend) -> axum::Router {
             }
             Ok(Err(error)) => match error.as_str() {
                 "AUTH_REQUIRED" => (StatusCode::UNAUTHORIZED, "authentication", error),
+                "Нет доступа к изменению диалога" | "Нет доступа к участникам переписки" => (StatusCode::FORBIDDEN, "authorization", error),
+                "Диалог изменён. Обновите данные и повторите попытку" => (StatusCode::CONFLICT, "validation", error),
                 "MESSAGE_READ_FORBIDDEN" | "BOT_SETTINGS_FORBIDDEN" | "BOT_POLICY_FORBIDDEN" => {
                     (StatusCode::FORBIDDEN, "authorization", error)
                 },

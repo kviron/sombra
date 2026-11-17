@@ -71,12 +71,12 @@ export type Channel = {id:string;name:string;kind:string};
 export type GroupPermission = 'group.rename' | 'group.avatar' | 'channels.create_text' | 'channels.create_voice' | 'channels.rename' | 'channels.delete' | 'members.invite' | 'invite.rotate' | 'members.kick' | 'messages.delete_any' | 'stickers.manage' | 'bots.manage';
 export type GroupRole = {id:string;name:string;permissions:GroupPermission[]};
 export type Group = {id:string;name:string;owner:string;invite:string;members:string[];channels:Channel[];avatar?:string;roles?:GroupRole[];memberRoles?:Record<string,string>;rolesRevision?:number;membersCanInvite?:boolean;permissions?:GroupPermission[]};
-export type Dialog = {id:string;name:string;members:string[];unreadCount?:number};
+export type Dialog = {id:string;name:string;members:string[];owner?:string;avatar?:string;revision?:number;unreadCount?:number};
 export type VoicePresence = {user:string;muted:boolean;deaf:boolean};
 export type DialogCall = {id:string;dialog:string;caller:string;video:boolean;created_at:number;participants:string[];declined:string[];empty_since?:number};
 export type DialogPreferences = {pinned:boolean;muted:boolean};
 export type ChatPreferences = {revision?:number;notifications:{direct:boolean;groups:boolean};dialogs:Record<string,DialogPreferences>};
-export type ChatState = {humanTypingSupported?:boolean;humanTyping?:{user:string;channel:string;until:number}[];readReceiptsSupported?:boolean;botTyping?:{bot:string;channel:string;until:number}[];chatPreferences?:ChatPreferences;me:User;email:string;users:User[];groups:Group[];dialogs:Dialog[];messages:ChatMessage[];stickers:Sticker[];friends:Friend[];bots:Bot[];voicePresence?:Record<string,VoicePresence[]>;dialogCalls?:DialogCall[]};
+export type ChatState = {conversationMemberSearchSupported?:boolean;dialogMetadataSupported?:boolean;humanTypingSupported?:boolean;humanTyping?:{user:string;channel:string;until:number}[];readReceiptsSupported?:boolean;botTyping?:{bot:string;channel:string;until:number}[];chatPreferences?:ChatPreferences;me:User;email:string;users:User[];groups:Group[];dialogs:Dialog[];messages:ChatMessage[];stickers:Sticker[];friends:Friend[];bots:Bot[];voicePresence?:Record<string,VoicePresence[]>;dialogCalls?:DialogCall[]};
 
 export type AttachmentDraft = {name:string;data:string;mime?:string};
 export type MessageAttachmentMetadata = {id:string;name:string;size:number;mime:string;expired?:boolean;cached?:boolean};
