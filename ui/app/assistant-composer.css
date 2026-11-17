@@ -1,0 +1,16 @@
+.composer.sombra-assistant-composer{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:12px;border-radius:24px;min-width:0;background:var(--bg-elevated,#25262c);border:1px solid var(--border,#3a3b43)}
+.composer.sombra-assistant-composer:focus-within{border-color:var(--primary,#8e91a1)}
+.composer.sombra-assistant-composer textarea{width:100%;min-height:44px;max-height:180px;flex:none;padding:8px 10px;resize:none;background:transparent;border:0;outline:none;box-shadow:none;line-height:1.5}
+.sombra-assistant-composer .sombra-composer-tools{display:flex;align-items:center;gap:8px;min-width:0}
+.sombra-assistant-composer .sombra-composer-hint{margin-left:auto;font-size:12px;color:var(--muted-foreground,#b0b1bd)}
+.sombra-assistant-composer .sombra-composer-tools>button[type=submit]{border-radius:50%;width:40px;height:40px;flex-shrink:0}
+.sombra-assistant-composer .sombra-composer-menu{position:absolute;bottom:calc(100% + 12px);left:0;right:auto;width:min(420px,100%);z-index:40;padding:8px;max-height:min(340px,50vh);overflow:auto;border-radius:16px;min-width:0}
+.sombra-composer-menu p{margin:4px 8px 8px;font-size:12px;color:var(--muted-foreground,#b0b1bd)}
+.sombra-composer-menu button[role=option]{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;min-height:54px;height:auto;padding:8px 12px;text-align:left;border-radius:10px;background:transparent;color:inherit}
+.sombra-composer-menu button[role=option][data-highlighted],.sombra-composer-menu button[role=option]:hover{background:var(--accent,rgba(255,255,255,.09))}
+.sombra-composer-menu button[role=option]>span:last-child{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.sombra-composer-menu strong,.sombra-composer-menu small{overflow-wrap:anywhere;white-space:normal}
+.sombra-composer-menu strong{font-size:14px;font-weight:600}.sombra-composer-menu small{font-size:12px;color:var(--muted-foreground,#b0b1bd)}
+.sombra-composer-menu .sombra-mention-avatar{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--accent,#41434e);font-size:16px}
+.sombra-mention-avatar img{width:100%;height:100%;object-fit:cover}.sombra-composer-menu-empty{padding:12px;font-size:14px;color:var(--muted-foreground,#b0b1bd)}
+@media(max-width:600px){.sombra-assistant-composer .sombra-composer-hint{display:none}.sombra-assistant-composer .sombra-composer-tools>button[type=submit]{margin-left:auto}}

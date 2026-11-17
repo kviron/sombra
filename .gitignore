@@ -19,6 +19,8 @@
 /notifications-qa/
 /human-typing-qa/
 /attachment-draft-qa/
+/assistant-composer-qa/
+/composer-audit.json
 __pycache__/
 *.pyc
 /voice-qa/

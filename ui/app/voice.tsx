@@ -106,6 +106,26 @@ export function Media({stream,muted,volume,speaker,audioOnly=false}:{stream:Medi
  return <>{audioOnly?<audio ref={attach} autoPlay muted={muted} onError={onError}/>:<video ref={attach} autoPlay playsInline muted={muted} onError={onError}/>}
   {blocked&&<Button variant="secondary" onClick={()=>void resumePlayback()}>Включить воспроизведение</Button>}{(error||gainError)&&<small role="alert">{error||gainError}</small>}</>
 }
+export function hasVisibleVideo(stream?:MediaStream):boolean{
+ return !!stream?.getVideoTracks().some(track=>track.readyState==='live'&&track.enabled&&!track.muted);
+}
+export function VoicePeerVisual({stream,user,onOpen}:{stream?:MediaStream;user:User;onOpen:()=>void}){
+ const [,refresh]=useState(0);
+ useEffect(()=>{
+  if(!stream)return;
+  let watched:MediaStreamTrack[]=[];
+  const changed=()=>refresh(value=>value+1);
+  const sync=()=>{
+   for(const track of watched)for(const event of ['mute','unmute','ended'])track.removeEventListener(event,changed);
+   watched=stream.getVideoTracks();
+   for(const track of watched)for(const event of ['mute','unmute','ended'])track.addEventListener(event,changed);
+   changed();
+  };
+  stream.addEventListener('addtrack',sync);stream.addEventListener('removetrack',sync);sync();
+  return()=>{stream.removeEventListener('addtrack',sync);stream.removeEventListener('removetrack',sync);for(const track of watched)for(const event of ['mute','unmute','ended'])track.removeEventListener(event,changed)};
+ },[stream]);
+ return hasVisibleVideo(stream)?<Media stream={stream!} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title={`Профиль ${user.name}`} onClick={onOpen}><UserAvatar user={user} size="xl"/></button>;
+}
 export function VoiceStage({voice:v,id,title,userName,me,meUser,users,onSettings}:{voice:Voice;id:string;title:string;userName:(id:string)=>string;me:string;meUser?:User;users?:User[];onSettings:()=>void}){
  const joined=v.room===id;
  const actions=useUserActions();
@@ -115,7 +135,7 @@ export function VoiceStage({voice:v,id,title,userName,me,meUser,users,onSettings
  return <div className="voice-stage"><h1>{title}</h1><p>{joined?(v.peers.length?'Вы в голосовой комнате':'Вы в комнате. Пригласите друзей, чтобы начать общение.'):'Присоединитесь, чтобы общаться голосом и видео'}</p>
  {joined&&<div className="voice-grid">{meUser?<UserContextMenu user={meUser}>{selfTile}</UserContextMenu>:selfTile}{v.peers.map(p=>{
   const identity:User=users?.find(user=>user.id===p.user)??{id:p.user,name:userName(p.user),bio:'',created_at:0,online:true};
-  const tile=<div className="voice-tile">{v.streams[p.client]?<Media stream={v.streams[p.client]} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title={`Профиль ${identity.name}`} onClick={()=>actions?.openProfile(identity.id)}><UserAvatar user={identity} size="xl"/></button>}<span>{identity.name} · {v.connections[p.client]==='connected'?'На связи':v.connections[p.client]==='failed'?'Нет соединения — перезайдите':'Подключение…'}</span></div>;
+  const tile=<div className="voice-tile">{<VoicePeerVisual stream={v.streams[p.client]} user={identity} onOpen={()=>actions?.openProfile(identity.id)}/>}<span>{identity.name} · {v.connections[p.client]==='connected'?'На связи':v.connections[p.client]==='failed'?'Нет соединения — перезайдите':'Подключение…'}</span></div>;
   return <UserContextMenu key={p.client} user={identity}>{tile}</UserContextMenu>;
  })}</div>}
  {v.error&&<p className="voice-error" role="alert">{v.error}</p>}
