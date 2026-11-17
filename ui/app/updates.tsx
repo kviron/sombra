@@ -32,7 +32,7 @@ export function UpdateNotice(){
   return()=>{active=false;clearTimeout(first);clearInterval(timer);window.removeEventListener('online',poll)};
  },[]);
  if(dismissed||state.phase!=='available')return null;
- return <aside className="update-notice dark" aria-label="Обновление Sombra"><span role="status">Доступна Sombra {state.version}. Откройте «Обновления» в настройках для установки.</span><Button variant="ghost" size="sm" onClick={()=>setDismissed(true)}>Позже</Button></aside>;
+ return <aside className="update-notice dark" aria-label="Обновление Sombra"><span role="status">Доступна Sombra {state.version}.</span><Button variant="secondary" size="sm" onClick={()=>{window.dispatchEvent(new Event('sombra:open-updates'));void updater.download()}}>Обновить</Button><Button variant="ghost" size="sm" onClick={()=>setDismissed(true)}>Позже</Button></aside>;
 }
 function message(state:ReturnType<typeof updater.snapshot>){
  switch(state.phase){

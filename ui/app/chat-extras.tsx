@@ -1,26 +1,133 @@
-import {useState, type ChangeEvent} from 'react';
-import {Smile, Sticker as StickerIcon, Upload, X, MessageCircle, UserPlus, Check, Bot as BotIcon, Copy, Trash2} from 'lucide-react';
+import {useRef,useState} from 'react';
+import {Smile, Sticker as StickerIcon, X, MessageCircle, UserPlus, Check, Bot as BotIcon, Copy, Pencil, Trash2} from 'lucide-react';
+import {ContextMenu} from 'radix-ui';
+import {toast} from 'sonner';
 import {api, type ChatState, type ChatMessage} from '@/shared/api/backend';
+import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {Message,MessageAvatar,MessageContent,MessageHeader,MessageFooter,Bubble,BubbleContent} from '@/shared/ui/message';
+import {MessageActionDialog} from './message-action-dialog';
+import {useUserActions} from './user-actions';
 import './messages.css';
+import emojiData from '@emoji-mart/data/sets/15/native.json';
+import {StickerImage} from './sticker-library';
+import {MessageAttachment} from './message-attachments';
 export const emojis=['👍','❤️','😂','🔥','🎉','👀'];
 type Common={state:ChatState;refresh:()=>Promise<unknown>;onError:(message:string)=>void};
 export function MessageItem({message:m,previous,state,refresh,onError,userName}:{message:ChatMessage;previous?:ChatMessage;userName:(id:string)=>string}&Common){
- const [picker,setPicker]=useState(false),[busy,setBusy]=useState(false);
+ const [busy,setBusy]=useState(false);
+ const [dialog,setDialog]=useState<'edit'|'delete'>();
+ const userActions=useUserActions();
+ const row=useRef<HTMLElement>(null);
  const grouped=!!previous&&previous.channel===m.channel&&previous.user===m.user&&previous.bot_name===m.bot_name&&new Date(previous.time*1000).toDateString()===new Date(m.time*1000).toDateString();
  const sticker=state.stickers?.find(s=>s.id===m.sticker);
- async function react(emoji:string){if(busy)return;setBusy(true);try{await api('reaction',{message:m.id,emoji});await refresh();setPicker(false)}catch(e){onError((e as Error).message)}finally{setBusy(false)}}
- return <Message data-grouped={grouped} aria-label={m.bot_name||userName(m.user)} align={m.user===state.me.id&&!m.bot_name?'end':'start'}><MessageAvatar>{!m.bot_name&&state.users.find(u=>u.id===m.user)?.avatar?<img src={state.users.find(u=>u.id===m.user)!.avatar} alt=""/>:(m.bot_name||userName(m.user))[0]}</MessageAvatar><MessageContent><Bubble>{!grouped&&<MessageHeader><strong>{m.bot_name||userName(m.user)}</strong>{m.bot_name&&<small className="bot-badge">БОТ</small>}</MessageHeader>}<button className="message-react" title="Добавить реакцию" aria-expanded={picker} onClick={()=>setPicker(!picker)}><Smile size={16}/></button><BubbleContent>{m.text&&<p>{m.text}</p>}{sticker&&<img className="sent-sticker" src={sticker.image} alt={sticker.name}/>}</BubbleContent><MessageFooter><time dateTime={new Date(m.time*1000).toISOString()}>{new Date(m.time*1000).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</time>{m.user===state.me.id&&!m.bot_name&&<Check size={13} aria-label="Отправлено"/>}</MessageFooter></Bubble><div className="reactions">{emojis.filter(e=>m.reactions?.some(r=>r.emoji===e)).map(e=><button disabled={busy} aria-pressed={m.reactions?.some(r=>r.emoji===e&&r.user===state.me.id)} key={e} onClick={()=>void react(e)}>{e} {m.reactions?.filter(r=>r.emoji===e).length}</button>)}{picker&&<div className="reaction-picker">{emojis.map(e=><button key={e} disabled={busy} aria-label={'Реакция '+e} onClick={()=>void react(e)}>{e}</button>)}<button title="Закрыть реакции" onClick={()=>setPicker(false)}><X size={14}/></button></div>}</div></MessageContent></Message>
+ const author=m.user===state.me.id&&!m.bot_name;
+ const avatar=!m.bot_name&&state.users.find(u=>u.id===m.user)?.avatar;
+ const name=m.bot_name||userName(m.user);
+ const canOpenProfile=!m.bot_name&&state.users.some(user=>user.id===m.user);
+ const openProfile=()=>{if(canOpenProfile)userActions?.openProfile(m.user)};
+ const hasText=!!m.text?.trim();
+ const reactionEmojis=emojis.filter(emoji=>m.reactions?.some(reaction=>reaction.emoji===emoji));
+ async function react(emoji:string){
+  if(busy)return;
+  setBusy(true);
+  try{await api('reaction',{message:m.id,emoji});await refresh()}
+  catch(e){onError((e as Error).message)}
+  finally{setBusy(false)}
+ }
+ async function copyText(){
+  try{await navigator.clipboard.writeText(m.text);toast.success('Текст скопирован')}
+  catch{onError('Не удалось скопировать текст сообщения')}
+ }
+ const reactionMenu=<ContextMenu.Group aria-label="Реакции" className="flex justify-between gap-1 px-1 py-1">
+  {emojis.map(emoji=><ContextMenu.Item key={emoji} disabled={busy} aria-label={'Реакция '+emoji}
+   onSelect={()=>void react(emoji)}
+   className="grid size-8 cursor-default place-items-center rounded-sm text-base outline-none select-none data-[highlighted]:bg-accent data-[disabled]:opacity-50"
+  >{emoji}</ContextMenu.Item>)}
+ </ContextMenu.Group>;
+ const actions=[
+  ...(author&&hasText?[{label:'Редактировать',icon:Pencil,onSelect:()=>setDialog('edit')}]:[]),
+  ...(hasText?[{label:'Копировать текст',icon:Copy,onSelect:()=>void copyText()}]:[]),
+  {label:'Удалить сообщение',icon:Trash2,onSelect:()=>setDialog('delete')},
+ ];
+ return <>
+  <EntityContextMenu controls={reactionMenu} actions={actions}>
+   <Message ref={row} data-message-id={m.id} data-grouped={grouped} data-own={author} aria-label={name} align="start" tabIndex={0}
+    className="rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+    <MessageAvatar>{canOpenProfile?<button type="button" className="avatar-trigger" title={`Профиль ${name}`} onClick={openProfile}>{avatar?<img src={avatar} alt=""/>:name[0]}</button>:avatar?<img src={avatar} alt=""/>:name[0]}</MessageAvatar>
+    <MessageContent>
+     <Bubble data-sticker-only={!!sticker&&!hasText}>
+      {!grouped&&<MessageHeader><strong>{canOpenProfile?<button type="button" className="message-author" title={`Профиль ${name}`} onClick={openProfile}>{name}</button>:name}</strong>{m.bot_name&&<small className="bot-badge">БОТ</small>}</MessageHeader>}
+      <BubbleContent>{m.text&&<p>{m.text}</p>}{sticker&&<StickerImage key={sticker.id} className="sent-sticker" sticker={sticker}/ >}{m.attachment&&<MessageAttachment messageId={m.id} attachment={m.attachment}/>}</BubbleContent>
+      <div className={reactionEmojis.length?'message-bottom-row':'message-bottom-inline'}>
+       {reactionEmojis.length>0&&<div className="reactions">{reactionEmojis.map(emoji=><button
+        type="button" disabled={busy} aria-label={`Реакция ${emoji}`} aria-pressed={m.reactions?.some(reaction=>reaction.emoji===emoji&&reaction.user===state.me.id)}
+        key={emoji} onClick={()=>void react(emoji)}
+       >{emoji} {m.reactions?.filter(reaction=>reaction.emoji===emoji).length}</button>)}</div>}
+      <MessageFooter>
+       <time dateTime={new Date(m.time*1000).toISOString()}>{new Date(m.time*1000).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</time>
+       {author&&<Check size={13} aria-label="Отправлено"/>}
+      </MessageFooter>
+      </div>
+     </Bubble>
+    </MessageContent>
+   </Message>
+  </EntityContextMenu>
+  {dialog&&<MessageActionDialog mode={dialog} message={m} author={author} trigger={row} refresh={refresh} onClose={()=>setDialog(undefined)}/>}
+ </>;
 }
-export function ExpressionPicker({state,refresh,onError,onEmoji,onSticker,disabled}:{onEmoji:(emoji:string)=>void;onSticker:(id:string)=>Promise<void>;disabled:boolean}&Common){
- const [panel,setPanel]=useState(''),[busy,setBusy]=useState(false);
- async function upload(e:ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0];e.target.value='';if(!file)return;setBusy(true);try{
-  if(!['image/png','image/webp'].includes(file.type)||file.size>256*1024)throw new Error('Выберите PNG или WebP до 256 КБ.');
-  const image=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(file)});
-  const bitmap=await createImageBitmap(file);const valid=bitmap.width<=512&&bitmap.height<=512;bitmap.close();if(!valid)throw new Error('Размер стикера — не более 512 × 512 пикселей.');
-  await api('create_sticker',{image,name:file.name.replace(/\.[^.]+$/,'').slice(0,40)||'Стикер'});await refresh();
- }catch(e){onError((e as Error).message)}finally{setBusy(false)}}
- return <div className="expression-control"><button type="button" title="Эмодзи" disabled={disabled} aria-expanded={panel==='emoji'} onClick={()=>setPanel(panel==='emoji'?'':'emoji')}><Smile size={20}/></button><button type="button" title="Стикеры" disabled={disabled} aria-expanded={panel==='stickers'} onClick={()=>setPanel(panel==='stickers'?'':'stickers')}><StickerIcon size={20}/></button>{panel&&<section className="expression-panel" aria-label={panel==='emoji'?'Эмодзи':'Стикеры'}><header><strong>{panel==='emoji'?'Эмодзи':'Мои стикеры'}</strong><button type="button" title="Закрыть панель" onClick={()=>setPanel('')}><X size={16}/></button></header>{panel==='emoji'?<div className="emoji-grid">{[...emojis,'😊','🙌','💜','🤔','😎','✨','👋','💯','🥳','☕'].map(e=><button key={e} type="button" onClick={()=>{onEmoji(e);setPanel('')}}>{e}</button>)}</div>:<><div className="sticker-grid">{state.stickers?.map(s=><button type="button" key={s.id} disabled={busy} title={s.name} onClick={()=>{setBusy(true);void onSticker(s.id).then(()=>setPanel('')).catch(e=>onError(e.message)).finally(()=>setBusy(false))}}><img src={s.image} alt={s.name}/></button>)}</div>{!state.stickers?.length&&<p>Добавьте своё изображение — оно станет стикером для переписки.</p>}<label className="sticker-upload"><Upload size={16}/>{busy?'Сохраняем…':'Создать стикер'}<input type="file" accept="image/png,image/webp" disabled={busy} onChange={e=>void upload(e)}/></label><small>PNG / WebP · до 256 КБ · до 512 × 512</small></>}</section>}</div>
+const categories:Record<string,string>={people:'Люди',nature:'Природа',foods:'Еда',activity:'Занятия',places:'Места',objects:'Предметы',symbols:'Символы',flags:'Флаги'};
+const emojiById=emojiData.emojis as Record<string,{name:string;keywords?:string[];skins:{native:string}[]}>;
+type Panel='emoji'|'stickers';
+export function ExpressionPicker({state,onError,onEmoji,onSticker,disabled,group,onManage}:{onEmoji:(emoji:string)=>void;onSticker:(id:string)=>Promise<void>;disabled:boolean;group?:{id:string;owner:string};onManage:(scope:'personal'|'group')=>void}&Common){
+ const [panel,setPanel]=useState<Panel>();
+ const [busy,setBusy]=useState(false),[category,setCategory]=useState('people'),[query,setQuery]=useState('');
+ const [scope,setScope]=useState<'personal'|'group'>('personal'),[pack,setPack]=useState('');
+ const library=state.stickers.filter(sticker=>!sticker.archived&&(scope==='group'?!!group&&sticker.group===group.id:!sticker.group&&sticker.owner===state.me.id));
+ const packs=[...new Set(library.map(sticker=>sticker.pack||''))];
+ const filtered=library.filter(sticker=>!pack||sticker.pack===pack);
+ const search=query.trim().toLowerCase();
+ const emojiIds=search
+  ?Object.keys(emojiById).filter(id=>{const item=emojiById[id];return [item.name,id,...item.keywords||[],item.skins[0]?.native].some(value=>value?.toLowerCase().includes(search))})
+  :emojiData.categories.find(item=>item.id===category)?.emojis||[];
+ function toggle(next:Panel){setPanel(panel===next?undefined:next)}
+ async function sendSticker(id:string){
+  setBusy(true);
+  try{await onSticker(id);setPanel(undefined)}
+  catch(e){onError((e as Error).message)}
+  finally{setBusy(false)}
+ }
+ return <div className="expression-control">
+  <button type="button" title="Эмодзи" disabled={disabled} aria-expanded={panel==='emoji'} onClick={()=>toggle('emoji')}><Smile size={20}/></button>
+  <button type="button" title="Стикеры" disabled={disabled} aria-expanded={panel==='stickers'} onClick={()=>toggle('stickers')}><StickerIcon size={20}/></button>
+  {panel&&<section className="expression-panel" aria-label="Эмодзи и стикеры">
+   <header><nav className="expression-tabs" aria-label="Тип вложения">
+    <button type="button" aria-pressed={panel==='emoji'} onClick={()=>setPanel('emoji')}>Эмодзи</button>
+    <button type="button" aria-pressed={panel==='stickers'} onClick={()=>setPanel('stickers')}>Стикеры</button>
+   </nav><button type="button" title="Закрыть панель" onClick={()=>setPanel(undefined)}><X size={16}/></button></header>
+   {panel==='emoji'?<>
+    <div className="expression-filters"><input aria-label="Поиск эмодзи" placeholder="Поиск эмодзи" value={query} onKeyDown={event=>{if(event.key==='Enter')event.preventDefault()}} onChange={event=>setQuery(event.target.value)}/>
+     <select aria-label="Категория эмодзи" value={category} onChange={event=>{setCategory(event.target.value);setQuery('')}}>
+      {emojiData.categories.map(item=><option key={item.id} value={item.id}>{categories[item.id]||item.id}</option>)}
+     </select>
+    </div>
+    <div className="emoji-grid" key={category}>{emojiIds.map(id=>{
+     const item=emojiById[id],emoji=item?.skins[0]?.native;
+     return emoji&&<button key={id} type="button" title={item.name} onClick={()=>{onEmoji(emoji);setPanel(undefined)}}>{emoji}</button>;
+    })}</div>
+    {!emojiIds.length&&<p>Эмодзи не найдены.</p>}
+   </>:<>
+    {group&&<nav className="expression-tabs sticker-scopes" aria-label="Библиотека стикеров">
+     <button type="button" aria-pressed={scope==='personal'} onClick={()=>{setScope('personal');setPack('')}}>Мои стикеры</button>
+     <button type="button" aria-pressed={scope==='group'} onClick={()=>{setScope('group');setPack('')}}>Стикеры группы</button>
+    </nav>}
+    {packs.length>1&&<select aria-label="Набор стикеров" value={pack} onChange={event=>setPack(event.target.value)}>
+     <option value="">Все наборы</option>{packs.filter(Boolean).map(name=><option key={name}>{name}</option>)}
+    </select>}
+    {filtered.length?<div className="sticker-grid">{filtered.map(sticker=><button type="button" key={sticker.id} disabled={disabled||busy} title={sticker.name} onClick={()=>void sendSticker(sticker.id)}><StickerImage sticker={sticker}/></button>)}</div>:<p>Пока нет стикеров.</p>}
+    {(scope==='personal'||group?.owner===state.me.id)&&<button type="button" className="manage-stickers" onClick={()=>{setPanel(undefined);onManage(scope)}}>Управлять стикерами</button>}
+   </>}
+  </section>}
+ </div>;
 }
 export function Friends({state,refresh,onError,onDialog}:Common&{onDialog:(id:string)=>void}){
  const [tab,setTab]=useState('all'),[query,setQuery]=useState(''),[busy,setBusy]=useState(false);

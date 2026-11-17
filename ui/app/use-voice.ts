@@ -1,26 +1,106 @@
-﻿import {useEffect,useRef,useState} from 'react';
-import {api} from '@/shared/api/backend';
-export type MediaPreferences={mic:string;camera:string;speaker:string;volume:number;echo:boolean;noise:boolean};
-export const defaultMedia:MediaPreferences={mic:'',camera:'',speaker:'',volume:100,echo:true,noise:true};
-export function readMedia():MediaPreferences{try{return {...defaultMedia,...JSON.parse(localStorage.getItem('mines-media')||'{}')}}catch{return defaultMedia}}
+import {useEffect,useRef,useState} from 'react';
+import {api,ApiConnectionError} from '@/shared/api/backend';
+import {recordDesktopDiagnostic} from '@/shared/api/diagnostics';
+import {captureVoiceStream,readMedia,setCapturedTrackEnabled,stopCapturedTrack,type MediaPreferences} from './voice-input';
 export function mediaError(e:unknown){const name=(e as DOMException).name;return name==='NotAllowedError'?'Разрешите доступ к микрофону или камере в настройках приложения и Windows.':name==='NotFoundError'?'Устройство не найдено. Подключите микрофон или камеру.':name==='NotReadableError'?'Устройство занято другим приложением. Освободите его и повторите.':(e as Error).message||'Не удалось подключить устройство.'}
-export function audioConstraints(p:MediaPreferences){return {deviceId:p.mic?{exact:p.mic}:undefined,echoCancellation:p.echo,noiseSuppression:p.noise}}
-type Peer={client:string;user:string};
+function videoConstraints(p:MediaPreferences){return {deviceId:p.camera?{exact:p.camera}:undefined,width:{ideal:1280},height:{ideal:720}}}
+type VoiceAvailability={muted:boolean;deaf:boolean};
+type Peer={client:string;user:string}&Partial<VoiceAvailability>;
 type Poll={peers:Peer[];signals:{id:number;from:string;payload:{description?:RTCSessionDescriptionInit;candidate?:RTCIceCandidateInit}}[];cursor:number;iceServers:RTCIceServer[]};
+type MicrophoneGain={context:AudioContext;source:MediaStreamAudioSourceNode;gain:GainNode;track:MediaStreamTrack};
+type Call={room:string;client:string;stream:MediaStream;pcs:Map<string,RTCPeerConnection>;stop:boolean;microphone:MediaStreamTrack;micGain?:MicrophoneGain;members?:Set<string>};
+type TrackKind='audio'|'video';
+const voiceCues={
+ joined:new URL('./voice-peer-joined.wav',import.meta.url).href,
+ left:new URL('./voice-left.wav',import.meta.url).href,
+};
+
+async function playVoiceCue(cue:keyof typeof voiceCues,speaker:string){
+ const audio=new Audio();
+ if(speaker&&speaker!=='default'&&audio.setSinkId){
+  await audio.setSinkId(speaker).catch(()=>{}); // Use the system output if the selected device is unavailable.
+ }
+ audio.src=voiceCues[cue];
+ await audio.play().catch(()=>{});
+}
+
+function otherMembers(peers:Peer[],client:string){
+ const ownUser=peers.find(peer=>peer.client===client)?.user;
+ return new Set(peers.filter(peer=>peer.client!==client&&peer.user!==ownUser).map(peer=>peer.user));
+}
+
+async function captureTrack(kind:TrackKind,preferences:MediaPreferences){
+ try{
+  const stream=kind==='audio'?await captureVoiceStream(preferences):await navigator.mediaDevices.getUserMedia({video:videoConstraints(preferences)});
+  const track=stream.getTracks().find(t=>t.kind===kind);
+  if(track)return track;
+  stream.getTracks().forEach(stopCapturedTrack);
+  throw new DOMException('Устройство не найдено','NotFoundError');
+ }catch(error){
+  recordDesktopDiagnostic(kind==='audio'?'voice_microphone':'voice_camera',(error as DOMException).name==='NotAllowedError'?'device_permission':'device_error');
+  throw error;
+ }
+}
+
+async function replaceSenders(call:Call,kind:TrackKind,track:MediaStreamTrack|null){
+ const results=await Promise.allSettled([...call.pcs.values()].map(async pc=>{
+  const sender=pc.getTransceivers().find(t=>t.receiver.track.kind===kind)?.sender;
+  if(!sender||pc.signalingState==='closed')return;
+  try{await sender.replaceTrack(track)}
+  catch(e){if(!call.stop&&pc.connectionState!=='closed')throw e}
+ }));
+ const failure=results.find(result=>result.status==='rejected');
+ if(failure)throw failure.reason;
+}
+function microphoneSource(context:AudioContext,gain:GainNode,track:MediaStreamTrack){
+ const source=context.createMediaStreamSource(new MediaStream([track]));
+ source.connect(gain);
+ return source;
+}
+function stopMicrophoneGain(graph:MicrophoneGain){
+ graph.source.disconnect();
+ graph.gain.disconnect();
+ graph.track.stop();
+ void graph.context.close();
+}
 export function useVoice(){
- const [room,setRoom]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[muted,setMuted]=useState(false),[deaf,setDeaf]=useState(false),[camera,setCamera]=useState(false),[local,setLocal]=useState<MediaStream|null>(null),[peers,setPeers]=useState<Peer[]>([]),[streams,setStreams]=useState<Record<string,MediaStream>>({}),[connections,setConnections]=useState<Record<string,string>>({}),[preferences,setPreferences]=useState(readMedia);
- const current=useRef<{room:string;client:string;stream:MediaStream;pcs:Map<string,RTCPeerConnection>;stop:boolean}|null>(null),pending=useRef(false),generation=useRef(0);
- function leave(){generation.current++;const c=current.current;current.current=null;if(c){c.stop=true;c.stream.getTracks().forEach(t=>t.stop());c.pcs.forEach(pc=>pc.close());void api('voice_leave',{room:c.room,client:c.client}).catch(()=>{})}setRoom('');setLocal(null);setPeers([]);setStreams({});setConnections({});setCamera(false);setMuted(false);setDeaf(false)}
+ const [room,setRoom]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[camera,setCamera]=useState(false),[local,setLocal]=useState<MediaStream|null>(null),[peers,setPeers]=useState<Peer[]>([]),[streams,setStreams]=useState<Record<string,MediaStream>>({}),[connections,setConnections]=useState<Record<string,string>>({}),[preferences,setPreferences]=useState(readMedia);
+ const [availability,setAvailability]=useState<VoiceAvailability>({muted:false,deaf:false});
+ const latestAvailability=useRef(availability);
+ const [micVolume,setMicVolumeValue]=useState(100);
+ const preferredMicVolume=useRef(100);
+ useEffect(()=>{if(room&&preferredMicVolume.current!==100)setMicVolume(preferredMicVolume.current)},[room]);
+ const current=useRef<Call|null>(null),pending=useRef(false),changingMedia=useRef(false),generation=useRef(0);
+ const preferred=useRef(preferences);
+ function leave(){
+  generation.current++;
+  const c=current.current;
+  current.current=null;
+  if(c){
+   c.stop=true;
+   c.stream.getTracks().filter(track=>track!==c.microphone&&track!==c.micGain?.track).forEach(stopCapturedTrack);
+   stopCapturedTrack(c.microphone);
+   if(c.micGain)stopMicrophoneGain(c.micGain);
+   c.pcs.forEach(pc=>pc.close());
+   void api('voice_leave',{room:c.room,client:c.client}).catch(()=>{});
+   if(c.members)void playVoiceCue('left',preferred.current.speaker);
+  }
+  setRoom('');setLocal(null);setPeers([]);setStreams({});setConnections({});setCamera(false);setMicVolumeValue(preferredMicVolume.current);
+ }
  useEffect(()=>()=>{leave()},[]);
- async function join(destination:string){if(pending.current)return;pending.current=true;leave();const epoch=generation.current;setBusy(true);setError('');let acquired:MediaStream|null=null;
+ async function join(destination:string,withVideo=false){if(pending.current||changingMedia.current)return false;pending.current=true;leave();const epoch=generation.current;setBusy(true);setError('');let acquired:MediaStream|null=null;
  try{
   if(!navigator.mediaDevices)throw new Error('Для доступа к устройствам откройте приложение через HTTPS или localhost.');
-  acquired=await navigator.mediaDevices.getUserMedia({audio:audioConstraints(preferences)});
-  if(epoch!==generation.current){acquired.getTracks().forEach(t=>t.stop());return}
-  const c={room:destination,client:crypto.randomUUID(),stream:acquired,pcs:new Map<string,RTCPeerConnection>(),stop:false};current.current=c;
+  acquired=new MediaStream([await captureTrack('audio',preferred.current)]);
+  if(withVideo)acquired.addTrack(await captureTrack('video',preferred.current));
+  if(epoch!==generation.current){acquired.getTracks().forEach(stopCapturedTrack);return false}
+  const c:Call={room:destination,client:crypto.randomUUID(),stream:acquired,pcs:new Map(),stop:false,microphone:acquired.getAudioTracks()[0]};current.current=c;
+  setCapturedTrackEnabled(c.microphone,!latestAvailability.current.muted&&!latestAvailability.current.deaf);
   const request=(op:string,data={})=>api<Poll>(op,{room:c.room,client:c.client,...data});
-  const first=await request('voice_join');if(c.stop)return;
-  setRoom(destination);setLocal(acquired);let cursor=0;
+  const first=await request('voice_join',latestAvailability.current);if(c.stop)return false;
+  c.members=otherMembers(first.peers,c.client);
+  setRoom(destination);setLocal(acquired);setCamera(withVideo);let cursor=0;
+  let lastPoll=performance.now();
   const signal=(target:string,payload:unknown)=>request('voice_signal',{target,payload});
   const make=(id:string,initiator=false)=>{
    const pc=new RTCPeerConnection({iceServers:first.iceServers});c.pcs.set(id,pc);
@@ -34,7 +114,25 @@ export function useVoice(){
   };
   const candidates=new Map<string,RTCIceCandidateInit[]>();
   async function poll(){if(c.stop)return;try{
-   const data=await request('voice_poll',{after:cursor});if(c.stop)return;setPeers(data.peers.filter(p=>p.client!==c.client));
+   let data:Poll;
+   try {
+    data=await request('voice_poll',{after:cursor,...latestAvailability.current});
+   } catch (error) {
+    if(error instanceof ApiConnectionError&&performance.now()-lastPoll<14000)return;
+    throw error;
+   }
+   if(c.stop)return;
+   lastPoll=performance.now();
+   setPeers(data.peers.filter(p=>p.client!==c.client));
+   const nextMembers=otherMembers(data.peers,c.client);
+   const previousMembers=c.members;
+   const someoneJoined=previousMembers&&[...nextMembers].some(user=>!previousMembers.has(user));
+   const someoneLeft=previousMembers&&[...previousMembers].some(user=>!nextMembers.has(user));
+   c.members=nextMembers;
+   if(!latestAvailability.current.deaf){
+    if(someoneLeft)void playVoiceCue('left',preferred.current.speaker);
+    else if(someoneJoined)void playVoiceCue('joined',preferred.current.speaker);
+   }
    for(const [id,pc] of c.pcs)if(!data.peers.some(p=>p.client===id)){pc.close();c.pcs.delete(id);setStreams(old=>{const next={...old};delete next[id];return next})}
    for(const peer of data.peers)if(peer.client!==c.client&&!c.pcs.has(peer.client)&&c.client<peer.client){const pc=make(peer.client,true);await pc.setLocalDescription(await pc.createOffer());await signal(peer.client,{description:pc.localDescription})}
    for(const message of data.signals){const id=message.from;if(!data.peers.some(p=>p.client===id))continue;const pc=c.pcs.get(id)||make(id);const payload=message.payload;
@@ -44,17 +142,137 @@ export function useVoice(){
    cursor=data.cursor;
   }catch(e){if(!c.stop){leave();setError(mediaError(e))}}finally{if(!c.stop)setTimeout(()=>void poll(),700)}}
   void poll();
- }catch(e){acquired?.getTracks().forEach(t=>t.stop());leave();setError(mediaError(e))}finally{pending.current=false;setBusy(false)}}
- function toggleMic(){const next=!muted;setMuted(next);current.current?.stream.getAudioTracks().forEach(t=>t.enabled=!next&&!deaf)}
- function toggleDeaf(){const next=!deaf;setDeaf(next);current.current?.stream.getAudioTracks().forEach(t=>t.enabled=!next&&!muted)}
- async function toggleCamera(){const c=current.current;if(!c||busy)return;setBusy(true);setError('');try{
-  const old=c.stream.getVideoTracks()[0];const track=old?null:(await navigator.mediaDevices.getUserMedia({video:{deviceId:preferences.camera?{exact:preferences.camera}:undefined,width:{ideal:1280},height:{ideal:720}}})).getVideoTracks()[0];
-  if(c.stop){track?.stop();return}
-  try{await Promise.all([...c.pcs.values()].map(pc=>pc.getTransceivers().find(t=>t.receiver.track.kind==='video')?.sender.replaceTrack(track)))}catch(e){track?.stop();throw e}
-  if(old){old.stop();c.stream.removeTrack(old)}if(track)c.stream.addTrack(track);setLocal(new MediaStream(c.stream.getTracks()));setCamera(!!track);
- }catch(e){setError(mediaError(e))}finally{setBusy(false)}}
- function savePreferences(next:MediaPreferences){setPreferences(next);localStorage.setItem('mines-media',JSON.stringify(next))}
- return {room,busy,error,muted,deaf,camera,local,peers,streams,connections,preferences,savePreferences,join,leave,toggleMic,toggleDeaf,toggleCamera};
+  return true;
+ }catch(e){acquired?.getTracks().forEach(stopCapturedTrack);leave();setError(mediaError(e));return false}finally{pending.current=false;setBusy(false)}}
+ function updateAvailability(next:VoiceAvailability){
+  latestAvailability.current=next;
+  setAvailability(next);
+  const c=current.current;
+  if(!c)return;
+  const enabled=!next.muted&&!next.deaf;
+  setCapturedTrackEnabled(c.microphone,enabled);
+  c.stream.getAudioTracks().forEach(track=>{track.enabled=enabled});
+ }
+ function toggleMic(){
+  const {muted,deaf}=latestAvailability.current;
+  updateAvailability({muted:!muted&&!deaf,deaf:false});
+ }
+ function toggleDeaf(){
+  const previous=latestAvailability.current;
+  updateAvailability({...previous,deaf:!previous.deaf});
+ }
+ async function replaceLocalTrack(c:Call,kind:TrackKind,track:MediaStreamTrack|null,{keepPrevious=false}={}){
+  if(c.stop){if(track)stopCapturedTrack(track);return false}
+  const previous=c.stream.getTracks().find(t=>t.kind===kind);
+  if(track&&previous)setCapturedTrackEnabled(track,previous.enabled);
+  if(previous)c.stream.removeTrack(previous);
+  if(track)c.stream.addTrack(track);
+  try{await replaceSenders(c,kind,track)}
+  catch(error){
+   if(!c.stop){
+    if(track)c.stream.removeTrack(track);
+    if(previous){
+     if(track)setCapturedTrackEnabled(previous,track.enabled);
+     c.stream.addTrack(previous);
+    }
+    await replaceSenders(c,kind,previous??null).catch(()=>{});
+   }
+   if(track)stopCapturedTrack(track);
+   if(c.stop&&!keepPrevious&&previous)stopCapturedTrack(previous);
+   throw error;
+  }
+  if(!keepPrevious&&previous)stopCapturedTrack(previous);
+  if(c.stop){if(track)stopCapturedTrack(track);return false}
+  setLocal(new MediaStream(c.stream.getTracks()));
+  return true;
+ }
+ async function changeMedia(c:Call,action:()=>Promise<void>){
+  if(pending.current||changingMedia.current)return;
+  changingMedia.current=true;
+  setBusy(true);setError('');
+  try{await action()}catch(e){if(!c.stop)setError(mediaError(e))}
+  finally{changingMedia.current=false;setBusy(false)}
+ }
+ async function toggleCamera(){
+  const c=current.current;
+  if(!c)return;
+  await changeMedia(c,async()=>{
+   const track=c.stream.getVideoTracks().length?null:await captureTrack('video',preferred.current);
+   if(await replaceLocalTrack(c,'video',track))setCamera(!!track);
+  });
+ }
+ function setMicVolume(value:number){
+  value=Math.max(0,Math.min(200,value));
+  preferredMicVolume.current=value;
+  const c=current.current;
+  if(!c){setMicVolumeValue(value);return}
+  if(c.micGain){
+   c.micGain.gain.gain.value=value/100;
+   setMicVolumeValue(value);
+   return;
+  }
+  if(value===100)return;
+  void changeMedia(c,async()=>{
+   const context=new AudioContext();
+   let graph:MicrophoneGain|undefined;
+   try{
+    const gain=context.createGain(),output=context.createMediaStreamDestination();
+    gain.gain.value=value/100;
+    const source=microphoneSource(context,gain,c.microphone);
+    gain.connect(output);
+    graph={context,source,gain,track:output.stream.getAudioTracks()[0]};
+    c.micGain=graph;
+    setMicVolumeValue(value);
+    await context.resume();
+    if(!c.stop)await replaceLocalTrack(c,'audio',graph.track,{keepPrevious:true});
+   }catch(error){
+    if(!c.stop){
+     c.micGain=undefined;
+     if(graph)stopMicrophoneGain(graph);
+     else void context.close();
+     setMicVolumeValue(100);
+    }
+    throw error;
+   }
+  });
+ }
+ function savePreferences<K extends keyof MediaPreferences>(key:K,value:MediaPreferences[K]){
+  if(preferred.current[key]===value)return;
+  function save(){
+   const next={...preferred.current,[key]:value};
+   preferred.current=next;
+   setPreferences(next);
+   localStorage.setItem('mines-media',JSON.stringify(next));
+  }
+  const c=current.current;
+  if(key==='volume'){save();return}
+  if(pending.current||changingMedia.current)return;
+  let kind:TrackKind|undefined;
+  if(key==='mic'||key==='echo'||key==='noise')kind='audio';
+  else if(key==='camera'&&c?.stream.getVideoTracks().length)kind='video';
+  if(!c||!kind){save();return}
+  const trackKind=kind;
+  void changeMedia(c,async()=>{
+   const track=await captureTrack(trackKind,{...preferred.current,[key]:value});
+   if(trackKind==='audio'&&c.micGain){
+    if(c.stop){stopCapturedTrack(track);return}
+    const graph=c.micGain;
+    try{
+     setCapturedTrackEnabled(track,graph.track.enabled);
+     const source=microphoneSource(graph.context,graph.gain,track);
+     graph.source.disconnect();
+     graph.source=source;
+    }catch(error){stopCapturedTrack(track);throw error}
+    stopCapturedTrack(c.microphone);
+    c.microphone=track;
+    save();
+   }else if(await replaceLocalTrack(c,trackKind,track)){
+    if(trackKind==='audio')c.microphone=track;
+    save();
+   }
+  });
+ }
+ return {room,busy,error,...availability,camera,local,peers,streams,connections,preferences,savePreferences,join,leave,toggleMic,toggleDeaf,toggleCamera,micVolume,setMicVolume};
 }
 export type Voice=ReturnType<typeof useVoice>;
 

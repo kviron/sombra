@@ -1,0 +1,41 @@
+.new-dialog-overlay { position: fixed; inset: 0; z-index: 110; background: rgb(0 0 0 / 65%); }
+.new-dialog-dialog { position: fixed; top: 50%; left: 50%; z-index: 111; transform: translate(-50%, -50%); display: flex; flex-direction: column; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--popover); color: var(--popover-foreground); box-shadow: 0 24px 80px rgb(0 0 0 / 40%); }
+.new-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 24px 24px 16px; }
+.new-dialog-header h2 { margin: 0; font-size: 20px; font-weight: 650; line-height: 1.4; }
+.new-dialog-header p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.5; }
+.new-dialog-header > button { flex-shrink: 0; width: 36px; height: 36px; }
+.new-dialog-form { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.new-dialog-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 24px 16px; }
+.new-dialog-search { position: relative; }
+.new-dialog-search > svg { position: absolute; left: 12px; top: 11px; color: var(--muted-foreground); pointer-events: none; }
+.new-dialog-search input { height: 40px; padding-left: 40px; }
+.new-dialog-chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 16px 0 0; }
+.new-dialog-chips li { min-width: 0; max-width: 100%; }
+.new-dialog-chip { max-width: 100%; gap: 6px; height: 36px; padding: 4px 8px; border-radius: 20px; }
+.new-dialog-chip > span:not(.user-avatar) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.new-dialog-chip > svg { flex-shrink: 0; }
+.new-dialog-count { margin: 16px 0 8px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.new-dialog-name { display: grid; gap: 8px; margin: 16px 0; }
+.new-dialog-name label { font-size: 14px; font-weight: 500; }
+.new-dialog-name label span { margin-left: 4px; color: var(--muted-foreground); font-weight: 400; }
+.new-dialog-people { display: grid; gap: 4px; }
+.new-dialog-selection { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 12px; border-radius: 8px; }
+.new-dialog-selection:hover, .new-dialog-selection[data-selected="true"] { background: var(--accent); }
+.new-dialog-person { flex: 1; min-width: 0; border: 0; border-radius: 8px; padding: 4px 0; background: transparent; text-align: left; cursor: pointer; }
+.new-dialog-person:disabled { cursor: not-allowed; opacity: .5; }
+.new-dialog-dialog .user-row-title strong { color: var(--popover-foreground); }
+.new-dialog-dialog .user-row-subtitle { color: var(--muted-foreground); }
+.new-dialog-checkbox { display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; padding: 0; border: 1px solid var(--input); border-radius: 5px; background: var(--background); color: var(--primary-foreground); cursor: pointer; }
+.new-dialog-checkbox[data-state="checked"] { border-color: var(--primary); background: var(--primary); }
+.new-dialog-checkbox:disabled { cursor: not-allowed; opacity: .5; }
+.new-dialog-checkbox > span { display: grid; place-items: center; }
+.new-dialog-person:focus-visible, .new-dialog-checkbox:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.new-dialog-empty { padding: 24px 8px; margin: 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.5; text-align: center; }
+.new-dialog-footer { flex-shrink: 0; border-top: 1px solid var(--border); padding: 16px 24px 24px; }
+.new-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.new-dialog-actions > button { min-height: 40px; white-space: normal; }
+.new-dialog-error { overflow-wrap: anywhere; margin: 0 0 12px; color: var(--destructive); font-size: 14px; line-height: 1.5; }
+.new-dialog-spinner { animation: new-dialog-spin 1s linear infinite; }
+@keyframes new-dialog-spin { to { transform: rotate(360deg); } }
+@media (max-width: 480px) { .new-dialog-header { padding: 20px 16px 16px; } .new-dialog-body { padding: 0 16px 16px; } .new-dialog-footer { padding: 16px; } }
+@media (prefers-reduced-motion: reduce) { .new-dialog-spinner { animation: none; } }

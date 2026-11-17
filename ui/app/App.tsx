@@ -1,4 +1,4 @@
-import { UpdateNotice } from './updates';
+import { UpdateNotice, UpdateSettings } from './updates';
 import { LiveChat } from './live-chat';
 import { api } from '@/shared/api/backend';
 import { useEffect, useState } from "react";
@@ -18,6 +18,8 @@ import './chat-extras.css';
 import './hologram.css';
 
 export function App() {
+  const [showUpdates,setShowUpdates]=useState(false);
+  useEffect(()=>{const open=()=>setShowUpdates(true);window.addEventListener('sombra:open-updates',open);return()=>window.removeEventListener('sombra:open-updates',open)},[]);
   const [route, setRoute] = useState(window.location.hash);
   useEffect(() => {
     const navigate = () => setRoute(window.location.hash);
@@ -44,6 +46,7 @@ export function App() {
       {auth === 'ready' ? <LiveChat /> : route === '#register' ? <RegisterPage /> : route === '#login' || auth === 'guest' ? <LoginPage /> : <main className="m-auto text-center"><p role="status">{auth === 'checking' ? 'Проверяем сессию…' : 'Не удалось проверить сессию.'}</p>{auth === 'error' && <button onClick={() => setAttempt(n => n+1)}>Повторить</button>}</main>}
       <WindowResizeHandles inTauri={inTauri} isMaximized={isMaximized} />
       <UpdateNotice />
+      {showUpdates&&auth!=='ready'&&<div className="update-guest-overlay"><section className="update-guest-dialog" role="dialog" aria-modal="true" aria-label="Обновления Sombra"><button type="button" onClick={()=>setShowUpdates(false)} aria-label="Закрыть обновления">Закрыть</button><UpdateSettings inCall={false}/></section></div>}
       <Toaster
         position="bottom-right"
         theme={theme}

@@ -1,0 +1,204 @@
+import { useEffect, useRef, useState } from 'react';
+import { Check, Clock3, MessageCircle, UserMinus, UserPlus, X } from 'lucide-react';
+import type { Group, User } from '@/shared/api/backend';
+import { UserAvatar } from '@/shared/ui/user-avatar';
+import { useUserActions } from './user-actions';
+import './user-profile.css';
+
+function formatDay(timestamp: number) {
+  return new Intl.DateTimeFormat('ru', { day: 'numeric', month: 'long', year: 'numeric' }).format(timestamp * 1000);
+}
+
+function formatMoment(timestamp: number) {
+  const date = new Date(timestamp * 1000);
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  return sameDay
+    ? `сегодня в ${date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`
+    : `${date.toLocaleDateString('ru', { day: 'numeric', month: 'short' })} в ${date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+export function UserProfile({
+  user,
+  me,
+  groups,
+  onClose,
+  onOpenGroup,
+}: {
+  user: User;
+  me: User;
+  groups: Group[];
+  onClose: () => void;
+  onOpenGroup?: (id: string) => void;
+}) {
+  const actions = useUserActions();
+  const isSelf = user.id === me.id;
+  const status = isSelf ? 'self' : actions?.friendStatus(user.id) ?? 'none';
+  const shared = groups.filter((group) => group.members.includes(user.id));
+  const noteKey = `sombra-profile-note:${me.id}:${user.id}`;
+  const [note, setNote] = useState(() => {
+    try { return localStorage.getItem(noteKey) ?? ''; } catch { return ''; }
+  });
+  const [saved, setSaved] = useState(false);
+  const closeButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    closeButton.current?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
+    }
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      previous?.focus?.();
+    };
+  }, [onClose]);
+
+  function updateNote(value: string) {
+    setNote(value);
+    try { localStorage.setItem(noteKey, value); setSaved(true); } catch { /* local note is optional */ }
+  }
+
+  useEffect(() => {
+    if (!saved) return;
+    const timer = window.setTimeout(() => setSaved(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [saved]);
+
+  const statusText = user.online ? 'В сети' : 'Не в сети';
+  const friendNote = (() => {
+    if (isSelf) return null;
+    if (status === 'friends') return <span className="user-profile-friend"><Check size={13} /> В друзьях</span>;
+    if (status === 'outgoing') return <span className="user-profile-friend is-muted"><Clock3 size={13} /> Заявка отправлена</span>;
+    if (status === 'incoming') return <span className="user-profile-friend is-waiting">Хочет добавить вас</span>;
+    return null;
+  })();
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-profile-name"
+        className="user-profile"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button ref={closeButton} type="button" className="user-profile-close" title="Закрыть профиль" aria-label="Закрыть профиль" onClick={onClose}>
+          <X size={18} />
+        </button>
+        <div className="user-profile-banner" aria-hidden="true">
+          <span className="user-profile-banner-glow" />
+          <span className="user-profile-banner-grid" />
+        </div>
+        <div className="user-profile-body">
+          <div className="user-profile-identity">
+            <UserAvatar user={user} size="xl" decorative />
+            <div className="user-profile-heading">
+              <h2 id="user-profile-name">{user.name}</h2>
+              <p className="user-profile-status" data-online={user.online ? 'true' : 'false'}>
+                <span className="user-profile-status-dot" aria-hidden="true" />
+                {statusText}
+                {!user.online && user.last_seen ? <span className="user-profile-last">· {formatMoment(user.last_seen)}</span> : null}
+                {isSelf && <span className="user-profile-self-tag">Это вы</span>}
+              </p>
+            </div>
+          </div>
+
+          <div className="user-profile-actions">
+            {isSelf ? (
+              <button type="button" className="user-profile-primary" onClick={() => { onClose(); actions?.editOwnProfile(); }}>
+                Редактировать профиль
+              </button>
+            ) : (
+              <>
+                <button type="button" className="user-profile-primary" onClick={() => { actions?.messageUser(user.id); onClose(); }}>
+                  <MessageCircle size={16} /> Сообщение
+                </button>
+                {status === 'none' && (
+                  <button type="button" className="user-profile-secondary" onClick={() => actions?.addFriend(user.id)}>
+                    <UserPlus size={16} /> Добавить в друзья
+                  </button>
+                )}
+                {status === 'incoming' && (
+                  <button type="button" className="user-profile-secondary is-accept" onClick={() => actions?.acceptFriend(user.id)}>
+                    <Check size={16} /> Принять заявку
+                  </button>
+                )}
+                {status === 'outgoing' && (
+                  <button type="button" className="user-profile-secondary" disabled>
+                    <Clock3 size={16} /> Заявка отправлена
+                  </button>
+                )}
+                {status === 'friends' && (
+                  <button type="button" className="user-profile-secondary" onClick={() => actions?.removeFriend(user.id)}>
+                    <UserMinus size={16} /> Удалить из друзей
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {friendNote}
+
+          <p className={user.bio ? 'user-profile-bio' : 'user-profile-bio is-empty'}>
+            {user.bio || 'Пользователь пока ничего не рассказал о себе.'}
+          </p>
+
+          <dl className="user-profile-facts">
+            <div>
+              <dt>В Sombra</dt>
+              <dd>с {formatDay(user.created_at)}</dd>
+            </div>
+            <div>
+              <dt>Общие группы</dt>
+              <dd>{shared.length ? shared.length : 'нет'}</dd>
+            </div>
+            <div>
+              <dt>Последняя активность</dt>
+              <dd>{user.online ? 'сейчас' : user.last_seen ? formatMoment(user.last_seen) : 'неизвестно'}</dd>
+            </div>
+          </dl>
+
+          <section className="user-profile-groups" aria-label="Общие группы">
+            <h3>Общие группы <span>{shared.length}</span></h3>
+            {shared.length ? (
+              <ul>
+                {shared.map((group) => (
+                  <li key={group.id}>
+                    <button type="button" disabled={!onOpenGroup} onClick={() => { onOpenGroup?.(group.id); onClose(); }} title={onOpenGroup ? `Открыть «${group.name}»` : group.name}>
+                      <span className="user-profile-group-avatar" aria-hidden="true">
+                        {group.avatar ? <img src={group.avatar} alt="" /> : group.name.slice(0, 1).toLocaleUpperCase('ru')}
+                      </span>
+                      <span className="user-profile-group-text">
+                        <strong>{group.name}</strong>
+                        <small>{group.members.length} {group.members.length === 1 ? 'участник' : group.members.length < 5 ? 'участника' : 'участников'}</small>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="user-profile-empty">Вы пока не состоите с этим человеком в общих группах.</p>
+            )}
+          </section>
+
+          <section className="user-profile-note">
+            <div className="user-profile-note-head">
+              <h3>Заметка</h3>
+              <span>{saved ? 'Сохранено' : 'Видна только вам'}</span>
+            </div>
+            <textarea
+              aria-label={`Заметка о ${user.name}`}
+              maxLength={280}
+              rows={3}
+              placeholder="Например: часовой пояс, чем занимается, о чём поговорить"
+              value={note}
+              onChange={(event) => updateNote(event.target.value)}
+            />
+          </section>
+        </div>
+      </section>
+    </div>
+  );
+}

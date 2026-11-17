@@ -2,6 +2,7 @@
 import {spawn} from 'node:child_process';
 import {readFileSync,writeFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
+process.env.MINES_DATA_DIR=process.cwd()+'/auth-qa/data-'+Date.now();
 const server=await preview({preview:{host:'127.0.0.1',port:4191,strictPort:true}});
 const chrome=spawn('C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new','--no-sandbox','--disable-gpu-sandbox','--disable-gpu','--no-first-run','--remote-debugging-port=9332','--user-data-dir='+process.cwd()+'/auth-qa/browser-profile','about:blank'],{windowsHide:true,stdio:'ignore'});
 let ws;
@@ -20,12 +21,20 @@ try {
  await evaluate(`fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'register',name:'Test Profile',email:${JSON.stringify(email)},password:${JSON.stringify(password)}})}).then(r=>r.json())`);
  await send('Page.reload');await wait("!!document.querySelector('.profile')");
  await evaluate(`document.querySelector('.profile button:last-child').click()`);await wait("!!document.querySelector('#account-avatar')");
+ const fill=async(selector,value)=>evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+ await fill('#account-name','Unsaved name');
+ await fill('#account-bio','Unsaved description');
  const doc=await send('DOM.getDocument');const input=await send('DOM.querySelector',{nodeId:doc.root.nodeId,selector:'#account-avatar'});
  await send('DOM.setFileInputFiles',{nodeId:input.nodeId,files:['D:/media/Documents/Craft Anything/discord/reference/picture-1.png']});
- await new Promise(r=>setTimeout(r,1500));console.log(await evaluate("document.querySelector('[role=alert]')?.textContent"));await shot('debug-avatar');await wait("!!document.querySelector('.avatar-editor img')");
- await evaluate("document.querySelector('.settings-form').requestSubmit()");await wait("!!document.querySelector('[role=status]')");
- assert.equal(await evaluate("!!document.querySelector('.profile .avatar img')"),true);await shot('account-avatar-new');
- const fill=async(selector,value)=>evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+ await wait("!!document.querySelector('.avatar-editor img')");
+ assert.equal(await evaluate("!!document.querySelector('.profile .avatar img')"),true,'Picking an avatar should update the saved profile');
+ assert.equal(await evaluate("document.querySelector('#account-name').value"),'Unsaved name');
+ assert.equal(await evaluate("document.querySelector('#account-bio').value"),'Unsaved description');
+ await send('Page.reload');await wait("!!document.querySelector('.profile .avatar img')");
+ await evaluate("document.querySelector('.profile button:last-child').click()");await wait("!!document.querySelector('.avatar-editor img')");
+ assert.equal(await evaluate("document.querySelector('#account-name').value"),'Test Profile');
+ assert.equal(await evaluate("document.querySelector('#account-bio').value"),'');
+ await shot('account-avatar-new');
  await fill('#account-email','new-'+email);await fill('#email-password',password);
  await evaluate("document.querySelector('.email-form').requestSubmit()");
  await wait("!!document.querySelector('[role=status]')");
@@ -40,6 +49,10 @@ try {
  assert.equal(await evaluate("document.querySelector('#account-email').value"),'new-'+email);
  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});await shot('account-mobile-new');
  assert.equal(await evaluate("document.querySelector('.account-modal').scrollWidth<=document.querySelector('.account-modal').clientWidth"),true);
+ await evaluate("document.querySelector('.avatar-editor button').click()");
+ await wait("!document.querySelector('.profile .avatar img')");
+ await send('Page.reload');await wait("document.querySelector('.profile-name strong')?.textContent==='Test Profile'");
+ assert.equal(await evaluate("!!document.querySelector('.profile .avatar img')"),false);
  console.log('PASS: avatar persistence, email, password validation/change, new credentials login, mobile layout.');
 
 } finally {ws?.close();chrome.kill();await new Promise(r=>server.httpServer.close(r))}

@@ -1,33 +1,37 @@
 /* Reference lock: retain original dark shell and compact panels; classic chat bubbles. */
 .chat-message[data-slot="message"]{display:flex;align-items:flex-end;gap:8px;margin:6px 0;padding:0;background:none;max-width:100%}
-.chat-message[data-align="end"]{flex-direction:row-reverse}
+.chat-message[data-slot="message"]{flex-direction:row;justify-content:flex-start}
 .chat-message[data-slot="message"] .message-content{flex:0 1 auto;min-width:0;max-width:min(76%,620px)}
 .chat-message[data-slot="message"] .message-avatar{width:28px;height:28px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:2px}
 .message-avatar img{width:100%;height:100%;object-fit:cover}
-.chat-message[data-align="end"] .message-avatar{display:none}
 .message-bubble{padding:8px 12px 5px;border:1px solid #ffffff12;border-radius:14px 14px 14px 4px;background:#202630;color:#e3e7ef}
-[data-align="end"] .message-bubble{background:#303d62;border-color:#798dc22b;border-radius:14px 14px 4px 14px}
+[data-own="true"] .message-bubble{background:#303d62;border-color:#798dc22b}
+.chat-message .message-bubble[data-sticker-only="true"]{background:transparent;border-color:transparent}
 .chat-message .message-meta{gap:8px;min-height:20px;color:#b6c8e7;font-size:12px}
 .chat-message .message-meta button{opacity:1;display:flex;align-items:center;justify-content:center;min-width:24px;min-height:24px}
 .chat-message .message-content p{margin:0;line-height:1.5;font-size:14px;overflow-wrap:anywhere;white-space:pre-wrap}
 .message-footer{display:flex;justify-content:flex-end;align-items:center;gap:4px;margin-top:3px;font-size:10px;color:#adb8ca;line-height:15px}
-[data-align="end"] .message-footer{color:#c0cdec}
+[data-own="true"] .message-footer{color:#c0cdec}
 .chat-message .reactions:empty{display:none}
 .chat-message .reactions:not(:empty){margin-top:5px}
-.chat-day{display:flex;justify-content:center;margin:18px 0 12px;font-size:11px;color:#aeb6c5}
+.chat-day{display:flex;justify-content:center;margin:10px 0 6px;font-size:11px;color:#aeb6c5}
 .chat-day span{padding:4px 10px;border-radius:20px;background:#ffffff09}
 .voice-messages .chat-message .message-content{max-width:85%}
 @media(max-width:760px){.chat-message[data-slot="message"] .message-content{max-width:90%}.chat-message[data-slot="message"] .message-avatar{display:none}}
 
 /* Attachment 23: compact bubbles and one author label per consecutive run. */
-.chat-message[data-slot="message"]{margin:3px 0}
+.chat-message[data-slot="message"]{margin:6px 0 0}
+.chat-message[data-slot="message"][data-grouped="true"]{margin-top:2px}
 .chat-message[data-grouped="true"] .message-avatar{visibility:hidden}
-.chat-message .message-bubble{position:relative;display:flow-root;padding:5px 10px 4px}
+.chat-message .message-bubble{position:relative;display:flow-root;padding:7px 10px 5px}
 .chat-message .message-meta{min-height:18px;margin-bottom:1px;padding-right:10px}
 .chat-message .bubble-content{display:contents}
 .chat-message .message-content p{display:inline;line-height:1.4}
 .chat-message .message-footer{float:right;display:inline-flex;margin:4px 0 0 10px;line-height:15px}
 .chat-message .sent-sticker{display:block}
-.chat-message .message-react{position:absolute;right:4px;top:2px;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#202630;color:#adb8ca;opacity:0;z-index:1}
-.chat-message:hover .message-react,.chat-message .message-react:focus-visible,.chat-message .message-react[aria-expanded="true"]{opacity:1}
-@media(hover:none){.chat-message .message-react{position:static;float:right;margin-left:6px;opacity:1}}
+.chat-message .message-avatar{flex-shrink:0}
+.chat-message .message-bottom-inline{display:contents}
+.chat-message .message-bottom-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:5px;clear:both}
+.chat-message .message-bottom-row .message-footer{float:none;flex-shrink:0;margin:0 0 1px}
+.chat-message .message-bottom-row .reactions{margin:0;gap:4px;min-width:0}
+.chat-message .reactions>button{display:inline-flex;align-items:center;gap:3px;min-height:22px;padding:1px 7px;border-radius:12px}

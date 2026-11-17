@@ -4,8 +4,8 @@ import './select.css';
 
 type Option = {value: string; label: string};
 // Prefix values so the default device's empty ID remains a selectable item.
-export function Select({id,value,onValueChange,options,label}: {id?:string;value:string;onValueChange:(value:string)=>void;options:Option[];label:string}) {
- return <Primitive.Root value={`value:${value}`} onValueChange={next=>onValueChange(next.slice(6))}>
+export function Select({id,value,onValueChange,options,label,disabled}: {id?:string;value:string;onValueChange:(value:string)=>void;options:Option[];label:string;disabled?:boolean}) {
+ return <Primitive.Root disabled={disabled} value={`value:${value}`} onValueChange={next=>onValueChange(next.slice(6))}>
   <Primitive.Trigger id={id} data-slot="select-trigger" aria-label={label}><Primitive.Value/><Primitive.Icon><ChevronDown size={16}/></Primitive.Icon></Primitive.Trigger>
   <Primitive.Portal><Primitive.Content data-slot="select-content" position="popper" sideOffset={6} collisionPadding={12}>
    <Primitive.ScrollUpButton className="select-scroll"><ChevronUp size={16}/></Primitive.ScrollUpButton>

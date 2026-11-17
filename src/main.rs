@@ -4,7 +4,11 @@ use tauri::Manager;
 mod screenshot;
 mod updates;
 mod remote;
+mod attachment_download;
 mod session_storage;
+mod notifications;
+#[cfg(windows)]
+mod tray;
 fn data_path() -> std::path::PathBuf {
     std::env::var("MINES_DATA_DIR").map(std::path::PathBuf::from).unwrap_or_else(|_| std::env::current_dir().expect("working directory").join("data")).join("mines-db.json")
 }
@@ -26,11 +30,18 @@ fn main() {
     }
     let mut context = tauri::generate_context!();
     let screenshot = std::env::args().skip_while(|a| a != "--screenshot").nth(1);
+    #[cfg(windows)]
+    {
+        // Keep the main WebView's chat polling and call signaling active when it is hidden.
+        let key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
+        let mut args = std::env::var_os(key).unwrap_or_default();
+        args.push(" --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-features=CalculateNativeWinOcclusion");
+        std::env::set_var(key, args);
+    }
     if screenshot.is_some() {
         let profile = std::env::current_dir().expect("working directory").join("shots").join(format!("webview-{}", std::process::id()));
         std::fs::create_dir_all(&profile).expect("screenshot profile directory");
         std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", profile);
-        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-features=CalculateNativeWinOcclusion");
         for window in &mut context.config_mut().app.windows {
             window.focus = false;
             #[cfg(windows)]
@@ -41,10 +52,33 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updates::UpdateStore::default())
-        .invoke_handler(tauri::generate_handler![screenshot::capture, remote::remote_api, updater_configured, updates::check_update, updates::download_update, updates::install_update, updates::restart_app])
+        .invoke_handler(tauri::generate_handler![screenshot::capture, remote::remote_api, attachment_download::save_message_attachment, remote::record_desktop_diagnostic, notifications::notify_direct_message, notifications::notification_popup_ready, notifications::resize_notification_popup, updater_configured, updates::check_update, updates::download_update, updates::install_update, updates::restart_app])
         .setup(move |app| {
             app.manage(remote::Remote::new(app.path().app_data_dir()?.join("session.dpapi"))?);
-            if let Some(path) = screenshot { screenshot::schedule(app, path)?; }
+            #[cfg(windows)]
+            if let Some(window) = app.get_webview_window("main") {
+                window.with_webview(|webview| {
+                    // This only disables WebView2's built-in menu. DOM contextmenu events still reach Sombra.
+                    let _ = unsafe {
+                        webview.controller().CoreWebView2()
+                            .and_then(|core| core.Settings())
+                            .and_then(|settings| settings.SetAreDefaultContextMenusEnabled(false))
+                    };
+                })?;
+            }
+            if let Some(path) = screenshot {
+                screenshot::schedule(app, path)?;
+            } else {
+                #[cfg(windows)]
+                {
+                    if let Err(error) = tray::setup(app) {
+                        eprintln!("Could not create the Sombra tray icon: {error}");
+                    }
+                    if let Err(error) = notifications::setup_popup(app) {
+                        eprintln!("Could not create the Sombra notification window: {error}");
+                    }
+                }
+            }
             Ok(())
         })
         .run(context)

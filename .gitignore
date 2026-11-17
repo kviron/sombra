@@ -1,4 +1,4 @@
-﻿/data/
+/data/
 /target/
 /node_modules/
 /dist/
@@ -7,6 +7,10 @@
 
 /auth-qa/
 /social-qa/
+/ui-qa/
+/user-qa/
+/attachments-qa/
+/dialog-calls-qa/
 /voice-qa/
 /.npm-cache/
 /.env
@@ -18,3 +22,5 @@
 *.key.pub
 /release-secrets/
 /release/
+/sound-design/Backups/
+/sound-design/Audio Files/

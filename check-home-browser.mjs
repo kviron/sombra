@@ -16,10 +16,12 @@ try {
  await send('Page.enable'); const me={id:'me',name:'HollyWood',bio:'',created_at:1};
  const users=[me,{id:'a',name:'Александр',bio:'',created_at:1},{id:'b',name:'Мария',bio:'',created_at:1}];
  const fixture={me,email:'',users,groups:[],dialogs:[{id:'a',name:'Личный диалог',members:['me','a']},{id:'b',name:'Личный диалог',members:['me','b']}],messages:[{id:'1',channel:'a',user:'a',text:'Привет! Сегодня будем играть?',time:Math.floor(Date.now()/1000)},{id:'2',channel:'b',user:'me',text:'Спасибо, до встречи!',time:Math.floor(Date.now()/1000)-600}],friends:[],bots:[],stickers:[]};
+ fixture.groups.push({id:'group',name:'Тестовая группа',owner:'me',invite:'test',members:['me','a'],channels:[{id:'room',name:'общий',kind:'text'}]});
  await send('Page.addScriptToEvaluateOnNewDocument',{source:`const fixture=${JSON.stringify(fixture)};window.fetch=async()=>new Response(JSON.stringify({data:fixture}),{headers:{'Content-Type':'application/json'}});`});
  await send('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
  await send('Page.navigate',{url:'http://127.0.0.1:4191/#chat'});
  await wait("document.querySelectorAll('.dialog-row').length===2");
+ assert.equal(await evaluate("!!document.querySelector('.chat-header button[title=Участники]')"),false);
  assert.equal(await evaluate("document.querySelector('.channel-sidebar').textContent.includes('Друзья')"),false);
  assert.equal(await evaluate("document.querySelector('.channel-sidebar').textContent.includes('Личные сообщения')"),false);
  await shot('home-conversations');
@@ -29,6 +31,7 @@ try {
  assert.equal(await evaluate("document.querySelector('.dialog-heading strong').textContent"),'Мария');
  await evaluate("document.querySelector('.dialog-row').click()");
  await wait("document.querySelector('.chat-header strong').textContent==='Мария'");
+ assert.equal(await evaluate("!!document.querySelector('.chat-header button[title=Участники]')"),false);
  await evaluate("document.querySelector('.dialog-search button').click()");
  await wait("document.querySelectorAll('.dialog-row').length===2");
  await shot('home-conversation-open');
@@ -36,5 +39,11 @@ try {
  await send('Input.insertText',{text:'нет такого'});
  await wait("document.querySelectorAll('.dialog-row').length===0");
  assert.equal(await evaluate("document.querySelector('.dialog-empty').textContent"),'Переписки не найдены');
+ await evaluate("document.querySelector('.server-rail button[title=\"Тестовая группа\"]').click()");
+ await wait("!!document.querySelector('.chat-header button[title=Участники]')");
+ await evaluate("document.querySelector('.chat-header button[title=Участники]').click()");
+ await wait("document.querySelector('.member-list')?.textContent.includes('Александр')");
+ await evaluate("document.querySelector('.server-rail button[title=\"Личные сообщения\"]').click()");
+ await wait("!document.querySelector('.chat-header button[title=Участники]') && !document.querySelector('.member-list')");
  console.log('PASS: home layout, names, search, clear, open conversation, empty search. Screenshots captured from production build with isolated fixture.');
 } finally {ws?.close();chrome.kill();await new Promise(r=>server.httpServer.close(r))}

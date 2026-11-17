@@ -1,0 +1,212 @@
+/* One identity component for every place a person is listed. */
+.user-avatar {
+  --avatar-size: 32px;
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  background: linear-gradient(145deg, hsl(var(--avatar-hue, 232) 36% 42%), hsl(calc(var(--avatar-hue, 232) + 28) 32% 27%));
+  color: #eef1f8;
+  font-size: calc(var(--avatar-size) * 0.4);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  box-shadow: inset 0 0 0 1px #ffffff1a;
+  user-select: none;
+}
+.user-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+.user-avatar[data-size="xs"] { --avatar-size: 20px; }
+.user-avatar[data-size="sm"] { --avatar-size: 24px; }
+.user-avatar[data-size="md"] { --avatar-size: 32px; }
+.user-avatar[data-size="lg"] { --avatar-size: 40px; }
+.user-avatar[data-size="xl"] { --avatar-size: 88px; }
+
+.user-presence {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  box-sizing: content-box;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--presence-ring, #0c0f15);
+  border-radius: 50%;
+  background: #747c8c;
+  transition: background-color 180ms ease, box-shadow 180ms ease;
+}
+.user-presence[data-online="true"] {
+  background: #3ecf8e;
+  box-shadow: 0 0 9px #3ecf8e66;
+}
+.user-avatar[data-size="xs"] .user-presence { width: 7px; height: 7px; }
+.user-avatar[data-size="sm"] .user-presence { width: 8px; height: 8px; }
+.user-avatar[data-size="xl"] .user-presence {
+  right: 4px;
+  bottom: 4px;
+  width: 13px;
+  height: 13px;
+  border-width: 3px;
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  border-radius: 8px;
+  color: #c3c8d4;
+  text-align: left;
+}
+.user-row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.user-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.user-row-title strong {
+  overflow: hidden;
+  color: #eef1f7;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-row-title > :not(strong) {
+  flex-shrink: 0;
+  color: #98a2b5;
+  font-size: 11px;
+  line-height: 1;
+}
+.user-row-subtitle {
+  overflow: hidden;
+  color: #98a2b5;
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-row[data-offline="true"] .user-avatar { opacity: 0.72; filter: saturate(0.65); }
+.user-row[data-offline="true"] .user-row-title strong { color: #bcc3d0; }
+.user-row[role="button"]:focus-visible {
+  outline: 2px solid #8c92ff;
+  outline-offset: -2px;
+  background: #ffffff0a;
+}
+
+.user-row[data-variant="member"] {
+  min-height: 40px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.chat-shell .user-row[data-variant="member"]:hover { background: #ffffff0a; color: #fff; }
+.user-row[data-variant="member"] .user-row-title strong { font-size: 14px; }
+
+.user-row[data-variant="dialog"] {
+  min-height: 64px;
+  padding: 10px 8px;
+  gap: 10px;
+}
+.chat-shell .user-row[data-variant="dialog"]:hover { color: #fff; }
+.chat-shell .user-row[data-variant="dialog"][data-selected="true"] { background: rgba(125, 145, 180, 0.22); }
+.user-row[data-variant="dialog"] .user-row-title time {
+  margin-left: auto;
+  color: #98a5b8;
+  font-size: 10px;
+}
+.user-row[data-variant="dialog"] .user-row-subtitle { margin-top: 2px; }
+
+.user-row[data-variant="voice"] {
+  min-height: 34px;
+  padding: 4px 6px;
+  gap: 8px;
+  color: #aeb4c0;
+  font-size: 13px;
+}
+.chat-shell .user-row[data-variant="voice"]:hover { background: #ffffff08; color: #eee; }
+.user-row[data-variant="voice"] .user-row-main { gap: 0; }
+.user-row[data-variant="voice"] .user-row-title strong { color: inherit; font-size: 13px; font-weight: 500; }
+.user-row[data-variant="voice"] small { font-size: 10px; opacity: 0.7; }
+.user-row[data-variant="voice"] > svg { flex-shrink: 0; }
+
+/* Members panel: grouped by presence, one row per account. */
+.member-list { padding: 14px 10px 20px; overflow: auto; }
+.member-list ul { display: flex; flex-direction: column; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.member-list .member-section + .member-section { margin-top: 22px; }
+.member-list .member-section h3 {
+  margin: 0 8px 8px;
+  color: #8d94a5;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.member-list .member-section h3 span { color: #6c7484; font-weight: 500; }
+.member-list .member-empty { margin: 0 8px; color: #7d8494; font-size: 12px; line-height: 1.5; }
+
+/* The account chip in the sidebar opens the same profile card. */
+.chat-shell .profile-self {
+  flex: 1;
+  min-width: 0;
+  gap: 10px;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+.chat-shell .profile-self:hover { background: transparent; }
+.profile-self .avatar { flex: 0 0 32px; }
+.profile-self .avatar span[data-online="false"] { background: #5d6472; }
+
+/* Author avatar and name inside a message open the profile card. */
+.chat-shell .message-avatar .avatar-trigger {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.chat-shell .message-avatar .avatar-trigger:hover { background: transparent; box-shadow: inset 0 0 0 1px #ffffff3d; }
+.chat-shell .message-author {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+.chat-shell .message-author:hover { background: transparent; text-decoration: underline; }
+
+.chat-shell .chat-header-user {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+}
+.chat-shell .chat-header-user:hover { background: transparent; color: #fff; text-decoration: underline; }
