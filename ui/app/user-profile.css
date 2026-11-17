@@ -23,7 +23,7 @@
 
 .user-profile-banner {
   position: relative;
-  height: 118px;
+  aspect-ratio: 3 / 1;
   overflow: hidden;
   border-bottom: 1px solid #ffffff12;
   background:
@@ -73,14 +73,15 @@
   position: relative;
   z-index: 1;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 16px;
-  margin-top: -42px;
+  margin-top: 0;
 }
 .user-profile-identity .user-avatar {
+  margin-top: -42px;
   box-shadow: 0 0 0 4px #171b24, 0 12px 26px #00000073, inset 0 0 0 1px #ffffff1f;
 }
-.user-profile-heading { min-width: 0; padding-bottom: 4px; }
+.user-profile-heading { min-width: 0; padding-top: 16px; padding-bottom: 4px; }
 .user-profile-heading h2 {
   margin: 0 0 6px;
   overflow-wrap: anywhere;
@@ -317,10 +318,10 @@
 
 @media (max-width: 640px) {
   .user-profile { max-height: calc(100vh - var(--title-bar-height, 32px) - 32px); border-radius: 16px; }
-  .user-profile-banner { height: 92px; }
+  .user-profile-banner { aspect-ratio: 3 / 1; }
   .user-profile-body { padding: 0 16px 18px; }
-  .user-profile-identity { gap: 12px; margin-top: -34px; }
-  .user-profile-identity .user-avatar { --avatar-size: 72px; }
+  .user-profile-identity { gap: 12px; }
+  .user-profile-identity .user-avatar { --avatar-size: 72px; margin-top: -34px; }
   .user-profile-heading h2 { font-size: 20px; }
   .user-profile-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .chat-shell .user-profile-primary,

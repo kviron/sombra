@@ -5,8 +5,15 @@ import {ColumnResizer} from './column-resizer';
 import {Select} from '@/shared/ui/select';
 import {MessageItem,ExpressionPicker,Bots,Friends} from './chat-extras';
 import {BotCommandSuggestions} from './bot-command-suggestions';
+import {BotTyping} from './bot-typing';
+import {BotSettingsDialog} from './bot-settings-dialog';
 import {NotificationSettings} from './notification-settings';
+import {AttachmentCacheSettings} from './attachment-cache-settings';
 import {ConversationMaterials} from './conversation-materials';
+import {ConversationInfoDialog,participantCount} from './conversation-info-dialog';
+import type {MaterialCategory} from '@/shared/lib/conversation-materials';
+import {GroupSettingsDialog,type GroupSettingsSection} from './group-settings-dialog';
+import {canGroup} from '@/shared/lib/group-permissions';
 import {DialogListRow} from './dialog-list-row';
 import {StickerLibrary} from './sticker-library';
 import {StickerSuggestions} from './sticker-suggestions';
@@ -29,21 +36,27 @@ import {Button} from '@/shared/ui/button';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {AccountSecurity} from './account-security';
 import {toast} from 'sonner';
-import {prepareAvatar} from '@/shared/lib/prepare-avatar';
+
 ﻿import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {PanelRight,Home,Phone,Video,Bot,ChevronUp,Volume2,Plus,MessageCircle,Users,Settings,LogOut,Send,X,Search,Mic,MicOff,Headphones,HeadphoneOff} from 'lucide-react';
-import {api,logout,type ChatState,type ChatPreferences,type DialogPreferences,type Group,type Channel,type Dialog} from '@/shared/api/backend';
+import {ShieldCheck,PanelRight,Home,Phone,Video,Bot,ChevronUp,Volume2,Plus,MessageCircle,Users,Settings,LogOut,Send,X,Search,Mic,MicOff,Headphones,HeadphoneOff} from 'lucide-react';
+import {api,logout,type ChatState,type ChatPreferences,type DialogPreferences,type Group,type GroupPermission,type Channel,type Dialog} from '@/shared/api/backend';
 import './chat.css';
 import {useChatDraft} from './use-chat-draft';
 import {useMessageLink} from './use-message-link';
+import {useMessageReadState} from './message-read-state';
 export function LiveChat(){
  const call=useVoice();
  const microphoneOff=call.muted||call.deaf;
  const [accountSection,setAccountSection]=useState<AccountSection>('profile');
+ const [botSettingsId,setBotSettingsId]=useState('');
  useEffect(()=>{const open=()=>{setAccountSection('updates');setSettings(true)};window.addEventListener('sombra:open-updates',open);return()=>window.removeEventListener('sombra:open-updates',open)},[]);
  const [state,setState]=useState<ChatState|null>(null),[groupId,setGroupId]=useState(''),[channelId,setChannelId]=useState(''),[home,setHome]=useState(true),[error,setError]=useState(''),[search,setSearch]=useState(''),[settings,setSettings]=useState(false),[modal,setModal]=useState(''),[name,setName]=useState(''),[selected,setSelected]=useState<string[]>([]),[busy,setBusy]=useState(false),[members,setMembers]=useState(false),[profileId,setProfileId]=useState('');
  const [materialsOpen,setMaterialsOpen]=useState(false),[jumpTarget,setJumpTarget]=useState('');
  const materialsTrigger=useRef<HTMLButtonElement>(null);
+ const infoTrigger=useRef<HTMLButtonElement>(null);
+ const [infoOpen,setInfoOpen]=useState(false),[headerProfile,setHeaderProfile]=useState(false),[materialsCategory,setMaterialsCategory]=useState<MaterialCategory|'all'>('all'),[materialsEpoch,setMaterialsEpoch]=useState(0);
+ function openInfoMaterials(category:MaterialCategory){setInfoOpen(false);setProfileId('');setHeaderProfile(false);setMaterialsCategory(category);setMaterialsEpoch(value=>value+1);setMaterialsOpen(true);requestAnimationFrame(()=>document.querySelector<HTMLElement>('#conversation-materials button')?.focus())}
+ function openInfoProfile(id:string){setInfoOpen(false);setHeaderProfile(false);requestAnimationFrame(()=>{infoTrigger.current?.focus();setProfileId(id)})}
  function closeMaterials(){setMaterialsOpen(false);requestAnimationFrame(()=>materialsTrigger.current?.focus())}
  function jumpToMessage(id:string){setSearch('');setMaterialsOpen(false);setJumpTarget(id)}
  useEffect(()=>{
@@ -52,6 +65,11 @@ export function LiveChat(){
   const timer=setTimeout(()=>setJumpTarget(''),2500);
   return()=>{cancelAnimationFrame(frame);clearTimeout(timer)};
  },[jumpTarget,search]);
+ const [rolesGroupId,setRolesGroupId]=useState('');
+ const [groupSettingsSection,setGroupSettingsSection]=useState<GroupSettingsSection>('general');
+ const rolesGroup=state?.groups.find(item=>item.id===rolesGroupId);
+ function permits(target:Group|undefined,permission:GroupPermission){return !!state&&canGroup(target,state.me.id,permission)}
+ function canEditGroup(target:Group|undefined){return !!target&&!!state&&target.members.includes(state.me.id)}
  const conversationMotion=useScreenGlitch(`${home}:${groupId}:${channelId}`);
  const settingsMotion=useScreenGlitch(`${settings}:${accountSection}`);
  const [participantVolumes,setParticipantVolumes]=useState<Record<string,number>>({});
@@ -128,7 +146,12 @@ export function LiveChat(){
   setAccountSection('profile');
   setSettings(true);
  }
- function applyState(next:ChatState){setState(previous=>previous?.me.id===next.me.id&&previous.chatPreferences&&(!next.chatPreferences||(next.chatPreferences.revision||0)<(previous.chatPreferences.revision||0))?{...next,chatPreferences:previous.chatPreferences}:next)}
+ function applyState(next:ChatState){setState(previous=>{
+  if(!previous||previous.me.id!==next.me.id)return next;
+  const groups=next.groups.map(group=>{const old=previous.groups.find(item=>item.id===group.id);return old&&(old.rolesRevision||0)>(group.rolesRevision||0)?old:group});
+  const chatPreferences=previous.chatPreferences&&(!next.chatPreferences||(next.chatPreferences.revision||0)<(previous.chatPreferences.revision||0))?previous.chatPreferences:next.chatPreferences;
+  return {...next,groups,chatPreferences};
+ })}
  function applyChatPreferences(owner:string,preferences:ChatPreferences){setState(previous=>previous?.me.id===owner&&(preferences.revision||0)>=(previous.chatPreferences?.revision||0)?{...previous,chatPreferences:preferences}:previous)}
  const pendingDialogPreferences=useRef(new Set<string>());
  const [dialogPreferencesBusy,setDialogPreferencesBusy]=useState<Record<string,boolean>>({});
@@ -148,9 +171,9 @@ export function LiveChat(){
  const group=state?.groups.find(g=>g.id===groupId)||state?.groups[0];
  const canShowMembers=!home&&!!group;
  const channel=home?state?.dialogs.find(d=>d.id===channelId):(group?.channels.find(c=>c.id===channelId)||group?.channels.find(c=>c.name==='games')||group?.channels[0]);
- useDirectMessageNotifications(state,{activeChannel:channel?.id,settingsOpen:settings||!!modal||!!profileId});
+ useDirectMessageNotifications(state,{activeChannel:channel?.id,settingsOpen:settings||!!modal||!!profileId||infoOpen});
  const {draft,setDraft,clearSent}=useChatDraft(channel?.id||'');
- const messageLink=useMessageLink({channel:channel?.id||'',draft,setDraft,disabled:busy||settings||!!modal||!!profileId||!!dialogCalls.incoming});
+ const messageLink=useMessageLink({channel:channel?.id||'',draft,setDraft,disabled:busy||settings||!!modal||!!profileId||infoOpen||!!dialogCalls.incoming});
  const [attachments,setAttachments]=useState<Record<string,AttachmentDraft|undefined>>({});
  const [readingAttachments,setReadingAttachments]=useState<Record<string,boolean>>({});
  const attachmentReads=useRef<Record<string,number>>({});
@@ -176,9 +199,8 @@ export function LiveChat(){
  }
  const [editingChannel,setEditingChannel]=useState<{group:string;channel:Channel}|null>(null);
  const [editingGroup,setEditingGroup]=useState<Pick<Group,'id'|'name'|'avatar'>|null>(null);
- const [avatarDraft,setAvatarDraft]=useState<string>();
- const groupAvatar=avatarDraft??editingGroup?.avatar??'';
- const groupAvatarChanged=groupAvatar!==(editingGroup?.avatar??'');
+ const editingGroupData=state?.groups.find(item=>item.id===editingGroup?.id);
+ const editingChannelGroup=state?.groups.find(item=>item.id===editingChannel?.group);
  const [channelKind,setChannelKind]=useState('text');
  const end=useRef<HTMLDivElement>(null);
  const voice=(!!channel&&'kind' in channel&&channel.kind==='voice')||!!(voiceRoom&&call.room===voiceRoom);
@@ -190,26 +212,17 @@ export function LiveChat(){
  const showFriends=home&&channelId==='friends';
  const title=showFriends?'Друзья':channel?(home?dialogName(channel as Dialog):channel.name):(home?'Выберите переписку':group?'Выберите канал':'Выберите группу');
  const dmPeer=home&&channel&&'members' in channel&&channel.members.length===2?state?.users.find(user=>user.id!==state.me.id&&(channel as Dialog).members.includes(user.id)):undefined;
+ const ownerDmBot=dmPeer?.bot&&!state?.me.bot?state?.bots?.find(bot=>bot.id===dmPeer.id&&bot.owner===state.me.id):undefined;
+ const managedBot=state&&!state.me.bot?state.bots?.find(bot=>bot.id===botSettingsId&&bot.owner===state.me.id):undefined;
  const userName=(id:string)=>state?.users.find(u=>u.id===id)?.name||'Участник';
- function open(kind:string){setChannelKind('text');setModal(kind);setName('');setSelected([]);setError('')}
+ function open(kind:string){setChannelKind(kind==='channel'&&!permits(group,'channels.create_text')?'voice':'text');setModal(kind);setName('');setSelected([]);setError('')}
  function editGroup(target:Group){
-  if(target.owner!==state?.me.id)return;
-  setEditingGroup({id:target.id,name:target.name,avatar:target.avatar});
-  setAvatarDraft(undefined);
-  setName(target.name);
-  setError('');
-  setModal('edit-group');
- }
- async function selectGroupAvatar(file:File){
-  setBusy(true);
-  setError('');
-  try{setAvatarDraft(await prepareAvatar(file))}
-  catch(e){setError((e as Error).message)}
-  finally{setBusy(false)}
+  if(!canEditGroup(target))return;
+  setGroupSettingsSection('general');setRolesGroupId(target.id);
  }
  function manageStickers(scope:'personal'|'group'){
   if(scope==='group'){
-   if(!group||group.owner!==state?.me.id)return;
+   if(!group||!permits(group,'stickers.manage'))return;
    setEditingGroup({id:group.id,name:group.name,avatar:group.avatar});
    setModal('group-stickers');
    return;
@@ -217,8 +230,8 @@ export function LiveChat(){
   setAccountSection('stickers');
   setSettings(true);
  }
- function editChannel(c:Channel){if(!group||group.owner!==state?.me.id)return;setEditingChannel({group:group.id,channel:c});setName(c.name);setError('');setModal('edit-channel')}
- function channelSettings(c:Channel){return group?.owner===state?.me.id?<button type="button" className="channel-settings" title="Настроить канал" aria-label={`Настроить канал ${c.name}`} onClick={()=>editChannel(c)}><MotionIcon icon={Settings} kind="settings" size={16}/></button>:null}
+ function editChannel(c:Channel){if(!group||(!permits(group,'channels.rename')&&!permits(group,'channels.delete')))return;setEditingChannel({group:group.id,channel:c});setName(c.name);setError('');setModal('edit-channel')}
+ function channelSettings(c:Channel){return permits(group,'channels.rename')||permits(group,'channels.delete')?<button type="button" className="channel-settings" title="Настроить канал" aria-label={`Настроить канал ${c.name}`} onClick={()=>editChannel(c)}><MotionIcon icon={Settings} kind="settings" size={16}/></button>:null}
  async function send(e:FormEvent){
   e.preventDefault();
   if(!channel||(!draft.trim()&&!attachment)||busy||readingAttachment)return;
@@ -243,23 +256,25 @@ export function LiveChat(){
   }catch(e){setError((e as Error).message);return false}
   finally{setBusy(false)}
  }
+ async function leaveGroup(target:Group){
+  if(!state||target.owner===state.me.id||busy||!window.confirm(`Покинуть группу «${target.name}»?`))return;
+  setBusy(true);try{await api('leave_group',{group:target.id});if(target.channels.some(channel=>channel.id===call.room))call.leave();if(groupId===target.id){setHome(true);setGroupId('');setChannelId('')}await refresh()}catch(reason){toast.error((reason as Error).message)}finally{setBusy(false)}
+ }
+ async function rotateInvite(){
+  if(!group||!permits(group,'invite.rotate')||busy||!window.confirm('Заменить код приглашения? Старый код перестанет работать.'))return;
+  setBusy(true);setError('');try{await api('rotate_group_invite',{group:group.id});await refresh();toast.success('Код приглашения обновлён')}catch(reason){setError((reason as Error).message)}finally{setBusy(false)}
+ }
  async function create(e:FormEvent){e.preventDefault();if(busy||modal==='group-stickers')return;setBusy(true);setError('');try{
  if(modal==='invite'){
-  if(!group||group.owner!==state?.me.id)return;
+  if(!group||!permits(group,'members.invite'))return;
   await api('invite_group_member',{group:group.id,email:name.trim()});
   setModal('');
   toast.success('Участник добавлен в группу');
   return;
  }
- if(modal==='edit-group'&&editingGroup){
-  await api('update_group',{
-   group:editingGroup.id,
-   ...(name.trim()!==editingGroup.name&&{name}),
-   ...(groupAvatarChanged&&{avatar:groupAvatar}),
-  });
- }
- else if(modal==='edit-channel'&&editingChannel){await api('update_channel',{group:editingChannel.group,channel:editingChannel.channel.id,name})}
+ if(modal==='edit-channel'&&editingChannel){if(!permits(editingChannelGroup,'channels.rename'))throw new Error('Нет права переименовывать каналы');await api('update_channel',{group:editingChannel.group,channel:editingChannel.channel.id,name})}
  else if(modal==='delete-channel'&&editingChannel){
+   if(!permits(editingChannelGroup,'channels.delete'))throw new Error('Нет права удалять каналы');
   const target=editingChannel.channel.id;
   await api('delete_channel',{group:editingChannel.group,channel:target});
   if(call.room===target)call.leave();
@@ -270,15 +285,17 @@ export function LiveChat(){
  else if(modal==='dialog'){const d=await api<Dialog>('create_dialog',{name,members:selected});setHome(true);setChannelId(d.id)}
  else if(modal==='group'){const created=await api<Group>('create_group',{name});setGroupId(created.id);setChannelId('');setHome(false)}
  else if(modal==='join'){const joined=await api<Group>('join_group',{invite:name.trim()});setGroupId(joined.id);setChannelId('');setHome(false)}
- else if(modal==='channel'){const created=await api<Channel>('create_channel',{group:group?.id,name,kind:channelKind});setChannelId(created.id)}
+ else if(modal==='channel'){if(!permits(group,channelKind==='voice'?'channels.create_voice':'channels.create_text'))throw new Error('Нет права создавать этот тип канала');const created=await api<Channel>('create_channel',{group:group?.id,name,kind:channelKind});setChannelId(created.id)}
  await refresh();setModal('');
  }catch(e){setError((e as Error).message)}finally{setBusy(false)}}
- useEffect(()=>{setSearch('');setError('');setJumpTarget('')},[channel?.id]);
+ useEffect(()=>{setSearch('');setError('');setJumpTarget('');setInfoOpen(false);setHeaderProfile(false);setMaterialsCategory('all')},[channel?.id]);
  useEffect(()=>{if(!jumpTarget)end.current?.scrollIntoView({block:'nearest'})},[channel?.id,state?.messages.length]);
- useEffect(()=>{if((!modal||modal==='dialog')&&!settings)return;const previous=document.activeElement as HTMLElement;const dialog=document.querySelector<HTMLElement>('[role=dialog]');dialog?.querySelector<HTMLElement>('input,button')?.focus();const handle=(e:KeyboardEvent)=>{if(e.key==='Escape'&&!busy){setModal('');setSettings(false);setError('')}if(e.key==='Tab'&&dialog){const items=Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,a[href]'));const visible=items.filter(item=>item.getClientRects().length>0);const first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}};window.addEventListener('keydown',handle);return()=>{window.removeEventListener('keydown',handle);previous?.focus()}},[modal,settings,busy]);
- const visibleMessages=state?.messages.filter(m=>m.channel===channel?.id&&(m.text+' '+userName(m.user)).toLowerCase().includes(search.toLowerCase()))||[];
+ useEffect(()=>{if((!modal||modal==='dialog'||modal==='edit-group')&&!settings)return;const previous=document.activeElement as HTMLElement;const dialog=document.querySelector<HTMLElement>('[role=dialog]');dialog?.querySelector<HTMLElement>('input,button')?.focus();const handle=(e:KeyboardEvent)=>{if(e.defaultPrevented||document.querySelector('[data-image-crop-dialog]'))return;if(e.key==='Escape'&&!busy){setModal('');setSettings(false);setError('')}if(e.key==='Tab'&&dialog){const items=Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,a[href]'));const visible=items.filter(item=>item.getClientRects().length>0);const first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}};window.addEventListener('keydown',handle);return()=>{window.removeEventListener('keydown',handle);previous?.focus()}},[modal,settings,busy]);
  const profile=profileId&&state?(state.me.id===profileId?state.me:state.users.find(user=>user.id===profileId)):undefined;
- return <UserActionsProvider value={{me:state?.me,openProfile:setProfileId,messageUser:id=>void messageUser(id),editOwnProfile:openOwnProfile,friendStatus,addFriend:id=>void requestFriend(id),acceptFriend:id=>void acceptFriend(id),removeFriend:id=>void removeFriend(id)}}>
+ // Draft IDs survive modal closure; only rendered overlays block read receipts.
+ useMessageReadState(state,channel?.id||'',settings||!!modal||!!profile||headerProfile||infoOpen||!!rolesGroup||!!managedBot||!!dialogCalls.incoming||showFriends);
+ const visibleMessages=state?.messages.filter(m=>m.channel===channel?.id&&(m.text+' '+userName(m.user)).toLowerCase().includes(search.toLowerCase()))||[];
+ return <UserActionsProvider value={{me:state?.me,openProfile:id=>{setHeaderProfile(false);setProfileId(id)}, messageUser:id=>void messageUser(id),editOwnProfile:openOwnProfile,friendStatus,addFriend:id=>void requestFriend(id),acceptFriend:id=>void acceptFriend(id),removeFriend:id=>void removeFriend(id)}}>
  <main className="chat-shell">
  <div className="voice-playback">{Object.entries(call.streams).map(([id,stream])=>{
   const peer=call.peers.find(peer=>peer.client===id);
@@ -290,7 +307,7 @@ export function LiveChat(){
   <div className="rail-line"/>
   {state?.groups.map(g=><EntityContextMenu
    key={g.id}
-   actions={g.owner===state.me.id?[{label:'Настройки группы',icon:Settings,onSelect:()=>editGroup(g)}]:undefined}
+   actions={[...(canEditGroup(g)?[{label:'Настройки группы',icon:Settings,onSelect:()=>editGroup(g)}]:[]),{label:'Роли и права',icon:ShieldCheck,onSelect:()=>{setGroupSettingsSection('roles');setRolesGroupId(g.id)}},...(g.rolesRevision!==undefined&&g.owner!==state.me.id?[{label:'Покинуть группу',icon:LogOut,onSelect:()=>void leaveGroup(g)}]:[])]}
   >
    <button className={'server '+(!home&&group?.id===g.id?'active':'')} title={g.name} aria-label={g.name} onClick={()=>{setGroupId(g.id);setChannelId('');setHome(false)}}>
     {g.avatar?<img className="server-avatar" src={g.avatar} alt=""/>:g.name.slice(0,2)}
@@ -302,8 +319,9 @@ export function LiveChat(){
  <aside className="channel-sidebar"><ColumnResizer label="Ширина списка каналов" side="right" variable="--channel-width" min={190} max={480}/>{home?<header className="dialog-search-header"><label className="dialog-search"><Search size={17}/><input aria-label="Поиск переписок" placeholder="Поиск" value={dialogSearch} onChange={e=>setDialogSearch(e.target.value)}/>{dialogSearch&&<button aria-label="Очистить поиск переписок" onClick={()=>setDialogSearch('')}><X size={15}/></button>}</label><button className="new-dialog" title="Новый диалог" onClick={()=>open('dialog')}><Plus size={19}/></button></header>:<header className="group-header">
  <strong title={group?.name}>{group?.name||'Ваши группы'}</strong>
  <button title="Новый диалог" onClick={()=>open('dialog')}><Plus size={19}/></button>
- {group&&group.owner===state?.me.id&&<button type="button" className="group-settings-button" title="Настройки группы" aria-label="Настройки группы" onClick={()=>editGroup(group)}><MotionIcon icon={Settings} kind="settings" size={17}/></button>}
- </header>}<div className="channel-list">{home?<><Button type="button" variant="ghost" className={'friends-nav '+(showFriends?'selected':'')} aria-pressed={showFriends} onClick={()=>setChannelId('friends')}><Users size={20}/><span>Друзья</span>{!!state?.friends.filter(friend=>!friend.accepted&&friend.to===state.me.id).length&&<small>{state.friends.filter(friend=>!friend.accepted&&friend.to===state.me.id).length}</small>}</Button><div className="category">Личные сообщения<button type="button" title="Создать сообщение" aria-label="Создать сообщение" onClick={()=>open('dialog')}><Plus size={15}/></button></div><div className="dialog-list" aria-label="Переписки">{dialogs.map(d=>{const last=latest.get(d.id);const peer=d.members.length===2?state?.users.find(u=>u.id!==state.me.id&&d.members.includes(u.id)):undefined;const name=dialogName(d);return <DialogListRow key={d.id} dialog={d} name={name} peer={peer} last={last} meId={state?.me.id||''} active={d.id===channel?.id} preferences={preferencesForDialog(d.id)} busy={!!dialogPreferencesBusy[d.id]} onSelect={()=>setChannelId(d.id)} onUpdate={patch=>void changeDialogPreferences(d.id,patch)}/>})}</div>{!dialogs.length&&<p className="dialog-empty">{dialogSearch.trim()?'Переписки не найдены':state?'Пока нет переписок. Нажмите +, чтобы начать разговор.':'Загрузка переписок…'}</p>}</>:<>{group&&<button className="channel" onClick={()=>open('invite')}><Users/>Пригласить участников</button>}<div className="category">Текстовые каналы{group?.owner===state?.me.id&&<button title="Добавить канал" onClick={()=>open('channel')}><Plus size={15}/></button>}</div>{group?.channels.filter(c=>c.kind==='text').map(c=><div className={'channel-row '+(c.id===channel?.id?'selected':'')} key={c.id}><button className={'channel '+(c.id===channel?.id?'selected':'')} onClick={()=>setChannelId(c.id)}><MessageCircle/><span>{c.name}</span></button>{channelSettings(c)}</div>)}<div className="category">Голосовые каналы</div>{group?.channels.filter(c=>c.kind==='voice').map(c=><div className="voice-channel" key={c.id}><div className={'channel-row '+(c.id===channel?.id?'selected':'')}><button className={'channel '+(c.id===channel?.id?'selected':'')} key={c.id} onClick={()=>setChannelId(c.id)} onDoubleClick={()=>{setChannelId(c.id);if(call.room!==c.id&&!call.busy)void call.join(c.id)}}><Volume2/><span>{c.name}</span></button>{channelSettings(c)}</div>
+ {group&&canEditGroup(group)&&<button type="button" className="group-settings-button" title="Настройки группы" aria-label="Настройки группы" onClick={()=>editGroup(group)}><MotionIcon icon={Settings} kind="settings" size={17}/></button>}
+ {group&&<button type="button" className="group-roles-button" title="Роли и права" aria-label="Роли и права группы" onClick={()=>{setGroupSettingsSection('roles');setRolesGroupId(group.id)}}><ShieldCheck size={17}/></button>}</header>}<div className="channel-list">{home?<><Button type="button" variant="ghost" className={'friends-nav '+(showFriends?'selected':'')} aria-pressed={showFriends} onClick={()=>setChannelId('friends')}><Users size={20}/><span>Друзья</span>{!!state?.friends.filter(friend=>!friend.accepted&&friend.to===state.me.id).length&&<small>{state.friends.filter(friend=>!friend.accepted&&friend.to===state.me.id).length}</small>}</Button><div className="category">Личные сообщения<button type="button" title="Создать сообщение" aria-label="Создать сообщение" onClick={()=>open('dialog')}><Plus size={15}/></button></div><div className="dialog-list" aria-label="Переписки">{dialogs.map(d=>{const last=latest.get(d.id);const peer=d.members.length===2?state?.users.find(u=>u.id!==state.me.id&&d.members.includes(u.id)):undefined;const name=dialogName(d);return <DialogListRow readReceiptsSupported={state?.readReceiptsSupported} key={d.id} dialog={d} name={name} peer={peer} last={last} meId={state?.me.id||''} active={d.id===channel?.id} preferences={preferencesForDialog(d.id)} busy={!!dialogPreferencesBusy[d.id]} onSelect={()=>setChannelId(d.id)} onUpdate={patch=>void changeDialogPreferences(d.id,patch)}/>})}</div>{!dialogs.length&&<p className="dialog-empty">{dialogSearch.trim()?'Переписки не найдены':state?'Пока нет переписок. Нажмите +, чтобы начать разговор.':'Загрузка переписок…'}</p>}</>:<>{group&&(permits(group,'members.invite')||permits(group,'invite.rotate'))&&<button className="channel" onClick={()=>open('invite')}><Users/>Пригласить участников</button>}<div className="category">Текстовые каналы{permits(group,'channels.create_text')&&<button title="Добавить канал" onClick={()=>open('channel')}><Plus size={15}/></button>}</div>{group?.channels.filter(c=>c.kind==='text').map(c=><div className={'channel-row '+(c.id===channel?.id?'selected':'')} key={c.id}><button className={'channel '+(c.id===channel?.id?'selected':'')} onClick={()=>setChannelId(c.id)}><MessageCircle/><span>{c.name}</span></button>{channelSettings(c)}</div>)}
+ <div className="category">Голосовые каналы{permits(group,'channels.create_voice')&&<button type="button" title="Добавить голосовой канал" aria-label="Добавить голосовой канал" onClick={()=>{open('channel');setChannelKind('voice')}}><Plus size={15}/></button>}</div>{group?.channels.filter(c=>c.kind==='voice').map(c=><div className="voice-channel" key={c.id}><div className={'channel-row '+(c.id===channel?.id?'selected':'')}><button className={'channel '+(c.id===channel?.id?'selected':'')} key={c.id} onClick={()=>setChannelId(c.id)} onDoubleClick={()=>{setChannelId(c.id);if(call.room!==c.id&&!call.busy)void call.join(c.id)}}><Volume2/><span>{c.name}</span></button>{channelSettings(c)}</div>
  <VoiceParticipants voice={call} room={c.id} title={c.name} me={state?.me} users={state?.users||[]} presence={state?.voicePresence?.[c.id]}
   volumeForUser={volumeForUser} setUserVolume={setUserVolume}
   canRequestFriend={canRequestFriend} requestFriend={id=>void requestFriend(id)}/>
@@ -312,45 +330,31 @@ export function LiveChat(){
   <div className="voice-device-control"><Button type="button" variant="ghost" size="icon-sm" title={microphoneOff?'Включить микрофон':'Выключить микрофон'} aria-label="Микрофон" aria-pressed={microphoneOff} onClick={call.toggleMic}>{microphoneOff?<MotionIcon icon={MicOff} kind="device" size={18} className="text-red-400"/>:<MotionIcon icon={Mic} kind="device" size={18}/>}</Button><VoiceQuickSettings voice={call} kind="input" onSettings={()=>{setAccountSection('voice');setSettings(true)}}/></div>
   <div className="voice-device-control"><Button type="button" variant="ghost" size="icon-sm" title={call.deaf?'Включить звук':'Отключить звук'} aria-label="Наушники" aria-pressed={call.deaf} onClick={call.toggleDeaf}>{call.deaf?<MotionIcon icon={HeadphoneOff} kind="device" size={18} className="text-red-400"/>:<MotionIcon icon={Headphones} kind="device" size={18}/>}</Button><VoiceQuickSettings voice={call} kind="output" onSettings={()=>{setAccountSection('voice');setSettings(true)}}/></div>
   <button title="Настройки пользователя" onClick={()=>setSettings(true)}><MotionIcon icon={Settings} kind="settings" size={19}/></button></footer></aside>
- <AttachmentDropZone channel={channel?.id} disabled={busy||readingAttachment||settings||!!modal||!!profileId||!!dialogCalls.incoming} onFile={file=>void selectAttachment(file)}><header className="chat-header">{home?<MessageCircle/>:voice?<Volume2/>:<MessageCircle/>}<strong>{dmPeer?<button type="button" className="chat-header-user" title={`Профиль ${dmPeer.name}`} onClick={()=>setProfileId(dmPeer.id)}>{title}</button>:title}</strong><div className="header-actions">{home&&channel&&!showFriends&&!dmPeer?.bot&&<div className="dialog-call-header-actions"><Button type="button" variant="ghost" size="icon-sm" title="Начать аудиозвонок" aria-label="Начать аудиозвонок" disabled={dialogCalls.busy||call.busy} onClick={()=>void dialogCalls.start(channel.id,false)}><Phone/></Button><Button type="button" variant="ghost" size="icon-sm" title="Начать видеозвонок" aria-label="Начать видеозвонок" disabled={dialogCalls.busy||call.busy} onClick={()=>void dialogCalls.start(channel.id,true)}><Video/></Button></div>}{!home&&channel&&<button title="Боты комнаты" onClick={()=>open('bots')}><Bot/></button>}{canShowMembers&&<button title="Участники" aria-pressed={members&&!materialsOpen} onClick={()=>{setMaterialsOpen(false);setMembers(open=>materialsOpen?true:!open)}}><Users/></button>}<label className="chat-search"><input aria-label="Поиск сообщений" placeholder="Поиск сообщений" value={search} onChange={e=>setSearch(e.target.value)}/><Search size={17}/></label>{channel&&!showFriends&&<button ref={materialsTrigger} type="button" className="materials-toggle" aria-label="Открыть материалы переписки" title="Фото, файлы и ссылки" aria-controls="conversation-materials" aria-expanded={materialsOpen} onClick={()=>setMaterialsOpen(open=>!open)}><PanelRight size={19}/></button>}</div></header>{error&&<div className="chat-notice" role="alert">{error}<a href="#login">Войти</a><button onClick={()=>setError('')} title="Закрыть"><X size={16}/></button></div>}
+ <AttachmentDropZone channel={channel?.id} disabled={busy||readingAttachment||settings||!!modal||!!profileId||infoOpen||!!dialogCalls.incoming} onFile={file=>void selectAttachment(file)}><header className="chat-header">{home?<MessageCircle/>:voice?<Volume2/>:<MessageCircle/>}{channel&&!showFriends?<button ref={infoTrigger} type="button" className="chat-conversation-info" aria-label="Информация о чате" title="Информация о чате" onClick={()=>{if(home&&'members' in channel&&channel.members.length===2){if(dmPeer){setHeaderProfile(true);setProfileId(dmPeer.id)}else setInfoOpen(true)}else setInfoOpen(true)}}><strong>{title}</strong>{home&&'members' in channel&&channel.members.length>2&&<small>{participantCount(channel.members.length)}</small>}</button>:<strong>{title}</strong>}<div className="header-actions">{ownerDmBot&&<Button type="button" variant="ghost" size="icon-sm" title="Управление ботом" aria-label="Управление ботом" onClick={()=>setBotSettingsId(ownerDmBot.id)}><Settings/></Button>}{home&&channel&&!showFriends&&!dmPeer?.bot&&<div className="dialog-call-header-actions"><Button type="button" variant="ghost" size="icon-sm" title="Начать аудиозвонок" aria-label="Начать аудиозвонок" disabled={dialogCalls.busy||call.busy} onClick={()=>void dialogCalls.start(channel.id,false)}><Phone/></Button><Button type="button" variant="ghost" size="icon-sm" title="Начать видеозвонок" aria-label="Начать видеозвонок" disabled={dialogCalls.busy||call.busy} onClick={()=>void dialogCalls.start(channel.id,true)}><Video/></Button></div>}{!home&&channel&&<button title="Боты комнаты" onClick={()=>open('bots')}><Bot/></button>}{canShowMembers&&<button title="Участники" aria-pressed={members&&!materialsOpen} onClick={()=>{setMaterialsOpen(false);setMembers(open=>materialsOpen?true:!open)}}><Users/></button>}<label className="chat-search"><input aria-label="Поиск сообщений" placeholder="Поиск сообщений" value={search} onChange={e=>setSearch(e.target.value)}/><Search size={17}/></label>{channel&&!showFriends&&<button ref={materialsTrigger} type="button" className="materials-toggle" aria-label="Открыть материалы переписки" title="Фото, файлы и ссылки" aria-controls="conversation-materials" aria-expanded={materialsOpen} onClick={()=>{setMaterialsCategory('all');setMaterialsEpoch(value=>value+1);setMaterialsOpen(open=>!open)}}><PanelRight size={19}/></button>}</div></header>{error&&<div className="chat-notice" role="alert">{error}<a href="#login">Войти</a><button onClick={()=>setError('')} title="Закрыть"><X size={16}/></button></div>}
  {dialogCalls.error&&!dialogCalls.incoming&&<div className="chat-notice" role="alert">{dialogCalls.error}<button type="button" aria-label="Закрыть ошибку звонка" onClick={dialogCalls.clearError}><X size={16}/></button></div>}
  {currentDialogCall&&<DialogCallBanner call={currentDialogCall} joined={call.room===currentDialogCall.id} busy={dialogCalls.busy||call.busy} onJoin={()=>void dialogCalls.join(currentDialogCall)} onLeave={call.leave}/>}
- <div className="conversation-body" ref={conversationMotion}><div className={voice?"chat-main voice-layout":"chat-main"}>{voice&&<ColumnResizer label="Ширина чата канала" side="left" variable="--voice-chat-width" min={260} max={600} target=".voice-messages"/>}{showFriends&&state?<Friends state={state} refresh={refresh} onError={setError} onDialog={id=>{setHome(true);setChannelId(id)}}/>:voice?<VoiceStage voice={call} id={voiceRoom||channel!.id} title={title} userName={userName} me={state?.me.name||"Вы"} meUser={state?.me} users={state?.users} onSettings={()=>{setAccountSection("voice");setSettings(true)}}/>:<div className="message-scroll">{!channel&&home&&state?<p className="conversation-empty">Выберите переписку слева или начните новый диалог кнопкой +.</p>:<>{!visibleMessages.length&&!search&&<p className="conversation-empty">{channel?'Пока тихо. Начните разговор — отправьте первое сообщение.':'Выберите или создайте комнату, чтобы начать общение.'}</p>}{state&&visibleMessages.map((m,i)=><div key={m.id} data-message-id={m.id} className={jumpTarget===m.id?'message-jump-highlight':undefined}>{(i===0||new Date(m.time*1000).toDateString()!==new Date(visibleMessages[i-1].time*1000).toDateString())&&<div className="chat-day"><span>{new Date(m.time*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})}</span></div>}<MessageItem previous={visibleMessages[i-1]} message={m} state={state} refresh={refresh} onError={setError} userName={userName}/></div>)}</>}{search&&!visibleMessages.length&&<p className="no-results">Сообщения не найдены</p>}<div ref={end}/></div>}{voice&&<div className="voice-messages"><h3>Чат канала · {title}</h3>{state&&visibleMessages.map((m,i)=><div key={m.id} data-message-id={m.id} className={jumpTarget===m.id?'message-jump-highlight':undefined}>{(i===0||new Date(m.time*1000).toDateString()!==new Date(visibleMessages[i-1].time*1000).toDateString())&&<div className="chat-day"><span>{new Date(m.time*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})}</span></div>}<MessageItem previous={visibleMessages[i-1]} message={m} state={state} refresh={refresh} onError={setError} userName={userName}/></div>)}<div ref={end}/></div>}{channel&&<form className="composer" onSubmit={send}><AttachmentComposer draft={attachment} reading={readingAttachment} disabled={busy} onFile={file=>void selectAttachment(file)} onRemove={removeAttachment}/><textarea ref={messageLink.textareaRef} rows={1} onPaste={event=>{const file=pastedAttachment(event);if(file)void selectAttachment(file)}} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}} aria-label="Сообщение" placeholder={`Написать в ${title}`} value={draft} disabled={!channel} onChange={e=>setDraft(e.target.value)} maxLength={2000}/>{state&&<BotCommandSuggestions state={state} channel={channel.id} group={home?undefined:group?.id} draft={draft} disabled={busy} onSelect={setDraft}/>}{state&&<StickerSuggestions key={channel.id} draft={draft} stickers={state.stickers} user={state.me.id} group={home?undefined:group?.id} busy={busy} onSelect={sendStickerSuggestion}/>}{state&&<ExpressionPicker key={channel.id} state={state} refresh={refresh} onError={setError} disabled={busy} group={home?undefined:group} onManage={manageStickers} onEmoji={e=>setDraft(draft+e)} onSticker={async sticker=>{await api('message',{channel:channel.id,sticker});await refresh()}}/>}<button type="submit" title="Отправить сообщение" disabled={busy||readingAttachment||!channel||(!draft.trim()&&!attachment)}><MotionIcon icon={Send} kind="send" size={20}/></button></form>}</div>{!materialsOpen&&canShowMembers&&members&&<aside className="member-list" aria-label="Участники"><ColumnResizer label="Ширина списка участников" side="left" variable="--member-width" min={180} max={420}/>{state&&group?
- <MemberList members={group.members} users={state.users} meId={state.me.id}/>:<p className="member-empty">Загрузка участников…</p>}</aside>}{materialsOpen&&channel&&!showFriends&&state&&<ConversationMaterials key={channel.id} channel={channel.id} title={title} messages={state.messages} userName={userName} onClose={closeMaterials} onJump={jumpToMessage}/>}</div></AttachmentDropZone>
- {settings&&<div className="modal-backdrop" onClick={()=>setSettings(false)}><section role="dialog" aria-modal="true" aria-label="Учётная запись" className="account-modal dark" onClick={e=>e.stopPropagation()}><AccountSidebar avatar={state?.me.avatar} name={state?.me.name||''} section={accountSection} onSection={setAccountSection} onLogout={()=>{void logout().catch(e=>setError(e.message))}}/><article><header><span>{accountSections.find(item=>item.id===accountSection)?.label}</span><Button variant="ghost" size="icon-sm" title="Закрыть настройки" aria-label="Закрыть настройки" onClick={()=>setSettings(false)}><X/></Button></header><div id="account-panel" ref={settingsMotion}>{accountSection==='updates'?<UpdateSettings inCall={!!call.room||call.busy}/>:accountSection==='notifications'?<NotificationSettings preferences={state?.chatPreferences} ready={!!state} onSaved={preferences=>{if(state)applyChatPreferences(state.me.id,preferences)}}/>:accountSection==='voice'?<VoiceSettings voice={call}/>:accountSection==='stickers'&&state?<StickerLibrary stickers={state.stickers} user={state.me.id} refresh={refresh}/>:<AccountSecurity state={state} refresh={refresh} section={accountSection}/>}</div></article></section></div>}
+ <div className="conversation-body" ref={conversationMotion}><div className={voice?"chat-main voice-layout":"chat-main"}>{voice&&<ColumnResizer label="Ширина чата канала" side="left" variable="--voice-chat-width" min={260} max={600} target=".voice-messages"/>}{showFriends&&state?<Friends state={state} refresh={refresh} onError={setError} onDialog={id=>{setHome(true);setChannelId(id)}}/>:voice?<VoiceStage voice={call} id={voiceRoom||channel!.id} title={title} userName={userName} me={state?.me.name||"Вы"} meUser={state?.me} users={state?.users} onSettings={()=>{setAccountSection("voice");setSettings(true)}}/>:<div className="message-scroll">{!channel&&home&&state?<p className="conversation-empty">Выберите переписку слева или начните новый диалог кнопкой +.</p>:<>{!visibleMessages.length&&!search&&<p className="conversation-empty">{channel?'Пока тихо. Начните разговор — отправьте первое сообщение.':'Выберите или создайте комнату, чтобы начать общение.'}</p>}{state&&visibleMessages.map((m,i)=><div key={m.id} data-message-id={m.id} className={jumpTarget===m.id?'message-jump-highlight':undefined}>{(i===0||new Date(m.time*1000).toDateString()!==new Date(visibleMessages[i-1].time*1000).toDateString())&&<div className="chat-day"><span>{new Date(m.time*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})}</span></div>}<MessageItem previous={visibleMessages[i-1]} message={m} state={state} refresh={refresh} onError={setError} userName={userName}/></div>)}</>}{search&&!visibleMessages.length&&<p className="no-results">Сообщения не найдены</p>}{state&&channel&&<BotTyping state={state} channel={channel.id}/>}<div ref={end}/></div>}{voice&&<div className="voice-messages"><h3>Чат канала · {title}</h3>{state&&visibleMessages.map((m,i)=><div key={m.id} data-message-id={m.id} className={jumpTarget===m.id?'message-jump-highlight':undefined}>{(i===0||new Date(m.time*1000).toDateString()!==new Date(visibleMessages[i-1].time*1000).toDateString())&&<div className="chat-day"><span>{new Date(m.time*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})}</span></div>}<MessageItem previous={visibleMessages[i-1]} message={m} state={state} refresh={refresh} onError={setError} userName={userName}/></div>)}{state&&channel&&<BotTyping state={state} channel={channel.id}/>}<div ref={end}/></div>}{channel&&<form className="composer" onSubmit={send}><AttachmentComposer draft={attachment} reading={readingAttachment} disabled={busy} onFile={file=>void selectAttachment(file)} onRemove={removeAttachment}/><textarea ref={messageLink.textareaRef} rows={1} onPaste={event=>{const file=pastedAttachment(event);if(file)void selectAttachment(file)}} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}} aria-label="Сообщение" placeholder={`Написать в ${title}`} value={draft} disabled={!channel} onChange={e=>setDraft(e.target.value)} maxLength={2000}/>{state&&<BotCommandSuggestions state={state} channel={channel.id} group={home?undefined:group?.id} draft={draft} disabled={busy} onSelect={setDraft}/>}{state&&<StickerSuggestions key={channel.id} draft={draft} stickers={state.stickers} user={state.me.id} group={home?undefined:group?.id} busy={busy} onSelect={sendStickerSuggestion}/>}{state&&<ExpressionPicker key={channel.id} state={state} refresh={refresh} onError={setError} disabled={busy} group={home?undefined:group} onManage={manageStickers} onEmoji={e=>setDraft(draft+e)} onSticker={async sticker=>{await api('message',{channel:channel.id,sticker});await refresh()}}/>}<button type="submit" title="Отправить сообщение" disabled={busy||readingAttachment||!channel||(!draft.trim()&&!attachment)}><MotionIcon icon={Send} kind="send" size={20}/></button></form>}</div>{!materialsOpen&&canShowMembers&&members&&<aside className="member-list" aria-label="Участники"><ColumnResizer label="Ширина списка участников" side="left" variable="--member-width" min={180} max={420}/>{state&&group?
+ <MemberList members={group.members} users={state.users} meId={state.me.id} group={group}/>:<p className="member-empty">Загрузка участников…</p>}</aside>}{materialsOpen&&channel&&!showFriends&&state&&<ConversationMaterials key={`${channel.id}:${materialsEpoch}`} initialCategory={materialsCategory} channel={channel.id} title={title} messages={state.messages} userName={userName} onClose={closeMaterials} onJump={jumpToMessage}/>}</div></AttachmentDropZone>
+ {settings&&<div className="modal-backdrop" onClick={()=>setSettings(false)}><section role="dialog" aria-modal="true" aria-label="Учётная запись" className="account-modal dark" onClick={e=>e.stopPropagation()}><AccountSidebar avatar={state?.me.avatar} name={state?.me.name||''} section={accountSection} onSection={setAccountSection} onLogout={()=>{void logout().catch(e=>setError(e.message))}}/><article><header><span>{accountSections.find(item=>item.id===accountSection)?.label}</span><Button variant="ghost" size="icon-sm" title="Закрыть настройки" aria-label="Закрыть настройки" onClick={()=>setSettings(false)}><X/></Button></header><div id="account-panel" ref={settingsMotion}>{accountSection==='updates'?<UpdateSettings inCall={!!call.room||call.busy}/>:accountSection==='notifications'?<NotificationSettings preferences={state?.chatPreferences} ready={!!state} onSaved={preferences=>{if(state)applyChatPreferences(state.me.id,preferences)}}/>:accountSection==='storage'?<AttachmentCacheSettings key={state?.me.id||'loading'} ready={!!state} onChanged={refresh}/>:accountSection==='voice'?<VoiceSettings voice={call}/>:accountSection==='stickers'&&state?<StickerLibrary stickers={state.stickers} user={state.me.id} refresh={refresh}/>:<AccountSecurity state={state} refresh={refresh} section={accountSection}/>}</div></article></section></div>}
  {modal==='dialog'&&state&&<NewDialogDialog state={state} refresh={refresh} onClose={()=>setModal('')} onCreated={dialog=>{setHome(true);setChannelId(dialog.id);setModal('')}}/>}
  {dialogCalls.incoming&&state&&<IncomingDialogCall call={dialogCalls.incoming} state={state} busy={dialogCalls.busy||call.busy} error={dialogCalls.error} onAccept={video=>void dialogCalls.join(dialogCalls.incoming!,video)} onDecline={()=>void dialogCalls.decline(dialogCalls.incoming!)}/>}
- {modal&&modal!=='dialog'&&<div className="modal-backdrop"><form className="group-modal" role="dialog" aria-modal="true" aria-label={modal==='delete-channel'?'Удалить канал':modal==='edit-group'?'Настройки группы':'Управление чатами'} onSubmit={create}><h2>{{group:'Создать группу',join:'Вступить в группу',dialog:'Новый диалог',channel:'Создать канал','edit-channel':'Настроить канал','delete-channel':'Удалить канал','edit-group':'Настройки группы','group-stickers':'Стикеры группы',invite:'Пригласить участников',bots:'Подключения'}[modal]}</h2>{modal==='group-stickers'&&state&&editingGroup?<StickerLibrary stickers={state.stickers} user={state.me.id} group={editingGroup.id} refresh={refresh}/>:modal==='bots'&&state&&channel?<Bots state={state} refresh={refresh} onError={setError} channel={channel.id} group={group?.id} owner={group?.owner===state.me.id}/>:modal==='invite'?<>
- {group?.owner===state?.me.id&&<>
+ {modal&&modal!=='dialog'&&modal!=='edit-group'&&<div className="modal-backdrop"><form className="group-modal" role="dialog" aria-modal="true" aria-label={modal==='delete-channel'?'Удалить канал':modal==='edit-group'?'Настройки группы':'Управление чатами'} onSubmit={create}><h2>{{group:'Создать группу',join:'Вступить в группу',dialog:'Новый диалог',channel:'Создать канал','edit-channel':'Настроить канал','delete-channel':'Удалить канал','edit-group':'Настройки группы','group-stickers':'Стикеры группы',invite:'Пригласить участников',bots:'Подключения'}[modal]}</h2>{modal==='group-stickers'&&state&&editingGroup?(permits(editingGroupData,'stickers.manage')?<StickerLibrary stickers={state.stickers} user={state.me.id} group={editingGroup.id} refresh={refresh}/>:<p role="status">Нет права управлять стикерами этой группы.</p>):modal==='bots'&&state&&channel?<Bots state={state} refresh={refresh} onError={setError} channel={channel.id} group={group?.id} owner={permits(group,'bots.manage')}/>:modal==='invite'?<>
+ {permits(group,'members.invite')&&<>
   <label htmlFor="invite-email">Email аккаунта Sombra</label>
   <input id="invite-email" type="email" autoComplete="off" autoFocus required disabled={busy} maxLength={254} value={name} onChange={e=>{setName(e.target.value);setError('')}}/>
  </>}
- <p>Код приглашения</p>
+ {permits(group,'members.invite')&&!!group?.invite&&<><p>Код приглашения</p>
  <input readOnly aria-label="Код приглашения" value={group?.invite||''}/>
- <button type="button" className="small-button" onClick={()=>{void navigator.clipboard.writeText(group?.invite||'').then(()=>toast.success('Код скопирован')).catch(()=>setError('Выделите и скопируйте код вручную'))}}>Скопировать приглашение</button>
- </>:modal==='delete-channel'?<p>Канал «{editingChannel?.channel.name}» и все его сообщения будут удалены без возможности восстановления.</p>:modal==='edit-group'?<>
- <label htmlFor="group-edit-name">Название группы</label>
- <input id="group-edit-name" autoFocus disabled={busy} required maxLength={60} value={name} onChange={e=>setName(e.target.value)}/>
- <section className="group-avatar-field">
-  <label htmlFor="group-edit-avatar">Аватарка группы</label>
-  <div className="group-avatar-editor">
-   <span className="group-avatar-preview" aria-hidden="true">{groupAvatar?<img src={groupAvatar} alt=""/>:name.slice(0,2)}</span>
-   <div>
-    <input id="group-edit-avatar" type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} aria-describedby="group-avatar-hint"
-     onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void selectGroupAvatar(file)}}/>
-    <p id="group-avatar-hint">PNG, JPEG или WebP до 5 МБ</p>
-    {groupAvatar&&<Button type="button" size="sm" variant="ghost" disabled={busy} onClick={()=>{setAvatarDraft('');setError('')}}>Удалить аватарку</Button>}
-   </div>
-  </div>
- </section>
- <Button type="button" size="sm" variant="outline" disabled={busy} onClick={()=>setModal('group-stickers')}>Стикеры группы</Button>
- </>:<>{modal==='edit-channel'&&<label htmlFor="channel-edit-name">Название канала</label>}<input id={modal==='edit-channel'?'channel-edit-name':undefined} autoFocus disabled={busy} required={modal!=='dialog'} aria-label={modal==='join'?'Код приглашения':'Название'} placeholder={modal==='join'?'Код приглашения':'Название'} value={name} onChange={e=>setName(e.target.value)} maxLength={modal==='channel'||modal==='edit-channel'?40:60}/>{modal==='channel'&&<label className="channel-kind">Тип канала<Select label="Тип канала" value={channelKind} onValueChange={setChannelKind} options={[{value:'text',label:'Текстовый'},{value:'voice',label:'Голосовой с чатом'}]}/></label>}{modal==='dialog'&&<div style={{display:'block',maxHeight:220,overflow:'auto'}}>{state?.users.filter(u=>u.id!==state.me.id).map(u=><label key={u.id} style={{display:'flex',alignItems:'center',gap:10}}><input style={{width:18,margin:8}} type="checkbox" disabled={!selected.includes(u.id)&&selected.length>=9} checked={selected.includes(u.id)} onChange={e=>setSelected(e.target.checked?[...selected,u.id]:selected.filter(id=>id!==u.id))}/>{u.name}</label>)}{state?.users.length===1&&<p>Пока вы первый пользователь. Создайте второй аккаунт, чтобы начать диалог.</p>}</div>}</>}{error&&<p role="alert">{error}</p>}<div className={modal==='edit-channel'?'channel-settings-actions':undefined}>
- {modal==='edit-channel'&&<Button type="button" variant="destructive" size="sm" disabled={busy} onClick={()=>{setError('');setModal('delete-channel')}}>Удалить канал</Button>}
+ <button type="button" className="small-button" onClick={()=>{if(!permits(group,'members.invite')||!group?.invite)return;void navigator.clipboard.writeText(group.invite).then(()=>toast.success('Код скопирован')).catch(()=>setError('Выделите и скопируйте код вручную'))}}>Скопировать приглашение</button>
+ </>}{group?.rolesRevision!==undefined&&permits(group,'invite.rotate')&&<Button type="button" variant="outline" disabled={busy} onClick={()=>void rotateInvite()}>Заменить код приглашения</Button>}</>:modal==='delete-channel'?<p>Канал «{editingChannel?.channel.name}» и все его сообщения будут удалены без возможности восстановления.</p>:<>{modal==='edit-channel'&&<label htmlFor="channel-edit-name">Название канала</label>}<input id={modal==='edit-channel'?'channel-edit-name':undefined} autoFocus disabled={busy||(modal==='edit-channel'&&!permits(editingChannelGroup,'channels.rename'))} required={modal!=='dialog'} aria-label={modal==='join'?'Код приглашения':'Название'} placeholder={modal==='join'?'Код приглашения':'Название'} value={name} onChange={e=>setName(e.target.value)} maxLength={modal==='channel'||modal==='edit-channel'?40:60}/>{modal==='channel'&&<label className="channel-kind">Тип канала<Select label="Тип канала" value={channelKind} onValueChange={setChannelKind} options={[...(permits(group,'channels.create_text')?[{value:'text',label:'Текстовый'}]:[]),...(permits(group,'channels.create_voice')?[{value:'voice',label:'Голосовой с чатом'}]:[])]}/></label>}{modal==='dialog'&&<div style={{display:'block',maxHeight:220,overflow:'auto'}}>{state?.users.filter(u=>u.id!==state.me.id).map(u=><label key={u.id} style={{display:'flex',alignItems:'center',gap:10}}><input style={{width:18,margin:8}} type="checkbox" disabled={!selected.includes(u.id)&&selected.length>=9} checked={selected.includes(u.id)} onChange={e=>setSelected(e.target.checked?[...selected,u.id]:selected.filter(id=>id!==u.id))}/>{u.name}</label>)}{state?.users.length===1&&<p>Пока вы первый пользователь. Создайте второй аккаунт, чтобы начать диалог.</p>}</div>}</>}{error&&<p role="alert">{error}</p>}<div className={modal==='edit-channel'?'channel-settings-actions':undefined}>
+ {modal==='edit-channel'&&permits(editingChannelGroup,'channels.delete')&&<Button type="button" variant="destructive" size="sm" disabled={busy} onClick={()=>{setError('');setModal('delete-channel')}}>Удалить канал</Button>}
  <button type="button" disabled={busy} onClick={()=>{setModal(modal==='delete-channel'?'edit-channel':'');setError('')}}>{modal==='delete-channel'?'Отмена':'Закрыть'}</button>
- {modal==='delete-channel'&&<Button type="submit" variant="destructive" size="sm" disabled={busy}>{busy?'Удаление…':'Удалить канал'}</Button>}{modal==='invite'&&group?.owner===state?.me.id&&<button type="submit" className="small-button" disabled={busy||!name.trim()}>{busy?'Добавление…':'Пригласить'}</button>}{modal!=='invite'&&modal!=='bots'&&modal!=='delete-channel'&&modal!=='group-stickers'&&<button className="small-button" disabled={busy||(modal==='edit-group'&&(!name.trim()||(!groupAvatarChanged&&name.trim()===editingGroup?.name)))||(modal==='edit-channel'&&(!name.trim()||name.trim()===editingChannel?.channel.name))||(modal==='dialog'&&(!selected.length||selected.length>9))}>{modal==='edit-channel'||modal==='edit-group'?(busy?'Сохранение…':'Сохранить'):'Готово'}</button>}</div></form></div>}
+ {modal==='delete-channel'&&<Button type="submit" variant="destructive" size="sm" disabled={busy||!permits(editingChannelGroup,'channels.delete')}>{busy?'Удаление…':'Удалить канал'}</Button>}{modal==='invite'&&permits(group,'members.invite')&&<button type="submit" className="small-button" disabled={busy||!name.trim()}>{busy?'Добавление…':'Пригласить'}</button>}{modal!=='invite'&&modal!=='bots'&&modal!=='delete-channel'&&modal!=='group-stickers'&&(modal!=='edit-channel'||permits(editingChannelGroup,'channels.rename'))&&<button className="small-button" disabled={busy||(modal==='channel'&&!permits(group,channelKind==='voice'?'channels.create_voice':'channels.create_text'))||(modal==='edit-channel'&&(!name.trim()||name.trim()===editingChannel?.channel.name))||(modal==='dialog'&&(!selected.length||selected.length>9))}>{modal==='edit-channel'?(busy?'Сохранение…':'Сохранить'):'Готово'}</button>}</div></form></div>}
+ {managedBot&&state&&<BotSettingsDialog bot={managedBot} state={state} refresh={refresh} onClose={()=>setBotSettingsId('')}/>}
+ {rolesGroup&&state&&<GroupSettingsDialog key={rolesGroup.id} initialSection={groupSettingsSection} group={rolesGroup} state={state} onClose={()=>setRolesGroupId('')} refresh={refresh} onError={message=>toast.error(message)} onManageStickers={id=>{const target=state.groups.find(item=>item.id===id);if(!target||!permits(target,'stickers.manage'))return;setEditingGroup({id:target.id,name:target.name,avatar:target.avatar});setRolesGroupId('');setModal('group-stickers')}}/>}
  {messageLink.dialog}
- {profile&&state&&<UserProfile key={profile.id} user={profile} me={state.me} groups={state.groups} onClose={()=>setProfileId('')} onOpenGroup={id=>{setGroupId(id);setChannelId('');setHome(false)}}/>}
+ {infoOpen&&channel&&state&&!showFriends&&<ConversationInfoDialog state={state} title={home?title:group?.name||title} channel={channel.id} memberIds={home&&'members' in channel?channel.members:group?.members||[]} avatar={!home?group?.avatar:undefined} channelLabel={!home?channel.name:undefined} onClose={()=>setInfoOpen(false)} onProfile={openInfoProfile} onMaterials={openInfoMaterials} onSettings={!home&&group?()=>{setInfoOpen(false);requestAnimationFrame(()=>{setGroupSettingsSection('general');setRolesGroupId(group.id)})}:undefined}/>}
+  {profile&&state&&<UserProfile key={`${state.me.id}:${profile.id}`} user={profile} me={state.me} groups={state.groups} restoreFocusRef={headerProfile?infoTrigger:undefined} conversationMaterials={headerProfile&&home&&channel&&'members' in channel&&channel.members.length===2&&dmPeer?.id===profile.id?{messages:state.messages,channel:channel.id,onOpen:openInfoMaterials}:undefined} onClose={()=>{setProfileId('');setHeaderProfile(false)}} onOpenGroup={id=>{setGroupId(id);setChannelId('');setHome(false)}}/>}
  </main>
  </UserActionsProvider>
 }
-

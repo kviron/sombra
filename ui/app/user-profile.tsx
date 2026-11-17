@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import {ConversationMaterialRows,type ProfileConversationMaterials} from './conversation-info-dialog';
 import { Check, Clock3, MessageCircle, UserMinus, UserPlus, X } from 'lucide-react';
 import type { Group, User } from '@/shared/api/backend';
 import { UserAvatar } from '@/shared/ui/user-avatar';
+import { ProfileCover } from '@/shared/ui/profile-cover';
 import { useUserActions } from './user-actions';
 import './user-profile.css';
 
@@ -24,12 +26,16 @@ export function UserProfile({
   groups,
   onClose,
   onOpenGroup,
+  conversationMaterials,
+  restoreFocusRef,
 }: {
   user: User;
   me: User;
   groups: Group[];
   onClose: () => void;
   onOpenGroup?: (id: string) => void;
+  conversationMaterials?: ProfileConversationMaterials;
+  restoreFocusRef?: RefObject<HTMLButtonElement|null>;
 }) {
   const actions = useUserActions();
   const isSelf = user.id === me.id;
@@ -41,19 +47,29 @@ export function UserProfile({
   });
   const [saved, setSaved] = useState(false);
   const closeButton = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef(onClose); closeRef.current = onClose;
+  const restoreRef = useRef(restoreFocusRef); restoreRef.current = restoreFocusRef;
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     closeButton.current?.focus();
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeRef.current(); }
+      if (event.key === 'Tab') {
+        const dialog = closeButton.current?.closest('[role="dialog"]');
+        const items = Array.from(dialog?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,textarea') ?? []).filter(item => item.getClientRects().length);
+        const first = items[0], last = items.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
     }
     window.addEventListener('keydown', onKeyDown, true);
     return () => {
       window.removeEventListener('keydown', onKeyDown, true);
-      previous?.focus?.();
+      const target = restoreRef.current?.current ?? previous;
+      if (target?.isConnected) target.focus();
     };
-  }, [onClose]);
+  }, []);
 
   function updateNote(value: string) {
     setNote(value);
@@ -76,7 +92,7 @@ export function UserProfile({
   })();
 
   return (
-    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) { event.preventDefault(); onClose(); } }}>
       <section
         role="dialog"
         aria-modal="true"
@@ -87,10 +103,7 @@ export function UserProfile({
         <button ref={closeButton} type="button" className="user-profile-close" title="Закрыть профиль" aria-label="Закрыть профиль" onClick={onClose}>
           <X size={18} />
         </button>
-        <div className="user-profile-banner" aria-hidden="true">
-          <span className="user-profile-banner-glow" />
-          <span className="user-profile-banner-grid" />
-        </div>
+        <ProfileCover user={user} accountId={me.id} className="user-profile-banner" />
         <div className="user-profile-body">
           <div className="user-profile-identity">
             <UserAvatar user={user} size="xl" decorative />
@@ -140,6 +153,7 @@ export function UserProfile({
             )}
           </div>
 
+          {conversationMaterials && <ConversationMaterialRows {...conversationMaterials} />}
           {friendNote}
           {user.bot && <section aria-label="Команды бота"><h3>Команды</h3>{user.commands?.length ? user.commands.map(command => <p key={command.command}><code>/{command.command.replace(/^\//, '')}</code> — {command.description}</p>) : <p>Введите /help в личном сообщении боту.</p>}<p>Бот работает через отдельный сервис. Не отправляйте ему пароли и ключи.</p></section>}
 

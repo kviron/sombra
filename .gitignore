@@ -8,6 +8,7 @@
 /auth-qa/
 /social-qa/
 /ui-qa/
+/testsfixturesui-qa/
 /user-qa/
 /attachments-qa/
 /dialog-calls-qa/
@@ -31,3 +32,7 @@ __pycache__/
 /release/
 /sound-design/Backups/
 /sound-design/Audio Files/
+
+# Superseded isolation prototypes; selected release reuses the existing gateway.
+/hermes-sombra-runtime/
+/deploy/sombra-hermes-broker.service

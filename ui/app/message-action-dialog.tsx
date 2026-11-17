@@ -7,6 +7,7 @@ type Props={
  mode:'edit'|'delete';
  message:ChatMessage;
  author:boolean;
+ canDeleteEveryone?:boolean;
  trigger:RefObject<HTMLElement|null>;
  refresh:()=>Promise<unknown>;
  onClose:()=>void;
@@ -17,9 +18,11 @@ const contentClass='fixed top-1/2 left-1/2 z-[111] w-[calc(100%-2rem)] max-w-md 
 const titleClass='text-base font-semibold';
 const actionsClass='mt-5 flex justify-end gap-2';
 
-export function MessageActionDialog({mode,message,author,trigger,refresh,onClose}:Props){
+export function MessageActionDialog({mode,message,author,canDeleteEveryone=false,trigger,refresh,onClose}:Props){
  const [text,setText]=useState(message.text||'');
  const [forEveryone,setForEveryone]=useState(false);
+ const mayDeleteEveryone=author||canDeleteEveryone;
+ const removeForEveryone=mayDeleteEveryone&&forEveryone;
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
  const trimmed=text.trim();
@@ -38,7 +41,7 @@ export function MessageActionDialog({mode,message,author,trigger,refresh,onClose
   setError('');
   try{
    if(mode==='edit')await api('update_message',{message:message.id,text:trimmed});
-   else await api('delete_message',{message:message.id,for_everyone:author&&forEveryone});
+   else await api('delete_message',{message:message.id,for_everyone:removeForEveryone});
    await refresh();
    onClose();
   }catch(err){setError((err as Error).message)}
@@ -52,11 +55,11 @@ export function MessageActionDialog({mode,message,author,trigger,refresh,onClose
    <AlertDialog.Content className={contentClass} onCloseAutoFocus={restoreFocus}>
     <AlertDialog.Title className={titleClass}>Удалить сообщение?</AlertDialog.Title>
     <AlertDialog.Description className="mt-2 text-sm text-muted-foreground">
-     {forEveryone?'Сообщение исчезнет у всех участников чата.':'Сообщение исчезнет только у вас.'}
+     {removeForEveryone?'Сообщение исчезнет у всех участников чата.':'Сообщение исчезнет только у вас.'}
     </AlertDialog.Description>
     <form onSubmit={submit}>
-     {author&&<label className="mt-4 flex w-fit cursor-pointer items-center gap-2 text-sm">
-      <input type="checkbox" className="size-4 accent-primary" checked={forEveryone} onChange={event=>setForEveryone(event.target.checked)} disabled={busy}/>
+     {mayDeleteEveryone&&<label className="mt-4 flex w-fit cursor-pointer items-center gap-2 text-sm">
+      <input type="checkbox" className="size-4 accent-primary" checked={removeForEveryone} onChange={event=>setForEveryone(event.target.checked)} disabled={busy}/>
       Удалить для всех
      </label>}
      {submitError}

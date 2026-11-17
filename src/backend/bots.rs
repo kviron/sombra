@@ -107,12 +107,15 @@ impl Backend {
     pub(super) fn bot_public(&self, b: &Value) -> Value {
         let mut out = b.clone();
         out["commands"] = self.bot_commands(b);
+        out["transportVersion"] = json!(if b["legacy"] == true { 0 } else { 2 });
+        out["managementVersion"] = json!(if b["legacy"] == true { 0 } else { 1 });
+        out["conversation"] = self.bot_conversation(b);
         out["privacy"] = json!(if b["legacy"] == true {
             "legacy_room_history"
         } else {
             "commands_only"
         });
-        for key in ["token_hash", "ack", "seq"] {
+        for key in ["token_hash", "ack", "seq", "tool_policy", "followups"] {
             out.as_object_mut().unwrap().remove(key);
         }
         out
@@ -138,7 +141,7 @@ impl Backend {
             .map(|b| self.bot_public(b))
             .collect()
     }
-    fn bot_target_allowed(&self, b: &Value, channel: &str) -> bool {
+    pub(super) fn bot_target_allowed(&self, b: &Value, channel: &str) -> bool {
         if b["enabled"] == false {
             return false;
         }
@@ -169,7 +172,7 @@ impl Backend {
             let group = arr(&self.db["groups"])
                 .into_iter()
                 .find(|g| {
-                    g["owner"] == uid
+                    self.group_permission(g, uid, "bots.manage")
                         && if legacy {
                             arr(&g["channels"]).iter().any(|c| c["id"] == v["channel"])
                         } else {
@@ -247,20 +250,32 @@ impl Backend {
             .position(|b| b["id"] == *bid)
             .ok_or("Бот не найден")?;
         let bot = self.db["bots"][i].clone();
+        // A scoped delete removes only this installation, never another group's bot or credentials.
+        if op == "delete_bot" && !s(v, "group").is_empty() {
+            if bot["legacy"] != true {
+                let mut scoped = v.clone();
+                scoped["op"] = json!("remove_bot_from_group");
+                return self.bot_management(&scoped, uid);
+            }
+            let gi = self.require_group_permission(s(v, "group"), uid, "bots.manage")?;
+            if !arr(&self.db["groups"][gi]["channels"])
+                .iter()
+                .any(|c| c["id"] == bot["channel"])
+            {
+                return Err("BOT_SCOPE_FORBIDDEN".into());
+            }
+        }
         if op == "add_bot_to_group" || op == "remove_bot_from_group" {
             let gi = self.db["groups"]
                 .as_array()
                 .unwrap()
                 .iter()
-                .position(|g| g["id"] == v["group"] && g["owner"] == uid)
+                .position(|g| g["id"] == v["group"] && self.group_permission(g, uid, "bots.manage"))
                 .ok_or("Только владелец группы")?;
             if bot["legacy"] == true || bot["enabled"] == false {
                 return Err("Бот недоступен".into());
             }
             if op == "add_bot_to_group" {
-                if bot["owner"] != uid {
-                    return Err("Только владелец бота".into());
-                }
                 if !arr(&bot["groups"]).contains(&v["group"]) {
                     if self.installed_bot_count(&v["group"]) >= 5 {
                         return Err("Не более 5 ботов в группе".into());
@@ -277,6 +292,9 @@ impl Backend {
                         .push(bot["id"].clone());
                 }
             } else {
+                if !arr(&bot["groups"]).contains(&v["group"]) {
+                    return Err("BOT_NOT_INSTALLED".into());
+                }
                 self.db["bots"][i]["groups"]
                     .as_array_mut()
                     .unwrap()
@@ -286,13 +304,28 @@ impl Backend {
                     .unwrap()
                     .retain(|u| *u != bot["id"]);
                 let channels = arr(&self.db["groups"][gi]["channels"]);
+                self.bot_typing.retain(|t| {
+                    !(t["bot"] == bot["id"] && channels.iter().any(|c| c["id"] == t["channel"]))
+                });
                 self.db["bot_updates"].as_array_mut().unwrap().retain(|u| {
                     !(u["bot"] == bot["id"] && channels.iter().any(|c| c["id"] == u["channel"]))
                 });
             }
         } else {
-            if bot["owner"] != uid {
-                return Err("Только владелец бота".into());
+            let legacy_group = arr(&self.db["groups"]).into_iter().find(|g| {
+                arr(&g["channels"])
+                    .iter()
+                    .any(|c| c["id"] == bot["channel"])
+            });
+            let legacy_manage = bot["legacy"] == true
+                && legacy_group
+                    .as_ref()
+                    .is_some_and(|g| self.group_permission(g, uid, "bots.manage"));
+            if bot["owner"] != uid && !(op == "delete_bot" && legacy_manage) {
+                return Err("BOT_OWNER_REQUIRED".into());
+            }
+            if bot["legacy"] == true && !legacy_manage {
+                return Err("BOT_SCOPE_FORBIDDEN".into());
             }
             if op == "bot_rotate_token" {
                 if bot["enabled"] == false {
@@ -301,6 +334,7 @@ impl Backend {
                 let token = format!("{}{}", id(), id());
                 self.db["bots"][i]["token_hash"] = json!(token_hash(&token));
                 self.save()?;
+                self.bot_typing.retain(|t| t["bot"] != bot["id"]);
                 return Ok(json!({"token":token,"bot":self.bot_public(&self.db["bots"][i])}));
             }
             if op == "bot_set_commands" {
@@ -320,6 +354,7 @@ impl Backend {
                 }
                 self.db["bots"][i]["commands"] = json!(commands);
             } else if op == "delete_bot" {
+                self.bot_typing.retain(|t| t["bot"] != bot["id"]);
                 self.db["bots"][i]["enabled"] = json!(false);
                 self.db["bots"][i]["token_hash"] = Value::Null;
                 self.db["bots"][i]["groups"] = json!([]);
@@ -348,7 +383,10 @@ impl Backend {
             .into_iter()
             .find(|u| u["id"] == message["user"])
             .ok_or("Пользователь не найден")?;
-        if sender["bot"] == true {
+        if sender["bot"] == true
+            || sender["active"] == false
+            || !self.allowed(s(&sender, "id"), s(message, "channel"))
+        {
             return Ok(());
         }
         let channel = s(message, "channel");
@@ -374,7 +412,8 @@ impl Backend {
             let mention = text
                 .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '@'))
                 .any(|word| word.eq_ignore_ascii_case(&format!("@{}", s(b, "username"))));
-            if group.is_some() && command.is_null() && !mention {
+            let natural = self.bot_natural_reason(index, b, message);
+            if group.is_some() && command.is_null() && !mention && natural.is_none() {
                 continue;
             }
             if arr(&self.db["bot_updates"])
@@ -392,6 +431,26 @@ impl Backend {
                 json!({"id":channel,"kind":"direct","name":sender["name"]})
             };
             let mut update = json!({"bot":b["id"],"update_id":seq,"channel":channel,"message":self.public_message(message),"sender":{"id":sender["id"],"name":sender["name"]},"chat":chat,"done":false});
+            update["reason"] = json!(if !command.is_null() {
+                "command"
+            } else if mention {
+                "mention"
+            } else {
+                natural.unwrap_or("direct")
+            });
+            if let Some(path) = self.attachment_path(&message["attachment"]) {
+                use std::io::Read;
+                if let Ok(file) = std::fs::File::open(path) {
+                    let mut bytes = Vec::new();
+                    if file.take(10485761).read_to_end(&mut bytes).is_ok()
+                        && bytes.len() <= 10485760
+                    {
+                        update["attachment_digest"] = json!(token_hash(
+                            &base64::engine::general_purpose::STANDARD.encode(bytes)
+                        ));
+                    }
+                }
+            }
             if !command.is_null() {
                 update["command"] = command
             }
@@ -436,7 +495,7 @@ impl Backend {
                 .find(|u| u["id"] == b["id"])
                 .ok_or("AUTH_REQUIRED")?;
             return Ok(
-                json!({"user":self.public(&u),"bot":self.bot_public(&b),"installs":b["groups"]}),
+                json!({"user":self.public(&u),"bot":self.bot_public(&b),"installs":b["groups"],"toolPolicy":self.bot_policy(&b)}),
             );
         }
         if op == "bot_poll" || op == "bot_message" {
@@ -468,11 +527,11 @@ impl Backend {
                     u["bot"] == b["id"]
                         && u["done"] != true
                         && u["update_id"].as_u64().unwrap_or(0) > after
-                        && self.bot_target_allowed(&b, s(u, "channel"))
+                        && self.invocation_authority(&b, u).is_ok()
                 })
                 .take(limit)
                 .map(|mut u| {
-                    for k in ["bot", "done", "response"] {
+                    for k in ["bot", "done", "response", "responses", "attachment_digest"] {
                         u.as_object_mut().unwrap().remove(k);
                     }
                     u
@@ -485,12 +544,11 @@ impl Backend {
             .unwrap()
             .iter()
             .position(|u| u["bot"] == b["id"] && u["update_id"] == v["update_id"])
-            .ok_or("Update not found")?;
-        let update = self.db["bot_updates"][ui].clone();
-        if !self.bot_target_allowed(&b, s(&update, "channel")) {
-            return Err("Install removed".into());
-        }
+            .ok_or("BOT_SOURCE_UNAVAILABLE")?;
         if op == "bot_ack" {
+            self.bot_followup_ack(i, ui);
+            self.bot_typing
+                .retain(|t| !(t["bot"] == b["id"] && t["update_id"] == v["update_id"]));
             self.db["bot_updates"][ui]["done"] = json!(true);
             let ack = arr(&self.db["bot_updates"])
                 .iter()
@@ -503,28 +561,10 @@ impl Backend {
             self.save()?;
             return Ok(json!({"ok":true,"ack":ack}));
         }
-        if op != "bot_reply" {
-            return Err("Неизвестная команда".into());
+        if ["bot_get_settings", "bot_update_self", "bot_react"].contains(&op) {
+            return self.bot_invocation_management(v, &b, ui);
         }
-        if v.get("channel").is_some() || v.get("response_key").is_some_and(|k| k != "main") {
-            return Err("Only update target and main response_key allowed".into());
-        }
-        if !self.allowed(s(&update["sender"], "id"), s(&update, "channel")) {
-            return Err("Sender no longer has access".into());
-        }
-        if update["response"].is_object() {
-            return Ok(update["response"].clone());
-        }
-        let text = s(v, "text").trim();
-        if text.is_empty() || text.chars().count() > 2000 {
-            return Err("Сообщение: 1–2000 символов".into());
-        }
-        let m = json!({"id":id(),"channel":update["channel"],"user":b["id"],"bot_name":b["name"],"text":text,"time":now()});
-        self.db["messages"].as_array_mut().unwrap().push(m.clone());
-        self.db["bot_updates"][ui]["response"] = m.clone();
-        self.db["bots"][i]["last_seen"] = json!(now());
-        self.save()?;
-        Ok(m)
+        self.scoped_bot_operation(v, &b, ui)
     }
 }
 
@@ -532,17 +572,294 @@ impl Backend {
 mod bot_tests {
     use super::*;
     #[test]
+    fn scoped_attachment_limits_revoke_and_rollback() {
+        let path = std::env::temp_dir().join(id()).join("db.json");
+        let mut b = Backend::open(path.clone()).unwrap();
+        let owner = b.db["users"][0]["id"].clone();
+        let group = b.db["groups"][0]["id"].clone();
+        let channel = b.db["groups"][0]["channels"][0]["id"].clone();
+        let bot = b
+            .bot_management(
+                &json!({"op":"create_bot","group":group,"name":"Files","username":"files"}),
+                owner.as_str().unwrap(),
+            )
+            .unwrap();
+        let bt = bot["token"].clone();
+        let bid = bot["bot"]["id"].clone();
+        let actor = json!({"id":id(),"name":"Owner","active":true});
+        let uid = s(&actor, "id").to_owned();
+        b.db["users"].as_array_mut().unwrap().push(actor);
+        b.db["groups"][0]["members"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!(uid));
+        let draft = json!({"name":"../../evil.html","mime":"text/html","data":base64::engine::general_purpose::STANDARD.encode(b"not html image")});
+        let attachment = b.store_attachment(&draft).unwrap();
+        let source = json!({"id":id(),"channel":channel,"user":uid,"text":"/ask file","time":now(),"attachment":attachment});
+        b.db["messages"]
+            .as_array_mut()
+            .unwrap()
+            .push(source.clone());
+        b.enqueue_bots(&source).unwrap();
+        let call = |op: &str| json!({"op":op,"bot_token":bt,"update_id":1,"requester_id":owner,"sender":{"id":owner}});
+        assert_eq!(
+            b.request(call("bot_authorize_update")).unwrap()["access"]["trusted"],
+            false
+        );
+        b.bot_tool_users(
+            &json!({"op":"set_bot_tool_users","bot":bid,"revision":0,"users":[uid]}),
+            owner.as_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            b.request(call("bot_authorize_update")).unwrap()["access"]["trusted"],
+            true
+        );
+        let file = b.request(call("bot_attachment_file")).unwrap();
+        assert_eq!(file["mime"], "application/octet-stream");
+        assert_eq!(file["name"], "evil.html");
+        let mut wrong = call("bot_attachment_file");
+        wrong["update_id"] = json!(2);
+        assert!(b.request(wrong).is_err());
+        let big = json!({"name":"ten.bin","data":base64::engine::general_purpose::STANDARD.encode(vec![0;10485760])});
+        for key in ["main", "second"] {
+            let mut r = call("bot_reply");
+            r["attachment"] = big.clone();
+            r["response_key"] = json!(key);
+            let m = b.request(r.clone()).unwrap();
+            assert_eq!(m["attachment"]["size"], 10485760);
+            assert_eq!(b.request(r).unwrap(), m);
+        }
+        let mut over = call("bot_reply");
+        over["response_key"] = json!("third");
+        over["attachment"] = draft.clone();
+        assert_eq!(b.request(over).unwrap_err(), "BOT_OUTPUT_LIMIT");
+        assert!(!std::fs::read_to_string(&path)
+            .unwrap()
+            .contains(big["data"].as_str().unwrap()));
+        b.bot_tool_users(
+            &json!({"op":"set_bot_tool_users","bot":bid,"revision":1,"users":[]}),
+            owner.as_str().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            b.request(call("bot_authorize_update")).unwrap()["access"]["trusted"],
+            false
+        );
+        let file_path = b.attachment_path(&source["attachment"]).unwrap();
+        std::fs::write(
+            &file_path,
+            vec![0; source["attachment"]["size"].as_u64().unwrap() as usize],
+        )
+        .unwrap();
+        assert_eq!(
+            b.request(call("bot_attachment_file")).unwrap_err(),
+            "BOT_ATTACHMENT_UNAVAILABLE"
+        );
+        std::fs::remove_file(&file_path).unwrap();
+        assert_eq!(
+            b.request(call("bot_attachment_file")).unwrap_err(),
+            "BOT_ATTACHMENT_UNAVAILABLE"
+        );
+        let snapshot = b.db.clone();
+        let saved_path = b.path.clone();
+        b.path = path.parent().unwrap().to_path_buf();
+        let mut fail = call("bot_reply");
+        fail["text"] = json!("cannot save");
+        fail["response_key"] = json!("failed");
+        assert!(b.request(fail).is_err());
+        assert_eq!(b.db, snapshot);
+        b.path = saved_path;
+        let mut second = source.clone();
+        second["id"] = json!(id());
+        second["text"] = json!("/ask second");
+        b.db["messages"]
+            .as_array_mut()
+            .unwrap()
+            .push(second.clone());
+        b.enqueue_bots(&second).unwrap();
+        // Raw fixture injection bypassed save: normalize before measuring action rollback.
+        b.normalize_read_sequences().unwrap();
+        let snapshot = b.db.clone();
+        let failed_path = path.parent().unwrap().join("failed-save").join("db.json");
+        std::fs::create_dir_all(&failed_path).unwrap();
+        b.path = failed_path.clone();
+        let mut fail = call("bot_reply");
+        fail["update_id"] = json!(2);
+        fail["attachment"] = draft;
+        assert!(b.request(fail).is_err());
+        assert_eq!(b.db, snapshot);
+        assert_eq!(
+            std::fs::read_dir(failed_path.with_file_name("message-attachments"))
+                .unwrap()
+                .count(),
+            0
+        );
+        b.path = path.clone();
+        b.db["groups"][0]["members"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|x| x != &json!(uid));
+        assert_eq!(
+            b.request(call("bot_authorize_update")).unwrap_err(),
+            "BOT_SOURCE_UNAVAILABLE"
+        );
+        assert!(b.request(call("bot_get_updates")).unwrap()["updates"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        b.request(call("bot_ack")).unwrap();
+        drop(b);
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn scoped_policy_authority_outputs_and_typing() {
+        let path = std::env::temp_dir().join(id()).join("db.json");
+        let mut b = Backend::open(path.clone()).unwrap();
+        let owner = s(&b.db["users"][0], "id").to_owned();
+        let group = b.db["groups"][0]["id"].clone();
+        let channel = b.db["groups"][0]["channels"][0]["id"].clone();
+        let bot = b
+            .bot_management(
+                &json!({"op":"create_bot","group":group,"name":"Scoped","username":"scoped"}),
+                &owner,
+            )
+            .unwrap();
+        let bid = bot["bot"]["id"].clone();
+        let bt = bot["token"].clone();
+        let message =
+            json!({"id":id(),"channel":channel,"user":owner,"text":"/ask hello","time":now()});
+        b.db["messages"]
+            .as_array_mut()
+            .unwrap()
+            .push(message.clone());
+        b.enqueue_bots(&message).unwrap();
+        let call = |op: &str| json!({"op":op,"bot_token":bt,"update_id":1});
+        assert_eq!(
+            b.request(call("bot_authorize_update")).unwrap()["access"]["trusted"],
+            true
+        );
+        assert!(b.bot_public(&b.db["bots"][0])["tool_policy"].is_null());
+        assert_eq!(b.bot_public(&b.db["bots"][0])["transportVersion"], 2);
+        let mut legacy = b.db["bots"][0].clone();
+        legacy["legacy"] = json!(true);
+        assert_eq!(b.bot_public(&legacy)["transportVersion"], 0);
+        assert_eq!(
+            b.request(call("bot_get_me")).unwrap()["bot"]["transportVersion"],
+            2
+        );
+        let human = json!({"id":id(),"name":"Same Name","active":true});
+        b.db["users"].as_array_mut().unwrap().push(human.clone());
+        assert!(b
+            .bot_tool_users(
+                &json!({"op":"set_bot_tool_users","bot":bid,"users":[human["id"]],"revision":0}),
+                s(&human, "id")
+            )
+            .is_err());
+        let p = b
+            .bot_tool_users(
+                &json!({"op":"set_bot_tool_users","bot":bid,"users":[human["id"]],"revision":0}),
+                &owner,
+            )
+            .unwrap();
+        assert_eq!(p["revision"], 1);
+        assert!(b
+            .bot_tool_users(
+                &json!({"op":"set_bot_tool_users","bot":bid,"users":[bid],"revision":1}),
+                &owner
+            )
+            .is_err());
+        assert_eq!(
+            b.request(call("bot_get_me")).unwrap()["toolPolicy"]["revision"],
+            1
+        );
+        let mut reply = call("bot_reply");
+        reply["text"] = json!("first");
+        let first = b.request(reply.clone()).unwrap();
+        assert_eq!(b.request(reply.clone()).unwrap(), first);
+        reply["text"] = json!("collision");
+        assert_eq!(
+            b.request(reply.clone()).unwrap_err(),
+            "BOT_RESPONSE_CONFLICT"
+        );
+        let mut edit = call("bot_edit");
+        edit["text"] = json!("edited");
+        edit["revision"] = json!(1);
+        let edited = b.request(edit.clone()).unwrap();
+        assert_eq!(b.request(edit.clone()).unwrap(), edited);
+        edit["text"] = json!("stale");
+        assert_eq!(b.request(edit).unwrap_err(), "BOT_RESPONSE_CONFLICT");
+        b.request(call("bot_delete")).unwrap();
+        b.request(call("bot_delete")).unwrap();
+        reply["text"] = json!("first");
+        assert_eq!(b.request(reply).unwrap(), edited);
+        assert!(!arr(&b.db["messages"])
+            .iter()
+            .any(|m| m["id"] == first["id"]));
+        for n in 1..32 {
+            let mut r = call("bot_reply");
+            r["response_key"] = json!(format!("part{n}"));
+            r["text"] = json!("part");
+            b.request(r).unwrap();
+        }
+        let mut r = call("bot_reply");
+        r["response_key"] = json!("overflow");
+        r["text"] = json!("part");
+        assert_eq!(b.request(r).unwrap_err(), "BOT_OUTPUT_LIMIT");
+        b.request(call("bot_typing")).unwrap();
+        assert_eq!(b.visible_bot_typing(&owner).len(), 1);
+        assert!(b.visible_bot_typing(s(&human, "id")).is_empty());
+        b.bot_typing[0]["until"] = json!(now() - 1);
+        assert!(b.visible_bot_typing(&owner).is_empty());
+        b.request(call("bot_typing")).unwrap();
+        let owner_record = b.db["users"][0].clone();
+        let token = b.token(&owner_record, "test", false).unwrap();
+        for text in ["edited source", "/ask hello"] {
+            b.request(
+                json!({"op":"update_message","token":token,"message":message["id"],"text":text}),
+            )
+            .unwrap();
+            assert_eq!(
+                b.request(call("bot_authorize_update")).unwrap_err(),
+                "BOT_SOURCE_UNAVAILABLE"
+            );
+        }
+        assert_eq!(b.db["messages"][0]["text"], message["text"]);
+        assert_eq!(b.db["bot_updates"][0]["source_cancelled"], true);
+        assert!(b.visible_bot_typing(&owner).is_empty());
+        assert!(b.request(call("bot_get_updates")).unwrap()["updates"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        let mut reopened = Backend::open(path.clone()).unwrap();
+        assert_eq!(
+            reopened.request(call("bot_authorize_update")).unwrap_err(),
+            "BOT_SOURCE_UNAVAILABLE"
+        );
+        drop(reopened);
+        b.request(call("bot_ack")).unwrap();
+        assert!(b.bot_typing.is_empty());
+        drop(b);
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
     fn live_poll_refreshes_presence_without_rewriting_heartbeat() {
-        let path=std::env::temp_dir().join(id()).join("db.json");
-        let mut b=Backend::open(path).unwrap();
-        let owner=s(&b.db["users"][0],"id").to_owned();
-        let group=b.db["groups"][0]["id"].clone();
-        let bot=b.bot_management(&json!({"op":"create_bot","group":group,"name":"Heartbeat","username":"heartbeat"}),&owner).unwrap();
-        let bid=s(&bot["bot"],"id").to_owned();
-        let previous=now()-50;
-        b.db["bots"][0]["last_seen"]=json!(previous);
-        b.bot_worker(&json!({"op":"bot_get_updates","bot_token":bot["token"]})).unwrap();
-        assert_eq!(b.db["bots"][0]["last_seen"],json!(previous));
+        let path = std::env::temp_dir().join(id()).join("db.json");
+        let mut b = Backend::open(path).unwrap();
+        let owner = s(&b.db["users"][0], "id").to_owned();
+        let group = b.db["groups"][0]["id"].clone();
+        let bot = b
+            .bot_management(
+                &json!({"op":"create_bot","group":group,"name":"Heartbeat","username":"heartbeat"}),
+                &owner,
+            )
+            .unwrap();
+        let bid = s(&bot["bot"], "id").to_owned();
+        let previous = now() - 50;
+        b.db["bots"][0]["last_seen"] = json!(previous);
+        b.bot_worker(&json!({"op":"bot_get_updates","bot_token":bot["token"]}))
+            .unwrap();
+        assert_eq!(b.db["bots"][0]["last_seen"], json!(previous));
         assert!(b.public(&bot["user"])["online"].as_bool().unwrap());
         assert!(b.presence.contains_key(&bid));
     }
@@ -727,7 +1044,12 @@ mod bot_tests {
             .unwrap();
         }
         assert!(arr(&b.db["bot_updates"]).is_empty());
-        b.enqueue_bots(&json!({"id":id(),"channel":channel,"user":owner["id"],"text":"/ask@voicehelper hello","time":now()})).unwrap();
+        let invocation = json!({"id":id(),"channel":channel,"user":owner["id"],"text":"/ask@voicehelper hello","time":now()});
+        b.db["messages"]
+            .as_array_mut()
+            .unwrap()
+            .push(invocation.clone());
+        b.enqueue_bots(&invocation).unwrap();
         let updates = b
             .bot_worker(&json!({"op":"bot_get_updates","bot_token":bot["token"]}))
             .unwrap();

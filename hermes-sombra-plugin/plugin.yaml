@@ -1,0 +1,27 @@
+name: sombra-platform
+label: Sombra
+kind: platform
+version: 0.1.0
+description: Sombra transport inside Hermes v0.22.5; explicit shared-host or isolated actor/channel mode.
+author: Sombra
+requires_env:
+  - name: SOMBRA_API_URL
+    description: Operator-configured HTTPS backend or scoped broker API
+  - name: SOMBRA_STATE_DIR
+    description: Private durable Sombra transport state directory
+optional_env:
+  - name: SOMBRA_MODE
+    description: shared_host (explicit risk acknowledgement) or isolated (default)
+  - name: SOMBRA_SHARED_HOST_ACK
+    description: Explicit I_ACCEPT_SHARED_HOST_FULL_TOOLS operator acknowledgement
+  - name: SOMBRA_TOKEN_FILE
+    description: Shared-host protected credential file; defaults /etc/sombra-hermes/bot.env
+  - name: SOMBRA_PROFILE
+    description: Clean served logical Sombra profile, never Telegram/default
+  - name: SOMBRA_API_TOKEN
+    description: Isolated mode scoped broker token only
+    password: true
+  - name: SOMBRA_ACTOR_ID
+    description: Isolated mode immutable selected actor
+  - name: SOMBRA_CHANNEL_ID
+    description: Isolated mode immutable channel

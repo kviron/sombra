@@ -51,6 +51,70 @@ fn provision_group_bot(
     result
 }
 
+fn configure_bot_acknowledged(args: &[std::ffi::OsString], ack: Option<&str>) -> bool {
+    args.len() == 3 && ack == Some("1")
+}
+
+fn configure_bot(
+    directory: &std::path::Path,
+    args: &[std::ffi::OsString],
+) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::Read;
+    if !configure_bot_acknowledged(
+        args,
+        std::env::var("SOMBRA_OFFLINE_MAINTENANCE").ok().as_deref(),
+    ) {
+        return Err(std::io::Error::other("Stop the Sombra service and back up its database, set SOMBRA_OFFLINE_MAINTENANCE=1, then use --configure-bot USERNAME JSON_FILE").into());
+    }
+    let username = args[1].to_str().ok_or("Username must be UTF-8")?;
+    let database = directory.join("mines-db.json");
+    if !database.is_file() {
+        return Err("Existing Sombra database not found".into());
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(&args[2])?
+        .take(1048577)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > 1048576 {
+        return Err("Bot configuration file exceeds 1 MiB".into());
+    }
+    let patch: serde_json::Value = serde_json::from_slice(&bytes)?;
+    // An explicit offline acknowledgment is not an OS lock. Never run alongside the service.
+    let mut store = backend::Backend::open(database).map_err(std::io::Error::other)?;
+    let result = store
+        .configure_bot_offline(username, &patch)
+        .map_err(std::io::Error::other)?;
+    println!(
+        "Configured bot {} @{}",
+        result["profile"]["name"]
+            .as_str()
+            .unwrap_or("")
+            .escape_debug(),
+        result["bot"]["username"]
+            .as_str()
+            .unwrap_or(username)
+            .escape_debug()
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+mod maintenance_tests {
+    #[test]
+    fn configure_requires_explicit_offline_ack_and_exact_arguments() {
+        let args = vec![
+            "--configure-bot".into(),
+            "helper".into(),
+            "config.json".into(),
+        ];
+        for ack in [None, Some(""), Some("0"), Some("true")] {
+            assert!(!super::configure_bot_acknowledged(&args, ack));
+        }
+        assert!(super::configure_bot_acknowledged(&args, Some("1")));
+        assert!(!super::configure_bot_acknowledged(&args[..2], Some("1")));
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let directory = std::env::var_os("MINES_DATA_DIR")
@@ -60,6 +124,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !args.is_empty() {
         if args[0] == "--provision-group-bot" {
             return provision_group_bot(&directory, &args);
+        }
+        if args[0] == "--configure-bot" {
+            return configure_bot(&directory, &args);
         }
         return Err(std::io::Error::other("Unknown server argument").into());
     }

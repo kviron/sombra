@@ -2,11 +2,13 @@ import {useRef,useState} from 'react';
 import {Smile, Sticker as StickerIcon, X, MessageCircle, UserPlus, Check, Bot as BotIcon, Copy, Pencil, Trash2} from 'lucide-react';
 import {ContextMenu} from 'radix-ui';
 import {toast} from 'sonner';
-import {api, type ChatState, type ChatMessage} from '@/shared/api/backend';
+import {api, type ChatState, type ChatMessage, type Group} from '@/shared/api/backend';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {Select} from '@/shared/ui/select';
 import {Message,MessageAvatar,MessageContent,MessageHeader,MessageFooter,Bubble,BubbleContent} from '@/shared/ui/message';
 import {MessageActionDialog} from './message-action-dialog';
+import {MessageReadersDialog} from './message-readers-dialog';
+import {CheckCheck,Eye} from 'lucide-react';
 import {useUserActions} from './user-actions';
 import './messages.css';
 import './bots.css';
@@ -15,22 +17,29 @@ import emojiData from '@emoji-mart/data/sets/15/native.json';
 import {StickerImage} from './sticker-library';
 import {MessageAttachment} from './message-attachments';
 import {MessageText} from './message-text';
+import {canGroup} from '@/shared/lib/group-permissions';
+import {BotToolAccess} from './bot-tool-access';
+import {BotSettingsDialog} from './bot-settings-dialog';
 export const emojis=['👍','❤️','😂','🔥','🎉','👀'];
 type Common={state:ChatState;refresh:()=>Promise<unknown>;onError:(message:string)=>void};
 export function MessageItem({message:m,previous,state,refresh,onError,userName}:{message:ChatMessage;previous?:ChatMessage;userName:(id:string)=>string}&Common){
  const [busy,setBusy]=useState(false);
  const [dialog,setDialog]=useState<'edit'|'delete'>();
+ const [readersOpen,setReadersOpen]=useState(false);
  const userActions=useUserActions();
  const row=useRef<HTMLElement>(null);
  const grouped=!!previous&&previous.channel===m.channel&&previous.user===m.user&&previous.bot_name===m.bot_name&&new Date(previous.time*1000).toDateString()===new Date(m.time*1000).toDateString();
  const sticker=state.stickers?.find(s=>s.id===m.sticker);
  const author=m.user===state.me.id&&!m.bot_name;
+ const messageGroup=state.groups.find(group=>group.channels.some(channel=>channel.id===m.channel));
+ const canDeleteEveryone=author||!!messageGroup?.permissions&&canGroup(messageGroup,state.me.id,'messages.delete_any');
  const identity=state.users.find(u=>u.id===m.user);
  const avatar=identity?.avatar;
  const name=identity?.name||m.bot_name||userName(m.user);
  const canOpenProfile=!!identity;
  const openProfile=()=>{if(canOpenProfile)userActions?.openProfile(m.user)};
  const hasText=!!m.text?.trim();
+ const hasImage=!!m.attachment&&['image/gif','image/png','image/jpeg','image/webp'].includes(m.attachment.mime);
  const reactionEmojis=emojis.filter(emoji=>m.reactions?.some(reaction=>reaction.emoji===emoji));
  async function react(emoji:string){
   if(busy)return;
@@ -49,20 +58,22 @@ export function MessageItem({message:m,previous,state,refresh,onError,userName}:
    className="grid size-8 cursor-default place-items-center rounded-sm text-base outline-none select-none data-[highlighted]:bg-accent data-[disabled]:opacity-50"
   >{emoji}</ContextMenu.Item>)}
  </ContextMenu.Group>;
+ const read=state.readReceiptsSupported===true&&author&&(m.readCount||0)>0;
  const actions=[
+  ...(state.readReceiptsSupported&&author?[{label:read?`Посмотрели: ${m.readCount}`:'Пока не просмотрено',icon:Eye,disabled:!read,onSelect:()=>setReadersOpen(true)}]:[]),
   ...(author&&hasText?[{label:'Редактировать',icon:Pencil,onSelect:()=>setDialog('edit')}]:[]),
   ...(hasText?[{label:'Копировать текст',icon:Copy,onSelect:()=>void copyText()}]:[]),
   {label:'Удалить сообщение',icon:Trash2,onSelect:()=>setDialog('delete')},
  ];
  return <>
   <EntityContextMenu controls={reactionMenu} actions={actions}>
-   <Message ref={row} data-message-id={m.id} data-grouped={grouped} data-own={author} aria-label={name} align="start" tabIndex={0}
+   <Message ref={row} data-read-message-id={m.id} data-message-id={m.id} data-grouped={grouped} data-own={author} aria-label={name} align="start" tabIndex={0}
     className="rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <MessageAvatar>{canOpenProfile?<button type="button" className="avatar-trigger" title={`Профиль ${name}`} onClick={openProfile}>{identity?<UserAvatar user={identity} size="md" presence={false} decorative/>:avatar?<img src={avatar} alt=""/>:name[0]}</button>:avatar?<img src={avatar} alt=""/>:name[0]}</MessageAvatar>
     <MessageContent>
-     <Bubble data-sticker-only={!!sticker&&!hasText}>
+     <Bubble data-sticker-only={!!sticker&&!hasText} data-image-only={hasImage&&!hasText} data-image-message={hasImage}>
       {!grouped&&<MessageHeader><strong>{canOpenProfile?<button type="button" className="message-author" title={`Профиль ${name}`} onClick={openProfile}>{name}</button>:name}</strong>{(m.bot_name||identity?.bot)&&<small className="bot-badge">БОТ</small>}</MessageHeader>}
-      <BubbleContent>{m.text&&<MessageText text={m.text}/>}{sticker&&<StickerImage key={sticker.id} className="sent-sticker" sticker={sticker}/ >}{m.attachment&&<MessageAttachment messageId={m.id} attachment={m.attachment}/>}</BubbleContent>
+      <BubbleContent>{m.text&&(hasImage?<div className="message-image-caption"><MessageText text={m.text}/></div>:<MessageText text={m.text}/>)}{sticker&&<StickerImage key={sticker.id} className="sent-sticker" sticker={sticker}/ >}{m.attachment&&<MessageAttachment messageId={m.id} attachment={m.attachment}/>}</BubbleContent>
       <div className={reactionEmojis.length?'message-bottom-row':'message-bottom-inline'}>
        {reactionEmojis.length>0&&<div className="reactions">{reactionEmojis.map(emoji=><button
         type="button" disabled={busy} aria-label={`Реакция ${emoji}`} aria-pressed={m.reactions?.some(reaction=>reaction.emoji===emoji&&reaction.user===state.me.id)}
@@ -70,20 +81,21 @@ export function MessageItem({message:m,previous,state,refresh,onError,userName}:
        >{emoji} {m.reactions?.filter(reaction=>reaction.emoji===emoji).length}</button>)}</div>}
       <MessageFooter>
        <time dateTime={new Date(m.time*1000).toISOString()}>{new Date(m.time*1000).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</time>
-       {author&&<Check size={13} aria-label="Отправлено"/>}
+       {author&&(read?<button type="button" className="message-read-check" aria-label="Просмотрено" title={`Посмотрели: ${m.readCount}${m.readAt?' · '+new Date(m.readAt*1000).toLocaleString('ru'):''}`} onClick={()=>setReadersOpen(true)}><CheckCheck size={13}/></button>:<Check size={13} aria-label="Отправлено"/>)}
       </MessageFooter>
       </div>
      </Bubble>
     </MessageContent>
    </Message>
   </EntityContextMenu>
-  {dialog&&<MessageActionDialog mode={dialog} message={m} author={author} trigger={row} refresh={refresh} onClose={()=>setDialog(undefined)}/>}
+  {readersOpen&&read&&<MessageReadersDialog state={state} message={m} trigger={row} onClose={()=>setReadersOpen(false)}/>}
+   {dialog&&<MessageActionDialog mode={dialog} message={m} author={author} canDeleteEveryone={canDeleteEveryone} trigger={row} refresh={refresh} onClose={()=>setDialog(undefined)}/>}
  </>;
 }
 const categories:Record<string,string>={people:'Люди',nature:'Природа',foods:'Еда',activity:'Занятия',places:'Места',objects:'Предметы',symbols:'Символы',flags:'Флаги'};
 const emojiById=emojiData.emojis as Record<string,{name:string;keywords?:string[];skins:{native:string}[]}>;
 type Panel='emoji'|'stickers';
-export function ExpressionPicker({state,onError,onEmoji,onSticker,disabled,group,onManage}:{onEmoji:(emoji:string)=>void;onSticker:(id:string)=>Promise<void>;disabled:boolean;group?:{id:string;owner:string};onManage:(scope:'personal'|'group')=>void}&Common){
+export function ExpressionPicker({state,onError,onEmoji,onSticker,disabled,group,onManage}:{onEmoji:(emoji:string)=>void;onSticker:(id:string)=>Promise<void>;disabled:boolean;group?:Group;onManage:(scope:'personal'|'group')=>void}&Common){
  const [panel,setPanel]=useState<Panel>();
  const [busy,setBusy]=useState(false),[category,setCategory]=useState('people'),[query,setQuery]=useState('');
  const [scope,setScope]=useState<'personal'|'group'>('personal'),[pack,setPack]=useState('');
@@ -125,7 +137,7 @@ export function ExpressionPicker({state,onError,onEmoji,onSticker,disabled,group
     </nav>}
     {packs.length>1&&<Select label="Набор стикеров" value={pack} onValueChange={setPack} options={[{value:'',label:'Все наборы'},...packs.filter(Boolean).map(name=>({value:name,label:name}))]}/>}
     {filtered.length?<div className="sticker-grid">{filtered.map(sticker=><button type="button" key={sticker.id} disabled={disabled||busy} title={sticker.name} onClick={()=>void sendSticker(sticker.id)}><StickerImage sticker={sticker}/></button>)}</div>:<p>Пока нет стикеров.</p>}
-    {(scope==='personal'||group?.owner===state.me.id)&&<button type="button" className="manage-stickers" onClick={()=>{setPanel(undefined);onManage(scope)}}>Управлять стикерами</button>}
+    {(scope==='personal'||canGroup(group,state.me.id,'stickers.manage'))&&<button type="button" className="manage-stickers" onClick={()=>{setPanel(undefined);onManage(scope)}}>Управлять стикерами</button>}
    </>}
   </section>}
  </div>;
@@ -139,10 +151,13 @@ export function Friends({state,refresh,onError,onDialog}:Common&{onDialog:(id:st
 }
 export function Bots({state,refresh,onError,channel,group,owner}:Common&{channel:string;group?:string;owner:boolean}){
  const [name,setName]=useState(''),[username,setUsername]=useState(''),[token,setToken]=useState(''),[busy,setBusy]=useState(false),[copied,setCopied]=useState(false);
+ const [managementId,setManagementId]=useState('');
+ const managedBot=state.bots?.find(b=>b.id===managementId&&b.owner===state.me.id);
  async function act(op:string,data:Record<string,unknown>){setBusy(true);try{const r=await api(op,data);if(r.token){setToken(r.token);setCopied(false)}await refresh()}catch{onError('Не удалось обновить подключение бота. Попробуйте снова.')}finally{setBusy(false)}}
  const bots=state.bots?.filter(b=>group?(b.groups?b.groups.includes(group)||b.channel===channel:b.group===group||b.channel===channel):b.channel===channel)||[];
  return <section className="bot-settings"><BotIcon size={28}/><h3>{group?'Боты в этой группе':'Боты в этой комнате'}</h3><p>Бот — отдельный участник. По умолчанию получает команды и упоминания в группе, сообщения в личном диалоге. ИИ работает через отдельный сервис; доступ к инструментам автоматически не предоставляется.</p>
- {bots.map(b=>{const user=state.users.find(u=>u.id===b.id)||{id:b.id,name:b.name};return <article className="bot-installation" key={b.id}><div className="bot-installation-heading"><UserAvatar user={user} size="sm" presence={false}/><div><strong>{b.name}</strong> <small className="bot-badge">БОТ</small>{b.username&&<p>@{b.username}</p>}</div></div><p>{b.enabled===false?'Отключён':b.last_seen&&Date.now()/1000-b.last_seen<120?'Сервис подключён':'Нет недавней активности сервиса'}</p><p>{b.channel?'Доступ к истории этой комнаты':b.privacy===false||b.privacy==='all'?'Читает все сообщения разрешённых чатов':'Команды и упоминания; личные сообщения — в отдельном диалоге'}</p>{b.commands?.length? <ul>{b.commands.map(c=><li key={c.command}><code>/{c.command.replace(/^\//,'')}</code> — {c.description}</li>)}</ul>:<p>Команды: /help</p>}<div className="bot-installation-actions">{b.owner===state.me.id&&<button type="button" disabled={busy} onClick={()=>{if(window.confirm('Заменить ключ? Старый ключ немедленно перестанет работать.'))void act('bot_rotate_token',{bot:b.id})}}>Заменить ключ</button>}{owner&&<button type="button" disabled={busy} onClick={()=>{if(window.confirm('Отключить бота от этого чата?'))void act(group&&!b.channel?'remove_bot_from_group':'delete_bot',group&&!b.channel?{bot:b.id,group}:{bot:b.id})}}>Отключить</button>}</div></article>})}
+ {bots.map(b=>{const user=state.users.find(u=>u.id===b.id)||{id:b.id,name:b.name};return <article className="bot-installation" key={b.id}><div className="bot-installation-heading"><UserAvatar user={user} size="sm" presence={false}/><div><strong>{b.name}</strong> <small className="bot-badge">БОТ</small>{b.username&&<p>@{b.username}</p>}</div></div><p>{b.enabled===false?'Отключён':b.last_seen&&Date.now()/1000-b.last_seen<120?'Сервис подключён':'Нет недавней активности сервиса'}</p><p>{b.channel?'Доступ к истории этой комнаты':b.privacy===false||b.privacy==='all'?'Читает все сообщения разрешённых чатов':'Команды и упоминания; личные сообщения — в отдельном диалоге'}</p>{b.commands?.length? <ul>{b.commands.map(c=><li key={c.command}><code>/{c.command.replace(/^\//,'')}</code> — {c.description}</li>)}</ul>:<p>Команды: /help</p>}<div className="bot-installation-actions">{!state.me.bot&&b.owner===state.me.id&&<button type="button" onClick={()=>setManagementId(b.id)}>Настроить бота</button>}{b.owner===state.me.id&&(!b.channel||owner)&&<button type="button" disabled={busy} onClick={()=>{if(window.confirm('Заменить ключ? Старый ключ немедленно перестанет работать.'))void act('bot_rotate_token',{bot:b.id})}}>Заменить ключ</button>}{owner&&<button type="button" disabled={busy} onClick={()=>{if(window.confirm('Отключить бота от этого чата?'))void act(group&&!b.channel?'remove_bot_from_group':'delete_bot',group&&!b.channel?{bot:b.id,group}:{bot:b.id})}}>Отключить</button>}</div>{b.owner===state.me.id&&<BotToolAccess bot={b} state={state} rootBusy={busy}/>}</article>})}
+ {managedBot&&<BotSettingsDialog bot={managedBot} state={state} refresh={refresh} onClose={()=>setManagementId('')}/>}
  {!bots.length&&<p>Здесь пока нет подключённых ботов.</p>}
  {owner&&<><label>Имя бота<input aria-label="Имя бота" maxLength={32} value={name} onChange={e=>setName(e.target.value)} placeholder="Помощник команды"/></label>{group&&<label>Уникальное имя<input aria-label="Уникальное имя бота" maxLength={32} value={username} onChange={e=>setUsername(e.target.value)} placeholder="team_bot" autoCapitalize="none" autoCorrect="off"/></label>}<button type="button" className="small-button" disabled={busy||!name.trim()||(!!group&&!username.trim())} onClick={()=>void act('create_bot',group?{group,name:name.trim(),username:username.trim().replace(/^@/,'')}:{channel,name:name.trim()})}>Создать бота</button></>}
  {token&&<div className="bot-token"><p>Новый ключ показан только сейчас. Сохраните его на машине сервиса бота. Не отправляйте в чат.</p><input type="password" aria-label="Новый ключ бота" readOnly value={token} autoComplete="off"/><button type="button" className="small-button" onClick={()=>void navigator.clipboard.writeText(token).then(()=>setCopied(true)).catch(()=>onError('Не удалось скопировать ключ. Проверьте доступ к буферу обмена.'))}><Copy size={16}/>{copied?'Скопировано':'Скопировать ключ'}</button><button type="button" onClick={()=>{setToken('');setCopied(false)}}>Я сохранил ключ</button></div>}

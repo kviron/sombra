@@ -1,0 +1,316 @@
+"""Shared gateway offline/loopback contracts, no provider/model/service calls."""
+import asyncio
+import contextvars
+from contextlib import asynccontextmanager, contextmanager
+import importlib.util
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+import threading
+import types
+import typing
+import unittest
+from unittest.mock import patch
+from http.server import ThreadingHTTPServer
+
+import test_plugin as fixtures
+
+ROOT = Path(__file__).resolve().parents[1]
+PACKAGE = "sombra_shared_fixture"
+package = types.ModuleType(PACKAGE)
+package.__path__ = [str(ROOT)]
+sys.modules[PACKAGE] = package
+sys.modules[PACKAGE + ".adapter"] = fixtures.plugin
+spec = importlib.util.spec_from_file_location(PACKAGE + ".shared_host", ROOT / "shared_host.py")
+shared = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = shared
+spec.loader.exec_module(shared)
+
+
+class SharedHostContracts(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        fixture = fixtures.Fixture
+        fixture.calls, fixture.outputs, fixture.events, fixture.acked = [], {}, [], set()
+        fixture.canonicals, fixture.envelope = {}, True
+        fixture.original_acked = threading.Event()
+        fixture.trusted, fixture.changed, fixture.fail_delivery = True, False, False
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), fixture)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        credentials = self.root / "bot.env"
+        credentials.write_text("SOMBRA_BOT_TOKEN='sombra_scope_test'\n", encoding="utf-8")
+        credentials.chmod(0o600)
+        self.env = {"SOMBRA_MODE": "shared_host", "SOMBRA_SHARED_HOST_ACK": shared.HOST_ACK,
+                    "SOMBRA_STATE_DIR": str(self.root / "state"), "SOMBRA_PROFILE": "sombra",
+                    "SOMBRA_TOKEN_FILE": str(credentials), "SOMBRA_LEGACY_STATE_DIR": str(self.root / "legacy"),
+                    "SOMBRA_API_URL": f"http://127.0.0.1:{self.server.server_port}/api", "SOMBRA_TEST_LOOPBACK": "1"}
+        self.environment = patch.dict(os.environ, self.env)
+        self.environment.start()
+        self.adapter = shared.SharedHostAdapter(None)
+        self.public_scope_marker = contextvars.ContextVar("unit_public_profile_scope", default=False)
+        @asynccontextmanager
+        async def stub_public_scope():
+            # Deliberate unit SDK stub only; exact installed-SDK scope tests run separately.
+            marker = self.public_scope_marker.set(True)
+            try:
+                yield
+            finally:
+                self.public_scope_marker.reset(marker)
+        self.adapter._public_runtime_scope = stub_public_scope
+        self.adapter.bot_id = "bot"
+        shared.SESSION_BINDINGS.clear()
+        self.context_token = shared.INVOCATION.set(None)
+        def routed_source(_adapter, **kwargs):
+            return types.SimpleNamespace(**kwargs, profile="sombra", profile_route_rejected=False)
+        self.source_patch = patch.object(fixtures.Base, "build_source", routed_source)
+        self.source_patch.start()
+
+    async def asyncTearDown(self):
+        shared.INVOCATION.reset(self.context_token)
+        shared.SESSION_BINDINGS.clear()
+        for scope in self.adapter._scopes.values():
+            scope["journal"].db.close()
+        self.source_patch.stop()
+        self.environment.stop()
+        await asyncio.to_thread(self.server.shutdown)
+        self.server.server_close()
+        self.thread.join()
+        self.temp.cleanup()
+
+    def event(self, number, actor="actor-a", channel="chan-a", trusted=True, text="question"):
+        canonical = {"update_id": number, "bot_id": "bot", "channel": channel,
+                     "sender": {"id": actor}, "chat": {"id": "group"},
+                     "access": {"trusted": trusted, "policy_revision": 1}}
+        fixtures.Fixture.canonicals[number] = canonical
+        event = {"update_id": number, "channel": channel, "sender": {"id": actor}, "chat": {"id": "group", "kind": "group"},
+                 "message": {"id": "message-" + str(number), "text": text}}
+        return event, canonical
+
+    def bind(self, number=1, actor="actor-a", channel="chan-a", trusted=True):
+        event, canonical = self.event(number, actor, channel, trusted)
+        _, scope = self.adapter._new_scope(canonical)
+        scope["trusted"] = trusted
+        token = shared.INVOCATION.set((self.adapter, scope, str(number)))
+        self.adapter.current = {"id": number, "parts": 0, "bytes": 0, "failed": False, "final": False,
+                                "canonical": fixtures.plugin.digest(canonical), "done": asyncio.Event()}
+        self.adapter.journal.begin(number, fixtures.plugin.digest(event))
+        return token, scope
+
+    async def test_explicit_risk_optin_required_no_isolation_claim(self):
+        with patch.dict(os.environ, {"SOMBRA_SHARED_HOST_ACK": ""}):
+            with self.assertRaises(fixtures.plugin.SafetyError):
+                shared.SharedHostAdapter(None)
+        self.assertNotIn("SOMBRA_BOT_TOKEN", self.adapter.env)
+        self.assertFalse((self.root / "state" / "isolated-runtime.json").exists())
+
+    async def test_persona_only_explicit_clean_sombra_profile_never_default(self):
+        profile = self.root / "profiles" / "sombra"
+        profile.mkdir(parents=True)
+        soul = profile / "SOUL.md"
+        soul.write_text("Sombra safe persona", encoding="utf-8")
+        self.assertEqual(shared.protected_persona(str(soul), "sombra"), "Sombra safe persona")
+        self.assertEqual(shared.protected_persona(None, "sombra"), "")
+        with self.assertRaises(fixtures.plugin.SafetyError):
+            shared.protected_persona(str(soul), "default")
+
+    async def test_actual_sdk_connect_consumer_forwards_initial_and_reconnect_keywords(self):
+        from test_startup_contract import function
+        consumer = function("gateway/run_adapters.py", "_connect_adapter_bounded", {"asyncio": asyncio}, "GatewayAdapterLifecycleMixin")
+        async def idle_poll():
+            await asyncio.Event().wait()
+        self.adapter._poll = idle_poll
+        self.adapter.public_runner = lambda *args: None  # Never called; no provider discovery.
+        runner = types.SimpleNamespace(_platform_connect_timeout_secs=lambda platform, initial=False: 0)
+        self.assertTrue(await consumer(runner, self.adapter, None, is_reconnect=False, initial=True))
+        await self.adapter.disconnect()
+        self.assertTrue(await consumer(runner, self.adapter, None, is_reconnect=True, initial=False))
+        await self.adapter.disconnect()
+        self.assertFalse(any(call["op"] in ("bot_get_updates", "bot_reply", "bot_ack") for call in fixtures.Fixture.calls))
+
+    async def test_backend_envelope_and_local_lifecycle_no_model_proxy(self):
+        response = await self.adapter.broker.acall("bot_get_me")
+        self.assertEqual(response["bot"]["id"], "bot")
+        await self.adapter.broker.acall("runtime_begin_invocation", update_id=99)
+        self.assertFalse(any(call["op"] == "runtime_begin_invocation" for call in fixtures.Fixture.calls))
+
+    async def test_two_concurrent_trusted_sources_keep_invocation_outputs_distinct(self):
+        first, authority_a = self.event(1, "actor-a", "chan-a")
+        second, authority_b = self.event(2, "actor-b", "chan-b")
+        _, scope_a = self.adapter._new_scope(authority_a)
+        _, scope_b = self.adapter._new_scope(authority_b)
+        await asyncio.gather(self.adapter._run_scope(scope_a, first, authority_a), self.adapter._run_scope(scope_b, second, authority_b))
+        self.assertEqual(fixtures.Fixture.acked, {1, 2})
+        self.assertEqual({payload["update_id"] for payload in fixtures.Fixture.outputs.values()}, {1, 2})
+        self.assertNotEqual(scope_a["directory"], scope_b["directory"])
+        self.assertEqual(scope_a["journal"].begin(1, fixtures.plugin.digest(first)), "ACKED")
+        self.assertEqual(scope_b["journal"].begin(2, fixtures.plugin.digest(second)), "ACKED")
+        self.assertIsNone(self.adapter.current)
+        self.assertIsNone(shared.INVOCATION.get())
+
+    async def test_fresh_auth_survives_thread_hop_revoke_and_telegram_untouched(self):
+        token, scope = self.bind()
+        try:
+            shared.bind_shared_agent_session(session_id="sombra-session", platform="sombra")
+            allowed = await asyncio.to_thread(shared.shared_pre_tool_call, tool_name="terminal", args={}, session_id="sombra-session")
+            self.assertIsNone(allowed)
+            fixtures.Fixture.canonicals[1]["access"]["trusted"] = False
+            denied = await asyncio.to_thread(shared.shared_pre_tool_call, tool_name="read_file", args={}, session_id="sombra-session")
+            self.assertEqual(denied["action"], "block")
+            # Simulate a context-dropping SDK boundary with the REAL registered session ID.
+            empty = contextvars.Context()
+            self.assertEqual(empty.run(shared.shared_pre_tool_call, session_id="sombra-session")["action"], "block")
+            self.assertIsNone(empty.run(shared.shared_pre_tool_call, session_id="telegram-unrelated"))
+        finally:
+            shared.INVOCATION.reset(token)
+
+    async def test_missing_pre_llm_binding_fails_closed_for_sombra_and_child(self):
+        shared.bind_shared_agent_session(session_id="lost-sombra", platform="sombra")
+        shared.bind_shared_agent_session(session_id="lost-child", platform="delegate", parent_session_id="lost-sombra")
+        self.assertEqual(shared.shared_pre_tool_call(session_id="lost-sombra")["action"], "block")
+        self.assertEqual(shared.shared_pre_tool_call(session_id="lost-child")["action"], "block")
+        self.assertIsNone(shared.shared_pre_tool_call(session_id="telegram"))
+
+    async def test_detached_old_task_cannot_piggyback_new_same_scope_invocation(self):
+        token, scope = self.bind()
+        try:
+            shared.bind_shared_agent_session(session_id="session", platform="sombra")
+            # Old ContextVar retains update1 immutably while same actor/channel starts update2.
+            scope["current"] = {"id": 2, "failed": False}
+            self.assertEqual(shared.shared_pre_tool_call(session_id="session")["action"], "block")
+            self.assertIsNone(self.adapter.current)
+        finally:
+            shared.INVOCATION.reset(token)
+
+    async def test_public_two_scopes_use_restricted_callback_not_gateway_or_private_history(self):
+        seen = []
+        async def public(payload, history):
+            self.assertTrue(self.public_scope_marker.get(), "Public callback ran before profile/secret scope entry")
+            seen.append((payload["update"]["sender"]["id"], list(history)))
+            await self.adapter._public_authorize(payload)
+            await asyncio.sleep(0.03)
+            return {"text": "public " + payload["update"]["sender"]["id"], "media": []}
+        self.adapter.public_runner = public
+        first, authority_a = self.event(1, "public-a", "chan-a", False)
+        second, authority_b = self.event(2, "public-b", "chan-b", False)
+        _, scope_a = self.adapter._new_scope(authority_a)
+        _, scope_b = self.adapter._new_scope(authority_b)
+        await asyncio.gather(self.adapter._run_scope(scope_a, first, authority_a), self.adapter._run_scope(scope_b, second, authority_b))
+        self.assertEqual(seen, [("public-a", []), ("public-b", [])])
+        self.assertEqual(fixtures.Fixture.outputs[(1, "part_00")]["text"], "public public-a")
+        self.assertEqual(fixtures.Fixture.outputs[(2, "part_00")]["text"], "public public-b")
+        self.assertFalse(hasattr(self.adapter, "last_event"))
+        a_history = scope_a["journal"].db.execute("SELECT text FROM public_history").fetchall()
+        self.assertNotIn("public public-b", repr(a_history))
+
+    async def test_offturn_public_scope_real_secret_guard_thread_copy_and_telegram_restore(self):
+        from test_startup_contract import function, SDK
+        # Actual pinned secret-scope implementation + actual official runtime-scope function;
+        # only home/path and terminal-policy IO are harmless fixture context managers.
+        spec = importlib.util.spec_from_file_location("sombra_real_secret_scope_fixture", SDK / "agent/secret_scope.py")
+        secret = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(secret)
+        owner_home = self.root / "owner"
+        named_home = self.root / "profiles" / "sombra"
+        home = contextvars.ContextVar("unit_sdk_home", default=owner_home)
+        constants = types.ModuleType("hermes_constants")
+        constants.set_hermes_home_override = lambda value: home.set(Path(value))
+        constants.reset_hermes_home_override = home.reset
+        constants.get_hermes_home = home.get
+        constants.get_routing_process_hermes_home = lambda: owner_home
+        constants.process_hermes_home_is_pinned = lambda: True
+        constants.pin_process_hermes_home = lambda value: None
+        terminal = types.ModuleType("tools.terminal_scope")
+        @contextmanager
+        def terminal_policy(path):
+            self.assertEqual(home.get(), path)
+            yield
+        terminal.install_and_reset_profile_terminal_scope = terminal_policy
+        tools = types.ModuleType("tools")
+        tools.__path__ = []
+        runtime = types.ModuleType("gateway.run")
+        runtime._profile_runtime_scope = contextmanager(function("gateway/run.py", "_profile_runtime_scope",
+                                                  {"_contextmanager": contextmanager, "Optional": typing.Optional, "Path": Path}))
+        modules = {"hermes_constants": constants, "agent.secret_scope": secret,
+                   "tools": tools, "tools.terminal_scope": terminal, "gateway.run": runtime}
+        self.adapter._public_profile_home = named_home
+        self.adapter._public_prepared_secrets = {"HERMES_CODEX_BASE_URL": "https://dummy-provider.invalid"}
+        token, _ = self.bind(trusted=False)
+        try:
+            with patch.dict(sys.modules, modules):
+                secret.set_multiplex_active(True)
+                secret.set_secret_scope(None)
+                with self.assertRaises(secret.UnscopedSecretError):
+                    await asyncio.to_thread(secret.get_secret_str, "HERMES_CODEX_BASE_URL", "")
+                environment = dict(os.environ)
+                async def public():
+                    # Invoke the PRODUCT method, not the setUp unit stub/outer fixture scope.
+                    async with shared.SharedHostAdapter._public_runtime_scope(self.adapter):
+                        def resolve_like_pool():
+                            return (secret.get_secret_str("HERMES_CODEX_BASE_URL", ""), home.get(),
+                                    secret.current_secret_scope_home(), secret.get_secret_str("TELEGRAM_BOT_TOKEN", ""),
+                                    shared.get_current_adapter() is self.adapter)
+                        value = await asyncio.to_thread(resolve_like_pool)
+                        self.assertEqual(value, ("https://dummy-provider.invalid", named_home, str(named_home), "", True))
+                        await asyncio.sleep(0)
+                async def telegram():
+                    with runtime._profile_runtime_scope(owner_home, {"TELEGRAM_BOT_TOKEN": "dummy-telegram"}):
+                        await asyncio.sleep(0)
+                        self.assertEqual(secret.get_secret_str("TELEGRAM_BOT_TOKEN", ""), "dummy-telegram")
+                        self.assertEqual(home.get(), owner_home)
+                await asyncio.gather(public(), telegram())
+                self.assertIsNone(secret.current_secret_scope())
+                self.assertEqual(home.get(), owner_home)
+                self.assertEqual(dict(os.environ), environment)
+                with self.assertRaises(secret.UnscopedSecretError):
+                    await asyncio.to_thread(secret.get_secret_str, "HERMES_CODEX_BASE_URL", "")
+        finally:
+            shared.INVOCATION.reset(token)
+
+    async def test_public_normal_sdk_fallback_tool_executor_always_blocked(self):
+        token, scope = self.bind(trusted=False)
+        try:
+            self.assertEqual(shared.shared_pre_tool_call(tool_name="terminal", args={})["action"], "block")
+            self.assertEqual(self.adapter.toolsets_for_source(None), [])
+        finally:
+            shared.INVOCATION.reset(token)
+
+    async def test_settings_is_intercepted_before_gateway_or_public_model(self):
+        event, canonical = self.event(1, trusted=False, text="/settings@hermes")
+        _, scope = self.adapter._new_scope(canonical)
+        called = []
+        async def forbidden_public(*args):
+            called.append(True)
+            raise AssertionError("Settings must not call a model")
+        self.adapter.public_runner = forbidden_public
+        await self.adapter._run_scope(scope, event, canonical)
+        self.assertFalse(called)
+        self.assertFalse(hasattr(self.adapter, "last_event"))
+        self.assertIn(1, fixtures.Fixture.acked)
+        self.assertTrue(any(call["op"] == "bot_get_settings" and call["update_id"] == 1 for call in fixtures.Fixture.calls))
+        self.assertIn("Настройки доступны владельцу в личке", fixtures.Fixture.outputs[(1, "part_00")]["text"])
+
+    async def test_canonical_sombra_handle_preserves_native_help_and_settings(self):
+        self.adapter.bot_handle = "sombra"
+        event, _ = self.event(1, text="/help@sombra")
+        self.assertEqual(self.adapter.classify_text(event), ("native", "/help"))
+        event["message"]["text"] = "@sombra /settings"
+        self.assertTrue(self.adapter._is_settings_update(event))
+        event["message"]["text"] = "/sombra-confirm@sombra " + "0" * 32 + " once"
+        self.assertTrue(self.adapter._is_control_text(event))
+
+    async def test_trusted_profile_fallback_to_telegram_is_refused(self):
+        token, scope = self.bind()
+        try:
+            with patch.object(fixtures.Base, "build_source", lambda *args, **kwargs: types.SimpleNamespace(profile=None, profile_route_rejected=False)):
+                with self.assertRaises(fixtures.plugin.SafetyError):
+                    self.adapter.build_source(chat_id="chan-a", user_id="actor-a")
+        finally:
+            shared.INVOCATION.reset(token)
+
+
+if __name__ == "__main__":
+    unittest.main()

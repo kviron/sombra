@@ -1,12 +1,17 @@
-import type { User } from '@/shared/api/backend';
+import type { User, Group } from '@/shared/api/backend';
 import { UserRow } from './user-row';
 import { useUserActions } from './user-actions';
+import {getGroupRoles} from '@/shared/lib/group-permissions';
+import './group-member-roles.css';
 
 function byName(left: User, right: User) {
   return left.name.localeCompare(right.name, 'ru');
 }
 
-export function MemberList({ members, users, meId }: { members: string[]; users: User[]; meId: string }) {
+export function MemberList({ members, users, meId,group }: { members: string[]; users: User[]; meId: string;group?:Group }) {
+ const roles=group?getGroupRoles(group):[];
+ const roleName=(user:User)=>user.bot?'Бот':group?.owner===user.id?'Владелец':roles.find(role=>role.id===(group?.memberRoles?.[user.id]||'member'))?.name||'Участник';
+ const roleBadge=(user:User)=><small className="group-member-role" title={roleName(user)}>{user.id===meId?'Вы · ':''}{roleName(user)}</small>;
   const actions = useUserActions();
   const people = members
     .map((id) => users.find((user) => user.id === id))
@@ -28,7 +33,7 @@ export function MemberList({ members, users, meId }: { members: string[]; users:
                 as="li"
                 variant="member"
                 identity={user}
-                meta={user.id === meId ? <small>Вы</small> : null}
+                meta={roleBadge(user)}
                 title={user.bio || user.name}
                 onClick={() => actions?.openProfile(user.id)}
               />
@@ -46,6 +51,7 @@ export function MemberList({ members, users, meId }: { members: string[]; users:
                 as="li"
                 variant="member"
                 identity={user}
+                meta={roleBadge(user)}
                 title={user.bio || user.name}
                 onClick={() => actions?.openProfile(user.id)}
               />

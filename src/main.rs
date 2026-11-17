@@ -1,10 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod backend;
+mod audio_device_context;
 use tauri::Manager;
 mod screenshot;
 mod updates;
 mod remote;
 mod attachment_download;
+mod attachment_cache;
 mod session_storage;
 mod notifications;
 #[cfg(windows)]
@@ -52,7 +54,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updates::UpdateStore::default())
-        .invoke_handler(tauri::generate_handler![screenshot::capture, remote::remote_api, attachment_download::save_message_attachment, remote::record_desktop_diagnostic, notifications::notify_direct_message, notifications::notification_popup_ready, notifications::resize_notification_popup, updater_configured, updates::check_update, updates::download_update, updates::install_update, updates::restart_app])
+        .invoke_handler(tauri::generate_handler![audio_device_context::audio_device_context, screenshot::capture, remote::remote_api, remote::attachment_cache_info, remote::set_attachment_cache_limit, remote::clear_attachment_cache, attachment_download::save_message_attachment, remote::record_desktop_diagnostic, notifications::notify_direct_message, notifications::notification_popup_ready, notifications::resize_notification_popup, updater_configured, updates::check_update, updates::download_update, updates::install_update, updates::restart_app])
         .setup(move |app| {
             app.manage(remote::Remote::new(app.path().app_data_dir()?.join("session.dpapi"))?);
             #[cfg(windows)]

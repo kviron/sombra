@@ -1,0 +1,55 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import ts from 'typescript';
+// Minimal deterministic IDB test double; no new dependencies or disk writes.
+const stores=new Map();let payloadReads=0;
+const db={objectStoreNames:{contains:name=>stores.has(name)},createObjectStore(name){stores.set(name,new Map())},deleteObjectStore(name){stores.delete(name)},transaction(){let pending=0;const tx={objectStore(name){const map=stores.get(name);function request(run){pending++;const req={};setTimeout(()=>{req.result=run();req.onsuccess?.();pending--;finish()},0);return req}function finish(){setTimeout(()=>{if(!pending)tx.oncomplete?.()},0)}return {get(key){if(name==='payloads')payloadReads++;return request(()=>structuredClone(map.get(key)))},put(value,key){return request(()=>map.set(key??value.key,structuredClone(value)))},delete(key){return request(()=>map.delete(key))},clear(){return request(()=>map.clear())},getAll(){assert.notEqual(name,'payloads','metadata operations must not read all payloads');return request(()=>structuredClone([...map.values()]))},openCursor(){const entries=[...map.entries()];let i=0;pending++;const req={};function next(){setTimeout(()=>{const pair=entries[i++];req.result=pair?{value:structuredClone(pair[1]),delete(){map.delete(pair[0])},continue:next}:null;req.onsuccess?.();if(!pair){pending--;finish()}},0)}next();return req}}}};setTimeout(()=>{if(!pending)tx.oncomplete?.()},0);return tx}};
+globalThis.indexedDB={open(){const req={result:db};setTimeout(()=>{req.onupgradeneeded?.();req.onsuccess?.()},0);return req}};
+const cache=await import('./ui/shared/api/attachment-cache.ts');
+const metadata={id:'a',name:'hello.txt',mime:'text/plain',size:3};
+const snapshot=(account='one',messages=[{id:'m',attachment:{...metadata,cached:true}}])=>({me:{id:account},messages});
+const accept=state=>cache.acceptAttachmentCacheState(state,cache.attachmentCacheGeneration());
+const file={data:'YWJj',name:metadata.name,mime:metadata.mime};
+test('browser attachment cache authorization, corruption, lifecycle and metadata-only stats',async()=>{
+ await accept(snapshot());assert.equal((await cache.getBrowserAttachmentCacheInfo()).limitMiB,1024);
+ await cache.writeAttachmentCache('m',file,cache.attachmentCacheGeneration());
+ assert.equal((await cache.readAttachmentCache('m')).cached,true);
+ const before=payloadReads;const decorated=await accept(snapshot());assert.equal(decorated.messages[0].attachment.cached,true);await cache.getBrowserAttachmentCacheInfo();assert.equal(payloadReads,before);
+ await accept(snapshot('two'));assert.equal(await cache.readAttachmentCache('m'),undefined);assert.equal((await cache.getBrowserAttachmentCacheInfo()).files,0);
+ await cache.writeAttachmentCache('m',file,cache.attachmentCacheGeneration());await cache.setBrowserAttachmentCacheLimit(512);
+ await accept(snapshot());assert.equal((await cache.getBrowserAttachmentCacheInfo()).limitMiB,1024);assert.equal((await cache.readAttachmentCache('m')).data,'YWJj');
+ await cache.clearBrowserAttachmentCache();await accept(snapshot('two'));assert.equal((await cache.getBrowserAttachmentCacheInfo()).limitMiB,512);assert.equal((await cache.getBrowserAttachmentCacheInfo()).files,1);assert.equal((await cache.readAttachmentCache('m')).data,'YWJj');
+ await accept(snapshot());await cache.writeAttachmentCache('m',file,cache.attachmentCacheGeneration());
+ const payloadKey=JSON.stringify(['one','m','a']);stores.get('payloads').set(payloadKey,'YWJk');assert.equal(await cache.readAttachmentCache('m'),undefined);assert.equal((await cache.getBrowserAttachmentCacheInfo()).files,0);
+ await cache.writeAttachmentCache('m',{...file,name:'wrong'},cache.attachmentCacheGeneration());assert.equal((await cache.getBrowserAttachmentCacheInfo()).files,0);
+ await cache.writeAttachmentCache('m',file,cache.attachmentCacheGeneration());await accept(snapshot('one',[]));assert.equal((await cache.getBrowserAttachmentCacheInfo()).files,0);
+ await accept(snapshot());const old=cache.attachmentCacheGeneration(),oldWrite=cache.attachmentCacheWriteEpoch();const pendingState=accept(snapshot());await cache.clearBrowserAttachmentCache();await pendingState;assert.equal(cache.attachmentCacheGeneration(),old);await cache.writeAttachmentCache('m',file,old,oldWrite);assert.equal((await cache.getBrowserAttachmentCacheInfo()).files,0);
+ await cache.setBrowserAttachmentCacheLimit(0);await cache.writeAttachmentCache('m',file,cache.attachmentCacheGeneration());assert.equal((await cache.getBrowserAttachmentCacheInfo()).files,0);
+ await assert.rejects(cache.setBrowserAttachmentCacheLimit(17));await cache.setBrowserAttachmentCacheLimit(256);
+ const now=Date.now;Date.now=()=>now()+6000;assert.equal(await cache.readAttachmentCache('m'),undefined);Date.now=now;
+ await accept(snapshot('two'));assert.equal((await cache.getBrowserAttachmentCacheInfo()).files,1);assert.equal((await cache.getBrowserAttachmentCacheInfo()).limitMiB,512);
+ await accept(snapshot());const dummyKey=JSON.stringify(['one','old','old']);stores.get('files').set(dummyKey,{key:dummyKey,account:'one',size:300*1024*1024,used:0});stores.get('payloads').set(dummyKey,'dummy');await cache.writeAttachmentCache('m',file,cache.attachmentCacheGeneration());assert.equal(stores.get('files').has(dummyKey),false);assert.equal((await cache.getBrowserAttachmentCacheInfo()).files,1);
+ await accept(snapshot('two'));assert.equal((await cache.readAttachmentCache('m')).data,'YWJj');await accept(snapshot());
+ const scopeBeforeLogout=cache.attachmentCacheGeneration();cache.resetAttachmentCacheAccess();assert.equal(cache.attachmentCacheNeedsState(),true);assert.equal(await cache.readAttachmentCache('m'),undefined);await cache.writeAttachmentCache('m',file,scopeBeforeLogout);await assert.rejects(cache.getBrowserAttachmentCacheInfo());await assert.rejects(cache.clearBrowserAttachmentCache());await assert.rejects(cache.setBrowserAttachmentCacheLimit(256));
+ await accept(snapshot());const transaction=db.transaction;db.transaction=()=>{throw new Error('QuotaExceededError')};await cache.writeAttachmentCache('m',file,cache.attachmentCacheGeneration());await assert.rejects(cache.getBrowserAttachmentCacheInfo(),{name:'CacheUnavailable'});db.transaction=transaction;
+ const originalIDB=globalThis.indexedDB;delete globalThis.indexedDB;const unsupported=await import('./ui/shared/api/attachment-cache.ts?unsupported');await unsupported.acceptAttachmentCacheState(snapshot(),unsupported.attachmentCacheGeneration());await assert.rejects(unsupported.getBrowserAttachmentCacheInfo(),{name:'CacheUnavailable'});globalThis.indexedDB=originalIDB;
+});
+
+test('API held HTTP response survives clear without refilling cache; observed 403 revokes cached access',async()=>{
+ globalThis.localStorage={getItem(){return ''},removeItem(){}};
+ const source=await readFile(new URL('./ui/shared/api/backend.ts',import.meta.url),'utf8');
+ let javascript=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ javascript=javascript.replace(/import \{ invoke, isTauri \} from '@tauri-apps\/api\/core';/,"const isTauri=()=>false;const invoke=()=>{throw new Error('Unexpected native invocation')};");
+ javascript=javascript.replaceAll("'./attachment-cache'",JSON.stringify(new URL('./ui/shared/api/attachment-cache.ts',import.meta.url).href));
+ const backend=await import('data:text/javascript;base64,'+Buffer.from(javascript).toString('base64'));
+ const response=data=>({ok:true,status:200,json:async()=>({data})});
+ globalThis.fetch=async()=>response(snapshot());await backend.api('state');await backend.setAttachmentCacheLimit(1024);await backend.clearAttachmentCache();
+ let release,started;const began=new Promise(resolve=>{started=resolve});
+ globalThis.fetch=async(_url,options)=>{const {op}=JSON.parse(options.body);if(op==='state')return response(snapshot());started();return new Promise(resolve=>{release=()=>resolve(response(file))})};
+ const download=backend.api('attachment_file',{message:'m'});await began;const generation=cache.attachmentCacheGeneration();await backend.clearAttachmentCache();release();assert.deepEqual(await download,{...file,cached:false});assert.equal(cache.attachmentCacheGeneration(),generation);assert.equal((await backend.getAttachmentCacheInfo()).files,0);
+ await cache.writeAttachmentCache('m',file,cache.attachmentCacheGeneration());assert.equal((await backend.getAttachmentCacheInfo()).files,1);
+ globalThis.fetch=async()=>({ok:false,status:403,json:async()=>({error:'Forbidden'})});await assert.rejects(backend.api('some_authorized_operation'));assert.equal(cache.attachmentCacheNeedsState(),true);assert.equal(await cache.readAttachmentCache('m'),undefined);
+ globalThis.fetch=async()=>response(snapshot());await backend.api('state');assert.equal((await cache.readAttachmentCache('m')).data,'YWJj');
+ globalThis.fetch=async()=>({ok:false,status:400,json:async()=>({error:'Сообщение не найдено'})});await assert.rejects(backend.api('attachment_file',{message:'deleted-message'}));assert.equal(cache.attachmentCacheNeedsState(),true);assert.equal(await cache.readAttachmentCache('m'),undefined);
+});

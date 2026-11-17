@@ -1,6 +1,6 @@
-﻿use std::path::Path;
+use std::path::Path;
 #[cfg(windows)]
-fn crypt(data: &[u8], encrypt: bool) -> Result<Vec<u8>, String> {
+pub(crate) fn crypt(data: &[u8], encrypt: bool) -> Result<Vec<u8>, String> {
     use windows::{core::PCWSTR, Win32::{Foundation::{LocalFree,HLOCAL}, Security::Cryptography::{CryptProtectData,CryptUnprotectData,CRYPT_INTEGER_BLOB}}};
     let input = CRYPT_INTEGER_BLOB { cbData: data.len() as u32, pbData: data.as_ptr() as *mut u8 };
     let mut output = CRYPT_INTEGER_BLOB::default();
@@ -13,7 +13,7 @@ fn crypt(data: &[u8], encrypt: bool) -> Result<Vec<u8>, String> {
     }
 }
 #[cfg(not(windows))]
-fn crypt(_: &[u8], _: bool) -> Result<Vec<u8>, String> { Err("Session persistence requires Windows".into()) }
+pub(crate) fn crypt(_: &[u8], _: bool) -> Result<Vec<u8>, String> { Err("Session persistence requires Windows".into()) }
 pub fn load(path: &Path) -> String {
     std::fs::read(path).ok().and_then(|bytes|crypt(&bytes,false).ok()).and_then(|bytes|String::from_utf8(bytes).ok()).unwrap_or_default()
 }
