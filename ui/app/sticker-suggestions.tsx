@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react';
 import type {Sticker} from '@/shared/api/backend';
 import {findStickerSuggestions} from './find-sticker-suggestions';
 import {StickerImage} from './sticker-library';
+import '@/shared/ui/menu-material.css';
 
 export function StickerSuggestions({draft,stickers,user,group,busy,onSelect}:{
  draft:string;stickers:Sticker[];user:string;group?:string;busy:boolean;
@@ -18,7 +19,7 @@ export function StickerSuggestions({draft,stickers,user,group,busy,onSelect}:{
   try{if(await onSelect(id,replaceDraft)&&!replaceDraft)setDismissed(draft)}
   finally{setPending(false)}
  }
- return <div className="sticker-suggestions" role="group" aria-label="Подходящие стикеры"
+ return <div className="sticker-suggestions sombra-menu-surface" data-slot="suggestion-menu-content" role="group" aria-label="Подходящие стикеры"
   onKeyDown={event=>{if(event.key==='Escape')setDismissed(draft)}}>
   {matches.map(({sticker,replaceDraft})=><button key={sticker.id} type="button" title={sticker.name}
    disabled={busy||pending} onClick={()=>void select(sticker.id,replaceDraft)}><StickerImage sticker={sticker}/></button>)}

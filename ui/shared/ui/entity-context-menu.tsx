@@ -1,6 +1,7 @@
 import { Fragment, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
 import { ContextMenu } from "radix-ui";
 import type { LucideIcon } from "lucide-react";
+import './menu-material.css';
 
 type Action = {
   label: string;
@@ -42,7 +43,7 @@ export function EntityContextMenu({ children, actions = [], controls }: EntityCo
           onCloseAutoFocus={(event) => {
             if (document.activeElement !== document.body) event.preventDefault();
           }}
-          className="z-[100] min-w-44 max-w-[calc(100vw-16px)] rounded-md border border-border bg-popover p-1 text-sm text-popover-foreground shadow-md"
+          className="sombra-menu-surface z-[100] min-w-44 max-w-[calc(100vw-16px)] rounded-md border border-border bg-popover p-1 text-sm text-popover-foreground shadow-md"
         >
           {controls}
           {controls && actions.length > 0 && <ContextMenu.Separator className="mx-1 my-1 h-px bg-border" />}

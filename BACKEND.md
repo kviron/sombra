@@ -20,6 +20,8 @@ POST /api JSON `{op,...fields}`; HTTP authentication uses its cookie; Tauri IPC 
 
 - register / login: name (registration), email, password. HTTP returns user and sets cookie; IPC returns user and token.
 - me: own UserDto and email. state: own groups/dialogs/messages and public user directory.
+- `state.chatPreferences`: private account settings `{revision,notifications:{direct,groups},dialogs:{[dialogId]:{pinned,muted}}}`. Defaults: notification categories enabled, no pinned/muted dialogs. Not included in public UserDto.
+- `set_notification_preferences {direct?:boolean,groups?:boolean}` and `set_dialog_preferences {dialog,pinned?:boolean,muted?:boolean}` require a human session and at least one strict boolean field. Dialog updates require membership. Both patch existing values, atomically persist them, increment revision and return the whole normalized settings object. Clients must not replace newer settings with a delayed older state snapshot. Bot tokens cannot change these settings.
 - update_profile: profile `{name,bio}`.
 - sessions: owned active session DTOs, with current flag; never token hashes.
 - revoke_session: session_id, ownership checked.

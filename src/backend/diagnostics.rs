@@ -11,7 +11,7 @@ pub(crate) fn operation(name: &str) -> &'static str {
         "login", "register", "me", "sessions", "revoke_session", "logout", "logout_all",
         "change_email", "change_password", "update_profile", "state", "create_group", "join_group",
         "update_group", "invite_group_member", "create_channel", "update_channel", "delete_channel",
-        "create_dialog", "message", "attachment_file", "delete_message", "update_message", "reaction", "friend_request", "friend_accept", "friend_remove",
+        "create_dialog", "set_notification_preferences", "set_dialog_preferences", "message", "attachment_file", "delete_message", "update_message", "reaction", "friend_request", "friend_accept", "friend_remove",
         "create_bot", "delete_bot", "bot_poll", "bot_message", "bot_get_me", "bot_get_updates", "bot_ack", "bot_reply", "bot_rotate_token", "bot_set_commands", "add_bot_to_group", "remove_bot_from_group", "create_sticker", "sticker_image",
         "import_sticker_pack", "remove_sticker", "remove_sticker_pack", "voice_join", "voice_poll",
         "voice_signal", "voice_leave", "dialog_call_start", "dialog_call_decline", "dialog_call_cancel", "diagnostics_recent", "diagnostics_report",

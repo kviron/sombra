@@ -8,7 +8,7 @@ patterns=[re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),re.c
 blocked=[]
 for path in filter(None,paths):
     parts=PurePosixPath(path).parts
-    if any(part in {'release-secrets','data','node_modules','target','dist','deploy-qa','auth-qa','voice-qa','social-qa','user-qa','ui-qa','attachments-qa','dialog-calls-qa','bots-qa','__pycache__'} for part in parts) or PurePosixPath(path).name in {'.env','FIRST-USER.txt','sombra.key'}:
+    if any(part in {'release-secrets','data','node_modules','target','dist','deploy-qa','auth-qa','voice-qa','social-qa','user-qa','ui-qa','attachments-qa','dialog-calls-qa','bots-qa','links-qa','drop-qa','menu-qa','notifications-qa','__pycache__'} for part in parts) or PurePosixPath(path).name in {'.env','FIRST-USER.txt','sombra.key'}:
         blocked.append(path+' (private path)'); continue
     content=subprocess.check_output(['git','show',':'+path])
     if any(pattern.search(content) for pattern in patterns): blocked.append(path+' (secret pattern)')

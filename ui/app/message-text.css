@@ -1,0 +1,4 @@
+.message-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.message-text a{color:#a9ccff;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.message-text a:hover{color:#d2e5ff}
+.message-text a:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:2px}

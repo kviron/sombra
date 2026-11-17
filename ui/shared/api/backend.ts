@@ -49,7 +49,9 @@ export type Group = {id:string;name:string;owner:string;invite:string;members:st
 export type Dialog = {id:string;name:string;members:string[]};
 export type VoicePresence = {user:string;muted:boolean;deaf:boolean};
 export type DialogCall = {id:string;dialog:string;caller:string;video:boolean;created_at:number;participants:string[];declined:string[];empty_since?:number};
-export type ChatState = {me:User;email:string;users:User[];groups:Group[];dialogs:Dialog[];messages:ChatMessage[];stickers:Sticker[];friends:Friend[];bots:Bot[];voicePresence?:Record<string,VoicePresence[]>;dialogCalls?:DialogCall[]};
+export type DialogPreferences = {pinned:boolean;muted:boolean};
+export type ChatPreferences = {revision?:number;notifications:{direct:boolean;groups:boolean};dialogs:Record<string,DialogPreferences>};
+export type ChatState = {chatPreferences?:ChatPreferences;me:User;email:string;users:User[];groups:Group[];dialogs:Dialog[];messages:ChatMessage[];stickers:Sticker[];friends:Friend[];bots:Bot[];voicePresence?:Record<string,VoicePresence[]>;dialogCalls?:DialogCall[]};
 
 export type AttachmentDraft = {name:string;data:string;mime?:string};
 export type MessageAttachmentMetadata = {id:string;name:string;size:number;mime:string;expired?:boolean};

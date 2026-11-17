@@ -4,6 +4,7 @@ import {ContextMenu} from 'radix-ui';
 import {toast} from 'sonner';
 import {api, type ChatState, type ChatMessage} from '@/shared/api/backend';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
+import {Select} from '@/shared/ui/select';
 import {Message,MessageAvatar,MessageContent,MessageHeader,MessageFooter,Bubble,BubbleContent} from '@/shared/ui/message';
 import {MessageActionDialog} from './message-action-dialog';
 import {useUserActions} from './user-actions';
@@ -13,6 +14,7 @@ import {UserAvatar} from '@/shared/ui/user-avatar';
 import emojiData from '@emoji-mart/data/sets/15/native.json';
 import {StickerImage} from './sticker-library';
 import {MessageAttachment} from './message-attachments';
+import {MessageText} from './message-text';
 export const emojis=['👍','❤️','😂','🔥','🎉','👀'];
 type Common={state:ChatState;refresh:()=>Promise<unknown>;onError:(message:string)=>void};
 export function MessageItem({message:m,previous,state,refresh,onError,userName}:{message:ChatMessage;previous?:ChatMessage;userName:(id:string)=>string}&Common){
@@ -60,7 +62,7 @@ export function MessageItem({message:m,previous,state,refresh,onError,userName}:
     <MessageContent>
      <Bubble data-sticker-only={!!sticker&&!hasText}>
       {!grouped&&<MessageHeader><strong>{canOpenProfile?<button type="button" className="message-author" title={`Профиль ${name}`} onClick={openProfile}>{name}</button>:name}</strong>{(m.bot_name||identity?.bot)&&<small className="bot-badge">БОТ</small>}</MessageHeader>}
-      <BubbleContent>{m.text&&<p>{m.text}</p>}{sticker&&<StickerImage key={sticker.id} className="sent-sticker" sticker={sticker}/ >}{m.attachment&&<MessageAttachment messageId={m.id} attachment={m.attachment}/>}</BubbleContent>
+      <BubbleContent>{m.text&&<MessageText text={m.text}/>}{sticker&&<StickerImage key={sticker.id} className="sent-sticker" sticker={sticker}/ >}{m.attachment&&<MessageAttachment messageId={m.id} attachment={m.attachment}/>}</BubbleContent>
       <div className={reactionEmojis.length?'message-bottom-row':'message-bottom-inline'}>
        {reactionEmojis.length>0&&<div className="reactions">{reactionEmojis.map(emoji=><button
         type="button" disabled={busy} aria-label={`Реакция ${emoji}`} aria-pressed={m.reactions?.some(reaction=>reaction.emoji===emoji&&reaction.user===state.me.id)}
@@ -102,16 +104,14 @@ export function ExpressionPicker({state,onError,onEmoji,onSticker,disabled,group
  return <div className="expression-control">
   <button type="button" title="Эмодзи" disabled={disabled} aria-expanded={panel==='emoji'} onClick={()=>toggle('emoji')}><Smile size={20}/></button>
   <button type="button" title="Стикеры" disabled={disabled} aria-expanded={panel==='stickers'} onClick={()=>toggle('stickers')}><StickerIcon size={20}/></button>
-  {panel&&<section className="expression-panel" aria-label="Эмодзи и стикеры">
+  {panel&&<section className="expression-panel sombra-menu-surface" data-slot="expression-menu-content" aria-label="Эмодзи и стикеры">
    <header><nav className="expression-tabs" aria-label="Тип вложения">
     <button type="button" aria-pressed={panel==='emoji'} onClick={()=>setPanel('emoji')}>Эмодзи</button>
     <button type="button" aria-pressed={panel==='stickers'} onClick={()=>setPanel('stickers')}>Стикеры</button>
    </nav><button type="button" title="Закрыть панель" onClick={()=>setPanel(undefined)}><X size={16}/></button></header>
    {panel==='emoji'?<>
     <div className="expression-filters"><input aria-label="Поиск эмодзи" placeholder="Поиск эмодзи" value={query} onKeyDown={event=>{if(event.key==='Enter')event.preventDefault()}} onChange={event=>setQuery(event.target.value)}/>
-     <select aria-label="Категория эмодзи" value={category} onChange={event=>{setCategory(event.target.value);setQuery('')}}>
-      {emojiData.categories.map(item=><option key={item.id} value={item.id}>{categories[item.id]||item.id}</option>)}
-     </select>
+     <Select label="Категория эмодзи" value={category} onValueChange={value=>{setCategory(value);setQuery('')}} options={emojiData.categories.map(item=>({value:item.id,label:categories[item.id]||item.id}))}/>
     </div>
     <div className="emoji-grid" key={category}>{emojiIds.map(id=>{
      const item=emojiById[id],emoji=item?.skins[0]?.native;
@@ -123,9 +123,7 @@ export function ExpressionPicker({state,onError,onEmoji,onSticker,disabled,group
      <button type="button" aria-pressed={scope==='personal'} onClick={()=>{setScope('personal');setPack('')}}>Мои стикеры</button>
      <button type="button" aria-pressed={scope==='group'} onClick={()=>{setScope('group');setPack('')}}>Стикеры группы</button>
     </nav>}
-    {packs.length>1&&<select aria-label="Набор стикеров" value={pack} onChange={event=>setPack(event.target.value)}>
-     <option value="">Все наборы</option>{packs.filter(Boolean).map(name=><option key={name}>{name}</option>)}
-    </select>}
+    {packs.length>1&&<Select label="Набор стикеров" value={pack} onValueChange={setPack} options={[{value:'',label:'Все наборы'},...packs.filter(Boolean).map(name=>({value:name,label:name}))]}/>}
     {filtered.length?<div className="sticker-grid">{filtered.map(sticker=><button type="button" key={sticker.id} disabled={disabled||busy} title={sticker.name} onClick={()=>void sendSticker(sticker.id)}><StickerImage sticker={sticker}/></button>)}</div>:<p>Пока нет стикеров.</p>}
     {(scope==='personal'||group?.owner===state.me.id)&&<button type="button" className="manage-stickers" onClick={()=>{setPanel(undefined);onManage(scope)}}>Управлять стикерами</button>}
    </>}

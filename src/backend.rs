@@ -7,6 +7,7 @@ pub(crate) mod diagnostics;
 mod attachments;
 mod bots;
 mod dialog_calls;
+mod chat_preferences;
 fn id()->String{uuid::Uuid::new_v4().to_string()}
 fn now()->u64{SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()}
 fn s<'a>(v:&'a Value,k:&str)->&'a str{v[k].as_str().unwrap_or("")}
@@ -208,7 +209,7 @@ impl Backend{
    sticker.as_object_mut().unwrap().remove("asset");
    Some(sticker)
   }).collect();
-  json!({"me":self.public(u),"email":u["email"],"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
+  json!({"me":self.public(u),"email":u["email"],"chatPreferences":self.chat_preferences(u),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
  }
  fn sticker_in_library(&self,sticker:&Value,uid:&str)->bool{
   if sticker["archived"]==true{return false}
@@ -319,7 +320,8 @@ impl Backend{
   let session=self.db["sessions"].as_array_mut().unwrap().iter_mut().find(|x|x["token_hash"]==current).unwrap();
   if session["last_seen"].as_u64().unwrap_or(0)+60<now(){session["last_seen"]=json!(now());self.save()?;}
   self.cleanup_calls(now()); if op.starts_with("dialog_call_"){return self.dialog_call_action(&v,uid)} if op.starts_with("voice_"){return self.voice_action(&v,uid,&current)}
-  match op{
+  if ["set_notification_preferences","set_dialog_preferences"].contains(&op){return self.set_chat_preferences(&v,&u)}
+   match op{
    "me"=>return Ok(json!({"user":self.public(&u),"email":u["email"]})),
    "sessions"=>return Ok(json!(arr(&self.db["sessions"]).iter().filter(|x|x["user_id"]==uid&&session_active(x,now())).map(|x|json!({"id":x["id"],"device":x["device"],"created_at":x["created_at"],"last_seen":x["last_seen"],"expires_at":x["expires_at"],"current":x["token_hash"]==current})).collect::<Vec<_>>())),
    "revoke_session"=>{let sessions=self.db["sessions"].as_array_mut().unwrap();if !sessions.iter().any(|x|x["user_id"]==uid&&x["id"]==v["session_id"]){return Err("Сессия не найдена".into())}sessions.retain(|x|!(x["user_id"]==uid&&x["id"]==v["session_id"]));},

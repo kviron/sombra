@@ -1,11 +1,12 @@
-﻿import {Mic,UserRound,ShieldCheck,Monitor,RefreshCw,LogOut,Pencil,Sticker} from 'lucide-react';
+import {Mic,UserRound,ShieldCheck,Monitor,RefreshCw,LogOut,Pencil,Sticker,Bell} from 'lucide-react';
 import {Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton} from '@/shared/ui/sidebar';
 import {Separator} from '@/shared/ui/separator';
 
-export type AccountSection='profile'|'security'|'sessions'|'voice'|'updates'|'stickers';
+export type AccountSection='profile'|'security'|'sessions'|'voice'|'updates'|'stickers'|'notifications';
 export const accountSections=[
   {id:'updates' as const,label:'Обновления',icon:RefreshCw},
   {id:'voice' as const,label:'Голос и видео',icon:Mic},
+  {id:'notifications' as const,label:'Уведомления',icon:Bell},
   {id:'profile' as const,label:'Учётная запись',icon:UserRound},
   {id:'security' as const,label:'Пароль и безопасность',icon:ShieldCheck},
   {id:'sessions' as const,label:'Активные сеансы',icon:Monitor},

@@ -37,7 +37,7 @@ export function VoiceQuickSettings({voice,kind,onSettings}:{voice:Voice;kind:'in
  if(selected&&!options.some(option=>option.value===selected))options.push({value:selected,label:'Выбранное устройство (недоступно)'});
  return <Popover.Root open={open} onOpenChange={setOpen}>
   <Popover.Trigger asChild><Button type="button" variant="ghost" size="icon-xs" className="voice-quick-trigger" aria-label={input?'Быстрые настройки микрофона':'Быстрые настройки наушников'} title={input?'Настройки микрофона':'Настройки наушников'}><ChevronUp size={12}/></Button></Popover.Trigger>
-  <Popover.Portal><Popover.Content side="top" align="end" sideOffset={10} collisionPadding={12} className="voice-quick-panel dark" aria-label={input?'Быстрые настройки микрофона':'Быстрые настройки наушников'}>
+  <Popover.Portal><Popover.Content side="top" align="end" sideOffset={10} collisionPadding={12} className="voice-quick-panel sombra-menu-surface dark" data-slot="popover-content" aria-label={input?'Быстрые настройки микрофона':'Быстрые настройки наушников'}>
    <label className="voice-quick-label" htmlFor={`quick-${kind}-device`}>{label}</label>
    <Select id={`quick-${kind}-device`} label={label} value={selected} disabled={voice.busy} options={options} onValueChange={value=>voice.savePreferences(key,value)}/>
    {error&&<p className="voice-quick-error" role="status">{error}</p>}
