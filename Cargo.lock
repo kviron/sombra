@@ -2214,7 +2214,7 @@ checksum = "d5848f5a9e8117cf94f2f90faac24a87ff81600ff8628c1e3deaab572e76bfa1"
 
 [[package]]
 name = "mines-chat"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "axum",
  "base64 0.22.1",

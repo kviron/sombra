@@ -362,6 +362,7 @@ try{
  await b.wait("document.querySelectorAll('.voice-channel-participant').length===1");
  await a.ev("document.querySelector('[title=\"Настройки пользователя\"]').click()");await a.wait("!!document.querySelector('.account-modal')");await a.ev("[...document.querySelectorAll('.settings-sidebar button')].find(b=>b.textContent.includes('Голос и видео')).click()");await a.wait("!!document.querySelector('.voice-settings')");await shot('settings');
  await a.ev("[...document.querySelectorAll('.voice-test-actions button')].find(b=>b.textContent.includes('Проверить камеру')).click()");await a.wait("!!document.querySelector('.voice-settings video')");await shot('settings-preview');await closeSettings();await a.wait("capturedTracks.every(t=>t.readyState==='ended')");
+ if(!process.argv.includes('--devices-only')){
  await a.ev("window.testNoise=true");
  await pointerClick("document.querySelector('.voice-controls button')");
  await a.wait("!!document.querySelector('.voice-hangup')");
@@ -405,5 +406,6 @@ try{
  await b.wait("!document.querySelector('.voice-hangup') && voiceCues.filter(({cue})=>cue==='left').length>=2");
  await a.wait("document.querySelectorAll('.voice-channel-participant').length===0");
  console.log('PASS: voice playback, live devices, gain, mute, camera, presence, cues and live noise modes. RNNoise noise RMS ratios:',{sender:noiseRatio,receiver:receivedRatio});
+ }else{console.log('PASS: devices-only voice playback, live microphone replacement, speaker setSinkId, gain, mute, camera, presence and cue cleanup. RNNoise RMS test not requested.');}
 }finally{sockets.forEach(s=>s.close());chrome.kill();await new Promise(r=>server.httpServer.close(r))}
 

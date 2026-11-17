@@ -3,6 +3,8 @@ import {Button} from '@/shared/ui/button';
 import {Switch} from '@/shared/ui/switch';
 import {Slider} from '@/shared/ui/slider';
 import {Select} from '@/shared/ui/select';
+import {useAudioDevices} from './use-audio-devices';
+import {AudioDeviceAccess} from './audio-device-access';
 import {Label} from '@/shared/ui/label';
 import {Progress} from '@/shared/ui/progress';
 import {Separator} from '@/shared/ui/separator';
@@ -126,21 +128,26 @@ const noiseOptions:{value:NoiseSuppression;label:string}[]=[
 ];
 
 export function VoiceSettings({voice:v}:{voice:Voice}){
- const [devices,setDevices]=useState<MediaDeviceInfo[]>([]),[preview,setPreview]=useState<MediaStream|null>(null),[error,setError]=useState(''),[level,setLevel]=useState(0),[busy,setBusy]=useState(false);
+ const audioDevices=useAudioDevices();
+ const {devices}=audioDevices;
+ const [preview,setPreview]=useState<MediaStream|null>(null),[error,setError]=useState(''),[level,setLevel]=useState(0),[busy,setBusy]=useState(false);
  const owned=useRef<MediaStream|null>(null),epoch=useRef(0);const p=v.preferences;
  function stop(){epoch.current++;owned.current?.getTracks().forEach(stopCapturedTrack);owned.current=null;setPreview(null);setLevel(0)}
- useEffect(()=>{const refresh=()=>void navigator.mediaDevices?.enumerateDevices().then(setDevices).catch(()=>{});refresh();navigator.mediaDevices?.addEventListener('devicechange',refresh);return()=>{epoch.current++;owned.current?.getTracks().forEach(stopCapturedTrack);navigator.mediaDevices?.removeEventListener('devicechange',refresh)}},[]);
+ useEffect(()=>()=>{epoch.current++;owned.current?.getTracks().forEach(stopCapturedTrack)},[]);
  useEffect(()=>{if(!preview)return;const ctx=new AudioContext(),analyser=ctx.createAnalyser();ctx.createMediaStreamSource(preview).connect(analyser);const data=new Uint8Array(analyser.fftSize);const timer=setInterval(()=>{analyser.getByteTimeDomainData(data);setLevel(Math.min(100,Math.max(...data.map(x=>Math.abs(x-128)))*3))},100);return()=>{clearInterval(timer);void ctx.close()}},[preview]);
- async function test(video:boolean){stop();const token=epoch.current;setBusy(true);setError('');try{if(!navigator.mediaDevices)throw new Error('Устройства доступны через HTTPS или localhost.');const stream=await captureVoiceStream(p,video?{deviceId:p.camera?{exact:p.camera}:undefined}:false);if(token!==epoch.current){stream.getTracks().forEach(stopCapturedTrack);return}owned.current=stream;setPreview(stream);setDevices(await navigator.mediaDevices.enumerateDevices())}catch(e){recordDesktopDiagnostic(video?'voice_camera':'voice_microphone',(e as DOMException).name==='NotAllowedError'?'device_permission':'device_error');setError(mediaError(e))}finally{setBusy(false)}}
+ async function test(video:boolean){stop();const token=epoch.current;setBusy(true);setError('');try{if(!navigator.mediaDevices)throw new Error('Устройства доступны через HTTPS или localhost.');const stream=await captureVoiceStream(p,video?{deviceId:p.camera?{exact:p.camera}:undefined}:false);if(token!==epoch.current){stream.getTracks().forEach(stopCapturedTrack);return}owned.current=stream;setPreview(stream);await audioDevices.refresh()}catch(e){recordDesktopDiagnostic(video?'voice_camera':'voice_microphone',(e as DOMException).name==='NotAllowedError'?'device_permission':'device_error');setError(mediaError(e))}finally{setBusy(false)}}
  return <section className="voice-settings">
   <h2>Голос и видео</h2>
   <p>{v.room?'Устройства можно менять прямо во время звонка.':'Выберите устройства и проверьте их перед входом в комнату.'}</p>
+  <AudioDeviceAccess devices={audioDevices} disabled={busy||v.busy}/>
   <div className="voice-device-fields">
    {(['audioinput','audiooutput','videoinput'] as const).map((kind,i)=>{
     const key=(['mic','speaker','camera'] as const)[i];
     const label=['Устройство ввода · микрофон','Устройство вывода · динамики','Камера'][i];
+    const options=[{value:'',label:'По умолчанию'},...devices.filter(d=>d.kind===kind&&d.deviceId).map((d,n)=>({value:d.deviceId,label:d.label||`Устройство ${n+1}`}))];
+    if(p[key]&&!options.some(option=>option.value===p[key]))options.push({value:p[key],label:'Выбранное устройство (недоступно)'});
     return <div className="voice-field" key={kind}><Label htmlFor={`voice-${key}`}>{label}</Label>
-     <Select id={`voice-${key}`} label={label} value={p[key]} disabled={v.busy} onValueChange={value=>{stop();v.savePreferences(key,value)}} options={[{value:'',label:'По умолчанию'},...devices.filter(d=>d.kind===kind&&d.deviceId).map((d,n)=>({value:d.deviceId,label:d.label||`Устройство ${n+1}`}))]}/>
+     <Select id={`voice-${key}`} label={label} value={p[key]} disabled={v.busy||audioDevices.requesting} onValueChange={value=>{stop();v.savePreferences(key,value)}} options={options}/>
     </div>;
    })}
   </div>
