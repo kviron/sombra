@@ -1,6 +1,6 @@
 import {useRef, type ClipboardEvent} from 'react';
 import {Paperclip} from 'lucide-react';
-import {Button} from '@/shared/ui/button';
+import {ComposerIconButton} from '@/shared/ui/elements-composer';
 import type {AttachmentDraft} from '@/shared/api/backend';
 import './message-attachments.css';
 
@@ -38,6 +38,6 @@ export function AttachmentComposer({disabled,reading,onFile}:AttachmentComposerP
  const input=useRef<HTMLInputElement>(null);
  return <div className="attachment-composer">
   <input ref={input} type="file" hidden disabled={disabled||reading} onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';if(file)onFile(file)}}/>
-  <Button type="button" variant="ghost" size="icon" disabled={disabled||reading} title="Прикрепить файл (до 10 МиБ)" aria-label="Прикрепить файл (до 10 МиБ)" onClick={()=>input.current?.click()}><Paperclip/></Button>
+  <ComposerIconButton disabled={disabled||reading} title="Прикрепить файл (до 10 МиБ)" aria-label="Прикрепить файл (до 10 МиБ)" onClick={()=>input.current?.click()}><Paperclip size={16}/></ComposerIconButton>
  </div>;
 }

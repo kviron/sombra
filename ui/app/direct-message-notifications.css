@@ -13,6 +13,9 @@
   box-shadow: 0 8px 28px #0005;
   color: #eef3fc;
 }
+/* One shared surface for the main action and its separate dismiss region. */
+.direct-message-toast:hover,
+.direct-message-toast:focus-within { background: #243141; }
 .direct-message-toast-avatar {
   width: 48px;
   height: 48px;
@@ -39,7 +42,9 @@
 .direct-message-toast button { display: grid; place-items: center; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #aebed2; cursor: pointer; }
 .direct-message-toast button:hover { background: #dce6fa18; color: #eef3fc; }
 .direct-message-toast button:focus-visible { outline: 2px solid #aebed2; }
-.direct-message-toast .direct-message-open { position:absolute; inset:0 32px 0 0; width:auto; height:auto; border-radius:12px; }
+.direct-message-toast .direct-message-open,
+.direct-message-toast .direct-message-open:hover,
+.direct-message-toast .direct-message-open:active { position:absolute; inset:0 32px 0 0; width:auto; height:auto; border-radius:12px; background:transparent; }
 .direct-message-toast .direct-message-open:focus-visible { outline-offset:-3px; }
 
 .direct-message-popup {

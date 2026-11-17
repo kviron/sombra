@@ -1,3 +1,4 @@
+import {ComposerIconButton} from '@/shared/ui/elements-composer';
 import {useRef,useState} from 'react';
 import {Smile, Sticker as StickerIcon, X, MessageCircle, UserPlus, Check, Bot as BotIcon, Copy, Pencil, Trash2} from 'lucide-react';
 import {ContextMenu} from 'radix-ui';
@@ -113,9 +114,9 @@ export function ExpressionPicker({state,onError,onEmoji,onSticker,disabled,group
   catch(e){onError((e as Error).message)}
   finally{setBusy(false)}
  }
- return <div className="expression-control">
-  <button type="button" title="Эмодзи" disabled={disabled} aria-expanded={panel==='emoji'} onClick={()=>toggle('emoji')}><Smile size={20}/></button>
-  <button type="button" title="Стикеры" disabled={disabled} aria-expanded={panel==='stickers'} onClick={()=>toggle('stickers')}><StickerIcon size={20}/></button>
+ return <div className="expression-control flex items-center gap-1.5">
+  <ComposerIconButton title="Эмодзи" disabled={disabled} aria-expanded={panel==='emoji'} onClick={()=>toggle('emoji')}><Smile size={16}/></ComposerIconButton>
+  <ComposerIconButton title="Стикеры" disabled={disabled} aria-expanded={panel==='stickers'} onClick={()=>toggle('stickers')}><StickerIcon size={16}/></ComposerIconButton>
   {panel&&<section className="expression-panel sombra-menu-surface" data-slot="expression-menu-content" aria-label="Эмодзи и стикеры">
    <header><nav className="expression-tabs" aria-label="Тип вложения">
     <button type="button" aria-pressed={panel==='emoji'} onClick={()=>setPanel('emoji')}>Эмодзи</button>

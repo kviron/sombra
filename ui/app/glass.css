@@ -56,7 +56,7 @@
   border-color: #8fa9d4; box-shadow: 0 0 0 2px #8fa9d429;
 }
 .composer input::placeholder, .composer textarea::placeholder { color: #9ba3b2; }
-.chat-shell textarea:focus-visible, .chat-shell select:focus-visible {
+.chat-shell textarea:not([data-slot="composer-input"]):focus-visible, .chat-shell select:focus-visible {
   outline: 2px solid #8fa9d4; outline-offset: 2px;
 }
 /* The composer provides one shared focus indicator around the entire field. */
