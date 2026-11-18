@@ -64,6 +64,7 @@ pub(crate) fn operation(name: &str) -> &'static str {
         "bot_edit",
         "bot_delete",
         "bot_typing",
+        "bot_set_user_decoration",
         "get_bot_tool_users",
         "set_bot_tool_users",
         "get_bot_settings",

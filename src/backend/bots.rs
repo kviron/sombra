@@ -522,6 +522,9 @@ impl Backend {
         if b["legacy"] == true {
             return Err("Legacy tokens are room-only".into());
         }
+        if op == super::bot_decorations::OP {
+            return self.bot_set_user_decoration(v, &b);
+        }
         if op == "bot_register_commands" {
             let commands = command_registration::merge(&b["commands"], v)?;
             if b["commands"] != commands { self.db["bots"][i]["commands"] = commands.clone(); self.save()?; }
@@ -547,6 +550,7 @@ impl Backend {
                         "responses",
                         "attachment_digest",
                         super::bot_model_settings::OWNER_APPLIED,
+                        super::bot_decorations::APPLIED,
                     ] {
                         u.as_object_mut().unwrap().remove(k);
                     }

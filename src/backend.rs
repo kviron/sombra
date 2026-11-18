@@ -9,6 +9,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 mod attachments;
+mod bot_decorations;
 mod bot_management;
 mod bot_model_settings;
 mod bot_transport;
@@ -876,6 +877,7 @@ impl Backend {
             "bot_edit",
             "bot_delete",
             "bot_typing",
+            bot_decorations::OP,
             bot_model_settings::OWNER_OP,
             "bot_get_settings",
             "bot_update_self",
@@ -1849,7 +1851,10 @@ fn api_router(backend: Backend) -> axum::Router {
                 "AUTH_REQUIRED" => (StatusCode::UNAUTHORIZED, "authentication", error),
                 "Нет доступа к изменению диалога" | "Нет доступа к участникам переписки" => (StatusCode::FORBIDDEN, "authorization", error),
                 "Диалог изменён. Обновите данные и повторите попытку" => (StatusCode::CONFLICT, "validation", error),
-                "MESSAGE_READ_FORBIDDEN" | "BOT_SETTINGS_FORBIDDEN" | "BOT_POLICY_FORBIDDEN" => {
+                "MESSAGE_READ_FORBIDDEN"
+                | "BOT_SETTINGS_FORBIDDEN"
+                | "BOT_POLICY_FORBIDDEN"
+                | "BOT_DECORATION_FORBIDDEN" => {
                     (StatusCode::FORBIDDEN, "authorization", error)
                 },
                 "DIAGNOSTICS_FORBIDDEN" => (

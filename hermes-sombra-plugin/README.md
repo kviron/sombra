@@ -130,7 +130,7 @@ Missing/mismatched attestation, wrong cwd/home, raw-key configuration or untrust
 
 ## Broker API and authority
 
-HTTPS JSON `/api`, `Authorization: Bearer <scope-token>`. Standard operations and shape are documented in `../BOTS.md`: `bot_get_me`, `bot_get_updates`, `bot_authorize_update`, `bot_attachment_file`, `bot_reply`, `bot_edit`, `bot_delete`, `bot_typing`, `bot_owner_update_settings`, `bot_ack`.
+HTTPS JSON `/api`, `Authorization: Bearer <scope-token>`. Standard operations and shape are documented in `../BOTS.md`: `bot_get_me`, `bot_get_updates`, `bot_authorize_update`, `bot_attachment_file`, `bot_reply`, `bot_edit`, `bot_delete`, `bot_typing`, `bot_owner_update_settings`, `bot_set_user_decoration`, `bot_ack`.
 
 Required broker-only lifecycle operations:
 
@@ -167,7 +167,7 @@ On restart `RUNNING` becomes **UNCERTAIN**. It is never silently regenerated, no
 
 Native destructive commands such as `/reset` may require confirmation under the SDK's default policy. The original request remains unACKed until the exact issued single-use nonce control finishes; a confirmation prompt alone is not completion. The slash prompt is rendered under the official full Sombra runtime scope, then its `copy_context()` snapshot is retained **process-locally only, after durable prompt JSON is committed**. Following fresh authorization of both original and control messages plus atomic nonce consumption, the actual resolver coroutine runs in an owning-loop Task with that captured context (home, bound secrets, terminal policy and original invocation)—not merely a coroutine created inside a context. The poll task's ambient scope is restored afterward. No context/secret mapping is serialized, no global environment fallback is used, and `/reset` confirmation is not disabled in production. Follow the exact emitted nonce command with `once` or `cancel`; generic `yes` is not approval.
 
-Explicit native command whitelist: `help`, `start` (normalized to `help`), `reset`, `new`, `status`, `model`, `models`, `tools`, `stop`, `compact`, `clear`, `usage`, `context`, `skills`. These alone set `MessageEvent.allow_gateway_control=True`; normal prose and `/ask`/`/ai` text do not. `/ask@hermes` and `/ai@hermes` strip their transport prefix. Generic `/approve`, `/always`, `/deny`, `/cancel`, host `/restart`/`/update`/`/yolo` and all unknown slash commands are rejected before Gateway/model dispatch. No arbitrary next-message approval capture is enabled. Other normal native commands received while an invocation is active stay serialized in the queue; this initial adapter does not promise immediate active-turn `/stop` interruption.
+Explicit native command whitelist: `help`, `start` (normalized to `help`), `reset`, `new`, `status`, `model`, `models`, `tools`, `stop`, `compact`, `clear`, `usage`, `context`, `skills`. These alone set `MessageEvent.allow_gateway_control=True`; normal prose and `/ask`/`/ai` text do not. `/ask@hermes` and `/ai@hermes` strip their transport prefix. Generic `/approve`, `/always`, `/deny`, `/cancel`, host `/restart`/`/update`/`/yolo` and all unknown slash commands are rejected before Gateway/model dispatch. `/frame` (рамки и обложки) is the one slash command answered locally by the transport without any SDK turn — see the skill section below. No arbitrary next-message approval capture is enabled. Other normal native commands received while an invocation is active stay serialized in the queue; this initial adapter does not promise immediate active-turn `/stop` interruption.
 
 ### `/model` and backend-owned model settings
 
@@ -191,6 +191,43 @@ Alternative addressed form: `@hermes /sombra-confirm ...` / `@hermes /sombra-ans
 
 Pinned SDK exec prompt does **not forward request_id** and redacts command text. The safe no-core seam is exactly **one** live `list_gateway_approvals(session)` entry, then mandatory `resolve_gateway_approval(..., request_id=that_exact_id)`. Multiple pending requests without an explicit metadata ID are refused rather than approving FIFO or matching redacted command strings. To prevent a delayed old render from approving a newer different request, the displayed command/description and allowed actions are rebuilt from the exact selected pending snapshot, with public `agent.redact.redact_sensitive_text(..., force=True)`; stale `ExecApprovalPrompt.text/actions` are not trusted. Permanent `always` is intentionally not offered. Clarify binds `get_pending(id).session_key` and uses `resolve_gateway_clarify`; numeric choices map to exact option text. No arbitrary next-message capture. “Approved/Answer accepted” is emitted only for a positive resolver count/boolean. Unsupported prompt types remain fail closed. Native slash-confirm uses the same nonce-confirm command but only `once|cancel`; it checks public `get_pending(session)` exact `confirm_id` and `clear_if_stale` before calling the pinned async resolver. Permanent `always` is excluded. The SDK resolver may validly return None, so this path says **“Ответ передан; результат не подтверждён”**, never “Approved”; a returned handler text is delivered in bounded durable chunks. Nonces are consumed before the resolver and never retried after ambiguous completion.
 
+### Навык: рамки и обложки (`/frame`)
+
+Любой обычный пользователь Сомбры может оформить **свой** профиль: аватарную рамку или обложку. Это не загрузка картинки — профиль хранит компактный v1 JSON-документ, который рисует клиент (`ui/shared/ui/avatar-fx`). Плагин работает только бот-токеном и `update_id` сообщения: человеческая cookie и чужие профили недоступны, операция применяет документ к отправителю указанного update.
+
+Разбор намерения детерминированный, по словам; модель не вызывается, сеть не читается. Непонятное — короткая подсказка со списком доступного, профиль при этом не меняется.
+
+| Что пишут (примеры) | Пресет | Документ |
+| --- | --- | --- |
+| `/frame ember`, «сделай мне огненную рамку», «поставь огонь» | `ember` / `ember-crown` | аватар, `holy/divine-shield`, палитра `ember`, якорь `ring` |
+| `/frame slime`, «поставь слайм на аватар», «поставь слайм слева» | `slime` / `slime-pet` | аватар, `critters/slime`, палитра `poison`, угол `bottom-right` (`bottom-left` для «слева») |
+| `/frame aurora`, «сделай сияние на обложку», «сделай звёзды на обложку» | `aurora` / `aurora-cover` | обложка, `weather/aurora`, палитра `aurora`, якорь `fill` |
+| `/frame runner`, «сделай обложку с бегущим героем», «сделай сцену на обложку» | `runner` / `runner-cover` | обложка, `mode:"scene"`, `loop:true`, `weather/aurora` + `sombra/runner` |
+| `/frame remove`, «убери рамку», «сними обложку», «удали украшение» | — | `decoration: null` для аватара или обложки |
+
+Эффект, который сервер не принимает для этой цели, не подменяется молча: «сделай огненную обложку» и «сияние на аватар» получают честную подсказку, что доступно для аватара, а что для обложки.
+
+Команды и формат:
+
+```
+/frame                                   — список пресетов и команд
+/frame <ember|slime|aurora|runner>       — предложить готовый пресет
+/frame remove [avatar|cover]             — предложить удаление украшения
+/frame json <документ>                   — предложить свой v1-документ
+/frame confirm <32-hex-nonce>            — точное подтверждение (в группах: /frame@hermes confirm …)
+```
+
+```json
+{"v":1,"target":"avatar","seed":19,"layers":[
+  {"effect":"holy/divine-shield","palette":"ember","anchor":"ring","intensity":0.9}]}
+```
+
+Перед отправкой документ проверяется по тем же белым спискам, что и на сервере (`src/backend/profile_decorations.rs`): `v=1`; `target` — `avatar` или `cover`; `mode` — `frame` или `scene` (только обложка); `loop` — boolean; `seed` — целое 0…4294967295; 1–3 слоя; ключи слоя только `effect`, `palette`, `anchor`, `intensity`, `scale`, `flip`; эффекты `holy/divine-shield` (аватар, `ring`), `critters/slime` (аватар, углы), `weather/aurora` (обложка, `fill`), `sombra/runner` (обложка, `scene`, `runner`); палитра — имя из списка клиента или 3–12 цветов `#rgb`/`#rrggbb`; `intensity` 0–1, `scale` 0.5–2; документ ≤ 4096 байт в компактной сериализации. Лишние ключи, неизвестные эффекты и превышение лимитов отклоняются локально — сервер такой запрос не получает.
+
+Подтверждение двухшаговое. Первое сообщение только предлагает документ: в журнал области (`journal.sqlite`, таблица `decorations`) пишется `nonce` (32 hex из `secrets.token_hex(16)`), `actor`, `channel`, `target`, `doc`, `label`, `created`, `expires` = +5 минут и `consumed=0`, а ответ содержит, что именно будет применено, и точную команду `/frame@<handle> confirm <nonce>`. Профиль не меняется. Применяет только точная команда подтверждения от того же актора и канала: actor/channel/expiry/consumed проверяются одним `UPDATE … WHERE nonce=? AND actor=? AND channel=? AND consumed=0 AND expires>=?` (ровно один раз), и только затем вызывается `bot_set_user_decoration` с `update_id` **этого** подтверждающего сообщения. Повтор, просроченный nonce, чужой актор/канал или чужой чат — отказ, вызова нет. Текст модели или ассистента подтверждением не является.
+
+Ответы: успех — «Рамка применена»/«Обложка применена» с названием и описанием (без URL и секретов), либо «убрана»; `BOT_DECORATION_CONFLICT` — «уже применено или истекло, попросите заново»; `BOT_DECORATION_FORBIDDEN`/`BOT_DECORATION_INVALID`/`BOT_SOURCE_UNAVAILABLE` и транспортные ошибки — честное «профиль не изменён». Ошибки не прерывают turn и не логируют текст/секреты. Пока в этом чате идёт другой turn, команда попадает в обычный serialized-путь плагина (лишнего вызова профиля нет); повторите её после ответа.
+
 ## Parity / extension boundaries
 
 Available normal Hermes core tools retain native agent execution; no new orchestration engine. Media support is subject to backend format/size budgets and configured STT/TTS/provider dependencies. Native Telegram callback widgets, Google/calendar grants, sticker private catalogs, reactions, Telegram GIF service/auth, avatars, rich cards, live-call joining and remote-media download are **not enabled by discovery** and are not copied. Sombra equivalents should use separate explicit backend operations + extension adapters and the same scoped authority; do not import Telegram internals or copy private state. Future structured control UI may call the same bound nonce resolver contract. No claim of complete Telegram UI/native-extension parity.
@@ -201,7 +238,7 @@ Available normal Hermes core tools retain native agent execution; no new orchest
 python -m unittest discover -s app/hermes-sombra-plugin/tests -v
 ```
 
-Tests use a deliberate minimal SDK stub plus real loopback HTTP fixture (not production), static AST signature comparison with the pinned source mirror, registration/registry fields, fresh pre-tool revocation, canonical forgery rejection, attachment sniffing/path/size rules, Unicode multipart delivery, mutation APIs, crash uncertainty/no reexecution, final text/media/voice-only ACK order, strict approval request IDs, ambiguous-queue refusal, clarify nonce scopes/expiry/replay and unsupported-prompt denial. **These are not full Hermes model, external-tool side-effect, container isolation or production tests**. A separate exact-SDK shared-host integration must pass before authorized deployment. Trusted-path proof must drive the real `BasePlatformAdapter.handle_message → Gateway ingress → native envelope validation → durable SessionAuthority admission/worker → final delivery/ACK`, including owner DM, repeated DM and group sources; direct `AIAgent` or authorization-only fixtures do not exercise this boundary. No production API, provider/model request, installed Hermes import, service restart or Telegram mutation is performed by this unittest command.
+Tests use a deliberate minimal SDK stub plus real loopback HTTP fixture (not production), static AST signature comparison with the pinned source mirror, registration/registry fields, fresh pre-tool revocation, canonical forgery rejection, attachment sniffing/path/size rules, Unicode multipart delivery, mutation APIs, crash uncertainty/no reexecution, final text/media/voice-only ACK order, strict approval request IDs, ambiguous-queue refusal, clarify nonce scopes/expiry/replay, unsupported-prompt denial, and the `/frame` skill (deterministic phrase→preset mapping, local whitelist rejection, nonce one-shot/expiry/foreign-actor refusal, server refusals, runtime broker field forwarding). **These are not full Hermes model, external-tool side-effect, container isolation or production tests**. A separate exact-SDK shared-host integration must pass before authorized deployment. Trusted-path proof must drive the real `BasePlatformAdapter.handle_message → Gateway ingress → native envelope validation → durable SessionAuthority admission/worker → final delivery/ACK`, including owner DM, repeated DM and group sources; direct `AIAgent` or authorization-only fixtures do not exercise this boundary. No production API, provider/model request, installed Hermes import, service restart or Telegram mutation is performed by this unittest command.
 
 ### Mandatory actual startup preflight / corrected registry contract
 

@@ -133,6 +133,12 @@ class Fixture(BaseHTTPRequestHandler):
     owner_consumed = set()
     typing_calls = []
     typing_reject = False
+    # bot_set_user_decoration: one-shot per update, applied to that update's sender only.
+    decoration_error = ""
+    decoration_consumed = set()
+    decorations = []
+    user_decorations = {}
+    decoration_response_user = None
 
     def log_message(self, *args):
         pass
@@ -191,9 +197,15 @@ class Fixture(BaseHTTPRequestHandler):
             result = self.typing(payload, cls)
         elif op == "bot_owner_update_settings":
             result = self.owner_update(payload, cls)
+        elif op == "bot_set_user_decoration":
+            result = self.user_decoration(payload, cls)
         status = 200
         if "error" in result and op in ("bot_typing", "bot_owner_update_settings"):
             status = 403 if result["error"] == "BOT_SETTINGS_FORBIDDEN" else 400
+        elif op == "bot_set_user_decoration" and "error" in result:
+            status = {"BOT_DECORATION_INVALID": 400, "BOT_DECORATION_FORBIDDEN": 403,
+                      "BOT_DECORATION_CONFLICT": 400, "BOT_SOURCE_UNAVAILABLE": 400,
+                      "AUTH_REQUIRED": 401}.get(result["error"], 400)
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
@@ -250,6 +262,47 @@ class Fixture(BaseHTTPRequestHandler):
                               "revision": (revision if type(revision) is int else 0) + 1,
                               "modelDefault": not update["model"], "reasoningDefault": not update["reasoning"]}
         return {"bot": "bot", **cls.model_settings}
+
+    @staticmethod
+    def user_decoration(payload, cls):
+        """Bot-token decoration write: applies to the sender of that exact update, once."""
+        allowed = {"op", "update_id", "target", "decoration"}
+        update_id = payload.get("update_id")
+        if set(payload) - allowed or type(update_id) is not int:
+            return {"error": "BOT_DECORATION_INVALID"}
+        canonical = getattr(cls, "canonicals", {}).get(update_id)
+        if not canonical:
+            return {"error": "BOT_SOURCE_UNAVAILABLE"}
+        if cls.decoration_error:
+            return {"error": cls.decoration_error}
+        target = payload.get("target")
+        if target not in ("avatar", "cover"):
+            return {"error": "BOT_DECORATION_INVALID"}
+        decoration = payload.get("decoration")
+        if decoration is not None:
+            if not isinstance(decoration, dict) or decoration.get("v") != 1 \
+                    or decoration.get("target") != target:
+                return {"error": "BOT_DECORATION_INVALID"}
+            layers = decoration.get("layers")
+            if not isinstance(layers, list) or not 1 <= len(layers) <= 3:
+                return {"error": "BOT_DECORATION_INVALID"}
+            if len(json.dumps(decoration, separators=(",", ":")).encode()) > 4096:
+                return {"error": "BOT_DECORATION_INVALID"}
+            seed = decoration.get("seed", 0)
+            if type(seed) is not int or not 0 <= seed <= 0xFFFFFFFF:
+                return {"error": "BOT_DECORATION_INVALID"}
+        if update_id in cls.decoration_consumed:
+            return {"error": "BOT_DECORATION_CONFLICT"}
+        cls.decoration_consumed.add(update_id)
+        cls.decorations.append(dict(payload))
+        records = dict(cls.user_decorations)
+        if decoration is None:
+            records.pop(target, None)
+        else:
+            records[target] = json.loads(json.dumps(decoration))
+        cls.user_decorations = records
+        return {"user": {"id": cls.decoration_response_user or (canonical.get("sender") or {}).get("id"),
+                         "decorations": records}}
 
 
 class Contracts(unittest.TestCase):

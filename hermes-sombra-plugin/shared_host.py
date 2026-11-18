@@ -28,6 +28,7 @@ from urllib.parse import urlsplit
 
 from gateway.config import Platform
 from gateway.platforms.base import BasePlatformAdapter
+from . import decorations
 from .adapter import (Broker, BrokerRejected, Journal, HINT, MAX_FILE, SafetyError, SombraAdapter, SendResult,
                       digest, ident, packed, safe_file, sniff, tool_typing_hint, typing_status)
 
@@ -811,6 +812,75 @@ class SharedHostAdapter(SombraAdapter):
         kind, text = SombraAdapter.classify_text(update, self.bot_handle)
         return kind == "native" and text.split(" ", 1)[0] in ("/model", "/models")
 
+    # -- frame / cover skill -------------------------------------------------
+    def _frame_intent(self, update):
+        """Deterministic decoration intent from chat text: no model, no profile read."""
+        text = str(update.get("message", {}).get("text", ""))
+        command = decorations.parse_command(text, self.bot_handle)
+        if command is not None:
+            return command
+        kind, body = self.classify_text(update)
+        if kind != "text":
+            return None  # The exact /frame form only: other slash controls stay untouched.
+        return decorations.parse_intent(body)
+
+    def _is_frame_update(self, update):
+        return self._frame_intent(update) is not None
+
+    async def _frame_local_response(self, adapter, payload):
+        """Local reply for one /frame turn; a failure is honest and never breaks the turn."""
+        try:
+            text = await self._frame_turn(payload["update"], payload.get("authority") or {})
+        except Exception:
+            log.warning("Sombra frame skill failed; the profile was not changed")
+            text = decorations.refusal_text("")
+        return {"text": text, "media": []}
+
+    async def _frame_turn(self, update, canonical):
+        request = self._frame_intent(update)
+        if request is None:
+            return decorations.help_text()
+        if request["kind"] == "confirm":
+            return await self._confirm_frame(update, canonical, request["nonce"])
+        if request["kind"] == "hint":
+            return request.get("text") or decorations.help_text()
+        if request["kind"] == "list":
+            return decorations.help_text()
+        target, document, label, error = decorations.request_document(request)
+        if error:
+            return decorations.hint_text(error)
+        # A pending proposal is durable for this exact actor/channel; nothing is applied yet.
+        store = decorations.DecorationRequests(self.journal.db)
+        nonce, expires = store.propose(self.actor, self.channel, target, document, label)
+        return decorations.proposal_text(self.bot_handle, target, document, label, nonce,
+                                         int(expires - time.time()))
+
+    async def _confirm_frame(self, update, canonical, nonce):
+        """Exactly one human confirmation for one live nonce, from this actor and channel."""
+        actor, channel = ident(update.get("sender")), ident(update.get("channel"))
+        if (actor != self.actor or channel != self.channel
+                or ident(canonical.get("sender")) != actor or ident(canonical.get("channel")) != channel):
+            return decorations.refusal_text("nonce")
+        # The guarded UPDATE inside take() is the atomic actor/channel/expiry/consumed check.
+        record = decorations.DecorationRequests(self.journal.db).take(nonce, actor, channel)
+        if record is None:
+            return decorations.refusal_text("nonce")
+        try:
+            result = await self.broker.acall("bot_set_user_decoration", update_id=update["update_id"],
+                                             target=record["target"], decoration=record["doc"])
+        except BrokerRejected as exc:
+            return decorations.refusal_text(exc.code)
+        except Exception:
+            log.warning("Sombra decoration write was not confirmed; the profile is unchanged")
+            return decorations.refusal_text("")
+        # The operation is scoped to the sender by the backend; an answer naming another profile
+        # is not a success we may claim. No retry: the one-shot marker may already be consumed.
+        user = result.get("user") if isinstance(result, dict) else None
+        if isinstance(user, dict) and user.get("id") not in (None, "", actor):
+            log.warning("Sombra decoration answer belongs to a different user; no retry")
+            return decorations.uncertain_text()
+        return decorations.success_text(record["target"], record["doc"], record.get("label") or "")
+
     def _parse_model_change(self, args):
         """Owner ``/model`` arguments -> (patch, error). Only already-validated values return."""
         tokens = str(args or "").split()
@@ -1169,7 +1239,11 @@ class SharedHostAdapter(SombraAdapter):
             async with self._semaphore:
                 scope["trusted"] = canonical.get("access", {}).get("trusted") is True
                 scope["model_request"] = None
-                if self._is_settings_update(update):
+                if self._is_frame_update(update):
+                    # Any normal user may decorate their OWN profile; the backend applies the
+                    # document to this update's sender. No cookie, no model, one-shot nonce.
+                    await self._public_ingest(update, canonical, local_response=self._frame_local_response)
+                elif self._is_settings_update(update):
                     from .native_tools import settings_response
                     await self._public_ingest(update, canonical, local_response=settings_response)
                 elif self._is_model_update(update):

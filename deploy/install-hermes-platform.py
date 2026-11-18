@@ -22,7 +22,7 @@ PLUGIN = HOME / 'plugins/sombra-platform'
 PROFILE = HOME / 'profiles/sombra'
 WORKSPACE = Path('/home/hermes/workspace-sombra')
 STATE = Path('/var/lib/sombra-hermes-platform')
-FILES = {'plugin.yaml', '__init__.py', 'adapter.py', 'shared_host.py', 'public_runner.py', 'native_tools.py', 'persona/SOUL.md'}
+FILES = {'plugin.yaml', '__init__.py', 'adapter.py', 'shared_host.py', 'decorations.py', 'public_runner.py', 'native_tools.py', 'persona/SOUL.md'}
 
 
 def checked(path):
