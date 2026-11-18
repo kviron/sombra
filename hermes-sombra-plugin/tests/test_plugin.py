@@ -122,6 +122,17 @@ class Fixture(BaseHTTPRequestHandler):
     trusted = True
     fail_delivery = False
     changed = False
+    # New backend contract (BOT-MODEL-SETTINGS.md); defaults keep the old-server shape
+    # so every pre-existing scenario still exercises a server without the capability.
+    model_settings = {"model": "", "reasoning": "", "revision": 0, "modelDefault": True, "reasoningDefault": True}
+    registration_supported = False
+    fail_get_me = False
+    registered = []
+    # Owner chat command / strict typing activity: an offline copy of the server contract.
+    owner_settings_error = ""
+    owner_consumed = set()
+    typing_calls = []
+    typing_reject = False
 
     def log_message(self, *args):
         pass
@@ -135,7 +146,24 @@ class Fixture(BaseHTTPRequestHandler):
         if self.headers.get("Authorization") != "Bearer sombra_scope_test":
             result = {"error": "unauthorized"}
         elif op == "bot_get_me":
-            result = {"bot": {"id": "bot"}, "toolPolicy": {"owner": "actor", "users": [], "revision": 1}}
+            if cls.fail_get_me:
+                result = {"error": "temporarily unavailable"}
+            else:
+                result = {"bot": {"id": "bot", "modelSettings": dict(cls.model_settings)},
+                          "commandRegistrationSupported": cls.registration_supported,
+                          "toolPolicy": {"owner": "actor", "users": [], "revision": 1}}
+        elif op == "bot_register_commands":
+            incoming = payload.get("commands")
+            if (not isinstance(incoming, list) or not incoming
+                    or any(not isinstance(name, str) or not name for name in incoming)):
+                result = {"error": "invalid commands"}
+            else:
+                merged = list(cls.registered)
+                for name in incoming:
+                    if name not in merged:
+                        merged.append(name)
+                cls.registered = merged
+                result = {"commands": merged}
         elif op == "bot_authorize_update":
             result = getattr(cls, "canonicals", {}).get(payload["update_id"], {"update_id": payload["update_id"], "bot_id": "bot", "channel": "chan", "sender": {"id": "actor"},
                       "chat": {"id": "group"}, "access": {"trusted": cls.trusted, "policy_revision": 2 if cls.changed else 1}})
@@ -153,25 +181,84 @@ class Fixture(BaseHTTPRequestHandler):
                 else:
                     cls.outputs[key] = payload
                     result = {"id": "message-" + payload["response_key"]}
-        elif op in ("bot_ack", "bot_edit", "bot_delete", "bot_typing"):
+        elif op in ("bot_ack", "bot_edit", "bot_delete"):
             if op == "bot_ack":
                 cls.acked.add(payload["update_id"])
                 if payload["update_id"] == 1:
                     cls.original_acked.set()
             result = {"ok": True}
-        self.send_response(200)
+        elif op == "bot_typing":
+            result = self.typing(payload, cls)
+        elif op == "bot_owner_update_settings":
+            result = self.owner_update(payload, cls)
+        status = 200
+        if "error" in result and op in ("bot_typing", "bot_owner_update_settings"):
+            status = 403 if result["error"] == "BOT_SETTINGS_FORBIDDEN" else 400
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(json.dumps({"data": result} if getattr(cls, "envelope", False) else result).encode())
+        self.wfile.write(json.dumps({"data": result} if getattr(cls, "envelope", False) and status == 200 else result).encode())
+
+    @staticmethod
+    def typing(payload, cls):
+        """Strict bot_typing surface: unknown keys/invalid activity/status are a 400 refusal."""
+        allowed = {"op", "update_id", "typing", "activity", "status"}
+        activity = payload.get("activity")
+        status = payload.get("status", "")
+        if set(payload) - allowed or activity not in (None, "thinking", "tool", "image", "search", "code", "waiting"):
+            return {"error": "BOT_OUTPUT_INVALID"}
+        if not isinstance(status, str) or len(status) > 80 or any(ord(char) < 32 or ord(char) == 127 for char in status):
+            return {"error": "BOT_OUTPUT_INVALID"}
+        if cls.typing_reject and activity is not None:
+            return {"error": "BOT_OUTPUT_INVALID"}
+        cls.typing_calls.append(dict(payload))
+        return {"ok": True, "until": 8}
+
+    @staticmethod
+    def owner_update(payload, cls):
+        """One-shot owner update: bot token, own update, owner sender, CAS revision."""
+        allowed = {"op", "update_id", "model", "reasoning", "revision"}
+        if set(payload) - allowed:
+            return {"error": "BOT_SETTINGS_INVALID"}
+        if cls.owner_settings_error:
+            return {"error": cls.owner_settings_error}
+        update_id = payload.get("update_id")
+        if type(update_id) is not int:
+            return {"error": "BOT_SETTINGS_INVALID"}
+        canonical = getattr(cls, "canonicals", {}).get(update_id)
+        if not canonical or (canonical.get("sender") or {}).get("id") != "actor":
+            return {"error": "BOT_SETTINGS_FORBIDDEN"}
+        if update_id in cls.owner_consumed:
+            return {"error": "BOT_SETTINGS_CONFLICT"}
+        current = dict(cls.model_settings)
+        update = {"model": current.get("model", ""), "reasoning": current.get("reasoning", "")}
+        if "model" in payload:
+            model = payload["model"]
+            if not isinstance(model, str) or len(model) > 120 or (model and not all(
+                    char.isascii() and (char.isalnum() or char in "-_.:/@+") for char in model)):
+                return {"error": "BOT_SETTINGS_INVALID"}
+            update["model"] = model
+        if "reasoning" in payload:
+            if payload["reasoning"] not in ("", "low", "medium", "high"):
+                return {"error": "BOT_SETTINGS_INVALID"}
+            update["reasoning"] = payload["reasoning"]
+        revision = current.get("revision")
+        if "revision" in payload and payload["revision"] != revision:
+            return {"error": "BOT_SETTINGS_CONFLICT"}
+        cls.owner_consumed.add(update_id)
+        cls.model_settings = {"model": update["model"], "reasoning": update["reasoning"],
+                              "revision": (revision if type(revision) is int else 0) + 1,
+                              "modelDefault": not update["model"], "reasoningDefault": not update["reasoning"]}
+        return {"bot": "bot", **cls.model_settings}
 
 
 class Contracts(unittest.TestCase):
     def test_manifest_and_no_direct_engine(self):
-        source = (ROOT / "adapter.py").read_text()
+        source = (ROOT / "adapter.py").read_text(encoding="utf-8")
         self.assertNotIn("AIAgent(", source)
         self.assertNotIn("trusted_inbound", source)
         self.assertNotIn("TelegramAdapter", source)
-        self.assertIn("version: 0.1.0", (ROOT / "plugin.yaml").read_text())
+        self.assertIn("version: 0.1.0", (ROOT / "plugin.yaml").read_text(encoding="utf-8"))
         class Context:
             def register_hook(self, name, hook):
                 self.hook = (name, hook)
@@ -187,8 +274,8 @@ class Contracts(unittest.TestCase):
     def test_pinned_sdk_public_signatures(self):
         if not SDK.exists():
             self.fail("Reviewed source mirror required for pinned static SDK contract")
-        sdk = ast.parse((SDK / "gateway/platforms/base.py").read_text())
-        local = ast.parse((ROOT / "adapter.py").read_text())
+        sdk = ast.parse((SDK / "gateway/platforms/base.py").read_text(encoding="utf-8"))
+        local = ast.parse((ROOT / "adapter.py").read_text(encoding="utf-8"))
         base = next(n for n in sdk.body if isinstance(n, ast.ClassDef) and n.name == "BasePlatformAdapter")
         own = next(n for n in local.body if isinstance(n, ast.ClassDef) and n.name == "SombraAdapter")
         methods = {n.name: n for n in base.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
@@ -201,12 +288,12 @@ class Contracts(unittest.TestCase):
                 self.assertEqual([a.arg for a in expected.kwonlyargs], [a.arg for a in actual.kwonlyargs], item.name)
                 self.assertEqual(bool(expected.kwarg), bool(actual.kwarg), item.name)
         # Public registry keyword contract must exist in pinned PlatformEntry.
-        registry = ast.parse((SDK / "gateway/platform_registry.py").read_text())
+        registry = ast.parse((SDK / "gateway/platform_registry.py").read_text(encoding="utf-8"))
         entry = next(n for n in registry.body if isinstance(n, ast.ClassDef) and n.name == "PlatformEntry")
         fields = {n.target.id for n in entry.body if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)}
         for key in ("allowed_users_env", "own_policy_env", "allowlist_suppresses_pairing", "platform_hint", "display_overrides"):
             self.assertIn(key, fields)
-        plugins = (SDK / "hermes_cli/plugins.py").read_text()
+        plugins = (SDK / "hermes_cli/plugins.py").read_text(encoding="utf-8")
         self.assertIn('"pre_tool_call"', plugins)
         self.assertIn('action = result.get("action")', plugins)
 
@@ -283,6 +370,10 @@ class HTTPIntegration(unittest.IsolatedAsyncioTestCase):
         Fixture.canonicals, Fixture.envelope = {}, False
         Fixture.original_acked = threading.Event()
         Fixture.trusted, Fixture.changed, Fixture.fail_delivery = True, False, False
+        Fixture.model_settings = {"model": "", "reasoning": "", "revision": 0,
+                                  "modelDefault": True, "reasoningDefault": True}
+        Fixture.owner_settings_error, Fixture.owner_consumed = "", set()
+        Fixture.typing_calls, Fixture.typing_reject = [], False
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Fixture)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -351,7 +442,7 @@ class HTTPIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(native_metadata(event), {})
         event.metadata = {"sombra_update_id": 1}
         self.assertIsNone(native_metadata(event), "Old private metadata must reproduce actual SDK refusal")
-        envelope = ast.parse((RUNTIME_SDK / "gateway/session_envelope.py").read_text())
+        envelope = ast.parse((RUNTIME_SDK / "gateway/session_envelope.py").read_text(encoding="utf-8"))
         fields = next(node.value for node in envelope.body if isinstance(node, ast.Assign)
                       and any(isinstance(target, ast.Name) and target.id == "_EVENT_FIELDS" for target in node.targets))
         self.assertIn("platform_update_id", ast.literal_eval(fields))

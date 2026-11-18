@@ -1,5 +1,25 @@
 //! Invocation-scoped transport only. This does not execute or grant core tools.
 use super::*;
+/// Display-only activity codes a worker may announce next to its typing window.
+const BOT_ACTIVITIES: &[&str] = &["thinking", "tool", "image", "search", "code", "waiting"];
+/// Longest accepted UI label; longer labels are refused instead of silently truncated.
+const BOT_STATUS_MAX: usize = 80;
+/// One typing window. A series keeps the first `started_at` while it is refreshed.
+const BOT_TYPING_TTL: u64 = 8;
+/// Every key `bot_typing` may carry. The HTTP layer injects `token`/`bot_token`.
+const BOT_TYPING_KEYS: &[&str] = &[
+    "op",
+    "token",
+    "bot_token",
+    "update_id",
+    "typing",
+    "activity",
+    "status",
+    "until",
+];
+fn bot_status_valid(status: &str) -> bool {
+    status.chars().count() <= BOT_STATUS_MAX && !status.chars().any(char::is_control)
+}
 impl Backend {
     pub(super) fn bot_policy(&self, b: &Value) -> Value {
         json!({"revision":b["tool_policy"]["revision"].as_u64().unwrap_or(0),"owner":b["owner"],"users":b["tool_policy"]["users"].as_array().cloned().unwrap_or_default()})
@@ -109,7 +129,10 @@ impl Backend {
                             })
                     })
             })
-            .map(|t| json!({"bot":t["bot"],"channel":t["channel"],"until":t["until"]}))
+            .map(|t| {
+                let until = t["until"].as_u64().unwrap_or(0);
+                json!({"bot":t["bot"],"channel":t["channel"],"until":until,"started_at":t["started_at"].as_u64().unwrap_or(until.saturating_sub(BOT_TYPING_TTL)),"activity":t["activity"].as_str().unwrap_or(""),"status":t["status"].as_str().unwrap_or("")})
+            })
             .collect()
     }
     pub(super) fn scoped_bot_operation(
@@ -125,15 +148,56 @@ impl Backend {
             return Ok(authority);
         }
         if op == "bot_typing" {
+            for key in v.as_object().ok_or("BOT_OUTPUT_INVALID")?.keys() {
+                if !BOT_TYPING_KEYS.contains(&key.as_str()) {
+                    return Err("BOT_OUTPUT_INVALID".into());
+                }
+            }
             if v.get("typing").is_some_and(|x| !x.is_boolean()) {
                 return Err("BOT_OUTPUT_INVALID".into());
             }
+            let activity = v
+                .get("activity")
+                .map(|value| value.as_str().ok_or("BOT_OUTPUT_INVALID"))
+                .transpose()?;
+            if activity.is_some_and(|activity| !BOT_ACTIVITIES.contains(&activity)) {
+                return Err("BOT_OUTPUT_INVALID".into());
+            }
+            let status = v
+                .get("status")
+                .map(|value| value.as_str().ok_or("BOT_OUTPUT_INVALID"))
+                .transpose()?;
+            if status.is_some_and(|status| !bot_status_valid(status)) {
+                return Err("BOT_OUTPUT_INVALID".into());
+            }
+            // The window stays server-owned: a client-supplied `until` is checked but never
+            // honored, so a worker can neither extend nor shorten the eight-second TTL.
+            if v.get("until").is_some_and(|value| value.as_u64().is_none()) {
+                return Err("BOT_OUTPUT_INVALID".into());
+            }
+            let timestamp = now();
+            let started_at = self
+                .bot_typing
+                .iter()
+                .filter(|t| {
+                    t["bot"] == b["id"]
+                        && t["update_id"] == update["update_id"]
+                        && t["until"].as_u64().unwrap_or(0) > timestamp
+                })
+                .find_map(|t| t["started_at"].as_u64());
             self.bot_typing.retain(|t| {
-                t["until"].as_u64().unwrap_or(0) > now()
+                t["until"].as_u64().unwrap_or(0) > timestamp
                     && !(t["bot"] == b["id"] && t["update_id"] == update["update_id"])
             });
             if v["typing"] != false && update["done"] != true {
-                self.bot_typing.push(json!({"bot":b["id"],"channel":update["channel"],"update_id":update["update_id"],"until":now()+8}));
+                let mut entry = json!({"bot":b["id"],"channel":update["channel"],"update_id":update["update_id"],"until":timestamp+BOT_TYPING_TTL,"started_at":started_at.unwrap_or(timestamp)});
+                if let Some(activity) = activity {
+                    entry["activity"] = json!(activity);
+                }
+                if let Some(status) = status {
+                    entry["status"] = json!(status);
+                }
+                self.bot_typing.push(entry);
             }
             return Ok(json!({"ok":true}));
         }
@@ -228,6 +292,7 @@ impl Backend {
                     return Err("BOT_OUTPUT_LIMIT".into());
                 }
                 let mut m = json!({"id":id(),"channel":update["channel"],"user":b["id"],"bot_name":b["name"],"text":text,"time":now(),"revision":0});
+                m["mentions"] = self.canonical_mentions(s(&update, "channel"), text, None)?;
                 if attachment.is_object() {
                     m["attachment"] = attachment.clone()
                 }
@@ -276,7 +341,9 @@ impl Backend {
                         return Err("BOT_RESPONSE_CONFLICT".into());
                     }
                     let mi = mi.ok_or("BOT_RESPONSE_CONFLICT")?;
+                    let mentions = self.canonical_mentions(s(&update, "channel"), text, None)?;
                     self.db["messages"][mi]["text"] = json!(text);
+                    self.db["messages"][mi]["mentions"] = mentions;
                     self.db["messages"][mi]["revision"] = json!(revision);
                     old["message"] = self.db["messages"][mi].clone();
                     old["revision"] = json!(revision);
@@ -304,3 +371,7 @@ impl Backend {
         result
     }
 }
+
+#[cfg(test)]
+#[path = "bot_activity_tests.rs"]
+mod activity_tests;

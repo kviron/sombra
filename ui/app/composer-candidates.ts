@@ -21,7 +21,7 @@ export function mentionCandidates(state:ChatState,channel:string,group?:string){
  const user=state.users.find(u=>u.id===id),bot=bots.find(b=>b.id===id);
  if(!user&&!bot||user?.bot&&!enabledBots.has(id))return [];
  const name=user?.name||bot!.name,username=user?.username||bot?.username,isBot=!!(user?.bot||bot);
- return [{id,type:'mention',label:name,description:isBot?`Бот · @${username||name}`:`Участник · ${id.slice(0,8)}`,metadata:{insert:`@${isBot?username||name:name}`,avatar:user?.avatar||'',search:`${name} ${username||''}`}}];
+ return [{id,type:'mention',label:name,description:`${isBot?'Бот':'Участник'} · @${username||name}${username?'':` · ${id.slice(0,8)}`}`,metadata:{insert:`@${username||name}`,avatar:user?.avatar||'',search:`${name} ${username||''}`}}];
  });
 }
 export const localCommandCandidates=[

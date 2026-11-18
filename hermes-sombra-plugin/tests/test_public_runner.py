@@ -135,6 +135,22 @@ class RunnerTests(unittest.IsolatedAsyncioTestCase):
         for record in captured.records:
             self.assertFalse(record.exc_info)
 
+    async def test_backend_model_selection_reaches_provider_route_only(self):
+        await self.runner(model_settings=lambda: {'model': 'gpt-6-luna', 'reasoning': 'high'})(self.payload, [])
+        agent = FakeAgent.instances[-1]
+        self.assertEqual(agent.kwargs['model'], 'gpt-6-luna')  # Same route, no provider/key change.
+        self.assertEqual(agent.kwargs['reasoning_config'], {'enabled': True, 'effort': 'high'})
+        # Unsafe/unknown values keep the configured default instead of reaching the wire.
+        for settings in ({'model': 'https://evil.invalid/v1', 'reasoning': 'ultra'},
+                         {'model': 'sk-secret', 'reasoning': ''},
+                         {'model': 42, 'reasoning': None}, None):
+            await self.runner(model_settings=lambda value=settings: value)(self.payload, [])
+            unsafe = FakeAgent.instances[-1]
+            self.assertEqual(unsafe.kwargs['model'], 'fake')
+            self.assertIsNone(unsafe.kwargs['reasoning_config'])
+        with self.assertRaises(r.PolicyError):
+            self.runner(model_settings='not-callable')
+
     async def test_operator_persona_preserves_policy(self):
         await self.runner(persona='Сомбра любит игры.')(self.payload, [])
         system = FakeAgent.instances[-1].input[1]['system_message']

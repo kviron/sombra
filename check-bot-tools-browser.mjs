@@ -16,7 +16,7 @@ async function fill(selector,value){await tab.ev(`(()=>{const e=${q(selector)};O
 async function escape(){for(const type of ['keyDown','keyUp'])await tab.send('Input.dispatchKeyEvent',{type,key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await pause(100)}
 async function open(){await click(q('[title="Боты комнаты"]'));await tab.wait(`!!${q('.bot-tool-access-toggle')}`)}
 try{
- const html=readFileSync('dist/index.html','utf8');ok(html.includes('index-DCpCkr5G.js')&&html.includes('index-Dikf5QZQ.css'),'Frozen approved frontend artifacts');
+ const html=readFileSync('dist/index.html','utf8');ok(html.includes('index-Bi6FcXOb.js')&&html.includes('index-BnxBYdyB.css'),'Frozen approved frontend artifacts');
  for(const port of ports)await new Promise((r,j)=>{const s=net.createServer();s.once('error',j);s.listen(port,'127.0.0.1',()=>s.close(r))});
  backend=spawn(process.cwd()+'/target/debug/mines-server.exe',[],{stdio:'ignore',windowsHide:true,env:{...process.env,MINES_DATA_DIR:process.cwd()+'/'+out+'/data',MINES_BIND:'127.0.0.1:4452'}});await until(async()=>(await fetch(apiOrigin+'/health')).ok,'backend');
  server=await preview({configFile:false,build:{outDir:'dist'},preview:{host:'127.0.0.1',port:4252,strictPort:true,proxy:{'/api':apiOrigin}}});

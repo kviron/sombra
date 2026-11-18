@@ -112,12 +112,13 @@ impl Backend {
         out["transportVersion"] = json!(if b["legacy"] == true { 0 } else { 2 });
         out["managementVersion"] = json!(if b["legacy"] == true { 0 } else { 1 });
         out["conversation"] = self.bot_conversation(b);
+        out["modelSettings"] = self.bot_model_settings(b);
         out["privacy"] = json!(if b["legacy"] == true {
             "legacy_room_history"
         } else {
             "commands_only"
         });
-        for key in ["token_hash", "ack", "seq", "tool_policy", "followups"] {
+        for key in ["token_hash", "ack", "seq", "tool_policy", "followups", "settings"] {
             out.as_object_mut().unwrap().remove(key);
         }
         out
@@ -513,7 +514,8 @@ impl Backend {
             if text.is_empty() || text.chars().count() > 2000 {
                 return Err("Сообщение: 1–2000 символов".into());
             }
-            self.db["messages"].as_array_mut().unwrap().push(json!({"id":id(),"channel":b["channel"],"user":b["id"],"bot_name":b["name"],"text":text,"time":now()}));
+            let mentions = self.canonical_mentions(s(&b, "channel"), text, None)?;
+            self.db["messages"].as_array_mut().unwrap().push(json!({"id":id(),"channel":b["channel"],"user":b["id"],"bot_name":b["name"],"text":text,"time":now(),"mentions":mentions}));
             self.save()?;
             return Ok(json!({"ok":true}));
         }
@@ -538,13 +540,23 @@ impl Backend {
                 })
                 .take(limit)
                 .map(|mut u| {
-                    for k in ["bot", "done", "response", "responses", "attachment_digest"] {
+                    for k in [
+                        "bot",
+                        "done",
+                        "response",
+                        "responses",
+                        "attachment_digest",
+                        super::bot_model_settings::OWNER_APPLIED,
+                    ] {
                         u.as_object_mut().unwrap().remove(k);
                     }
                     u
                 })
                 .collect::<Vec<_>>();
             return Ok(json!({"updates":updates,"ack":b["ack"].as_u64().unwrap_or(0)}));
+        }
+        if op == super::bot_model_settings::OWNER_OP {
+            return self.bot_owner_update_settings(v, &b);
         }
         let ui = self.db["bot_updates"]
             .as_array()

@@ -4,6 +4,7 @@ import {Button} from '@/shared/ui/button';
 import {Input} from '@/shared/ui/input';
 import {ImageCropDialog,type PreparedProfileImage} from '@/shared/ui/image-crop-dialog';
 import {ProfileCover} from '@/shared/ui/profile-cover';
+import {ProfileDecorationPicker} from './profile-decoration-picker';
 import {Label} from '@/shared/ui/label';
 import type {AccountSection} from './account-sidebar';
 
@@ -67,6 +68,7 @@ export function AccountSecurity({state,refresh,section}:{state:ChatState|null;re
     <div className="settings-field"><Label htmlFor="account-bio">О себе</Label><Input id="account-bio" value={bio} onChange={e=>setBio(e.target.value)} maxLength={190}/></div>
     <div className="settings-actions"><Button variant="secondary" size="sm" disabled={busy}>{busy?'Сохраняем…':'Сохранить профиль'}</Button></div>
    </form>
+   <ProfileDecorationPicker state={state} refresh={refresh}/>
    <form className="settings-form email-form" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void run(async()=>{await api('change_email',{email,current_password:data.get('current_password')});await refresh();form.reset();setNotice('Почта изменена. Используйте её при следующем входе.')})}}>
     <h2>Электронная почта</h2>
     <div className="settings-field"><Label htmlFor="account-email">Почта</Label><Input id="account-email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required maxLength={254}/></div>

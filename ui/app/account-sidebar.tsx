@@ -1,6 +1,8 @@
 import {Mic,UserRound,ShieldCheck,Monitor,RefreshCw,LogOut,Pencil,Sticker,Bell,HardDrive} from 'lucide-react';
 import {Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton} from '@/shared/ui/sidebar';
 import {Separator} from '@/shared/ui/separator';
+import {UserAvatar} from '@/shared/ui/user-avatar';
+import type {User} from '@/shared/api/backend';
 
 export type AccountSection='profile'|'security'|'sessions'|'voice'|'updates'|'stickers'|'notifications'|'storage';
 export const accountSections=[
@@ -13,9 +15,9 @@ export const accountSections=[
   {id:'sessions' as const,label:'Активные сеансы',icon:Monitor},
   {id:'stickers' as const,label:'Стикеры',icon:Sticker},
 ];
-export function AccountSidebar({name,avatar,section,onSection,onLogout}:{name:string;avatar?:string;section:AccountSection;onSection:(section:AccountSection)=>void;onLogout:()=>void}) {
-  return <Sidebar className="settings-sidebar">
-    <SidebarHeader><button type="button" className="settings-identity" aria-label="Редактировать профиль" aria-controls="account-panel" onClick={()=>onSection('profile')}><span className="avatar" aria-hidden="true">{avatar?<img src={avatar} alt=""/>:name[0]}</span><span className="settings-identity-text"><strong title={name}>{name}</strong><span className="settings-edit-profile">Редактировать профиль <Pencil size={12}/></span></span></button></SidebarHeader>
+export function AccountSidebar({me,name,avatar,section,onSection,onLogout}:{me?:User;name:string;avatar?:string;section:AccountSection;onSection:(section:AccountSection)=>void;onLogout:()=>void}) {
+ return <Sidebar className="settings-sidebar">
+    <SidebarHeader><button type="button" className="settings-identity" aria-label="Редактировать профиль" aria-controls="account-panel" onClick={()=>onSection('profile')}><UserAvatar user={me??{id:name,name,avatar}} size="lg" presence={false} decorative decoration={me?.decorations?.avatar}/><span className="settings-identity-text"><strong title={name}>{name}</strong><span className="settings-edit-profile">Редактировать профиль <Pencil size={12}/></span></span></button></SidebarHeader>
     <SidebarContent><nav aria-label="Настройки учётной записи"><SidebarMenu>{accountSections.map(({id,label,icon:Icon})=><SidebarMenuItem key={id}><SidebarMenuButton isActive={section===id} aria-current={section===id?'page':undefined} aria-controls="account-panel" onClick={()=>onSection(id)}><Icon/><span>{label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></nav></SidebarContent>
     <SidebarFooter><Separator/><SidebarMenu><SidebarMenuItem><SidebarMenuButton onClick={onLogout}><LogOut/><span>Выйти из аккаунта</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarFooter>
   </Sidebar>;

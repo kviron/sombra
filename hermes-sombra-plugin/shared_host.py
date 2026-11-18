@@ -22,13 +22,14 @@ import sqlite3
 import stat
 import threading
 import sys
+import time
 import types
 from urllib.parse import urlsplit
 
 from gateway.config import Platform
 from gateway.platforms.base import BasePlatformAdapter
-from .adapter import (Broker, Journal, HINT, MAX_FILE, SafetyError, SombraAdapter, SendResult, digest,
-                      ident, packed, safe_file, sniff)
+from .adapter import (Broker, BrokerRejected, Journal, HINT, MAX_FILE, SafetyError, SombraAdapter, SendResult,
+                      digest, ident, packed, safe_file, sniff, tool_typing_hint, typing_status)
 
 log = logging.getLogger(__name__)
 # Hermes can load one plugin package per logical profile. Those packages must share
@@ -42,6 +43,21 @@ if not hasattr(_context_module, "sessions"):
     _context_module.sessions = {}
 SESSION_BINDINGS = _context_module.sessions
 HOST_ACK = "I_ACCEPT_SHARED_HOST_FULL_TOOLS"
+# Backend-owned model selection (BOT-MODEL-SETTINGS.md). The owner's own chat command is
+# written with the bot token through the one-shot ``bot_owner_update_settings`` operation;
+# the bot still has no way to choose an arbitrary other bot or a human-cookie write.
+MODEL_SETTINGS_TTL = 15.0
+MODEL_SETTINGS_MIN_REFRESH = 2.0
+REASONING_LEVELS = ("low", "medium", "high")
+MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/@+\-]{0,119}")
+DEFAULT_MODEL_SETTINGS = {"model": "", "reasoning": "", "revision": None,
+                           "modelDefault": True, "reasoningDefault": True}
+MODEL_READ_ONLY = "Изменять модель может только владелец бота."
+MODEL_RESET_ALIASES = ("default", "reset", "дефолт", "сброс")
+MODEL_USAGE = ("Формат: /model <модель> [low|medium|high], /model reasoning <low|medium|high> "
+               "или /model default.")
+MODEL_OWNER_HINT = ("Переключение модели выполняет владелец командой /model <модель> [low|medium|high]. "
+                    "Бот пишет только модель и уровень своим токеном и только для владельца.")
 
 
 def protected_token(path):
@@ -102,6 +118,92 @@ class DirectAPI(Broker):
         if not isinstance(result, dict):
             raise SafetyError("Invalid backend API response envelope")
         return result
+
+
+def normalize_model_settings(value):
+    """Safe projection of the backend ``modelSettings``; anything unknown becomes the default."""
+    value = value if isinstance(value, dict) else {}
+    model = value.get("model") if isinstance(value.get("model"), str) else ""
+    if (not MODEL_ID.fullmatch(model) or "://" in model
+            or model.startswith(("sk-", "sk_", "eyJ"))):
+        model = ""  # Never let a URL/credential-shaped value reach a model request or a reply.
+    reasoning = value.get("reasoning") if value.get("reasoning") in REASONING_LEVELS else ""
+    revision = value.get("revision")
+    revision = revision if type(revision) is int and revision >= 0 else None
+    return {"model": model, "reasoning": reasoning, "revision": revision,
+            "modelDefault": not model, "reasoningDefault": not reasoning}
+
+
+def reasoning_projection(level):
+    """Official SDK reasoning config for one validated backend level; None = profile default."""
+    if level not in REASONING_LEVELS:
+        return None
+    try:
+        from hermes_constants import parse_reasoning_effort
+        parsed = parse_reasoning_effort(level)
+        if parsed:
+            return parsed
+    except Exception:
+        pass
+    return {"enabled": True, "effort": level}
+
+
+def apply_session_model_settings(adapter, source, settings):
+    """Project backend model/reasoning onto THIS Sombra session only.
+
+    The pinned SDK consumes a session-scoped ``conversation.model_override`` in
+    ``_resolve_session_agent_runtime`` / ``_apply_session_model_override`` and the
+    ``conversation.reasoning_override`` typed by ``/reasoning``. Only the in-memory
+    ``SessionState`` of the source's own session key is touched: no global config,
+    no profile write, no api_key/base_url, no ``--global`` and no Telegram session.
+    """
+    runner = getattr(adapter, "gateway_runner", None)
+    if runner is None:
+        return False
+    platform = getattr(source, "platform", None)
+    if platform is not None and str(getattr(platform, "value", platform)).lower() != "sombra":
+        return False
+    key = ""
+    resolver = getattr(runner, "_session_key_for_source", None)
+    if callable(resolver):
+        try:
+            key = resolver(source) or ""
+        except Exception:
+            key = ""
+    if not key:
+        fallback = getattr(runner, "_resolve_session_key_or_none", None)
+        if callable(fallback):
+            try:
+                key = fallback(source, None) or ""
+            except Exception:
+                key = ""
+    if not isinstance(key, str) or not key:
+        return False
+    try:
+        peek = getattr(runner, "_peek_session_state", None)
+        state = peek(key) if callable(peek) else None
+        if state is None:
+            make = getattr(runner, "_session_state", None)
+            if not callable(make):
+                return False
+            state = make(key)
+        conversation = getattr(state, "conversation", None)
+        if conversation is None:
+            return False
+    except Exception:
+        return False
+    settings = settings if isinstance(settings, dict) else DEFAULT_MODEL_SETTINGS
+    raw_model = settings.get("model")
+    model = (raw_model if isinstance(raw_model, str) and MODEL_ID.fullmatch(raw_model)
+             and "://" not in raw_model and not raw_model.startswith(("sk-", "sk_", "eyJ")) else "")
+    try:
+        # Backend settings are authoritative for the Sombra turn; clear the projection
+        # when the owner restores the default so no stale override survives.
+        setattr(conversation, "model_override", {"model": model} if model else None)
+        setattr(conversation, "reasoning_override", reasoning_projection(settings.get("reasoning")))
+    except Exception:
+        return False
+    return True
 
 
 def observe_generated_artifact(**kwargs):
@@ -175,6 +277,26 @@ def shared_pre_tool_call(**kwargs):
             raise SafetyError("Full-tools grant revoked")
     except Exception:
         return {"action": "block", "message": "Sombra fresh invocation authorization unavailable; tool blocked"}
+    # Only a real, authorized tool start changes the typing stage; arguments never leak.
+    try:
+        adapter._typing_note(*tool_typing_hint(kwargs.get("tool_name")))
+    except Exception:
+        pass
+    return None
+
+
+def shared_post_tool_call(**kwargs):
+    """Clear the tool-stage typing hint after the tool returns; observer-only, never raises."""
+    binding = INVOCATION.get()
+    if binding is None:
+        return None
+    try:
+        adapter, scope, invocation_id = binding
+        current = scope.get("current") if adapter._scope() is scope else None
+        if isinstance(current, dict) and str(current.get("id")) == str(invocation_id):
+            current.pop("typing", None)
+    except Exception:
+        return None
     return None
 
 
@@ -210,6 +332,14 @@ class SharedHostAdapter(SombraAdapter):
         self.persona_path = Path(self.env["SOMBRA_SOUL_FILE"]) if self.env.get("SOMBRA_SOUL_FILE") else None
         self.bot_handle = "hermes"
         self._dm_policy = self._group_policy = "allowlist"
+        # Backend model settings are read with the bot token only (never written). The
+        # snapshot is per-adapter and replaced atomically after a successful read.
+        self._model_settings = dict(DEFAULT_MODEL_SETTINGS)
+        self._model_settings_at = 0.0
+        self._model_settings_error = ""
+        self._model_owner_id = ""
+        self._registered_commands = False
+        self._command_registration_supported = False
 
     def _scope(self):
         binding = INVOCATION.get()
@@ -624,6 +754,351 @@ class SharedHostAdapter(SombraAdapter):
             msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
         self._locks.append(stream)
 
+    @staticmethod
+    def _model_id(value):
+        """Safe model/provider identifier; never a URL or a credential-shaped value."""
+        value = str(value or "")
+        if (not MODEL_ID.fullmatch(value) or "://" in value
+                or value.startswith(("sk-", "sk_", "eyJ"))):
+            return ""
+        return value
+
+    async def _refresh_model_settings(self, me=None, *, force=False, min_interval=0.0):
+        """Read ``bot_get_me.bot.modelSettings`` with a TTL; failures never fail a turn."""
+        now = time.monotonic()
+        age = now - self._model_settings_at if self._model_settings_at else None
+        if not force and age is not None and age < (min_interval or MODEL_SETTINGS_TTL):
+            return self._model_settings
+        try:
+            if me is None:
+                me = await self.broker.acall("bot_get_me")
+            bot = me.get("bot") if isinstance(me, dict) else None
+            if not isinstance(bot, dict) or ident(bot) != self.bot_id:
+                raise SafetyError("Model settings bot identity changed")
+            settings = normalize_model_settings(bot.get("modelSettings"))
+            self._model_settings = settings
+            self._model_settings_at = time.monotonic()
+            self._model_settings_error = ""
+            owner = ident((me.get("toolPolicy") or {}).get("owner"))
+            if owner:
+                self._model_owner_id = owner
+        except Exception:
+            # Unavailable settings must never crash or invent a selection: keep the last
+            # known safe projection (Hermes default when none was ever read) and back off
+            # for one TTL instead of stalling every turn on the same failing read.
+            self._model_settings_error = "unavailable"
+            self._model_settings_at = time.monotonic()
+            if self._model_settings is None or not self._model_settings:
+                self._model_settings = dict(DEFAULT_MODEL_SETTINGS)
+        return self._model_settings
+
+    def _apply_model_settings(self, source=None):
+        """Project the cached backend selection onto THIS Sombra session before dispatch."""
+        if source is None:
+            return False
+        return apply_session_model_settings(self, source, self._model_settings)
+
+    async def handle_message(self, event):
+        """Backend model/reasoning is applied to the exact Sombra session before SDK dispatch."""
+        if self.current and getattr(event, "platform_update_id", None) == self.current["id"]:
+            try:
+                self._apply_model_settings(getattr(event, "source", None))
+            except Exception:
+                log.warning("Sombra model settings projection failed; turn keeps the Hermes default")
+        return await super().handle_message(event)
+
+    def _is_model_update(self, update):
+        kind, text = SombraAdapter.classify_text(update, self.bot_handle)
+        return kind == "native" and text.split(" ", 1)[0] in ("/model", "/models")
+
+    def _parse_model_change(self, args):
+        """Owner ``/model`` arguments -> (patch, error). Only already-validated values return."""
+        tokens = str(args or "").split()
+        if not tokens:
+            return None, ""
+        if tokens[0].lower() in ("reasoning", "reason", "уровень"):
+            if len(tokens) != 2 or tokens[1].lower() not in REASONING_LEVELS:
+                return None, MODEL_USAGE
+            return {"reasoning": tokens[1].lower()}, ""
+        if len(tokens) > 2:
+            return None, MODEL_USAGE
+        if tokens[0].lower() in MODEL_RESET_ALIASES:
+            if len(tokens) == 1:
+                return {"model": ""}, ""
+            if tokens[1].lower() in REASONING_LEVELS:
+                return {"model": "", "reasoning": tokens[1].lower()}, ""
+            return None, MODEL_USAGE
+        model = self._model_id(tokens[0])
+        if not model:
+            return None, ("Идентификатор модели недопустим: разрешены латиница, цифры и -_.:/@+ "
+                          "(не URL и не ключ). Модель не изменена.")
+        patch = {"model": model}
+        if len(tokens) == 2:
+            if tokens[1].lower() not in REASONING_LEVELS:
+                return None, MODEL_USAGE
+            patch["reasoning"] = tokens[1].lower()
+        return patch, ""
+
+    async def _model_catalog(self):
+        """Validated SDK catalog ``{provider: {model}}``; empty when it cannot be read."""
+        catalog = {}
+        try:
+            for row in await self._model_variants():
+                if not isinstance(row, dict):
+                    continue
+                provider = self._model_id(row.get("provider"))
+                models = {model for model in (self._model_id(item) for item in (row.get("models") or [])) if model}
+                if provider and models:
+                    catalog[provider] = models
+        except Exception:
+            return {}
+        return catalog
+
+    @staticmethod
+    def _catalog_match(catalog, candidate):
+        """Accept an SDK catalog id, optionally provider-prefixed; "" when not whitelisted."""
+        for provider, models in (catalog or {}).items():
+            if candidate in models:
+                return candidate
+            if candidate.startswith(provider + "/") and candidate[len(provider) + 1:] in models:
+                return candidate
+        return ""
+
+    async def _owner_model_write_error(self, request, code):
+        """Map a backend refusal code to a factual owner reply; the model is never claimed."""
+        if code == "BOT_SETTINGS_CONFLICT":
+            # One owner update applies exactly once: a repeat/CAS mismatch means "already
+            # applied or changed by the owner". Re-read instead of guessing and keep the DTO.
+            await self._refresh_model_settings(force=True)
+            request["settings"] = dict(self._model_settings)
+            request["error"] = ("Настройки модели уже применены или изменились; одноразовая команда "
+                                "использована. Показаны актуальные значения.")
+        elif code == "BOT_SETTINGS_FORBIDDEN":
+            request["error"] = ("Сервер отклонил изменение: эти настройки меняет только владелец бота. "
+                                "Модель не изменена.")
+        elif code == "BOT_SETTINGS_INVALID":
+            request["error"] = "Сервер отклонил параметры модели. Модель не изменена."
+        elif code == "BOT_SOURCE_UNAVAILABLE":
+            request["error"] = ("Изменение недоступно: источник команды больше не активен, повторите команду. "
+                                "Модель не изменена.")
+        elif code == "AUTH_REQUIRED":
+            request["error"] = "Сервер не принял бот-токен для изменения настроек. Модель не изменена."
+        else:
+            request["error"] = "Сервер не подтвердил изменение модели. Модель не изменена."
+
+    async def _apply_owner_model_change(self, request, update, args):
+        """ONE owner chat command -> ONE ``bot_owner_update_settings`` with the exact update_id."""
+        settings = request.get("settings") if isinstance(request.get("settings"), dict) else self._model_settings
+        patch, error = self._parse_model_change(args)
+        if error:
+            request["error"] = error
+            return
+        if not isinstance(patch, dict) or not patch:
+            request["error"] = MODEL_USAGE
+            return
+        catalog = await self._model_catalog()
+        if catalog and "model" in patch and not self._catalog_match(catalog, patch["model"]):
+            request["error"] = ("Модель " + patch["model"] + " отсутствует в каталоге SDK; выберите её "
+                                "из /model или задайте точный ID в настройках бота. Модель не изменена.")
+            return
+        payload = dict(patch)
+        payload["update_id"] = update["update_id"]
+        revision = settings.get("revision")
+        if type(revision) is int and revision >= 0:
+            payload["revision"] = revision  # CAS on the projection just read; never invented.
+        try:
+            result = await self.broker.acall("bot_owner_update_settings", **payload)
+        except BrokerRejected as exc:
+            await self._owner_model_write_error(request, exc.code)
+            return
+        except Exception:
+            request["error"] = "Сервер не ответил на изменение модели. Модель не изменена."
+            return
+        if not isinstance(result, dict) or ident(result.get("bot")) not in ("", self.bot_id):
+            request["error"] = "Ответ сервера относится к другому боту. Модель не изменена."
+            return
+        settings = normalize_model_settings(result)
+        # The owner's write is the newest truth: replace the cache and reset the TTL so the
+        # very next turn dispatches with the new model instead of the previous projection.
+        self._model_settings = settings
+        self._model_settings_at = time.monotonic()
+        self._model_settings_error = ""
+        request["settings"] = settings
+        request["applied"] = True
+        request["error"] = None
+        model = self._model_id(settings.get("model"))
+        reasoning = settings.get("reasoning") if settings.get("reasoning") in REASONING_LEVELS else ""
+        level = reasoning or "по умолчанию"
+        if "model" in patch:
+            request["head"] = (("Модель изменена на " + model) if model
+                               else "Модель переключена на значение по умолчанию Hermes") + \
+                              ". Уровень размышления: " + level + "."
+        else:
+            request["head"] = "Уровень размышления изменён на " + level + ". Модель: " + \
+                              (model or "значение по умолчанию Hermes") + "."
+
+    async def _prepare_model_request(self, update, canonical):
+        """Owner = fresh bot owner id + fresh trusted canonical sender; never client claims."""
+        scope = self._scope()
+        if scope is not None:
+            scope["model_request"] = None
+        if not self._is_model_update(update):
+            return None
+        _, text = SombraAdapter.classify_text(update, self.bot_handle)
+        args = text.partition(" ")[2].strip()
+        settings, admitted = dict(self._model_settings), False
+        try:
+            me = await self.broker.acall("bot_get_me")
+            bot = me.get("bot") if isinstance(me, dict) else None
+            if not isinstance(bot, dict) or ident(bot) != self.bot_id:
+                raise SafetyError("Model command bot identity changed")
+            settings = normalize_model_settings(bot.get("modelSettings"))
+            self._model_settings = settings
+            self._model_settings_at = time.monotonic()
+            self._model_settings_error = ""
+            self._model_owner_id = ident((me.get("toolPolicy") or {}).get("owner"))
+            admitted = True
+        except Exception:
+            self._model_settings_error = "unavailable"
+        owner = bool(admitted and self._model_owner_id and canonical.get("access", {}).get("trusted") is True
+                     and ident(canonical.get("sender")) == self._model_owner_id)
+        request = {"update_id": update["update_id"], "owner": owner, "args": args,
+                   "had_args": bool(args), "admitted": admitted, "applied": False,
+                   "settings": settings, "error": None}
+        if owner and args:
+            # The owner's own command is the only write path: bot token + this exact
+            # one-shot owner update. Another sender never writes and never sees a switch.
+            await self._apply_owner_model_change(request, update, args)
+        if args and not admitted and not request.get("error"):
+            # Without a fresh settings read there is no revision and no proof of ownership:
+            # never write and never imply that something changed.
+            request["error"] = ("Настройки модели сейчас недоступны; изменение не выполнялось. "
+                                "Показано безопасное значение по умолчанию.")
+        if scope is not None:
+            scope["model_request"] = request
+        return request
+
+    async def _configured_default_route(self):
+        """Configured Hermes default for the clean Sombra profile (no credentials/URLs)."""
+        try:
+            async with self._public_runtime_scope():
+                from hermes_cli.config import load_config
+                config = await asyncio.to_thread(load_config)
+        except Exception:
+            return "", ""
+        base = config.get("model") if isinstance(config, dict) else None
+        if not isinstance(base, dict):
+            return "", ""
+        return (self._model_id(base.get("default") or base.get("model") or ""),
+                self._model_id(base.get("provider") or ""))
+
+    async def _model_variants(self):
+        """Authenticated SDK catalog for the owner's read-only ``/model`` listing."""
+        try:
+            async with self._public_runtime_scope():
+                from hermes_cli.config import load_config
+                from hermes_cli.model_switch import list_authenticated_providers
+                config = await asyncio.to_thread(load_config)
+                base = config.get("model") if isinstance(config, dict) else {}
+                provider = base.get("provider") or ""
+                model = base.get("default") or base.get("model") or ""
+                try:
+                    from hermes_cli.config import get_compatible_custom_providers
+                    custom = get_compatible_custom_providers(config)
+                except Exception:
+                    custom = None
+                kwargs = {"current_provider": provider, "current_model": model,
+                          "user_providers": config.get("providers") if isinstance(config, dict) else None,
+                          "custom_providers": custom,
+                          "excluded_providers": ((config.get("model_catalog") or {}).get("excluded_providers", [])
+                                                 if isinstance(config, dict) else []),
+                          "max_models": 40, "non_blocking_catalogs": True,
+                          "probe_custom_providers": False, "probe_current_custom_provider": False}
+                try:
+                    rows = await asyncio.to_thread(list_authenticated_providers, **kwargs)
+                except TypeError:
+                    rows = await asyncio.to_thread(list_authenticated_providers,
+                                                   current_provider=provider, current_model=model)
+        except Exception:
+            return []
+        variants = []
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict):
+                continue
+            slug = self._model_id(row.get("slug"))
+            if not slug:
+                continue
+            models = []
+            for item in row.get("models") or []:
+                model_id = self._model_id(item) if isinstance(item, str) else ""
+                if model_id and model_id not in models:
+                    models.append(model_id)
+            variants.append({"provider": slug, "models": models[:12]})
+        return variants[:8]
+
+    async def _model_status_text(self, request=None):
+        scope = self._scope()
+        request = request if isinstance(request, dict) else ((scope or {}).get("model_request") or {})
+        settings = request.get("settings") if isinstance(request.get("settings"), dict) else self._model_settings
+        model = self._model_id(settings.get("model"))
+        reasoning = settings.get("reasoning") if settings.get("reasoning") in REASONING_LEVELS else ""
+        lines = []
+        if request.get("applied"):
+            lines.append(request.get("head") or "Настройки модели обновлены.")
+        else:
+            if model:
+                lines.append("Модель: " + model + " (выбрана владельцем в настройках бота).")
+            else:
+                default_model, _ = await self._configured_default_route()
+                lines.append("Модель: " + default_model + " (значение по умолчанию Hermes)." if default_model
+                             else "Модель: значение по умолчанию Hermes (имя недоступно).")
+            lines.append("Уровень размышления: " + (reasoning if reasoning else "по умолчанию") + ".")
+        if not request.get("admitted", True) or self._model_settings_error:
+            lines.append("Настройки модели сейчас недоступны; показано безопасное значение по умолчанию.")
+        if request.get("applied"):
+            return "\n".join(lines)
+        if request.get("error"):
+            return "\n".join([request["error"], *lines])
+        if request.get("owner"):
+            variants = await self._model_variants()
+            if variants:
+                lines.append("Доступные модели:")
+                for row in variants:
+                    if row["models"]:
+                        lines.append("- " + row["provider"] + ": " + ", ".join(row["models"]))
+            else:
+                lines.append("Список доступных моделей сейчас недоступен; точный ID задаёт владелец в настройках бота.")
+            lines.append(MODEL_OWNER_HINT)
+            if not self._command_registration_supported:
+                lines.append("В группах команда может быть недоступна: этот сервер не поддерживает регистрацию команд.")
+            return "\n".join(lines)
+        return "\n".join([*lines, MODEL_READ_ONLY])
+
+    async def _model_local_response(self, adapter, payload):
+        request = self._scope().get("model_request") or {}
+        return {"text": await self._model_status_text(request), "media": []}
+
+    async def send_model_picker(self, chat_id, providers, current_model, current_provider,
+                                session_key, on_model_selected, metadata=None):
+        """The SDK /model picker must never switch a Sombra session behind the backend setting."""
+        return await self.send(chat_id, await self._model_status_text(), metadata=metadata)
+
+    async def _register_supported_commands(self, me):
+        self._registered_commands = False
+        self._command_registration_supported = isinstance(me, dict) and me.get("commandRegistrationSupported") is True
+        if not self._command_registration_supported:
+            return False  # Existing server has no worker command-registration operation.
+        requested = ["model", "sombra_confirm", "sombra_answer"]
+        try:
+            response = await self.broker.acall("bot_register_commands", commands=requested)
+            names = response.get("commands", []) if isinstance(response, dict) else []
+            self._registered_commands = isinstance(names, list) and all(name in names for name in requested)
+            if not self._registered_commands:
+                log.warning("Sombra command registration was not confirmed; no group command availability claimed")
+        except Exception:
+            log.warning("Sombra command registration unavailable; no unsupported group command availability claimed")
+        return self._registered_commands
+
     async def connect(self, *, is_reconnect=False):
         # Same lock as the previous worker: parent must stop it before enabling this
         # platform. There is one poll owner, not a second worker racing the old token.
@@ -638,6 +1113,8 @@ class SharedHostAdapter(SombraAdapter):
         self.bot_handle = handle
         if not self.bot_id or me.get("bot", {}).get("legacy"):
             raise SafetyError("Current privacy-mode Sombra bot identity required")
+        await self._refresh_model_settings(me=me, force=True)
+        await self._register_supported_commands(me)
         if self.public_runner is None:
             try:
                 from .public_runner import create_public_callback
@@ -645,7 +1122,8 @@ class SharedHostAdapter(SombraAdapter):
                 persona = protected_persona(self.env.get("SOMBRA_SOUL_FILE"), self.profile)
                 self.public_runner = create_public_callback(authorize=self._public_authorize, artifact_base=self.root / "scopes", persona=persona,
                                                            get_persona=lambda: protected_persona(self.env.get("SOMBRA_SOUL_FILE"), self.profile),
-                                                           provider_snapshot=self._public_provider_snapshot, platform_context=HINT)
+                                                           provider_snapshot=self._public_provider_snapshot, platform_context=HINT,
+                                                           model_settings=self._public_model_settings)
             except ImportError:
                 log.warning("Sombra public AI runner unavailable; local help/reset only")
         self._connected = True
@@ -675,6 +1153,11 @@ class SharedHostAdapter(SombraAdapter):
             stream.close()
         self._locks = []
 
+    def _public_model_settings(self):
+        """Snapshot handed to the restricted public runner's provider construction."""
+        settings = self._model_settings if isinstance(self._model_settings, dict) else {}
+        return {"model": settings.get("model") or "", "reasoning": settings.get("reasoning") or ""}
+
     def _is_settings_update(self, update):
         handles = "(?:hermes|" + re.escape(self.bot_handle) + ")"
         text = str(update.get("message", {}).get("text", ""))
@@ -685,13 +1168,21 @@ class SharedHostAdapter(SombraAdapter):
         try:
             async with self._semaphore:
                 scope["trusted"] = canonical.get("access", {}).get("trusted") is True
+                scope["model_request"] = None
                 if self._is_settings_update(update):
                     from .native_tools import settings_response
                     await self._public_ingest(update, canonical, local_response=settings_response)
-                elif scope["trusted"]:
-                    await super().ingest(update)
+                elif self._is_model_update(update):
+                    # Both owner and non-owner get an honest local read-only status; no SDK
+                    # /model session switch is ever dispatched from chat.
+                    await self._prepare_model_request(update, canonical)
+                    await self._public_ingest(update, canonical, local_response=self._model_local_response)
                 else:
-                    await self._public_ingest(update, canonical)
+                    await self._refresh_model_settings()
+                    if scope["trusted"]:
+                        await super().ingest(update)
+                    else:
+                        await self._public_ingest(update, canonical)
         finally:
             INVOCATION.reset(token)
 
@@ -711,6 +1202,10 @@ class SharedHostAdapter(SombraAdapter):
                     args["after"] = cursor
                 response = await self.broker.acall("bot_get_updates", **args)
                 updates = response.get("updates", [])
+                if updates:
+                    # Owner changes apply without a restart: re-read modelSettings right after
+                    # a queue poll, throttled so an idle chat does not double every poll.
+                    await self._refresh_model_settings(force=False, min_interval=MODEL_SETTINGS_MIN_REFRESH)
                 for update in updates:
                     cursor = update["update_id"]
                     canonical = await self.broker.acall("bot_authorize_update", update_id=update["update_id"])

@@ -10,6 +10,7 @@ use std::{
 };
 mod attachments;
 mod bot_management;
+mod bot_model_settings;
 mod bot_transport;
 mod bots;
 mod chat_preferences;
@@ -19,7 +20,9 @@ mod dialog_metadata;
 mod group_roles;
 mod human_typing;
 mod message_reads;
+mod mentions;
 mod profile_covers;
+mod profile_decorations;
 fn id() -> String {
     uuid::Uuid::new_v4().to_string()
 }
@@ -92,8 +95,12 @@ fn validate_sticker(data: &str) -> Result<(), String> {
 struct UserDto {
     #[serde(rename = "coverSupported", default)]
     cover_supported: bool,
+    #[serde(rename = "decorationSupported", default)]
+    decoration_supported: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     cover: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    decorations: Option<Value>,
     id: String,
     name: String,
     bio: String,
@@ -356,7 +363,9 @@ impl Backend {
         });
         serde_json::to_value(UserDto {
             cover_supported: true,
+            decoration_supported: true,
             cover: profile_covers::public_metadata(&u["profile_cover"]),
+            decorations: profile_decorations::public(&u["decorations"]),
             id: s(u, "id").into(),
             name: s(u, "name").into(),
             bio: s(u, "bio").into(),
@@ -398,6 +407,9 @@ impl Backend {
         if let Some(fields) = message.as_object_mut() {
             fields.remove("hidden_by");
             fields.remove("messageSeq");
+        }
+        if !message["mentions"].is_array() {
+            message["mentions"] = json!([]);
         }
         if message["attachment"].is_object() {
             message["attachment"]["expired"] =
@@ -558,10 +570,21 @@ impl Backend {
     }
     fn state(&self, u: &Value, separate_assets: bool) -> Value {
         let uid = s(u, "id");
+        let mention_counts = self.unread_mention_counts(uid);
         let groups: Vec<_> = arr(&self.db["groups"])
             .into_iter()
             .filter(|g| arr(&g["members"]).contains(&json!(uid)))
-            .map(|g| self.group_dto(&g, uid))
+            .map(|g| {
+                let mut dto = self.group_dto(&g, uid);
+                if let Some(channels) = dto["channels"].as_array_mut() {
+                    for channel in channels {
+                        let cid = s(channel, "id").to_owned();
+                        channel["unreadCount"] = json!(self.unread_count(uid, &cid));
+                        channel["unreadMentionCount"] = json!(mention_counts.get(&cid).copied().unwrap_or(0));
+                    }
+                }
+                dto
+            })
             .collect();
         let voice_presence = self.voice_presence(&groups);
         let messages: Vec<_> = self.db["messages"]
@@ -596,7 +619,7 @@ impl Backend {
                 Some(sticker)
             })
             .collect();
-        json!({"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":self.public(u),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|self.receipt_dialog(d,uid)).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
+        json!({"decorationSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":self.public(u),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
     }
     fn sticker_in_library(&self, sticker: &Value, uid: &str) -> bool {
         if sticker["archived"] == true {
@@ -746,6 +769,9 @@ impl Backend {
         if v["op"] == "set_profile_cover" {
             return self.set_profile_cover(&v);
         }
+        if v["op"] == "set_profile_decoration" {
+            return self.set_profile_decoration(&v);
+        }
         if v["op"] == "attachment_file" {
             return self.attachment_file(&v);
         }
@@ -850,6 +876,7 @@ impl Backend {
             "bot_edit",
             "bot_delete",
             "bot_typing",
+            bot_model_settings::OWNER_OP,
             "bot_get_settings",
             "bot_update_self",
             "bot_react",
@@ -878,6 +905,9 @@ impl Backend {
         }
         if ["get_bot_settings", "update_bot_settings"].contains(&op) {
             return self.bot_settings_action(&v, uid);
+        }
+        if ["bot_get_model_settings", "bot_update_settings"].contains(&op) {
+            return self.bot_model_settings_action(&v, uid);
         }
         if op == "diagnostics_recent" {
             // The seeded owner is first. Registration only appends, and user IDs do not change.
@@ -1033,7 +1063,9 @@ impl Backend {
      if s(message,"text").is_empty(){return Err("В сообщении нет текста для редактирования".into())}
      let text=s(&v,"text").trim();
      if text.is_empty()||text.chars().count()>2000{return Err("Сообщение: 1–2000 символов".into())}
-     self.db["messages"][index]["text"]=json!(text);
+     let mentions=self.canonical_mentions(s(message,"channel"),text,v.get("mentions"))?;
+      self.db["messages"][index]["text"]=json!(text);
+      self.db["messages"][index]["mentions"]=mentions;
      for update in self.db["bot_updates"].as_array_mut().unwrap(){if update["message"]["id"]==v["message"]{update["source_cancelled"]=json!(true);}}
     }else{
      let for_everyone=v.get("for_everyone")
@@ -1062,8 +1094,9 @@ impl Backend {
     }
     let attachment=v.get("attachment").filter(|value|!value.is_null());
      if (text.is_empty()&&sticker.is_empty()&&attachment.is_none())||text.chars().count()>2000{return Err("Сообщение: 1–2000 символов или вложение".into())}
-     let attachment=attachment.map(|value|self.store_attachment(value)).transpose()?;
-     let mut message=json!({"id":id(),"channel":channel,"user":uid,"text":text,"sticker":sticker,"time":now()});
+     let mentions=self.canonical_mentions(channel,text,v.get("mentions"))?;
+      let attachment=attachment.map(|value|self.store_attachment(value)).transpose()?;
+     let mut message=json!({"id":id(),"channel":channel,"user":uid,"text":text,"sticker":sticker,"time":now(),"mentions":mentions});
      if let Some(ref attachment)=attachment{message["attachment"]=attachment.clone();}
      if let Err(error)=self.enqueue_bots(&message){if let Some(path)=attachment.as_ref().and_then(|value|self.attachment_path(value)){let _=std::fs::remove_file(path);}return Err(error)}self.db["messages"].as_array_mut().unwrap().push(message);
      if let Err(error)=self.save(){
@@ -1336,6 +1369,17 @@ mod tests {
         assert!(b.request(json!({"op":"message","token":gt,"channel":group["channels"][0]["id"],"sticker":sticker})).is_err());
     }
 
+    // unreadCount/unreadMentionCount are per-viewer state projections, never stored
+    // channel fields: create/keep replies stay identical and state adds exactly these
+    // two keys on top of the stored channel.
+    fn channel_without_unread(mut channel: Value) -> Value {
+        for key in ["unreadCount", "unreadMentionCount"] {
+            assert!(channel[key].is_u64(), "state channel must project {key}");
+            channel.as_object_mut().unwrap().remove(key);
+        }
+        channel
+    }
+
     #[test]
     fn channel_delete_removes_only_the_owned_channel_and_its_content() {
         let path = std::env::temp_dir().join(id()).join("db.json");
@@ -1380,7 +1424,10 @@ mod tests {
             .request(json!({"op":"state","token":guest["token"]}))
             .unwrap();
         assert_eq!(
-            state["groups"][0]["channels"],
+            json!(arr(&state["groups"][0]["channels"])
+                .into_iter()
+                .map(channel_without_unread)
+                .collect::<Vec<_>>()),
             json!([group["channels"][0]])
         );
         assert_eq!(arr(&state["messages"]).len(), 1);
@@ -1465,12 +1512,15 @@ mod tests {
         let mut member_expected = expected.clone();
         member_expected["permissions"] = json!([]);
         member_expected["invite"] = json!("");
-        assert_eq!(
-            backend
-                .request(json!({"op":"state","token":guest["token"]}))
-                .unwrap()["groups"][0],
-            member_expected
-        );
+        let mut member_state = backend
+            .request(json!({"op":"state","token":guest["token"]}))
+            .unwrap()["groups"][0]
+            .clone();
+        member_state["channels"] = json!(arr(&member_state["channels"])
+            .into_iter()
+            .map(channel_without_unread)
+            .collect::<Vec<_>>());
+        assert_eq!(member_state, member_expected);
         let cleared = backend
             .request(json!({"op":"update_group","token":token,"group":group["id"],"avatar":""}))
             .unwrap();
@@ -1553,7 +1603,11 @@ mod tests {
         let state = b.request(json!({"op":"state","token":t})).unwrap();
         assert_eq!(state["groups"][0]["id"], g["id"]);
         assert_eq!(arr(&state["groups"][0]["members"]).len(), 2);
-        assert!(arr(&state["groups"][0]["channels"]).contains(&c));
+        assert!(arr(&state["groups"][0]["channels"])
+            .into_iter()
+            .map(channel_without_unread)
+            .collect::<Vec<_>>()
+            .contains(&c));
         assert_eq!(state["messages"][0]["text"], "Saved message");
     }
 

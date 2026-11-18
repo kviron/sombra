@@ -7,6 +7,11 @@
 
 /* Compact channel introduction and history. */
 .message-scroll { min-height:0; padding:16px; justify-content:flex-start; }
+/* The composer (and the activity rows above it) float over the transcript. The
+   variable is written by the ResizeObserver in live-chat.tsx from the measured
+   composer height, so the last message, its time and its attachment always clear
+   the panel at one or five lines, with an attachment chip, and at 720x520. */
+.chat-main:not(.voice-layout)>.message-scroll{padding-bottom:calc(var(--sombra-composer-height,0px) + 24px)}
 .welcome { display:grid; grid-template-columns:36px minmax(0,1fr); column-gap:10px; row-gap:4px; margin:0 0 8px; }
 .welcome-icon { grid-row:1 / 3; width:36px; height:36px; margin:0; }
 .welcome-icon svg { width:24px; height:24px; }
@@ -70,3 +75,22 @@
 .dialog-heading time{flex-shrink:0;font-size:10px;color:#98a5b8}
 .dialog-preview{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:6px;font-size:12px;color:#98a5b8;line-height:17px}
 .channel-list .dialog-empty{padding:16px 8px;color:#98a5b8;font-size:13px;line-height:1.6}
+
+/* The account panel spreads over the whole left area (server rail + channel sidebar)
+   and stays pinned to the window bottom. It is still rendered inside the sidebar, so
+   the column resizer keeps measuring the shell; the extra width overflows to the left
+   over the rail. Lists reserve the panel height, so nothing ends behind it. */
+.chat-shell{--sombra-rail-width:72px}
+@media(max-width:1100px){.chat-shell{--sombra-rail-width:60px}}
+.profile{position:absolute;left:calc(-1 * var(--sombra-rail-width,72px) - 1px);right:-1px;bottom:0;z-index:3;height:58px;min-width:0;overflow:hidden}
+.profile .profile-self{flex:1;min-width:0}
+.profile .avatar,.profile .voice-device-control,.profile>button{flex-shrink:0}
+.profile-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-shell .channel-sidebar .channel-list{padding-bottom:66px}
+.server-rail{padding-bottom:66px}
+.channel-sidebar>.voice-status{margin-bottom:58px}
+/* Positioning context for the floating composer and its activity rows. */
+.chat-main{position:relative}
+@media(max-width:760px){
+ .profile{padding:6px 8px;gap:4px}
+}

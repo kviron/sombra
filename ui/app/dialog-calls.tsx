@@ -96,7 +96,7 @@ export function IncomingDialogCall({call,state,busy,declining=busy,error,hasOthe
  const group=!!dialog&&dialog.members.length>2;
  return <DialogPrimitive.Root open modal={false} onOpenChange={open=>{if(!open)onDecline()}}><DialogPrimitive.Portal><DialogPrimitive.Content className="incoming-dialog-call" data-call-id={call.id} aria-busy={busy} onOpenAutoFocus={event=>event.preventDefault()} onCloseAutoFocus={event=>event.preventDefault()} onInteractOutside={event=>event.preventDefault()} onEscapeKeyDown={event=>{event.preventDefault();onDecline()}}>
   <button type="button" className="incoming-call-close" aria-label="Отклонить звонок" onClick={onDecline}>×</button>
-   {caller?<UserAvatar user={caller} size="xl"/>:<Users size={48}/>}
+   {caller?<UserAvatar user={caller} size="xl" decoration={caller.decorations?.avatar}/>:<Users size={48}/>}
   <DialogPrimitive.Title>{caller?.name||'Участник Sombra'}</DialogPrimitive.Title>
   <DialogPrimitive.Description>{group?'Входящий групповой ': 'Входящий '}{call.video?'видеозвонок':'аудиозвонок'}{group&&dialog?.name?` · ${dialog.name}`:''}</DialogPrimitive.Description>
   {group&&<p className="incoming-call-members">Приглашены все участники диалога · {dialog.members.length} человек</p>}

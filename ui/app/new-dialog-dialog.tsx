@@ -97,7 +97,7 @@ export function NewDialogDialog({ state, onClose, onCreated, refresh }: NewDialo
             <div className="new-dialog-search"><Search size={18} aria-hidden="true" /><Input autoFocus aria-label="Поиск по имени" placeholder="Поиск по имени" value={query} onChange={event => setQuery(event.target.value)} disabled={locked} /></div>
             {selectedUsers.length > 0 && <ul className="new-dialog-chips" aria-label="Выбранные участники">{selectedUsers.map(user => <li key={user.id}>
               <Button type="button" variant="secondary" className="new-dialog-chip" disabled={locked} onClick={() => toggle(user.id)} aria-label={`Убрать: ${user.name}`}>
-                <UserAvatar user={user} size="xs" presence={false} decorative /><span>{user.name}</span><X size={14} aria-hidden="true" />
+                <UserAvatar user={user} size="xs" presence={false} decorative decoration={user.decorations?.avatar} /><span>{user.name}</span><X size={14} aria-hidden="true" />
               </Button>
             </li>)}</ul>}
             <p className="new-dialog-count" id={`${id}-limit`} aria-live="polite">Выбрано: {selected.length} из 9{selected.length === 9 ? ' · Достигнут лимит участников' : ' · До 10 участников вместе с вами'}</p>

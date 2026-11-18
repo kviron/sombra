@@ -43,7 +43,9 @@ export function newChatMessages(state:NotificationState,cursor:ChatNotificationC
   if(preferences?.dialogs?.[message.channel]?.muted)continue;
   if(context.group?preferences?.notifications?.groups===false:preferences?.notifications?.direct===false)continue;
   const author=message.bot_name||users.get(message.user)?.name||'Пользователь Sombra';
-  const sender=context.name?`${context.name} · ${author}`:author;
+  const mentioned=message.mentions?.some(mention=>mention.userId===state.me.id)===true;
+  // Native toasts keep their strict fields; the explicit prefix is the only added signal.
+  const sender=(mentioned?'Вас упомянули · ':'')+(context.name?`${context.name} · ${author}`:author);
   const text=preview(message.text.trim()||(message.attachment?`Файл: ${message.attachment.name}`:message.sticker?'Стикер':'Новое сообщение'));
   incoming.push({id:message.id,channel:message.channel,sender,text,avatar:users.get(message.user)?.avatar,count:1});
  }

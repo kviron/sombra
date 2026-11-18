@@ -7,7 +7,7 @@
 .message-bubble{padding:8px 12px 5px;border:1px solid #ffffff12;border-radius:14px 14px 14px 4px;background:#202630;color:#e3e7ef}
 [data-own="true"] .message-bubble{background:#303d62;border-color:#798dc22b}
 .chat-message .message-bubble[data-sticker-only="true"],.chat-message .message-bubble[data-image-message="true"]{background:transparent;border-color:transparent}
-.message-image-caption{padding:8px 12px;border:1px solid #ffffff12;border-radius:12px;background:#202630}
+.message-image-caption{padding:7px 10px 5px;border:1px solid #ffffff12;border-radius:12px;background:#202630}
 [data-own="true"] .message-image-caption{background:#303d62;border-color:#798dc22b}
 .chat-message .message-meta{gap:8px;min-height:20px;color:#b6c8e7;font-size:12px}
 .chat-message .message-meta button{opacity:1;display:flex;align-items:center;justify-content:center;min-width:24px;min-height:24px}
@@ -27,6 +27,9 @@
 .chat-message[data-grouped="true"] .message-avatar{visibility:hidden}
 .chat-message .message-bubble{position:relative;display:flow-root;padding:7px 10px 5px}
 .chat-message .message-meta{min-height:18px;margin-bottom:1px;padding-right:10px}
+/* Media starts on the same outer grid as a text bubble, not inside a second padded bubble. */
+.chat-message .message-bubble[data-image-message="true"]{padding:0;border:0;border-radius:0}
+.chat-message .message-bubble[data-image-message="true"]>.message-meta{padding:7px 21px 0 11px}
 .chat-message .bubble-content{display:contents}
 .chat-message .message-content p{display:inline;line-height:1.4}
 .chat-message .message-footer{float:right;display:inline-flex;margin:4px 0 0 10px;line-height:15px}
@@ -37,3 +40,7 @@
 .chat-message .message-bottom-row .message-footer{float:none;flex-shrink:0;margin:0 0 1px}
 .chat-message .message-bottom-row .reactions{margin:0;gap:4px;min-width:0}
 .chat-message .reactions>button{display:inline-flex;align-items:center;gap:3px;min-height:22px;padding:1px 7px;border-radius:12px}
+
+/* A decorated avatar paints a thin ring just outside its own circle: let it show instead of clipping it away. */
+.chat-message .message-avatar:has(.avatar-fx){overflow:visible}
+.chat-message .message-avatar:has(.avatar-fx) .avatar-trigger{overflow:visible}

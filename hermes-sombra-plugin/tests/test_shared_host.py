@@ -15,7 +15,7 @@ import threading
 import types
 import typing
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 from http.server import ThreadingHTTPServer
 
 import test_plugin as fixtures
@@ -39,6 +39,11 @@ class SharedHostContracts(unittest.IsolatedAsyncioTestCase):
         fixture.canonicals, fixture.envelope = {}, True
         fixture.original_acked = threading.Event()
         fixture.trusted, fixture.changed, fixture.fail_delivery = True, False, False
+        fixture.model_settings = {"model": "", "reasoning": "", "revision": 0, "modelDefault": True, "reasoningDefault": True}
+        fixture.registration_supported, fixture.fail_get_me = False, False
+        fixture.registered = []
+        fixture.owner_settings_error, fixture.owner_consumed = "", set()
+        fixture.typing_calls, fixture.typing_reject = [], False
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), fixture)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -481,6 +486,293 @@ class SharedHostContracts(unittest.IsolatedAsyncioTestCase):
                     self.adapter.build_source(chat_id="chan-a", user_id="actor-a")
         finally:
             shared.INVOCATION.reset(token)
+
+    async def test_model_settings_read_ttl_and_safe_projection(self):
+        fixtures.Fixture.model_settings = {"model": "gpt-6-luna", "reasoning": "high", "revision": 3}
+        await self.adapter._refresh_model_settings(force=True)
+        self.assertEqual(self.adapter._model_settings["model"], "gpt-6-luna")
+        self.assertEqual(self.adapter._model_settings["reasoning"], "high")
+        self.assertEqual(self.adapter._model_settings["revision"], 3)
+        self.assertFalse(self.adapter._model_settings["modelDefault"])
+        reads = len([call for call in fixtures.Fixture.calls if call["op"] == "bot_get_me"])
+        await self.adapter._refresh_model_settings()  # Within TTL: no extra backend read.
+        self.assertEqual(len([call for call in fixtures.Fixture.calls if call["op"] == "bot_get_me"]), reads)
+        fixtures.Fixture.model_settings = {"model": "", "reasoning": ""}
+        await self.adapter._refresh_model_settings(force=True)
+        self.assertEqual(self.adapter._model_settings["model"], "")
+        self.assertEqual(self.adapter._model_settings["reasoning"], "")
+        # A URL/credential-shaped model or an unknown level is never applied verbatim.
+        fixtures.Fixture.model_settings = {"model": "https://evil.invalid/v1", "reasoning": "ultra", "revision": "x"}
+        await self.adapter._refresh_model_settings(force=True)
+        self.assertEqual(self.adapter._model_settings["model"], "")
+        self.assertEqual(self.adapter._model_settings["reasoning"], "")
+        self.assertIsNone(self.adapter._model_settings["revision"])
+
+    async def test_turn_applies_session_scoped_model_and_reasoning_not_telegram(self):
+        fixtures.Fixture.model_settings = {"model": "gpt-6-luna", "reasoning": "low", "revision": 1}
+        runner = FakeRunner()
+        self.adapter.gateway_runner = runner
+        event, canonical = self.event(1, actor="actor-a", trusted=True, text="question")
+        _, scope = self.adapter._new_scope(canonical)
+        await self.adapter._run_scope(scope, event, canonical)
+        state = runner.states["sombra:test:chan-a"]
+        self.assertEqual(state.conversation.model_override, {"model": "gpt-6-luna"})
+        self.assertEqual(state.conversation.reasoning_override, {"enabled": True, "effort": "low"})
+        self.assertEqual(len(runner.states), 1)  # Only this Sombra source's session was touched.
+        self.assertIn(1, fixtures.Fixture.acked)
+        # A non-Sombra source can never be projected, and clearing restores the SDK default.
+        self.assertFalse(shared.apply_session_model_settings(
+            self.adapter, types.SimpleNamespace(platform="telegram", chat_id="tg"), {"model": "x"}))
+        self.assertEqual(len(runner.states), 1)
+        self.assertTrue(shared.apply_session_model_settings(
+            self.adapter, types.SimpleNamespace(platform="sombra", chat_id="chan-a"), {"model": "", "reasoning": ""}))
+        self.assertIsNone(state.conversation.model_override)
+        self.assertIsNone(state.conversation.reasoning_override)
+
+    async def test_model_command_owner_lists_current_model_and_variants(self):
+        fixtures.Fixture.model_settings = {"model": "gpt-6-luna", "reasoning": "medium", "revision": 2}
+        self.adapter._command_registration_supported = True
+        event, canonical = self.event(1, actor="actor", trusted=True, text="/model")
+        _, scope = self.adapter._new_scope(canonical)
+        with patch.object(self.adapter, "_model_variants",
+                          AsyncMock(return_value=[{"provider": "prov", "models": ["m-one", "m-two"]}])):
+            await self.adapter._run_scope(scope, event, canonical)
+        text = fixtures.Fixture.outputs[(1, "part_00")]["text"]
+        self.assertIn("gpt-6-luna", text)
+        self.assertIn("medium", text)
+        self.assertIn("m-one", text)
+        self.assertIn("владелец", text)
+        self.assertNotIn("https://", text)
+        self.assertNotIn("sombra_scope_test", text)
+        self.assertIn(1, fixtures.Fixture.acked)
+
+    async def test_model_command_non_owner_is_read_only_without_catalog_or_write(self):
+        fixtures.Fixture.model_settings = {"model": "gpt-6-luna", "reasoning": "", "revision": 2}
+        event, canonical = self.event(1, actor="member-z", trusted=False, text="/model secret-model")
+        _, scope = self.adapter._new_scope(canonical)
+        with patch.object(self.adapter, "_model_variants",
+                          AsyncMock(side_effect=AssertionError("catalog must not be listed to non-owner"))):
+            await self.adapter._run_scope(scope, event, canonical)
+        text = fixtures.Fixture.outputs[(1, "part_00")]["text"]
+        self.assertIn("gpt-6-luna", text)
+        self.assertIn("владелец", text)
+        self.assertNotIn("secret-model", text)
+        self.assertFalse(any(call["op"] in ("bot_update_settings", "bot_get_model_settings", "bot_owner_update_settings")
+                             for call in fixtures.Fixture.calls))
+        self.assertEqual(self.adapter._model_settings["model"], "gpt-6-luna")
+        self.assertIn(1, fixtures.Fixture.acked)
+
+    async def test_model_command_owner_argument_writes_once_and_next_turn_uses_it(self):
+        fixtures.Fixture.model_settings = {"model": "gpt-6-luna", "reasoning": "", "revision": 2}
+        runner = FakeRunner()
+        self.adapter.gateway_runner = runner
+        event, canonical = self.event(1, actor="actor", trusted=True, text="/model gpt-6-runtime low")
+        _, scope = self.adapter._new_scope(canonical)
+        await self.adapter._run_scope(scope, event, canonical)
+        writes = [call for call in fixtures.Fixture.calls if call["op"] == "bot_owner_update_settings"]
+        self.assertEqual(len(writes), 1)
+        # Exact one-shot owner update: current event, validated model, requested level, CAS revision.
+        self.assertEqual(writes[0], {"op": "bot_owner_update_settings", "update_id": 1,
+                                     "model": "gpt-6-runtime", "reasoning": "low", "revision": 2})
+        text = fixtures.Fixture.outputs[(1, "part_00")]["text"]
+        self.assertIn("Модель изменена на gpt-6-runtime", text)
+        self.assertIn("Уровень размышления: low", text)
+        self.assertNotIn("Модель не изменена", text)
+        self.assertNotIn("sombra_scope_test", text)
+        self.assertEqual(self.adapter._model_settings,
+                         {"model": "gpt-6-runtime", "reasoning": "low", "revision": 3,
+                          "modelDefault": False, "reasoningDefault": False})
+        self.assertIn(1, fixtures.Fixture.acked)
+        # The write replaced the cache and reset the TTL: the very next turn needs no /model read.
+        reads = len([call for call in fixtures.Fixture.calls if call["op"] == "bot_get_me"])
+        second, authority = self.event(2, actor="actor", trusted=True, text="hello")
+        await self.adapter._run_scope(scope, second, authority)
+        state = runner.states["sombra:test:chan-a"]
+        self.assertEqual(state.conversation.model_override, {"model": "gpt-6-runtime"})
+        self.assertEqual(state.conversation.reasoning_override, {"enabled": True, "effort": "low"})
+        self.assertEqual(len([call for call in fixtures.Fixture.calls if call["op"] == "bot_get_me"]), reads)
+
+    async def test_model_command_owner_write_refusals_never_change_or_claim_the_model(self):
+        expected = {"BOT_SETTINGS_CONFLICT": "уже применены",
+                    "BOT_SETTINGS_FORBIDDEN": "только владелец",
+                    "BOT_SETTINGS_INVALID": "отклонил параметры",
+                    "BOT_SOURCE_UNAVAILABLE": "источник команды больше не активен",
+                    "BOT_SETTINGS_UNEXPECTED": "не подтвердил"}
+        for number, (code, phrase) in enumerate(expected.items(), 1):
+            with self.subTest(code=code):
+                fixtures.Fixture.owner_settings_error = code
+                fixtures.Fixture.model_settings = {"model": "gpt-6-luna", "reasoning": "high", "revision": 4}
+                self.adapter._model_settings = shared.normalize_model_settings(dict(fixtures.Fixture.model_settings))
+                self.adapter._model_settings_at = 0.0
+                event, canonical = self.event(number, actor="actor", trusted=True, text="/model gpt-6-new low")
+                _, scope = self.adapter._new_scope(canonical)
+                await self.adapter._run_scope(scope, event, canonical)
+                text = fixtures.Fixture.outputs[(number, "part_00")]["text"]
+                self.assertIn(phrase, text)
+                self.assertNotIn("Модель изменена на", text)
+                self.assertEqual(self.adapter._model_settings["model"], "gpt-6-luna")
+                self.assertEqual(self.adapter._model_settings["reasoning"], "high")
+                self.assertIn(number, fixtures.Fixture.acked)
+                writes = [call for call in fixtures.Fixture.calls if call["op"] == "bot_owner_update_settings"]
+                self.assertEqual(writes[-1]["update_id"], number)
+
+    async def test_invalid_owner_model_argument_is_refused_without_a_write(self):
+        fixtures.Fixture.model_settings = {"model": "gpt-6-luna", "reasoning": "", "revision": 2}
+        for number, argument in enumerate(("https://evil.invalid/v1", "sk-secret", "model ultra"), 1):
+            with self.subTest(argument=argument):
+                event, canonical = self.event(number, actor="actor", trusted=True, text="/model " + argument)
+                _, scope = self.adapter._new_scope(canonical)
+                await self.adapter._run_scope(scope, event, canonical)
+                text = fixtures.Fixture.outputs[(number, "part_00")]["text"]
+                self.assertNotIn("Модель изменена на", text)
+                self.assertNotIn("evil.invalid", text)
+                self.assertNotIn("sk-secret", text)
+        self.assertFalse(any(call["op"] == "bot_owner_update_settings" for call in fixtures.Fixture.calls))
+        self.assertEqual(self.adapter._model_settings["model"], "gpt-6-luna")
+
+    async def test_model_catalog_is_used_as_owner_whitelist_when_available(self):
+        fixtures.Fixture.model_settings = {"model": "gpt-6-luna", "reasoning": "", "revision": 1}
+        catalog = [{"provider": "openai", "models": ["gpt-6-luna", "gpt-6-nova"]}]
+        with patch.object(self.adapter, "_model_variants", AsyncMock(return_value=catalog)):
+            event, canonical = self.event(1, actor="actor", trusted=True, text="/model gpt-6-nova")
+            _, scope = self.adapter._new_scope(canonical)
+            await self.adapter._run_scope(scope, event, canonical)
+            self.assertIn("Модель изменена на gpt-6-nova", fixtures.Fixture.outputs[(1, "part_00")]["text"])
+            refused, authority = self.event(2, actor="actor", trusted=True, text="/model not-in-catalog")
+            await self.adapter._run_scope(scope, refused, authority)
+            text = fixtures.Fixture.outputs[(2, "part_00")]["text"]
+            self.assertIn("отсутствует в каталоге", text)
+            self.assertNotIn("Модель изменена на not-in-catalog", text)
+            self.assertEqual(self.adapter._model_settings["model"], "gpt-6-nova")
+            writes = [call for call in fixtures.Fixture.calls if call["op"] == "bot_owner_update_settings"]
+            self.assertEqual([call["model"] for call in writes], ["gpt-6-nova"])
+
+    async def test_typing_reports_real_activity_and_status_and_survives_server_rejection(self):
+        token, scope = self.bind()
+        try:
+            await self.adapter.send_typing(self.adapter.channel)
+            payload = fixtures.Fixture.typing_calls[-1]
+            self.assertEqual(payload["activity"], "thinking")  # Unknown stage: activity only.
+            self.assertNotIn("status", payload)
+            self.adapter._typing_note(*shared.tool_typing_hint("image_generate"))
+            await self.adapter.send_typing(self.adapter.channel)
+            payload = fixtures.Fixture.typing_calls[-1]
+            self.assertEqual((payload["activity"], payload["status"]), ("image", "Генерирую изображение"))
+            self.assertLessEqual(len(payload["status"]), 80)
+            # The real hook path knows the tool name only, never its arguments.
+            self.assertIsNone(shared.shared_pre_tool_call(tool_name="terminal", args={"command": "cat /etc/shadow"}))
+            await self.adapter.send_typing(self.adapter.channel)
+            payload = fixtures.Fixture.typing_calls[-1]
+            self.assertEqual(payload["activity"], "code")
+            self.assertNotIn("shadow", payload["status"])
+            self.assertIsNone(shared.shared_post_tool_call(tool_name="terminal"))
+            await self.adapter.send_typing(self.adapter.channel)
+            self.assertEqual(fixtures.Fixture.typing_calls[-1]["activity"], "thinking")
+            # A 400 on the enhanced payload must not break the turn: plain indicator still lands.
+            fixtures.Fixture.typing_reject = True
+            await self.adapter.send_typing(self.adapter.channel)
+            self.assertNotIn("activity", fixtures.Fixture.typing_calls[-1])
+            self.assertNotIn("status", fixtures.Fixture.typing_calls[-1])
+        finally:
+            shared.INVOCATION.reset(token)
+
+    def test_runtime_broker_whitelist_forwards_owner_update_and_typing_activity(self):
+        path = ROOT.parent / "hermes-sombra-runtime" / "broker.py"
+        spec = importlib.util.spec_from_file_location("sombra_runtime_broker_fixture", path)
+        runtime_broker = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = runtime_broker  # dataclass() resolves its module by name.
+        try:
+            spec.loader.exec_module(runtime_broker)
+            self._assert_runtime_broker_whitelist(runtime_broker)
+        finally:
+            sys.modules.pop(spec.name, None)
+
+    def _assert_runtime_broker_whitelist(self, runtime_broker):
+        class Backend:
+            def __init__(self):
+                self.calls = []
+
+            def call(self, payload):
+                self.calls.append(payload)
+                if payload["op"] == "bot_authorize_update":
+                    return {"update_id": payload["update_id"], "bot_id": "bot", "sender": {"id": "alice"},
+                            "channel": "room", "access": {"trusted": True}}
+                return {"ok": True, "data": {"bot": "bot", "model": "gpt-6-luna", "reasoning": "low",
+                                             "revision": 3, "modelDefault": False, "reasoningDefault": False}}
+
+        backend = Backend()
+        broker = runtime_broker.Broker(backend)
+        scope = runtime_broker.Scope("server", "bot", "room", "alice")
+        token, _ = broker.issue(scope)
+        broker.db.execute("INSERT OR IGNORE INTO receipts VALUES (?,?,?)", (scope.key, 1, "pending"))
+        broker.db.commit()
+        broker.call(token, {"op": "bot_owner_update_settings", "update_id": 1, "model": "gpt-6-luna",
+                            "reasoning": "low", "revision": 3, "bot_token": "RAW", "owner": "attacker"})
+        self.assertEqual(backend.calls[-1], {"op": "bot_owner_update_settings", "update_id": 1,
+                                             "model": "gpt-6-luna", "reasoning": "low", "revision": 3})
+        broker.call(token, {"op": "bot_typing", "update_id": 1, "typing": True, "activity": "image",
+                            "status": "Генерирую изображение", "stage": "injected", "bot_token": "RAW"})
+        self.assertEqual(backend.calls[-1], {"op": "bot_typing", "update_id": 1, "typing": True,
+                                             "activity": "image", "status": "Генерирую изображение"})
+        broker.db.close()
+
+    async def test_command_registration_capability_gated_and_idempotent(self):
+        fixtures.Fixture.registration_supported = False
+        me = await self.adapter.broker.acall("bot_get_me")
+        self.assertFalse(await self.adapter._register_supported_commands(me))
+        self.assertFalse(any(call["op"] == "bot_register_commands" for call in fixtures.Fixture.calls))
+        fixtures.Fixture.registration_supported = True
+        me = await self.adapter.broker.acall("bot_get_me")
+        self.assertTrue(await self.adapter._register_supported_commands(me))
+        self.assertEqual(fixtures.Fixture.registered, ["model", "sombra_confirm", "sombra_answer"])
+        registrations = len([call for call in fixtures.Fixture.calls if call["op"] == "bot_register_commands"])
+        self.assertTrue(await self.adapter._register_supported_commands(me))  # Append-only merge is idempotent.
+        self.assertEqual(fixtures.Fixture.registered, ["model", "sombra_confirm", "sombra_answer"])
+        self.assertEqual(len([call for call in fixtures.Fixture.calls if call["op"] == "bot_register_commands"]), registrations + 1)
+
+    async def test_bot_get_me_unavailable_keeps_default_and_turn(self):
+        fixtures.Fixture.fail_get_me = True
+        await self.adapter._refresh_model_settings(force=True)  # Must not raise.
+        self.assertEqual(self.adapter._model_settings["model"], "")
+        self.assertEqual(self.adapter._model_settings_error, "unavailable")
+        seen = []
+        async def public(payload, history):
+            seen.append(payload["update"]["update_id"])
+            return {"text": "public answer", "media": []}
+        self.adapter.public_runner = public
+        event, canonical = self.event(1, actor="member-z", trusted=False, text="hello")
+        _, scope = self.adapter._new_scope(canonical)
+        await self.adapter._run_scope(scope, event, canonical)
+        self.assertEqual(seen, [1])
+        self.assertEqual(fixtures.Fixture.outputs[(1, "part_00")]["text"], "public answer")
+        self.assertIn(1, fixtures.Fixture.acked)
+
+
+class FakeConversation:
+    def __init__(self):
+        self.model_override = "unset"
+        self.reasoning_override = "unset"
+
+
+class FakeState:
+    def __init__(self):
+        self.conversation = FakeConversation()
+
+
+class FakeRunner:
+    """Minimal pinned-SDK session surface: session key + conversation state only."""
+
+    def __init__(self):
+        self.states = {}
+
+    def _session_key_for_source(self, source):
+        return "sombra:test:" + str(getattr(source, "chat_id", ""))
+
+    def _peek_session_state(self, key):
+        return self.states.get(key)
+
+    def _session_state(self, key):
+        return self.states.setdefault(key, FakeState())
 
 
 if __name__ == "__main__":

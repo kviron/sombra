@@ -106,7 +106,7 @@ export function UserProfile({
         <ProfileCover user={user} accountId={me.id} className="user-profile-banner" />
         <div className="user-profile-body">
           <div className="user-profile-identity">
-            <UserAvatar user={user} size="xl" decorative />
+            <UserAvatar user={user} size="xl" decorative decoration={user.decorations?.avatar} />
             <div className="user-profile-heading">
               <h2 id="user-profile-name">{user.name} {user.bot && <small className="bot-badge">БОТ</small>}</h2>
               {user.username && <p>@{user.username}</p>}

@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react';
 import { cn } from '@/shared/lib/utils';
+import { AvatarFrame } from '@/shared/ui/avatar-fx';
+import type { AvatarDecoration, DecorationInput } from '@/shared/ui/avatar-fx';
 
 export type UserIdentity = {
   id: string;
@@ -7,6 +9,11 @@ export type UserIdentity = {
   avatar?: string;
   online?: boolean;
   bot?: boolean;
+  /** Server-provided decorations (v1 documents); absent on an older server or an undecorated account. */
+  decorations?: {
+    avatar?: DecorationInput | AvatarDecoration | null;
+    cover?: DecorationInput | AvatarDecoration | null;
+  };
 };
 
 export type UserAvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -24,12 +31,15 @@ export function UserAvatar({
   presence = true,
   className,
   decorative = false,
+  decoration,
 }: {
   user: UserIdentity;
   size?: UserAvatarSize;
   presence?: boolean;
   className?: string;
   decorative?: boolean;
+  /** Optional pixel-art decoration (v1 document). Absent/`null` keeps the plain avatar. */
+  decoration?: DecorationInput | AvatarDecoration | null;
 }) {
   const name = user.name?.trim() || 'Участник';
   const initial = name.slice(0, 1).toLocaleUpperCase('ru');
@@ -46,6 +56,7 @@ export function UserAvatar({
       ) : (
         <span className="user-avatar-initial" aria-hidden="true">{initial}</span>
       )}
+      {decoration ? <AvatarFrame decoration={decoration} target="avatar" size={size} /> : null}
       {presence && (
         <span
           className="user-presence"

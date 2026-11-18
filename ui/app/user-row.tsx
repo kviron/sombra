@@ -46,7 +46,7 @@ export function UserRow({
   const content = (
     <>
       {before}
-      <UserAvatar user={identity} size={avatarSize} presence={presence} />
+      <UserAvatar user={identity} size={avatarSize} presence={presence} decoration={identity.decorations?.avatar} />
       {adornment}
       <span className="user-row-main">
         <span className="user-row-title">

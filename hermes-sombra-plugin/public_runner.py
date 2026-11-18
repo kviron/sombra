@@ -37,6 +37,22 @@ GENERIC_ERROR = 'Не удалось выполнить запрос. Попро
 LOGGER = logging.getLogger(__name__)
 
 
+def selected_model(settings):
+    """Validate the operator-selected model/reasoning snapshot; ``None`` keeps the default.
+
+    The adapter only ever passes the backend-owned projection; this guard keeps a
+    URL/credential-shaped or unknown value from reaching a provider request.
+    """
+    if not isinstance(settings, dict):
+        return None, None
+    model = settings.get('model')
+    model = (model if isinstance(model, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:/@+\-]{0,119}', model)
+             and '://' not in model and not model.startswith(('sk-', 'sk_', 'eyJ')) else None)
+    reasoning = settings.get('reasoning')
+    reasoning = reasoning if reasoning in ('low', 'medium', 'high') else None
+    return model, reasoning
+
+
 def log_public_failure(error):
     """Operator diagnostics only: no exception body, source lines, args or locals."""
     frames = []
@@ -427,11 +443,13 @@ def sdk_public_wrappers(inbound_paths=(), provider_snapshot=None):
 
 def create_public_callback(*, authorize, artifact_base='/var/lib/sombra-hermes/public-artifacts',
                            resolve_provider=None, confined_tools=None, agent_class=None, registry=None, persona=None,
-                           get_persona=None, provider_snapshot=None, platform_context=''):
+                           get_persona=None, provider_snapshot=None, platform_context='', model_settings=None):
     """Return async (canonical_update, history)->{text, media} for adapter use.
 
     `authorize(payload)` returns fresh canonical metadata, not a trust boolean.
     Neither payload text nor model arguments can install wrappers or permissions.
+    `model_settings()` is a read-only operator callable returning the backend-owned
+    ``{model, reasoning}`` projection for THIS turn; it never grants provider access.
     """
     if (not isinstance(platform_context, str) or '\0' in platform_context
             or len(platform_context.encode('utf-8')) > 8192):
@@ -453,6 +471,8 @@ def create_public_callback(*, authorize, artifact_base='/var/lib/sombra-hermes/p
         return '\n\n'.join(parts)
     if get_persona is not None and not callable(get_persona):
         raise PolicyError('Invalid operator persona loader')
+    if model_settings is not None and not callable(model_settings):
+        raise PolicyError('Invalid operator model settings loader')
     system = persona_system(persona)
     if provider_snapshot is not None:
         if not isinstance(provider_snapshot, dict) or set(provider_snapshot) - {'image', 'video'}:
@@ -511,6 +531,14 @@ def create_public_callback(*, authorize, artifact_base='/var/lib/sombra-hermes/p
                     provider = (resolve_provider or existing_provider)()
                     if provider.get('api_mode') == 'codex_app_server':
                         raise PolicyError('External tool runtime denied')
+                    # Backend-owned selection only: one validated id on the SAME resolved
+                    # route (no provider/key/config change) and the official reasoning kwarg.
+                    selection = model_settings() if model_settings is not None else None
+                    chosen_model, chosen_reasoning = selected_model(selection)
+                    if chosen_model:
+                        provider['model'] = chosen_model
+                    reasoning_config = ({'enabled': True, 'effort': chosen_reasoning}
+                                        if chosen_reasoning else None)
                     inbound_paths = []
                     for value in frozen.get('media_urls', [])[:32]:
                         # Only operator-staged original inbound files in this actor's
@@ -589,7 +617,8 @@ def create_public_callback(*, authorize, artifact_base='/var/lib/sombra-hermes/p
                                     result = json.dumps({'error': 'Tool denied or unavailable'})
                                 messages.append({'role': 'tool', 'tool_call_id': call.id, 'content': result})
 
-                    agent = PublicAgent(**provider, enabled_toolsets=[], max_iterations=8, max_tokens=4000,
+                    agent = PublicAgent(**provider, reasoning_config=reasoning_config,
+                        enabled_toolsets=[], max_iterations=8, max_tokens=4000,
                         run_budget_seconds=120, skip_memory=True, skip_context_files=True, load_soul_identity=False,
                         skip_background_review=True, save_trajectories=False, checkpoints_enabled=False,
                         verbose_logging=False, quiet_mode=True, session_id='sombra-public-'+uuid.uuid4().hex,

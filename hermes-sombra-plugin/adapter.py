@@ -18,6 +18,7 @@ import secrets
 import sqlite3
 import stat
 import time
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 
@@ -30,6 +31,11 @@ MAX_FILE = 10 * 1024 * 1024
 MAX_OUTPUT = 20 * 1024 * 1024
 logger = logging.getLogger(__name__)
 NATIVE_COMMANDS = frozenset({"help", "start", "reset", "new", "status", "model", "models", "tools", "stop", "compact", "clear", "usage", "context", "skills"})
+# Backend ``bot_typing`` activity enum (strict on the server) and the bounded UI label.
+# A label is display-only: never prompt text, tool arguments, secrets or reasoning.
+TYPING_ACTIVITIES = ("thinking", "tool", "image", "search", "code", "waiting")
+TYPING_STATUS_LIMIT = 80
+TYPING_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 HINT = ("You are Сомбра (Sombra), the assistant inside the Sombra desktop messenger. "
         "This conversation is in the independent Sombra app, NOT a Telegram, Discord or WhatsApp bot or wrapper. "
         "Never identify the current app, group, channel or voice chat as Telegram. If an earlier reply did so, "
@@ -55,6 +61,48 @@ HINT = ("You are Сомбра (Sombra), the assistant inside the Sombra desktop 
 
 class SafetyError(RuntimeError):
     pass
+
+
+class BrokerRejected(SafetyError):
+    """Backend refusal with only a bounded machine code; never a payload or a secret.
+
+    The Sombra backend answers refusals as ``{"error": "BOT_SETTINGS_CONFLICT"}`` (also on
+    a non-2xx status). Callers need the code to tell "already applied" from "forbidden"
+    without guessing from a human-readable message.
+    """
+
+    def __init__(self, code=""):
+        self.code = broker_error_code(code)
+        super().__init__("Scoped broker rejected operation" + (": " + self.code if self.code else ""))
+
+
+def broker_error_code(value):
+    """Only a short ``[A-Za-z0-9_]`` token is kept; any other body becomes an empty code."""
+    if not isinstance(value, str):
+        return ""
+    value = value.strip()
+    return value if len(value) <= 64 and re.fullmatch(r"[A-Za-z0-9_]+", value) else ""
+
+
+def typing_status(value):
+    """Bounded display label: one line, no control characters, never longer than 80 chars."""
+    text = TYPING_CONTROL.sub(" ", str(value if isinstance(value, str) else ""))
+    return re.sub(r"\s+", " ", text).strip()[:TYPING_STATUS_LIMIT]
+
+
+def tool_typing_hint(tool_name):
+    """Coarse, honest stage for a running tool; arguments/prompt text are never included."""
+    name = str(tool_name or "")
+    if name == "image_generate":
+        return "image", "Генерирую изображение"
+    if name == "video_generate":
+        return "image", "Генерирую видео"
+    if name in ("web_search", "search", "web_fetch", "browser", "browser_search", "web_extract"):
+        return "search", "Ищу в интернете"
+    if name.startswith(("terminal", "shell", "exec", "code")):
+        return "code", "Выполняю код"
+    short = re.sub(r"[^A-Za-z0-9_.\-]", "", name)[:40]
+    return "tool", ("Выполняю инструмент: " + short) if short else "Выполняю инструмент"
 
 
 def packed(value):
@@ -89,14 +137,34 @@ class Broker:
     def call(self, op, **args):
         request = Request(self.url, data=packed({"op": op, **args}).encode(),
                           headers={"Content-Type": "application/json", "Authorization": "Bearer " + self.token})
-        with self.opener.open(request, timeout=30) as response:
-            raw = response.read(30 * 1024 * 1024 + 1)
+        try:
+            with self.opener.open(request, timeout=30) as response:
+                raw = response.read(30 * 1024 * 1024 + 1)
+        except HTTPError as error:
+            # Refusals (400/403) carry the machine code in the JSON body, never in a message.
+            try:
+                body = error.read(4096)
+            except Exception:
+                body = b""
+            raise BrokerRejected(self._error_code(body)) from None
         if len(raw) > 30 * 1024 * 1024:
             raise SafetyError("Broker response exceeds limit")
         result = json.loads(raw)
-        if not isinstance(result, dict) or result.get("error"):
-            raise SafetyError("Scoped broker rejected operation")
+        if not isinstance(result, dict):
+            raise SafetyError("Scoped broker response is not an object")
+        if result.get("error"):
+            raise BrokerRejected(self._error_code(result.get("error")))
         return result
+
+    @staticmethod
+    def _error_code(value):
+        """Safe machine code from a refusal body/field; unknown shapes become no code."""
+        if isinstance(value, (bytes, bytearray)):
+            try:
+                value = json.loads(value).get("error")
+            except Exception:
+                return ""
+        return broker_error_code(value)
 
     async def acall(self, op, **args):
         return await asyncio.to_thread(self.call, op, **args)
@@ -543,6 +611,10 @@ class SombraAdapter(BasePlatformAdapter):
                 self.current["done"].set()
             raise
 
+    async def _render_slash_result(self, record, result):
+        """Optional transport projection of an SDK control result before public delivery."""
+        return result
+
     async def _notify_turn_error(self, event, e):
         if self.current:
             self.current["failed"] = True
@@ -732,10 +804,47 @@ class SombraAdapter(BasePlatformAdapter):
                 self.current["failed"] = True
             return False
 
+    def _typing_note(self, activity, status=""):
+        """Remember the real current stage for the next typing refresh (best effort).
+
+        Called from tool/observer hooks that may run in a worker thread: it only mutates
+        the invocation-bound dict, never performs I/O and never raises.
+        """
+        try:
+            current = self.current
+            if not isinstance(current, dict):
+                return
+            if activity not in TYPING_ACTIVITIES:
+                current.pop("typing", None)
+                return
+            current["typing"] = {"activity": activity, "status": typing_status(status)}
+        except Exception:
+            pass
+
+    def _typing_payload(self):
+        """activity/status for ``bot_typing``; an unknown stage is honestly just "thinking"."""
+        activity, status = "thinking", ""
+        current = self.current
+        hint = current.get("typing") if isinstance(current, dict) else None
+        if isinstance(hint, dict):
+            if hint.get("activity") in TYPING_ACTIVITIES:
+                activity = hint["activity"]
+            status = typing_status(hint.get("status"))
+        payload = {"activity": activity}
+        if status:
+            payload["status"] = status
+        return payload
+
     async def send_typing(self, chat_id, metadata=None):
         self._destination(chat_id)
         await self._authorize()
-        await self.broker.acall("bot_typing", update_id=self.current["id"], typing=True)
+        try:
+            await self.broker.acall("bot_typing", update_id=self.current["id"], typing=True, **self._typing_payload())
+        except Exception:
+            # An older server, or a rejected activity/status, must never break the turn:
+            # retry the plain indicator once and keep the failure visible in the log.
+            logger.warning("Sombra typing activity/status rejected; retrying plain typing indicator")
+            await self.broker.acall("bot_typing", update_id=self.current["id"], typing=True)
 
     async def stop_typing(self, chat_id, metadata=None):
         if self.current:
@@ -763,7 +872,8 @@ class SombraAdapter(BasePlatformAdapter):
             record["runtime_context"] = contextvars.copy_context()  # AFTER JSON commit; never serialized.
         self._prompts[nonce] = record
         suffix = "|".join(actions) if kind in ("approve", "slash") else "<answer text>"
-        command = "sombra-confirm" if kind in ("approve", "slash") else "sombra-answer"
+        separator = "_" if getattr(self, "_registered_commands", False) else "-"
+        command = "sombra" + separator + ("confirm" if kind in ("approve", "slash") else "answer")
         result = await self.send(chat_id, text + "\n\nExplicit reply within 5 minutes: /" + command + "@" + getattr(self, "bot_handle", "hermes") + " " + nonce + " " + suffix)
         if not result.success:
             self._prompts.pop(nonce, None)
@@ -836,7 +946,7 @@ class SombraAdapter(BasePlatformAdapter):
         """Only human-origin, exact anchored nonce commands; NEVER assistant/model text."""
         text = str(update.get("message", {}).get("text", ""))
         handles = "(?:hermes|" + re.escape(getattr(self, "bot_handle", "hermes")) + ")"
-        match = re.fullmatch(r"(?:@" + handles + r"[ \t]+)?/sombra-(confirm|answer)(?:@" + handles + r")?[ \t]+([a-f0-9]{32})[ \t]+([^\r\n]+)", text)
+        match = re.fullmatch(r"(?:@" + handles + r"[ \t]+)?/sombra[-_](confirm|answer)(?:@" + handles + r")?[ \t]+([a-f0-9]{32})[ \t]+([^\r\n]+)", text)
         if not match or not self.current or update["update_id"] == self.current["id"]:
             return False  # Ordinary input stays queued, never merged into the active turn.
         command, nonce, response = match.groups()
@@ -883,7 +993,7 @@ class SombraAdapter(BasePlatformAdapter):
             # execute in the captured context on this owning loop, not the poll context.
             callback = asyncio.create_task(slash_confirm.resolve(record["session"], record["sdk_id"], response),
                                            context=runtime_context.copy())
-            result_text = await callback
+            result_text = await self._render_slash_result(record, await callback)
             resolved = True
         else:
             from tools.clarify_gateway import resolve_gateway_clarify, get_pending
@@ -934,6 +1044,23 @@ def pre_tool_call(**kwargs):
         _ACTIVE.authorize()
     except Exception:
         return {"action": "block", "message": "Sombra fresh actor/channel authorization unavailable; tool blocked"}
+    try:
+        _ACTIVE._typing_note(*tool_typing_hint(kwargs.get("tool_name")))
+    except Exception:
+        pass  # Display-only stage; it must never fail or block a real tool call.
+    return None
+
+
+def post_tool_call(**kwargs):
+    """Observer only: the tool finished, so the typing stage is no longer known."""
+    if os.environ.get("SOMBRA_MODE") == "shared_host":
+        from .shared_host import shared_post_tool_call
+        return shared_post_tool_call(**kwargs)
+    try:
+        if _ACTIVE is not None and isinstance(_ACTIVE.current, dict):
+            _ACTIVE.current.pop("typing", None)
+    except Exception:
+        pass
     return None
 
 
@@ -957,6 +1084,7 @@ def register(ctx):
     os.environ["SOMBRA_ALLOWED_USERS"] = allowed
     os.environ["SOMBRA_DM_POLICY"] = "allowlist"
     os.environ["SOMBRA_GROUP_POLICY"] = "allowlist"
+    ctx.register_hook("post_tool_call", post_tool_call)
     ctx.register_hook("pre_tool_call", pre_tool_call)
     if shared:
         from .shared_host import bind_shared_agent_session, observe_generated_artifact

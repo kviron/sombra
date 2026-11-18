@@ -1,0 +1,76 @@
+/* «Украшение профиля»: live preview plus radio cards for the avatar frame and the cover scene. */
+.decoration-picker { display: flex; flex-direction: column; gap: 14px; margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
+.decoration-picker h2 { margin: 0; }
+.decoration-picker .settings-hint { margin: 0; }
+
+.decoration-preview { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px; }
+.decoration-preview-cell { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.decoration-preview-cell.is-wide { flex: 1 1 260px; }
+.decoration-preview-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 136px;
+  height: 136px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: radial-gradient(80% 80% at 30% 20%, #2c3140, #171a21 70%);
+}
+.decoration-preview-cover {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 3 / 1;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: radial-gradient(90% 150% at 12% 0%, #8c92ff4d, transparent 62%),
+    radial-gradient(70% 140% at 88% 10%, #5c3fa84d, transparent 60%),
+    linear-gradient(120deg, #131a2c, #201a33 55%, #2a1f3d);
+}
+.decoration-preview-glow { position: absolute; inset: auto -10% -70% 30%; height: 160px; background: radial-gradient(closest-side, #8c92ff3d, transparent); }
+.decoration-preview-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(#ffffff0d 1px, transparent 1px), linear-gradient(90deg, #ffffff0d 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, #0009, transparent 92%);
+}
+.decoration-preview-label { font-size: 11px; line-height: 16px; color: var(--muted-foreground); }
+
+.decoration-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.decoration-options legend { margin: 0 0 8px; padding: 0; font-size: 13px; font-weight: 600; line-height: 18px; color: var(--foreground); }
+.account-modal #account-panel .decoration-option {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #2a2d34;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.account-modal #account-panel .decoration-option:hover { background: #31353d; }
+.account-modal #account-panel .decoration-option[data-selected="true"] { border-color: #7c8dff; background: #333a52; }
+.account-modal #account-panel .decoration-option input[type="radio"] { width: 15px; height: 15px; margin: 3px 0 0; accent-color: #7c8dff; }
+.decoration-option-swatch { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1px #ffffff2e; background: #3b3f47; }
+.decoration-option-swatch[data-swatch="ember"] { background: radial-gradient(circle at 50% 50%, #ffc266, #e2461f 68%, #6d1a0c); }
+.decoration-option-swatch[data-swatch="slime"] { background: radial-gradient(circle at 36% 32%, #b6ff8e, #2f8f3f 68%, #14401d); }
+.decoration-option-swatch[data-swatch="runner"] { background: linear-gradient(160deg, #1b2b4a, #6a3d8f 55%, #0c1020); }
+.decoration-option-swatch[data-swatch="aurora"] { background: linear-gradient(120deg, #123a3a, #38d6a5 55%, #7c5cff); }
+.decoration-option-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.decoration-option-text strong { font-size: 12px; line-height: 16px; font-weight: 600; }
+.decoration-option-text small { font-size: 11px; line-height: 15px; color: var(--muted-foreground); }
+
+.decoration-error { margin: 0; font-size: 12px; line-height: 18px; }
+.decoration-notice { margin: 0; font-size: 12px; line-height: 18px; }
+.decoration-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+@media (max-width: 760px) {
+  .decoration-options { grid-template-columns: minmax(0, 1fr); }
+  .decoration-preview-avatar { width: 112px; height: 112px; }
+}

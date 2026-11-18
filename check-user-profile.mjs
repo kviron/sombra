@@ -124,7 +124,7 @@ try{
  await wait("document.querySelectorAll('.dialog-row').length===1",80);
  assert.equal(await evaluate("document.querySelectorAll('.dialog-row').length"),1,'one direct conversation');
  assert.equal(await evaluate("document.querySelector('.dialog-row .user-avatar .user-presence').dataset.online"),'true','direct message row is online');
- assert.equal(await evaluate("document.querySelector('.profile-self .avatar span').dataset.online"),'true','sidebar account chip is online');
+ assert.equal(await evaluate("document.querySelector('.profile-self .user-avatar .user-presence').dataset.online"),'true','sidebar account chip is online');
  await shot('dialogs');
 
  // Members panel: one row per account, grouped by presence.

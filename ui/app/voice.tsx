@@ -142,14 +142,14 @@ export function VoicePeerVisual({stream,user,onOpen}:{stream?:MediaStream;user:U
   stream.addEventListener('addtrack',sync);stream.addEventListener('removetrack',sync);sync();
   return()=>{stream.removeEventListener('addtrack',sync);stream.removeEventListener('removetrack',sync);for(const track of watched)for(const event of ['mute','unmute','ended'])track.removeEventListener(event,changed)};
  },[stream]);
- return hasVisibleVideo(stream)?<Media stream={stream!} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title={`Профиль ${user.name}`} onClick={onOpen}><UserAvatar user={user} size="xl"/></button>;
+ return hasVisibleVideo(stream)?<Media stream={stream!} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title={`Профиль ${user.name}`} onClick={onOpen}><UserAvatar user={user} size="xl" decoration={user.decorations?.avatar}/></button>;
 }
 export function VoiceStage({voice:v,id,title,userName,me,meUser,users,onSettings}:{voice:Voice;id:string;title:string;userName:(id:string)=>string;me:string;meUser?:User;users?:User[];onSettings:()=>void}){
  const joined=v.room===id;
  const actions=useUserActions();
  const microphoneOff=v.muted||v.deaf;
  const selfIdentity:User=meUser??{id:'',name:me,bio:'',created_at:0,online:true};
- const selfTile=<div className="voice-tile">{v.camera&&v.local?<Media stream={v.local} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title="Открыть профиль" onClick={()=>meUser&&actions?.openProfile(meUser.id)}><UserAvatar user={selfIdentity} size="xl"/></button>}<span>{me} · Вы {v.muted||v.deaf?'· микрофон выключен':''}</span></div>;
+ const selfTile=<div className="voice-tile">{v.camera&&v.local?<Media stream={v.local} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title="Открыть профиль" onClick={()=>meUser&&actions?.openProfile(meUser.id)}><UserAvatar user={selfIdentity} size="xl" decoration={selfIdentity.decorations?.avatar}/></button>}<span>{me} · Вы {v.muted||v.deaf?'· микрофон выключен':''}</span></div>;
  return <div className="voice-stage"><h1>{title}</h1><p>{joined?(v.peers.length?'Вы в голосовой комнате':'Вы в комнате. Пригласите друзей, чтобы начать общение.'):'Присоединитесь, чтобы общаться голосом и видео'}</p>
  {joined&&<div className="voice-grid">{meUser?<UserContextMenu user={meUser}>{selfTile}</UserContextMenu>:selfTile}{v.peers.map(p=>{
   const identity:User=users?.find(user=>user.id===p.user)??{id:p.user,name:userName(p.user),bio:'',created_at:0,online:true};
