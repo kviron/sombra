@@ -1,6 +1,6 @@
 import {ComposerIconButton} from '@/shared/ui/elements-composer';
 import {useRef,useState} from 'react';
-import {Smile, Sticker as StickerIcon, X, MessageCircle, UserPlus, Check, Bot as BotIcon, Copy, Pencil, Trash2} from 'lucide-react';
+import {Smile, Sticker as StickerIcon, X, MessageCircle, UserPlus, Check, Bot as BotIcon, Copy, Pencil, Trash2, Reply, Forward} from 'lucide-react';
 import {ContextMenu} from 'radix-ui';
 import {toast} from 'sonner';
 import {api, type ChatState, type ChatMessage, type Group} from '@/shared/api/backend';
@@ -23,7 +23,8 @@ import {BotToolAccess} from './bot-tool-access';
 import {BotSettingsDialog} from './bot-settings-dialog';
 export const emojis=['👍','❤️','😂','🔥','🎉','👀'];
 type Common={state:ChatState;refresh:()=>Promise<unknown>;onError:(message:string)=>void};
-export function MessageItem({message:m,previous,state,refresh,onError,userName}:{message:ChatMessage;previous?:ChatMessage;userName:(id:string)=>string}&Common){
+import {MessageQuote} from './message-references';
+export function MessageItem({message:m,previous,state,refresh,onError,userName,onReply,onForward,onJump}:{message:ChatMessage;previous?:ChatMessage;userName:(id:string)=>string;onReply?:(message:ChatMessage)=>void;onForward?:(message:ChatMessage)=>void;onJump?:(id:string)=>void}&Common){
  const [busy,setBusy]=useState(false);
  const [dialog,setDialog]=useState<'edit'|'delete'>();
  const [readersOpen,setReadersOpen]=useState(false);
@@ -61,8 +62,10 @@ export function MessageItem({message:m,previous,state,refresh,onError,userName}:
  </ContextMenu.Group>;
  const read=state.readReceiptsSupported===true&&author&&(m.readCount||0)>0;
  const actions=[
+  ...(onReply?[{label:'Ответить',icon:Reply,onSelect:()=>onReply(m)}]:[]),
+  ...(onForward&&!m.attachment&&!m.sticker&&!m.gif&&hasText?[{label:'Переслать',icon:Forward,onSelect:()=>onForward(m)}]:[]),
   ...(state.readReceiptsSupported&&author?[{label:read?`Посмотрели: ${m.readCount}`:'Пока не просмотрено',icon:Eye,disabled:!read,onSelect:()=>setReadersOpen(true)}]:[]),
-  ...(author&&hasText?[{label:'Редактировать',icon:Pencil,onSelect:()=>setDialog('edit')}]:[]),
+  ...(author&&hasText&&!m.forwardedFrom?[{label:'Редактировать',icon:Pencil,onSelect:()=>setDialog('edit')}]:[]),
   ...(hasText?[{label:'Копировать текст',icon:Copy,onSelect:()=>void copyText()}]:[]),
   {label:'Удалить сообщение',icon:Trash2,onSelect:()=>setDialog('delete')},
  ];
@@ -74,7 +77,9 @@ export function MessageItem({message:m,previous,state,refresh,onError,userName}:
     <MessageContent>
      <Bubble data-inline-time={hasText&&!m.attachment&&!sticker&&reactionEmojis.length===0} data-sticker-only={!!sticker&&!hasText} data-image-only={hasImage&&!hasText} data-image-message={hasImage}>
       {!grouped&&<MessageHeader><strong>{canOpenProfile?<button type="button" className="message-author" title={`Профиль ${name}`} onClick={openProfile}>{name}</button>:name}</strong>{(m.bot_name||identity?.bot)&&<small className="bot-badge">БОТ</small>}</MessageHeader>}
-      <BubbleContent>{m.text&&(hasImage?<div className="message-image-caption"><MessageText text={m.text} mentions={m.mentions}/></div>:<MessageText text={m.text} mentions={m.mentions}/>)}{sticker&&<SentSticker key={sticker.id} sticker={sticker} user={state.me.id} catalog={state.stickerCatalogSupported} refresh={refresh}/>}{m.attachment&&<MessageAttachment messageId={m.id} attachment={m.attachment}/>}</BubbleContent>
+      {m.replyTo&&<MessageQuote reply={m.replyTo} userName={userName} onJump={onJump?()=>onJump(m.replyTo!.id):undefined}/>}
+       {m.forwardedFrom&&<div className="message-forwarded"><Forward size={14} aria-hidden="true"/>Переслано от {userName(m.forwardedFrom.author)}</div>}
+       <BubbleContent>{m.text&&(hasImage?<div className="message-image-caption"><MessageText text={m.text} mentions={m.mentions}/></div>:<MessageText text={m.text} mentions={m.mentions}/>)}{sticker&&<SentSticker key={sticker.id} sticker={sticker} user={state.me.id} catalog={state.stickerCatalogSupported} refresh={refresh}/>}{m.attachment&&<MessageAttachment messageId={m.id} attachment={m.attachment}/>}</BubbleContent>
       <div className={reactionEmojis.length?'message-bottom-row':'message-bottom-inline'}>
        {reactionEmojis.length>0&&<div className="reactions">{reactionEmojis.map(emoji=><button
         type="button" disabled={busy} aria-label={`Реакция ${emoji}`} aria-pressed={m.reactions?.some(reaction=>reaction.emoji===emoji&&reaction.user===state.me.id)}

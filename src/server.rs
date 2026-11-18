@@ -1,4 +1,5 @@
 mod backend;
+mod diagnostic_file;
 
 fn provision_group_bot(
     directory: &std::path::Path,

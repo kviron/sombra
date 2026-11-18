@@ -94,6 +94,7 @@
 /* Positioning context for the floating composer and its activity rows. */
 .chat-main{position:relative}
 .chat-shell .chat-scroll-down{position:absolute;z-index:2;right:22px;bottom:calc(var(--sombra-composer-height,0px) + 20px);width:42px;height:42px;border:1px solid #36363d;border-radius:50%;color:#eee;background:#202024;box-shadow:0 3px 12px #0008}
+.chat-scroll-unread{position:absolute;top:-9px;left:50%;transform:translateX(-50%);min-width:22px;padding:2px 4px;border-radius:999px;background:var(--primary);color:var(--primary-foreground);font-size:11px;line-height:16px;text-align:center;font-variant-numeric:tabular-nums}
 @media(max-width:760px){
  .profile{padding:6px 8px;gap:4px}
 }

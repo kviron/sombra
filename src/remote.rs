@@ -1,17 +1,17 @@
 use crate::backend::diagnostics::{
     desktop_runtime_category, operation, Event, MAX_EVENTS, REPORT_BATCH,
 };
+use crate::diagnostic_file::Sink;
 use serde_json::{json, Value};
+#[cfg(test)]
+use std::fs;
 use std::{
     collections::VecDeque,
-    fs,
-    io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 const API: &str = "https://sombra.mi-nerva.ru/api";
-const LOG_MAX_BYTES: u64 = 64 * 1024;
 const SESSION_CHANGED: &str = "Сессия изменилась. Повторите запрос.";
 
 #[derive(Default)]
@@ -28,6 +28,7 @@ pub struct Remote {
     cookie: Mutex<String>,
     path: PathBuf,
     diagnostics: Arc<Mutex<DesktopDiagnostics>>,
+    diagnostic_file: Sink,
     cache: Mutex<crate::attachment_cache::Cache>,
     requests: tokio::sync::Mutex<()>,
     generation: std::sync::atomic::AtomicU64,
@@ -53,6 +54,7 @@ impl Remote {
             )),
             requests: tokio::sync::Mutex::new(()),
             generation: std::sync::atomic::AtomicU64::new(0),
+            diagnostic_file: Sink::start(path.parent().unwrap_or(Path::new(".")).to_path_buf()),
             path,
             diagnostics: Arc::default(),
         })
@@ -64,11 +66,9 @@ impl Remote {
             return;
         }
         let event = Event::desktop(name, category, status);
+        self.diagnostic_file.record(&event);
         if let Ok(mut diagnostics) = self.diagnostics.lock() {
-            if let Some(directory) = self.path.parent() {
-                let _ = write_diagnostic(directory, &event);
-            }
-            // Ordinary HTTP rejections are already visible in the server log.
+            // Keep ordinary HTTP rejections local; the server already sees its own status.
             if category != "http_error" || status.is_some_and(|code| code >= 500) {
                 if diagnostics.pending.len() == MAX_EVENTS {
                     diagnostics.pending.pop_front();
@@ -134,26 +134,6 @@ impl Remote {
             }
         });
     }
-}
-
-fn write_diagnostic(directory: &Path, event: &Event) -> std::io::Result<()> {
-    let mut line = serde_json::to_vec(event)?;
-    line.push(b'\n');
-    fs::create_dir_all(directory)?;
-    let path = directory.join("diagnostics.jsonl");
-    match fs::metadata(&path) {
-        Ok(info) if info.len() + line.len() as u64 > LOG_MAX_BYTES => {
-            fs::rename(&path, directory.join("diagnostics.previous.jsonl"))?;
-        }
-        Ok(_) => {}
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => return Err(error),
-    }
-    fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?
-        .write_all(&line)
 }
 
 fn session_cookie(header: &str) -> Option<String> {
@@ -867,10 +847,11 @@ mod tests {
     }
     #[test]
     fn remote_client_starts_without_prior_tls_initialization() {
-        let path =
-            std::env::temp_dir().join(format!("sombra-client-test-{}.dpapi", std::process::id()));
+        let directory = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+        let path = directory.join("session.dpapi");
         assert!(Remote::new(path.clone()).is_ok());
         assert!(Remote::new(path).is_ok());
+        fs::remove_dir_all(directory).unwrap();
     }
     #[test]
     fn session_cookie_login_logout() {

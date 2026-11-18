@@ -1,10 +1,10 @@
-import {Mic,UserRound,ShieldCheck,Monitor,RefreshCw,LogOut,Pencil,Sticker,Bell,HardDrive} from 'lucide-react';
+import {Mic,UserRound,ShieldCheck,Monitor,RefreshCw,LogOut,Pencil,Sticker,Bell,HardDrive,BookOpen} from 'lucide-react';
 import {Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton} from '@/shared/ui/sidebar';
 import {Separator} from '@/shared/ui/separator';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import type {User} from '@/shared/api/backend';
 
-export type AccountSection='profile'|'security'|'sessions'|'voice'|'updates'|'stickers'|'notifications'|'storage';
+export type AccountSection='profile'|'security'|'sessions'|'voice'|'updates'|'stickers'|'notifications'|'storage'|'journal';
 export const accountSections=[
   {id:'updates' as const,label:'Обновления',icon:RefreshCw},
   {id:'voice' as const,label:'Голос и видео',icon:Mic},
@@ -14,6 +14,7 @@ export const accountSections=[
   {id:'security' as const,label:'Пароль и безопасность',icon:ShieldCheck},
   {id:'sessions' as const,label:'Активные сеансы',icon:Monitor},
   {id:'stickers' as const,label:'Стикеры',icon:Sticker},
+  {id:'journal' as const,label:'Журнал',icon:BookOpen},
 ];
 export function AccountSidebar({me,name,avatar,section,onSection,onLogout}:{me?:User;name:string;avatar?:string;section:AccountSection;onSection:(section:AccountSection)=>void;onLogout:()=>void}) {
  return <Sidebar className="settings-sidebar">

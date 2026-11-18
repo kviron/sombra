@@ -1,0 +1,14 @@
+.journal-heading,.journal-entry-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.account-modal #account-panel .journal-heading h2{font-size:24px;line-height:32px;margin:0}
+.account-modal #account-panel .journal-heading [data-slot=button]{min-height:44px}
+.account-modal #account-panel .diagnostic-journal p{margin:0;color:var(--muted-foreground);line-height:1.5}
+.account-modal #account-panel .diagnostic-journal [role=alert]{color:var(--destructive)}
+.journal-summary{display:flex;align-items:center;gap:16px;margin-top:24px;padding:16px;border-radius:var(--radius-lg);background:var(--secondary);color:var(--secondary-foreground)}
+.journal-total{font-size:32px;line-height:1.25;color:var(--destructive);font-variant-numeric:tabular-nums}
+.diagnostic-journal h3{font-size:16px;font-weight:600;margin:24px 0 8px}
+.journal-entries{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.journal-entries li{padding:12px;border:1px solid var(--border);border-inline-start:3px solid var(--destructive);border-radius:var(--radius-md);background:var(--secondary);overflow-wrap:anywhere}
+.journal-entry-details{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
+.journal-entry-details,.journal-entry-heading time,.diagnostic-journal footer{color:var(--muted-foreground);font-size:12px}
+.journal-entry-heading time{white-space:nowrap;font-variant-numeric:tabular-nums}
+.diagnostic-journal footer{margin-top:16px}

@@ -22,6 +22,7 @@ mod group_roles;
 mod human_typing;
 mod message_reads;
 mod mentions;
+mod message_references;
 mod music;
 mod profile_covers;
 mod profile_decorations;
@@ -427,6 +428,10 @@ impl Backend {
         if let Some(fields) = message.as_object_mut() {
             fields.remove("hidden_by");
             fields.remove("messageSeq");
+            fields.remove("reply_to");
+            if let Some(author) = fields.remove("forwarded_author").filter(Value::is_string) {
+                fields.insert("forwardedFrom".into(), json!({"author":author}));
+            }
         }
         if !message["mentions"].is_array() {
             message["mentions"] = json!([]);
@@ -607,13 +612,18 @@ impl Backend {
             })
             .collect();
         let voice_presence = self.voice_presence(&groups);
-        let messages: Vec<_> = self.db["messages"]
+        let visible: Vec<_> = self.db["messages"]
             .as_array()
             .unwrap()
             .iter()
             .filter(|message| self.message_visible(message, uid))
-            .map(|message| self.receipt_message(message, uid))
             .collect();
+        let refs = visible.iter().map(|&message| (s(message, "id"), message)).collect();
+        let messages: Vec<_> = visible.into_iter().map(|message| {
+            let mut dto = self.receipt_message(message, uid);
+            Self::project_reply(&mut dto, message, &refs);
+            dto
+        }).collect();
         let sent: std::collections::HashSet<&str> = messages
             .iter()
             .map(|message| s(message, "sticker"))
@@ -640,7 +650,7 @@ impl Backend {
                 Some(sticker)
             })
             .collect();
-        json!({"decorationSupported":true,"profileEffectDraftsSupported":self.profile_effect_drafts_supported(u),"effectCatalogSupported":true,"profileEffectUploadsSupported":true,"stickerCatalogSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":self.public_for(u,uid),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public_for(user,uid)).collect::<Vec<_>>()})
+        json!({"features":{"messageReferences":message_references::supported()},"decorationSupported":true,"profileEffectDraftsSupported":self.profile_effect_drafts_supported(u),"effectCatalogSupported":true,"profileEffectUploadsSupported":true,"stickerCatalogSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":self.public_for(u,uid),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public_for(user,uid)).collect::<Vec<_>>()})
     }
     fn sticker_in_library(&self, sticker: &Value, uid: &str) -> bool {
         if self.sticker_pack_installed(sticker, uid) {
@@ -1099,6 +1109,7 @@ impl Backend {
     let author=message["user"]==uid&&s(message,"bot_name").is_empty();
     if op=="update_message"{
      if !author{return Err("Сообщение может редактировать только его автор".into())}
+      if message["forwarded_author"].is_string(){return Err("MESSAGE_FORWARD_IMMUTABLE".into())}
      if s(message,"text").is_empty(){return Err("В сообщении нет текста для редактирования".into())}
      let text=s(&v,"text").trim();
      if text.is_empty()||text.chars().count()>2000{return Err("Сообщение: 1–2000 символов".into())}
@@ -1120,7 +1131,9 @@ impl Backend {
      }
     }
    },
+   "forward_message"=>return self.forward_message(&v,uid),
    "message"=>{let channel=s(&v,"channel");if !self.allowed(uid,channel){return Err("Нет доступа к чату".into())}let text=s(&v,"text").trim();let sticker=s(&v,"sticker");
+     let reply=self.validated_reply(&v,uid,channel)?;
     if !sticker.is_empty(){
      let sticker=self.db["stickers"].as_array().unwrap().iter().find(|row|row["id"]==sticker&&(row["archived"]!=true||self.sticker_pack_installed(row,uid))).ok_or("Стикер не найден")?;
      let group=s(sticker,"group");
@@ -1136,7 +1149,8 @@ impl Backend {
      let mentions=self.canonical_mentions(channel,text,v.get("mentions"))?;
       let attachment=attachment.map(|value|self.store_attachment(value)).transpose()?;
      let mut message=json!({"id":id(),"channel":channel,"user":uid,"text":text,"sticker":sticker,"time":now(),"mentions":mentions});
-     if let Some(ref attachment)=attachment{message["attachment"]=attachment.clone();}
+     if let Some(reply)=reply{message["reply_to"]=json!(reply);}
+      if let Some(ref attachment)=attachment{message["attachment"]=attachment.clone();}
      if let Err(error)=self.enqueue_bots(&message){if let Some(path)=attachment.as_ref().and_then(|value|self.attachment_path(value)){let _=std::fs::remove_file(path);}return Err(error)}self.db["messages"].as_array_mut().unwrap().push(message);
      if let Err(error)=self.save(){
       if let Some(path)=attachment.as_ref().and_then(|value|self.attachment_path(value)){let _=std::fs::remove_file(path);}
@@ -1943,7 +1957,9 @@ pub(crate) fn api_router(backend: Backend) -> axum::Router {
                 "MUSIC_STREAM_UNAVAILABLE" => (StatusCode::BAD_GATEWAY, "upstream", error),
                 "MUSIC_STREAM_TIMEOUT" => (StatusCode::GATEWAY_TIMEOUT, "upstream", error),
                 "MUSIC_STREAM_BUSY" => (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error),
-                "MESSAGE_READ_FORBIDDEN"
+                "MESSAGE_REFERENCE_UNAVAILABLE" | "MESSAGE_FORWARD_TARGET_UNAVAILABLE" =>
+                    (StatusCode::NOT_FOUND, "authorization", error),
+                "MESSAGE_READ_FORBIDDEN" | "MESSAGE_REFERENCES_DISABLED"
                 | "BOT_SETTINGS_FORBIDDEN"
                 | "BOT_POLICY_FORBIDDEN"
                 | "BOT_DECORATION_FORBIDDEN" | "PROFILE_EFFECT_FORBIDDEN" => {
@@ -2013,7 +2029,15 @@ pub(crate) fn api_router(backend: Backend) -> axum::Router {
         .with_state(state)
 }
 
-pub async fn serve(backend: Backend) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn serve(mut backend: Backend) -> Result<(), Box<dyn std::error::Error>> {
+    backend.diagnostics = Arc::new(diagnostics::Diagnostics::with_file(
+        backend
+            .path
+            .parent()
+            .filter(|path| !path.as_os_str().is_empty())
+            .unwrap_or(std::path::Path::new("."))
+            .to_path_buf(),
+    ));
     let bind = std::env::var("MINES_BIND").unwrap_or("127.0.0.1:3847".into());
     let listener = tokio::net::TcpListener::bind(&bind).await?;
     axum::serve(listener, api_router(backend)).await?;

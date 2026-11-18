@@ -51,6 +51,7 @@ pub(crate) fn operation(name: &str) -> &'static str {
         "set_notification_preferences",
         "set_dialog_preferences",
         "message",
+        "forward_message",
         "attachment_file",
         "delete_message",
         "update_message",
@@ -165,14 +166,46 @@ impl Event {
     }
 
     fn from_report(value: &Value) -> Option<Self> {
-        let name = value["operation"].as_str()?;
+        Self::validated_desktop(
+            super::now(),
+            value["operation"].as_str()?,
+            value["category"].as_str()?,
+            &value["status"],
+        )
+    }
+
+    #[cfg(any(feature = "desktop", test))]
+    pub(crate) fn from_local_line(line: &[u8]) -> Option<Self> {
+        #[derive(serde::Deserialize)]
+        struct Row {
+            time: u64,
+            source: String,
+            operation: String,
+            category: String,
+            status: Value,
+        }
+        if line.iter().find(|byte| !byte.is_ascii_whitespace()) != Some(&b'{') {
+            return None;
+        }
+        let row: Row = serde_json::from_slice(line).ok()?;
+        if row.source != "desktop" {
+            return None;
+        }
+        Self::validated_desktop(row.time, &row.operation, &row.category, &row.status)
+    }
+
+    #[cfg(any(feature = "desktop", test))]
+    pub(crate) fn timestamp(&self) -> u64 {
+        self.time
+    }
+
+    fn validated_desktop(time: u64, name: &str, category: &str, status: &Value) -> Option<Self> {
         let operation = operation(name);
         if matches!(operation, "diagnostics_recent" | "diagnostics_report")
             || (operation == "unknown" && name != "unknown")
         {
             return None;
         }
-        let category = value["category"].as_str()?;
         let category = match category {
             "transport" => "transport",
             "timeout" => "timeout",
@@ -181,7 +214,7 @@ impl Event {
             "http_error" => "http_error",
             _ => desktop_runtime_category(operation, category)?,
         };
-        let status = match &value["status"] {
+        let status = match status {
             Value::Null => None,
             number => Some(
                 number
@@ -189,7 +222,13 @@ impl Event {
                     .filter(|status| (100..=599).contains(status))? as u16,
             ),
         };
-        Some(Self::desktop(operation, category, status))
+        Some(Self {
+            time,
+            source: "desktop",
+            operation,
+            category,
+            status,
+        })
     }
 }
 
@@ -200,13 +239,7 @@ struct History {
 }
 
 impl History {
-    fn push(&mut self, event: Event, journal: bool) {
-        if journal {
-            eprintln!(
-                "sombra_diagnostic {}",
-                serde_json::to_string(&event).expect("serializable diagnostic")
-            );
-        }
+    fn push(&mut self, event: Event) {
         if self.events.len() == MAX_EVENTS {
             self.events.pop_front();
         }
@@ -215,9 +248,25 @@ impl History {
 }
 
 #[derive(Default)]
-pub(super) struct Diagnostics(Mutex<History>);
+pub(super) struct Diagnostics {
+    history: Mutex<History>,
+    file: Option<crate::diagnostic_file::Sink>,
+}
 
 impl Diagnostics {
+    pub(super) fn with_file(directory: std::path::PathBuf) -> Self {
+        Self {
+            history: Mutex::default(),
+            file: Some(crate::diagnostic_file::Sink::start(directory)),
+        }
+    }
+
+    fn persist(&self, event: &Event) {
+        if let Some(file) = &self.file {
+            file.record(event);
+        }
+    }
+
     pub(super) fn server(&self, operation: &'static str, status: u16, category: &'static str) {
         if matches!(operation, "diagnostics_recent" | "diagnostics_report") && status < 500 {
             return;
@@ -243,13 +292,22 @@ impl Diagnostics {
             category,
             status: Some(status),
         };
-        if let Ok(mut history) = self.0.lock() {
-            history.push(event, status >= 500);
+        let voice = matches!(
+            operation,
+            "voice_join" | "voice_leave" | "voice_poll" | "voice_signal"
+        );
+        if status >= 500
+            || (voice && (status >= 400 || matches!(operation, "voice_join" | "voice_leave")))
+        {
+            self.persist(&event);
+        }
+        if let Ok(mut history) = self.history.lock() {
+            history.push(event);
         }
     }
 
     pub(super) fn recent(&self) -> Result<Value, String> {
-        let history = self.0.lock().map_err(|_| "DIAGNOSTICS_UNAVAILABLE")?;
+        let history = self.history.lock().map_err(|_| "DIAGNOSTICS_UNAVAILABLE")?;
         Ok(json!({"events": history.events}))
     }
 
@@ -263,7 +321,7 @@ impl Diagnostics {
             .map(Event::from_report)
             .collect::<Option<Vec<_>>>()
             .ok_or("Некорректный диагностический отчёт")?;
-        let mut history = self.0.lock().map_err(|_| "DIAGNOSTICS_UNAVAILABLE")?;
+        let mut history = self.history.lock().map_err(|_| "DIAGNOSTICS_UNAVAILABLE")?;
         let now = Instant::now();
         history
             .report_times
@@ -273,8 +331,58 @@ impl Diagnostics {
         }
         for event in events {
             history.report_times.push_back(now);
-            history.push(event, true);
+            self.persist(&event);
+            history.push(event);
         }
         Ok(json!({"ok": true}))
+    }
+}
+
+#[cfg(test)]
+mod file_tests {
+    use super::*;
+
+    #[test]
+    fn server_file_keeps_voice_context_and_validated_reports() {
+        let directory = std::env::temp_dir().join(format!(
+            "sombra-server-diagnostics-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let diagnostics = Diagnostics::with_file(directory.clone());
+        diagnostics.server("voice_poll", 200, "ok");
+        diagnostics.server("voice_signal", 200, "ok");
+        diagnostics.server("voice_join", 200, "ok");
+        diagnostics.server("voice_leave", 200, "ok");
+        diagnostics.server("voice_poll", 403, "forbidden");
+        diagnostics.server("create_group", 500, "storage");
+        diagnostics.server("login", 401, "auth_required");
+        assert!(diagnostics
+            .report(&json!([{"operation":"private operation","category":"transport"}]))
+            .is_err());
+        diagnostics.report(&json!([{"time":1,"source":"private source","operation":"voice_signal","category":"transport","message":"private body"}])).unwrap();
+        let records = std::fs::read_to_string(directory.join("diagnostics.jsonl")).unwrap();
+        assert!(!records.contains("private"));
+        let records: Vec<Value> = records
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(
+            records
+                .iter()
+                .map(|row| row["operation"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            [
+                "voice_join",
+                "voice_leave",
+                "voice_poll",
+                "create_group",
+                "voice_signal"
+            ]
+        );
+        assert_eq!(records[2]["status"], 403);
+        assert_eq!(records[4]["source"], "desktop");
+        assert_ne!(records[4]["time"], 1);
+        drop(diagnostics);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }
