@@ -66,6 +66,16 @@ Native image/video producer result привязывается к текущем�
 
 Новые клиентские исправления и следующие API (typing/group-DM metadata/search/command registration) пока только в коде для следующего согласованного выпуска. `/model` находится в отдельной подготовке и этим hotfix не объявляется развёрнутым.
 
+## Выпуск 0.1.19 — 18 ноября 2026
+
+Backend обновлён на SHA `3f8a53745582593b7229960945fd7e4b888ec246f5058332639bdb7aa438e71c` (PID2367821), с stopped-service приватной копией `/root/sombra-backups/release-0.1.19-backend-20261118T030556Z`. HTTPS health200; новые операции `set_profile_decoration`, `bot_update_settings`, `bot_get_model_settings`, `bot_owner_update_settings`, `bot_register_commands` без cookie отвечают401 (не 404/502); пользователи6/группы1/диалоги9/сообщения161/сессии4 сохранены. Сервисный конфиг, nginx, TURN и `.env` не менялись.
+
+Плагин Hermes обновлён до adapter `083f97d2a547b5004cd1f6744d36b7372b1b83d9b094bee77abe5a063da3e7f5`, shared_host `0993749b5790a4c951ea4dea1e942d5034b97490746c5781017bdf16a5970175`, public_runner `f5d156cbe3ed80c7cab69674de0fb10d30b53faeb5ee97ef6674377deadcd9ac` в обеих копиях (transport и named-profile `sombra`), backup `/root/sombra-backups/plugin-0.1.19-20261118T030243Z`. Новый gateway PID2366144, `gateway_state=running`, telegram/sombra connected, active_agents0, traceback нет; Telegram SOUL SHA `683f1135…6568` не изменился. Каталог `hermes-sombra-runtime/` (в `.gitignore`, используется только как source) на сервере не установлен и в этой выкладке не создавался.
+
+Сохранён старый source35 в `UNCERTAIN` (15/15 parts, нет prompt'ов, idle) — без ACK, replay и повторной генерации; из-за него в журнале две штатные строки ошибки о halted scope.
+
+Подписанный клиент0.1.19 SHA `d451384af11d08be3adf6d9d5eb58041a13642d412c5944e8adf2738c36a80b7` опубликован на `/updates/0.1.19/`, stable переключён после HTTPS-проверки; retention0.1.15–0.1.19. Клиент использует новые операции (`set_profile_decoration`, настройки модели бота, `/model`, mentions, активность и статус бота) и корректно деградирует на старом сервере (пикер украшений и вкладка модели показывают, что сервер не поддерживает).
+
 ## Срочный выпуск 0.1.18 — 18 ноября 2026
 
 Backend обновлён на SHA `1e8f82251e9bfda37df9faae260c435329b0c03a3728a69c55b2f72610dd16ac` (PID2326129), с stopped-service private backup `/root/sombra-backups/release-0.1.18-backend-20261117T221014Z/`. HTTPS health200, unauthorized search/update_dialog/set_typing/bot_register_commands401; исходные6 пользователей,1 группа,9 диалогов,155 сообщений,4 сессии сохранены. Добавлены capability-gated group-DM metadata/member search/human typing и append-only регистрация команд собственного v2 бота. Настройки сервиса/защиты/nginx/учётные данные не менялись. Temporary voice connections сбрасывались restart и требуют повторного подключения.

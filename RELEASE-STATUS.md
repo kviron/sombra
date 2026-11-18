@@ -1,5 +1,16 @@
 # Выпуски Sombra
 
+## Sombra 0.1.19 — 18 ноября 2026
+
+Опубликованы [GitHub v0.1.19](https://github.com/kviron/sombra/releases/tag/v0.1.19) и [Windows x64 установщик](https://sombra.mi-nerva.ru/updates/0.1.19/Sombra_0.1.19_x64-setup.exe). Источник/tag: `3b0a954` / `v0.1.19`. SHA-256 `D451384AF11D08BE3ADF6D9D5EB58041A13642D412C5944E8ADF2738C36A80B7`, размер13900446байт. Stable `latest.json` переключён только после HTTPS-проверки SHA-256 и подписи; предыдущий манифест — `/root/sombra-backups/release-0.1.19-manifest-20261118T031207Z/`. Retention оставил0.1.15–0.1.19.
+
+Содержимое: упоминания участников (кликабельный тег по ID, «Вас упомянули», `@` у непрочитанных), настройки модели и уровня размышления бота + команда `/model`, анимированные украшения аватара и обложки на pixelfx, полупрозрачное матовое поле ввода с корректным нижним отступом, закреплённая панель профиля на всю ширину, индикатор печати с аватаром и одна строка статуса задачи, карточка генерации изображения, аудио-плеер и карточки файлов, исправления выравнивания и группировки сообщений. Полный список — [0.1.19](RELEASE-NOTES-0.1.19.md).
+
+Проверки:124 desktop Rust (1 ignored timing probe),100 server Rust,101 оффлайн Python, TypeScript/Vite без ошибок, браузерные регрессии поля ввода/панели76, карточки генерации37, композера132, украшений61, движка эффектов40 unit+38 браузерных, упоминаний12, меню37, уведомлений26, выравнивания. Браузерные проверки используют синтетическую границу API; физические устройства и платные генерации не заявляются проверенными.
+
+Backend19 SHA `3f8a53745582593b7229960945fd7e4b888ec246f5058332639bdb7aa438e71c`, PID2367821, HTTPS health200, новые операции безCookie→401; счётчики данных6users/1group/9dialogs/161messages/4sessions сохранены. Приватная stopped-service копия — `/root/sombra-backups/release-0.1.19-backend-20261118T030556Z`. Плагин Hermes обновлён (`adapter.py` `083f97d2…`, `shared_host.py` `0993749b…`, `public_runner.py` `f5d156cb…`), backup — `/root/sombra-backups/plugin-0.1.19-20261118T030243Z`, roxy-hermes PID2366144, обе платформы connected, Telegram SOUL SHA не изменился.
+
+
 ## Sombra 0.1.18 — 18 ноября 2026
 
 Опубликованы [GitHub v0.1.18](https://github.com/kviron/sombra/releases/tag/v0.1.18) и [Windows x64 установщик](https://sombra.mi-nerva.ru/updates/0.1.18/Sombra_0.1.18_x64-setup.exe). Источник/tag: `1d22b1e` / `v0.1.18`. SHA-256 `144589d8bbc1e7e5891f4406f317b4999cfdd98c33e46247eb6ae793386b503a`, размер13796351байт. Криптографически проверены primary Ed25519/BLAKE2b512 и trusted-comment подписи существующим updater key. Это не Authenticode.
