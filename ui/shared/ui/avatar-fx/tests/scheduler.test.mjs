@@ -65,18 +65,19 @@ test('one observer batches visibility and spreads static first paints across fra
   assert.equal(fxSchedulerState().painted, 0);
   env.frame();
   assert.equal(fxSchedulerState().animated, MAX_ANIMATED_FX);
-  assert.equal(fxSchedulerState().painted, 8);
-  for (let i = 0; i < 4; i++) env.frame();
+  assert.equal(fxSchedulerState().painted, 4);
+  for (let i = 0; i < 9; i++) env.frame();
   assert.equal(fxSchedulerState().painted, 20);
   assert.equal(offscreen.paints, 0);
-  assert.ok(jobs.slice(4).every((job) => job.paints === 1 && job.advances.length === 0));
+  assert.ok(jobs.every((job) => job.paints >= 2 && job.advances.length > 0), 'every visible avatar animates even above the frame budget');
   env.visible(jobs, false);
   assert.equal(env.callbacks.size, 0);
   env.frame();
   assert.equal(fxSchedulerState().animated, 0);
+  const previousPaints = jobs.at(-1).paints;
   env.visible(jobs.slice(-1));
   env.frame();
-  assert.equal(jobs.at(-1).paints, 2);
+  assert.equal(jobs.at(-1).paints, previousPaints + 1);
 });
 
 test('priority previews take slots immediately without repainting displaced canvases', (t) => {

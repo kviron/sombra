@@ -47,13 +47,14 @@ import {AccountSecurity} from './account-security';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {toast} from 'sonner';
 
-﻿import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {ShieldCheck,PanelRight,Home,Phone,Video,Bot,ChevronUp,Volume2,Plus,MessageCircle,Users,Settings,LogOut,Send,X,Search,Mic,MicOff,Headphones,HeadphoneOff} from 'lucide-react';
+﻿import {useEffect,useLayoutEffect,useRef,useState,type FormEvent} from 'react';
+import {ShieldCheck,PanelRight,Home,Phone,Video,Bot,ChevronUp,ChevronDown,Volume2,Plus,MessageCircle,Users,Settings,LogOut,Send,X,Search,Mic,MicOff,Headphones,HeadphoneOff} from 'lucide-react';
 import {api,applyProfileEffect,logout,session,type ProfileEffectTarget,type ChatState,type ChatPreferences,type DialogPreferences,type Group,type GroupPermission,type Channel,type Dialog,type User} from '@/shared/api/backend';
 import './chat.css';
 import {useChatDraft} from './use-chat-draft';
 import {useMessageLink} from './use-message-link';
 import {useMessageReadState} from './message-read-state';
+import {chatScrollKey,useChatScroll} from './use-chat-scroll';
 export function LiveChat(){
  const call=useVoice();
  const microphoneOff=call.muted||call.deaf;
@@ -62,21 +63,24 @@ export function LiveChat(){
  useEffect(()=>{const open=()=>{setAccountSection('updates');setSettings(true)};window.addEventListener('sombra:open-updates',open);return()=>window.removeEventListener('sombra:open-updates',open)},[]);
  const [stickerCollectionOpen,setStickerCollectionOpen]=useState(false);
  const [state,setState]=useState<ChatState|null>(null),[groupId,setGroupId]=useState(''),[channelId,setChannelId]=useState(''),[home,setHome]=useState(true),[error,setError]=useState(''),[search,setSearch]=useState(''),[settings,setSettings]=useState(false),[modal,setModal]=useState(''),[name,setName]=useState(''),[selected,setSelected]=useState<string[]>([]),[busy,setBusy]=useState(false),[members,setMembers]=useState(false),[profileId,setProfileId]=useState('');
- const [materialsOpen,setMaterialsOpen]=useState(false),[jumpTarget,setJumpTarget]=useState('');
+ const [materialsOpen,setMaterialsOpen]=useState(false),[jumpMessage,setJumpTarget]=useState('');
+ const jumpOwner=useRef('');
+ const jumpTarget=jumpOwner.current===state?.me.id?jumpMessage:'';
  const notificationJump=useRef<{channel:string;message:string}|null>(null);
+ const [jumpEpoch,bumpJump]=useState(0);
  const materialsTrigger=useRef<HTMLButtonElement>(null);
  const infoTrigger=useRef<HTMLButtonElement>(null);
  const [infoOpen,setInfoOpen]=useState(false),[headerProfile,setHeaderProfile]=useState(false),[materialsCategory,setMaterialsCategory]=useState<MaterialCategory|'all'>('all'),[materialsEpoch,setMaterialsEpoch]=useState(0);
  function openInfoMaterials(category:MaterialCategory){setInfoOpen(false);setProfileId('');setHeaderProfile(false);setMaterialsCategory(category);setMaterialsEpoch(value=>value+1);setMaterialsOpen(true);requestAnimationFrame(()=>document.querySelector<HTMLElement>('#conversation-materials button')?.focus())}
  function openInfoProfile(id:string){setInfoOpen(false);setHeaderProfile(false);requestAnimationFrame(()=>{infoTrigger.current?.focus();setProfileId(id)})}
  function closeMaterials(){setMaterialsOpen(false);requestAnimationFrame(()=>materialsTrigger.current?.focus())}
- function jumpToMessage(id:string){setSearch('');setMaterialsOpen(false);setJumpTarget(id)}
+ function jumpToMessage(id:string){jumpOwner.current=state?.me.id||'';setSearch('');setMaterialsOpen(false);setJumpTarget(id);bumpJump(epoch=>epoch+1)}
  useEffect(()=>{
   if(!jumpTarget)return;
-  const frame=requestAnimationFrame(()=>{const element=document.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(jumpTarget)}"]`);element?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});materialsTrigger.current?.focus()});
+  const frame=requestAnimationFrame(()=>{const element=document.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(jumpTarget)}"]`);element?.getAnimations({subtree:true}).filter(animation=>animation instanceof CSSAnimation&&animation.animationName.includes('message-jump')).forEach(animation=>{animation.currentTime=0;animation.play()});element?.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});materialsTrigger.current?.focus({preventScroll:true})});
   const timer=setTimeout(()=>setJumpTarget(''),2500);
   return()=>{cancelAnimationFrame(frame);clearTimeout(timer)};
- },[jumpTarget,search]);
+ },[jumpTarget,jumpEpoch,search]);
  const [rolesGroupId,setRolesGroupId]=useState('');
  const [groupSettingsSection,setGroupSettingsSection]=useState<GroupSettingsSection>('general');
  const rolesGroup=state?.groups.find(item=>item.id===rolesGroupId);
@@ -213,8 +217,9 @@ export function LiveChat(){
  const channel=home?state?.dialogs.find(d=>d.id===channelId):(group?.channels.find(c=>c.id===channelId)||group?.channels.find(c=>c.name==='games')||group?.channels[0]);
  const activateNotification=useNotificationActivation(state,(next,route)=>{
   applyState(next);setSettings(false);setModal('');setProfileId('');setInfoOpen(false);setHeaderProfile(false);setBotSettingsId('');setRolesGroupId('');setMaterialsOpen(false);setSearch('');setError('');
-  notificationJump.current={channel:route.channel,message:route.message||''};
-  setHome(route.home);if(route.group)setGroupId(route.group);setChannelId(route.channel);setJumpTarget(route.message||'');
+  jumpOwner.current=next.me.id;
+   notificationJump.current={channel:route.channel,message:route.message||''};
+  setHome(route.home);if(route.group)setGroupId(route.group);setChannelId(route.channel);setJumpTarget(route.message||'');bumpJump(epoch=>epoch+1);
  });
  useDirectMessageNotifications(state,{activeChannel:channel?.id,settingsOpen:settings||!!modal||!!profileId||infoOpen,onActivate:activateNotification});
  const {draft,setDraft:storeDraft,clearSent}=useChatDraft(channel?.id||'');
@@ -265,9 +270,6 @@ export function LiveChat(){
  const [channelKind,setChannelKind]=useState('text');
  const end=useRef<HTMLDivElement>(null);
  const composerRef=useRef<HTMLDivElement>(null),scrollRef=useRef<HTMLDivElement>(null);
- // New messages and the live bot image card follow the transcript only while the reader
- // is at the bottom; someone scrolled up into history is left where they are.
- const stickToBottom=useRef(true),scrollChannel=useRef('');
  const voice=(!!channel&&'kind' in channel&&channel.kind==='voice')||!!(voiceRoom&&call.room===voiceRoom);
  const activeMusicRoom=state?.groups.some(g=>g.channels.some(c=>c.kind==='voice'&&c.id===call.room))?call.room:undefined;
  const roomMusic=useRoomMusic(activeMusicRoom,call.deaf,call.preferences.speaker);
@@ -313,7 +315,7 @@ export function LiveChat(){
    const musicCommand=!home&&voice&&!sentAttachment?parseMusicCommand(sent):undefined;
    if(musicCommand){
     if(activeMusicRoom!==destination)throw new Error('Сначала войдите в эту голосовую комнату.');
-    await roomMusic.command(musicCommand.action,musicCommand.url);
+    await roomMusic.command(musicCommand.action,musicCommand.url,musicCommand.limit);
     if(mentionDrafts.current[destination]?.text===sent)delete mentionDrafts.current[destination];
     clearSent(destination,sent);
     return;
@@ -324,7 +326,7 @@ export function LiveChat(){
    if(mentionDrafts.current[destination]?.text===sent)delete mentionDrafts.current[destination];
    clearSent(destination,sent);
    if(sentAttachment)setAttachments(previous=>previous[destination]===sentAttachment?{...previous,[destination]:undefined}:previous);
-   stickToBottom.current=true;
+   scroll.followOnNextUpdate();
    await refresh();
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
@@ -336,7 +338,7 @@ export function LiveChat(){
    await api('message',{channel:destination,sticker});
    if(replaceDraft)clearSent(destination,sent);
    if(replaceDraft&&mentionDrafts.current[destination]?.text===sent)delete mentionDrafts.current[destination];
-   stickToBottom.current=true;
+   scroll.followOnNextUpdate();
    void refresh().catch(e=>setError(e.message));
    return true;
   }catch(e){setError((e as Error).message);return false}
@@ -375,37 +377,41 @@ export function LiveChat(){
  await refresh();setModal('');
  }catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  useEffect(()=>{setSearch('');setError('');setJumpTarget(notificationJump.current&&notificationJump.current.channel===channel?.id?notificationJump.current.message:'');notificationJump.current=null;setInfoOpen(false);setHeaderProfile(false);setMaterialsCategory('all')},[channel?.id]);
- useEffect(()=>{const scroller=scrollRef.current;if(!scroller)return;const onScroll=()=>{stickToBottom.current=scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<=8};scroller.addEventListener('scroll',onScroll,{passive:true});onScroll();return()=>scroller.removeEventListener('scroll',onScroll)},[channel?.id,voice,showFriends]);
- useEffect(()=>{const scroller=scrollRef.current;if(!scroller||jumpTarget)return;const changed=scrollChannel.current!==(channel?.id||'');scrollChannel.current=channel?.id||'';if(!changed&&!stickToBottom.current)return;scroller.scrollTop=scroller.scrollHeight;stickToBottom.current=true},[channel?.id,state?.messages.length,jumpTarget]);
+ const chatMessages=state?.messages.filter(m=>m.channel===channel?.id)||[];
+ const visibleMessages=search?chatMessages.filter(m=>(m.text+' '+userName(m.user)).toLowerCase().includes(search.toLowerCase())):chatMessages;
+ const messageIds=chatMessages.map(m=>m.id);
+ const scrollKey=!voice&&!showFriends&&!search?chatScrollKey(meId||'',channel?.id||''):'';
+ const scroll=useChatScroll(scrollRef,scrollKey,`${messageIds.length}:${messageIds.at(-1)||''}:${imageActivityVisible}`,jumpTarget,jumpEpoch,messageIds);
  // The composer floats over the transcript, so its measured height becomes the
  // scroll container's bottom padding. A CSS variable keeps LiveChat from re-rendering
  // every time the field grows; the observer is the only source of that number.
- useEffect(()=>{
+ useLayoutEffect(()=>{
   const composer=composerRef.current,scroller=scrollRef.current;
   if(!composer||!scroller)return;
-  let sticky=true,frame=0;
-  const onScroll=()=>{sticky=scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight<=8};
+  let frame=0;
   // The measured panel height is a pure function of the composer, and the scroll jump
   // is deferred a frame: resizing the pad inside the observer callback is what makes
   // browsers report "ResizeObserver loop completed with undelivered notifications".
   const sync=()=>{
-   scroller.style.setProperty('--sombra-composer-height',`${composer.offsetHeight}px`);
-   if(!sticky)return;
+   scroller.parentElement?.style.setProperty('--sombra-composer-height',`${composer.offsetHeight}px`);
+   if(!scroll.sticky.current||!scrollKey)return;
    cancelAnimationFrame(frame);
-   frame=requestAnimationFrame(()=>{scroller.scrollTop=scroller.scrollHeight});
+   frame=requestAnimationFrame(()=>{if(scroll.sticky.current)scroller.scrollTop=scroller.scrollHeight});
   };
-  scroller.addEventListener('scroll',onScroll,{passive:true});
   window.addEventListener('resize',sync);
   sync();
+  // Apply the first bottom restoration against the actual composer padding, before
+  // its scroll event could turn the temporary padding gap into a history anchor.
+  if(scrollKey&&scroll.sticky.current)scroller.scrollTop=scroller.scrollHeight;
   const observer=new ResizeObserver(sync);
   observer.observe(composer);
-  return()=>{cancelAnimationFrame(frame);observer.disconnect();scroller.removeEventListener('scroll',onScroll);window.removeEventListener('resize',sync)};
- },[channel?.id,voice,showFriends]);
+  return()=>{cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('resize',sync)};
+ },[channel?.id,voice,showFriends,scrollKey]);
  useEffect(()=>{if((!modal||modal==='dialog'||modal==='edit-group')&&!settings)return;const previous=document.activeElement as HTMLElement;const dialog=document.querySelector<HTMLElement>('[role=dialog]');dialog?.querySelector<HTMLElement>('input,button')?.focus();const handle=(e:KeyboardEvent)=>{if(e.defaultPrevented||document.querySelector('[data-image-crop-dialog],.sticker-collection-modal,.sticker-preview-dialog'))return;if(e.key==='Escape'&&!busy){setModal('');setSettings(false);setError('')}if(e.key==='Tab'&&dialog){const items=Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select,a[href]'));const visible=items.filter(item=>item.getClientRects().length>0);const first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}};window.addEventListener('keydown',handle);return()=>{window.removeEventListener('keydown',handle);previous?.focus()}},[modal,settings,busy]);
  const profile=profileId&&state?(state.me.id===profileId?state.me:state.users.find(user=>user.id===profileId)):undefined;
  // Draft IDs survive modal closure; only rendered overlays block read receipts.
- useMessageReadState(state,channel?.id||'',settings||!!modal||!!profile||headerProfile||infoOpen||!!rolesGroup||!!managedBot||!!dialogCalls.incoming||showFriends);
- const visibleMessages=state?.messages.filter(m=>m.channel===channel?.id&&(m.text+' '+userName(m.user)).toLowerCase().includes(search.toLowerCase()))||[];
+ useMessageReadState(state,channel?.id||'',settings||!!modal||!!profile||headerProfile||infoOpen||!!rolesGroup||!!managedBot||!!dialogCalls.incoming||showFriends,scroll.acceptRead);
+
  return <UserActionsProvider value={{me:state?.me,openProfile:id=>{setHeaderProfile(false);setProfileId(id)}, messageUser:id=>void messageUser(id),editOwnProfile:openOwnProfile,friendStatus,addFriend:id=>void requestFriend(id),acceptFriend:id=>void acceptFriend(id),removeFriend:id=>void removeFriend(id)}}>
  <main className="chat-shell">
  {/* Playback belongs to the joined session, never Home/DM/channel navigation. */}
@@ -441,7 +447,7 @@ export function LiveChat(){
  <AttachmentDropZone channel={channel?.id} disabled={busy||readingAttachment||settings||!!modal||!!profileId||infoOpen||!!dialogCalls.incoming} onFile={file=>void selectAttachment(file)}><header className="chat-header">{!dmPeer&&(home&&channel&&'members' in channel&&channel.members.length>2&&channel.avatar?<img className="dialog-header-avatar" src={channel.avatar} alt=""/>:home?<MessageCircle/>:voice?<Volume2/>:<MessageCircle/>)}{channel&&!showFriends?<button ref={infoTrigger} type="button" className={`chat-conversation-info${dmPeer?' dm-header-info':''}`} aria-label="Информация о чате" title="Информация о чате" onClick={()=>{if(home&&'members' in channel&&channel.members.length===2){if(dmPeer){setHeaderProfile(true);setProfileId(dmPeer.id)}else setInfoOpen(true)}else setInfoOpen(true)}}>{dmPeer?<DmHeaderIdentity user={dmPeer} typingUntil={peerTypingUntil}/>:<strong>{title}</strong>}{home&&'members' in channel&&channel.members.length>2&&<small>{participantCount(channel.members.length)}</small>}</button>:<strong>{title}</strong>}<div className="header-actions">{ownerDmBot&&<Button type="button" variant="ghost" size="icon-sm" title="Управление ботом" aria-label="Управление ботом" onClick={()=>setBotSettingsId(ownerDmBot.id)}><Settings/></Button>}{home&&channel&&!showFriends&&!dmPeer?.bot&&<div className="dialog-call-header-actions"><Button type="button" variant="ghost" size="icon-sm" title="Начать аудиозвонок" aria-label="Начать аудиозвонок" disabled={dialogCalls.busy||call.busy} onClick={()=>void dialogCalls.start(channel.id,false)}><Phone/></Button><Button type="button" variant="ghost" size="icon-sm" title="Начать видеозвонок" aria-label="Начать видеозвонок" disabled={dialogCalls.busy||call.busy} onClick={()=>void dialogCalls.start(channel.id,true)}><Video/></Button></div>}{!home&&channel&&<button title="Боты комнаты" onClick={()=>open('bots')}><Bot/></button>}{canShowMembers&&<button title="Участники" aria-pressed={members&&!materialsOpen} onClick={()=>{setMaterialsOpen(false);setMembers(open=>materialsOpen?true:!open)}}><Users/></button>}<label className="chat-search"><input aria-label="Поиск сообщений" placeholder="Поиск сообщений" value={search} onChange={e=>setSearch(e.target.value)}/><Search size={17}/></label>{channel&&!showFriends&&<button ref={materialsTrigger} type="button" className="materials-toggle" aria-label="Открыть материалы переписки" title="Фото, файлы и ссылки" aria-controls="conversation-materials" aria-expanded={materialsOpen} onClick={()=>{setMaterialsCategory('all');setMaterialsEpoch(value=>value+1);setMaterialsOpen(open=>!open)}}><PanelRight size={19}/></button>}</div></header>{error&&<div className="chat-notice" role="alert">{error}<a href="#login">Войти</a><button onClick={()=>setError('')} title="Закрыть"><X size={16}/></button></div>}
  {dialogCalls.error&&!dialogCalls.incoming&&<div className="chat-notice" role="alert">{dialogCalls.error}<button type="button" aria-label="Закрыть ошибку звонка" onClick={dialogCalls.clearError}><X size={16}/></button></div>}
  {currentDialogCall&&<DialogCallBanner call={currentDialogCall} joined={call.room===currentDialogCall.id} busy={dialogCalls.busy||call.busy} onJoin={()=>void dialogCalls.join(currentDialogCall)} onLeave={call.leave}/>}
- <div className="conversation-body" ref={conversationMotion}><div className={voice?"chat-main voice-layout":"chat-main"}>{voice&&<ColumnResizer label="Ширина чата канала" side="left" variable="--voice-chat-width" min={260} max={600} target=".voice-messages"/>}{showFriends&&state?<Friends state={state} refresh={refresh} onError={setError} onDialog={id=>{setHome(true);setChannelId(id)}}/>:voice?<VoiceStage music={!home?roomMusic:undefined} voice={call} id={voiceRoom||channel!.id} title={title} userName={userName} me={state?.me.name||"Вы"} meUser={state?.me} users={state?.users} onSettings={()=>{setAccountSection("voice");setSettings(true)}}/>:<div className="message-scroll" ref={scrollRef}>{!channel&&home&&state?<p className="conversation-empty">Выберите переписку слева или начните новый диалог кнопкой +.</p>:<>{!visibleMessages.length&&!search&&<p className="conversation-empty">{channel?'Пока тихо. Начните разговор — отправьте первое сообщение.':'Выберите или создайте комнату, чтобы начать общение.'}</p>}{state&&visibleMessages.map((m,i)=><div key={m.id} data-message-id={m.id} className={jumpTarget===m.id?'message-jump-highlight':undefined}>{(i===0||new Date(m.time*1000).toDateString()!==new Date(visibleMessages[i-1].time*1000).toDateString())&&<div className="chat-day"><span>{new Date(m.time*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})}</span></div>}<MessageItem previous={visibleMessages[i-1]} message={m} state={state} refresh={refresh} onError={setError} userName={userName}/></div>)}{state&&!search&&channel&&<BotImageActivity state={state} channel={channel.id}/>}</>}{search&&!visibleMessages.length&&<p className="no-results">Сообщения не найдены</p>}<div ref={end}/></div>}{voice&&<div className="voice-messages"><h3>Чат канала · {title}</h3>{state&&visibleMessages.map((m,i)=><div key={m.id} data-message-id={m.id} className={jumpTarget===m.id?'message-jump-highlight':undefined}>{(i===0||new Date(m.time*1000).toDateString()!==new Date(visibleMessages[i-1].time*1000).toDateString())&&<div className="chat-day"><span>{new Date(m.time*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})}</span></div>}<MessageItem previous={visibleMessages[i-1]} message={m} state={state} refresh={refresh} onError={setError} userName={userName}/></div>)}{state&&channel&&<><BotImageActivity state={state} channel={channel.id}/>{!imageActivityVisible&&<BotTyping state={state} channel={channel.id}/>}</>}<div ref={end}/></div>}{channel&&<div className="composer-chrome dark" ref={composerRef}>{state&&!voice&&!imageActivityVisible&&<BotTyping state={state} channel={channel.id}/>}<AssistantComposer onMentionInserted={(mention,text)=>{const id=channel?.id||'';const current=editMentionDraft(mentionDrafts.current[id]||{text:draft,mentions:[]},text);mentionDrafts.current[id]={text,mentions:[...current.mentions.filter(m=>m.end<=mention.start||m.start>=mention.end),mention]}}} key={`${meId}:${channel.id}`} state={state!} channel={channel.id} group={home?undefined:group?.id} draft={draft} setDraft={setDraft} onSubmit={send} onSearch={()=>document.querySelector<HTMLInputElement>('.chat-search input')?.focus()} disabled={!channel} sendDisabled={busy||readingAttachment||!channel||(!draft.trim()&&!attachment)} attachments={<AttachmentDraftPreview key={`${meId}:${channel.id}`} draft={attachment} reading={readingAttachment} disabled={busy} onRemove={removeAttachment}/>} hasAttachment={!!attachment} placeholder={`Написать в ${title}`} textareaRef={messageLink.textareaRef} onPaste={event=>{const file=pastedAttachment(event);if(file)void selectAttachment(file)}} sendButton={<ComposerSendButton type="submit" title="Отправить сообщение" disabled={busy||readingAttachment||!channel||(!draft.trim()&&!attachment)}><MotionIcon icon={Send} kind="send" size={16}/></ComposerSendButton>}><AttachmentComposer reading={readingAttachment} disabled={busy} onFile={file=>void selectAttachment(file)} onRemove={removeAttachment}/>{state&&<StickerSuggestions key={channel.id} draft={draft} stickers={state.stickers} user={state.me.id} group={home?undefined:group?.id} busy={busy} onSelect={sendStickerSuggestion}/>}{state&&<ExpressionPicker key={channel.id} state={state} refresh={refresh} onError={setError} disabled={busy} group={home?undefined:group} onManage={manageStickers} onEmoji={e=>setDraft(draft+e)} onSticker={async sticker=>{await api('message',{channel:channel.id,sticker});await refresh()}}/>}</AssistantComposer></div>}</div>{!materialsOpen&&canShowMembers&&members&&<aside className="member-list" aria-label="Участники"><ColumnResizer label="Ширина списка участников" side="left" variable="--member-width" min={180} max={420}/>{state&&group?
+ <div className="conversation-body" ref={conversationMotion}><div className={voice?"chat-main voice-layout":"chat-main"}>{voice&&<ColumnResizer label="Ширина чата канала" side="left" variable="--voice-chat-width" min={260} max={600} target=".voice-messages"/>}{showFriends&&state?<Friends state={state} refresh={refresh} onError={setError} onDialog={id=>{setHome(true);setChannelId(id)}}/>:voice?<VoiceStage music={!home?roomMusic:undefined} voice={call} id={voiceRoom||channel!.id} title={title} userName={userName} me={state?.me.name||"Вы"} meUser={state?.me} users={state?.users} onSettings={()=>{setAccountSection("voice");setSettings(true)}}/>:<div className="message-scroll" ref={scrollRef} tabIndex={-1} role="region" aria-label="Сообщения">{!channel&&home&&state?<p className="conversation-empty">Выберите переписку слева или начните новый диалог кнопкой +.</p>:<>{!visibleMessages.length&&!search&&<p className="conversation-empty">{channel?'Пока тихо. Начните разговор — отправьте первое сообщение.':'Выберите или создайте комнату, чтобы начать общение.'}</p>}{state&&visibleMessages.map((m,i)=><div key={m.id} data-message-id={m.id} className={jumpTarget===m.id?'message-jump-highlight':undefined}>{(i===0||new Date(m.time*1000).toDateString()!==new Date(visibleMessages[i-1].time*1000).toDateString())&&<div className="chat-day"><span>{new Date(m.time*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})}</span></div>}<MessageItem previous={visibleMessages[i-1]} message={m} state={state} refresh={refresh} onError={setError} userName={userName}/></div>)}{state&&!search&&channel&&<BotImageActivity state={state} channel={channel.id}/>}</>}{search&&!visibleMessages.length&&<p className="no-results">Сообщения не найдены</p>}<div ref={end}/></div>}{scroll.mode&&scrollKey&&<Button type="button" variant="ghost" size="icon" className="chat-scroll-down" title={scroll.mode==="read"?"К последнему прочитанному сообщению":"В конец чата"} aria-label={scroll.mode==="read"?"К последнему прочитанному сообщению":"В конец чата"} onClick={scroll.goDown}><ChevronDown aria-hidden="true" size={20}/></Button>}{voice&&<div className="voice-messages"><h3>Чат канала · {title}</h3>{state&&visibleMessages.map((m,i)=><div key={m.id} data-message-id={m.id} className={jumpTarget===m.id?'message-jump-highlight':undefined}>{(i===0||new Date(m.time*1000).toDateString()!==new Date(visibleMessages[i-1].time*1000).toDateString())&&<div className="chat-day"><span>{new Date(m.time*1000).toLocaleDateString('ru',{day:'numeric',month:'long',year:'numeric'})}</span></div>}<MessageItem previous={visibleMessages[i-1]} message={m} state={state} refresh={refresh} onError={setError} userName={userName}/></div>)}{state&&channel&&<><BotImageActivity state={state} channel={channel.id}/>{!imageActivityVisible&&<BotTyping state={state} channel={channel.id}/>}</>}<div ref={end}/></div>}{channel&&<div className="composer-chrome dark" ref={composerRef}>{state&&!voice&&!imageActivityVisible&&<BotTyping state={state} channel={channel.id}/>}<AssistantComposer onMentionInserted={(mention,text)=>{const id=channel?.id||'';const current=editMentionDraft(mentionDrafts.current[id]||{text:draft,mentions:[]},text);mentionDrafts.current[id]={text,mentions:[...current.mentions.filter(m=>m.end<=mention.start||m.start>=mention.end),mention]}}} key={`${meId}:${channel.id}`} state={state!} channel={channel.id} group={home?undefined:group?.id} draft={draft} setDraft={setDraft} onSubmit={send} onSearch={()=>document.querySelector<HTMLInputElement>('.chat-search input')?.focus()} disabled={!channel} sendDisabled={busy||readingAttachment||!channel||(!draft.trim()&&!attachment)} attachments={<AttachmentDraftPreview key={`${meId}:${channel.id}`} draft={attachment} reading={readingAttachment} disabled={busy} onRemove={removeAttachment}/>} hasAttachment={!!attachment} placeholder={`Написать в ${title}`} textareaRef={messageLink.textareaRef} onPaste={event=>{const file=pastedAttachment(event);if(file)void selectAttachment(file)}} sendButton={<ComposerSendButton type="submit" title="Отправить сообщение" disabled={busy||readingAttachment||!channel||(!draft.trim()&&!attachment)}><MotionIcon icon={Send} kind="send" size={16}/></ComposerSendButton>}><AttachmentComposer reading={readingAttachment} disabled={busy} onFile={file=>void selectAttachment(file)} onRemove={removeAttachment}/>{state&&<StickerSuggestions key={channel.id} draft={draft} stickers={state.stickers} user={state.me.id} group={home?undefined:group?.id} busy={busy} onSelect={sendStickerSuggestion}/>}{state&&<ExpressionPicker key={channel.id} state={state} refresh={refresh} onError={setError} disabled={busy} group={home?undefined:group} onManage={manageStickers} onEmoji={e=>setDraft(draft+e)} onSticker={async sticker=>{await api('message',{channel:channel.id,sticker});await refresh()}}/>}</AssistantComposer></div>}</div>{!materialsOpen&&canShowMembers&&members&&<aside className="member-list" aria-label="Участники"><ColumnResizer label="Ширина списка участников" side="left" variable="--member-width" min={180} max={420}/>{state&&group?
  <MemberList members={group.members} users={state.users} meId={state.me.id} group={group}/>:<p className="member-empty">Загрузка участников…</p>}</aside>}{materialsOpen&&channel&&!showFriends&&state&&<ConversationMaterials key={`${channel.id}:${materialsEpoch}`} initialCategory={materialsCategory} channel={channel.id} title={title} messages={state.messages} userName={userName} onClose={closeMaterials} onJump={jumpToMessage}/>}</div></AttachmentDropZone>
  {settings&&<div className="modal-backdrop" onClick={()=>setSettings(false)}><section role="dialog" aria-modal="true" aria-label="Учётная запись" className="account-modal dark" onClick={e=>e.stopPropagation()}><AccountSidebar me={state?.me} avatar={state?.me.avatar} name={state?.me.name||''} section={accountSection} onSection={setAccountSection} onLogout={()=>{void logout().catch(e=>setError(e.message))}}/><article><header><span>{accountSections.find(item=>item.id===accountSection)?.label}</span><Button variant="ghost" size="icon-sm" title="Закрыть настройки" aria-label="Закрыть настройки" onClick={()=>setSettings(false)}><X/></Button></header><div id="account-panel" ref={settingsMotion}>{accountSection==='updates'?<UpdateSettings inCall={!!call.room||call.busy}/>:accountSection==='notifications'?<NotificationSettings preferences={state?.chatPreferences} ready={!!state} onSaved={preferences=>{if(state)applyChatPreferences(state.me.id,preferences)}}/>:accountSection==='storage'?<AttachmentCacheSettings key={state?.me.id||'loading'} ready={!!state} onChanged={refresh}/>:accountSection==='voice'?<VoiceSettings voice={call}/>:accountSection==='stickers'&&state?<><Button type="button" variant="outline" onClick={()=>setStickerCollectionOpen(true)}>Открыть коллекцию</Button><StickerCollectionModal open={stickerCollectionOpen} onOpenChange={setStickerCollectionOpen} stickers={state.stickers} user={state.me.id} catalog={state.stickerCatalogSupported} refresh={refresh}/></>:<AccountSecurity state={state} refresh={refresh} section={accountSection} onMediaSaved={mediaSaved}/>}</div></article></section></div>}
  {modal==='dialog'&&state&&<NewDialogDialog state={state} refresh={refresh} onClose={()=>setModal('')} onCreated={dialog=>{setHome(true);setChannelId(dialog.id);setModal('')}}/>}

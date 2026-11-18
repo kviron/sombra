@@ -1,9 +1,11 @@
-"""Opt-in loopback-only MP3 range bridge for one approved Yandex track.
+"""Opt-in loopback-only MP3 range bridge for Yandex tracks and playlists.
 
 No audio is written to disk. The caller must enforce room membership. Do not
 publish this listener through nginx or any other public route.
 """
 import argparse
+import json
+from collections import OrderedDict
 import os
 import re
 import subprocess
@@ -13,9 +15,14 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-TRACK = '39312848'
+TRACK_ID = re.compile(r'[1-9][0-9]{0,18}')
+PLAYLIST_ID = re.compile(r'(?:lk\.)?[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}')
+OWNER = re.compile(r'[A-Za-z0-9_.-]{1,64}')
 MAX_BYTES = 10 * 1024 * 1024
 CHUNK = 262144
+MAX_RESOLVE_TRACKS = 1000
+METADATA_BATCH_SIZE = 100
+RESOLVE_TIMEOUT = 16
 
 
 def https(url):
@@ -27,23 +34,63 @@ class Provider:
         from yandex_music import Client
         self.client = Client(token)
         self.lock = threading.Lock()
-        self.link = None
-        self.expires = 0
+        self.links = OrderedDict()
 
-    def url(self, refresh=False):
+    def resolve(self, query, limit):
+        if 'id' in query:
+            tracks = self.client.tracks([query['id']], timeout=8)
+        else:
+            deadline = time.monotonic() + RESOLVE_TIMEOUT
+            playlist = (self.client.playlist(query['playlist'], timeout=8) if 'playlist' in query else
+                        self.client.users_playlists(query['kind'], user_id=query['owner'], timeout=8))
+            if not playlist:
+                return []
+            candidates = [str(item.id) for item in (playlist.tracks or [])[:limit]]
+            unique = list(dict.fromkeys(i for i in candidates if TRACK_ID.fullmatch(i)))
+            by_id = {}
+            for start in range(0, len(unique), METADATA_BATCH_SIZE):
+                batch = unique[start:start + METADATA_BATCH_SIZE]
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError()
+                requested = set(batch)
+                for track in self.client.tracks(batch, timeout=min(8, remaining)):
+                    tid = str(track.id)
+                    if tid in requested:
+                        by_id[tid] = track
+            if time.monotonic() >= deadline:
+                raise TimeoutError()
+            # The provider need not return metadata in playlist order.
+            tracks = [by_id[i] for i in candidates if i in by_id]
+        result = []
+        for t in tracks[:limit]:
+            tid, duration = str(t.id), t.duration_ms
+            if not TRACK_ID.fullmatch(tid) or not isinstance(duration, int) or not 0 < duration <= 86400000 or not t.available:
+                continue
+            title = ' '.join((t.title or '').split())[:120] or 'Яндекс Музыка'
+            result.append(dict(id=tid,title=title,durationMs=duration))
+        return result
+
+    def url(self, track, refresh=False):
         with self.lock:
-            if refresh or not self.link or time.monotonic() >= self.expires:
-                options = [x for x in self.client.tracks_download_info(TRACK, timeout=8) if x.codec == 'mp3' and not x.preview]
-                link = min(options, key=lambda x: x.bitrate_in_kbps).get_direct_link(timeout=8)
-                if not https(link):
-                    raise ValueError('Unexpected source URL')
-                self.link = link
-                self.expires = time.monotonic() + 180
-            return self.link
+            cached = self.links.get(track)
+            if cached and not refresh and time.monotonic() < cached[1]:
+                self.links.move_to_end(track)
+                return cached[0]
+        options = [x for x in self.client.tracks_download_info(track, timeout=8) if x.codec == 'mp3' and not x.preview]
+        link = min(options, key=lambda x: x.bitrate_in_kbps).get_direct_link(timeout=8)
+        if not https(link):
+            raise ValueError('Unexpected source URL')
+        with self.lock:
+            self.links[track] = (link, time.monotonic() + 180)
+            self.links.move_to_end(track)
+            if len(self.links) > 64:
+                self.links.popitem(last=False)
+        return link
 
-    def chunk(self, offset):
+    def chunk(self, track, offset):
         for refresh in (False, True):
-            url = self.url(refresh)
+            url = self.url(track, refresh)
             # URL is supplied via stdin rather than argv or logs. Bound response
             # bytes before considering headers so a range-ignoring CDN fails closed.
             proc = subprocess.run(['curl', '-q', '--config', '-', '--proto', '=https', '--proto-redir', '=https',
@@ -80,11 +127,21 @@ def server(provider, port):
 
         def do_GET(self):
             parsed = urlsplit(self.path)
-            query = parse_qs(parsed.query, strict_parsing=False, max_num_fields=8) if len(self.path) <= 256 else {}
-            if parsed.path != '/chunk' or set(query) != {'id', 'offset', 'limit'} or query['id'] != [TRACK] or query['limit'] != [str(CHUNK)] or len(query['offset']) != 1 or not re.fullmatch(r'0|[1-9][0-9]{0,7}', query['offset'][0]):
+            try:
+                fields = parse_qs(parsed.query, keep_blank_values=True, max_num_fields=8) if len(self.path) <= 256 else {}
+                query = {key: values[0] for key, values in fields.items() if len(values) == 1}
+                if len(query) != len(fields):
+                    raise ValueError()
+            except ValueError:
+                self.send_error(400)
+                return
+            if parsed.path == '/resolve':
+                self.resolve(query)
+                return
+            if parsed.path != '/chunk' or set(query) != {'id', 'offset', 'limit'} or not TRACK_ID.fullmatch(query['id']) or query['limit'] != str(CHUNK) or not re.fullmatch(r'0|[1-9][0-9]{0,7}', query['offset']):
                 self.send_error(404)
                 return
-            offset = int(query['offset'][0]);
+            offset = int(query['offset'])
             if offset >= MAX_BYTES or offset % CHUNK:
                 self.send_error(416)
                 return
@@ -92,7 +149,7 @@ def server(provider, port):
                 self.send_error(503)
                 return
             try:
-                audio, total = provider.chunk(offset)
+                audio, total = provider.chunk(query['id'], offset)
             except Exception:
                 self.send_error(502)
                 return
@@ -108,6 +165,34 @@ def server(provider, port):
                 self.wfile.write(audio)
             except (BrokenPipeError, ConnectionResetError):
                 pass
+
+        def resolve(self, query):
+            limit = query.pop('limit', '')
+            if not re.fullmatch(r'[1-9][0-9]{0,3}', limit) or int(limit) > MAX_RESOLVE_TRACKS:
+                self.send_error(400)
+                return
+            valid = ((set(query) == {'id'} and TRACK_ID.fullmatch(query['id'])) or
+                     (set(query) == {'playlist'} and PLAYLIST_ID.fullmatch(query['playlist'])) or
+                     (set(query) == {'owner', 'kind'} and OWNER.fullmatch(query['owner']) and TRACK_ID.fullmatch(query['kind'])))
+            if not valid:
+                self.send_error(400)
+                return
+            if not slots.acquire(blocking=False):
+                self.send_error(503)
+                return
+            try:
+                body = json.dumps({'tracks': provider.resolve(query, int(limit))}, ensure_ascii=False).encode()
+            except Exception:
+                self.send_error(502)
+                return
+            finally:
+                slots.release()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
 
     return ThreadingHTTPServer(('127.0.0.1', port), Handler)
 

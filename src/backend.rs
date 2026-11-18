@@ -1844,18 +1844,54 @@ pub(crate) fn api_router(backend: Backend) -> axum::Router {
         let max_age = session_lifetime(request["remember_me"].as_bool().unwrap_or(false));
         let result = if operation == "music_stream_chunk" {
             let prepare = || {
-                state.backend.lock().map_err(|_| "STORAGE_UNAVAILABLE".to_string())?
+                state
+                    .backend
+                    .lock()
+                    .map_err(|_| "STORAGE_UNAVAILABLE".to_string())?
                     .prepare_music_chunk(&request)
             };
             Ok(match prepare() {
-                Ok((helper, offset)) => match helper.read(offset).await {
-                    // A skip, expiry, or voice leave during the upstream read
-                    // must not release the bytes to a now-unauthorized caller.
-                    Ok(data) => prepare().map(|_| data),
-                    Err(error) => Err(error),
-                },
+                Ok((helper, provider_id, offset)) => {
+                    match helper.read(&provider_id, offset).await {
+                        // A skip, expiry, or voice leave during the upstream read
+                        // must not release the bytes to a now-unauthorized caller.
+                        Ok(data) => prepare().map(|_| data),
+                        Err(error) => Err(error),
+                    }
+                }
                 Err(error) => Err(error),
             })
+        } else if operation == "music_command" && request["action"] == "add" {
+            // Never hold the backend mutex during a provider lookup. Authenticate and
+            // check the voice lease again before writing the resulting tracks.
+            let prepare = || -> Result<_, String> {
+                state
+                    .backend
+                    .lock()
+                    .map_err(|_| "STORAGE_UNAVAILABLE")?
+                    .prepare_music_add(&request)
+            };
+            match prepare() {
+                Ok(Some((helper, input, limit))) => Ok(match helper.resolve(input, limit).await {
+                    Ok(tracks) => state
+                        .backend
+                        .lock()
+                        .map_err(|_| "STORAGE_UNAVAILABLE".to_string())
+                        .and_then(|mut backend| backend.finish_music_add(&request, tracks)),
+                    Err(error) => Err(error),
+                }),
+                Ok(None) => {
+                    tokio::task::spawn_blocking(move || {
+                        state
+                            .backend
+                            .lock()
+                            .map_err(|_| "STORAGE_UNAVAILABLE")?
+                            .request(request)
+                    })
+                    .await
+                }
+                Err(error) => Ok(Err(error)),
+            }
         } else {
             tokio::task::spawn_blocking(move || {
                 state

@@ -10,10 +10,22 @@ use std::{
 };
 use std::{fs, io::Read, path::Path};
 
-const MAX_QUEUE: usize = 32;
+const MAX_QUEUE: usize = 1000;
+const DEFAULT_ADD_LIMIT: usize = 32;
+
+fn music_add_limit(request: &Value) -> Result<usize, String> {
+    match request.get("limit") {
+        None => Ok(DEFAULT_ADD_LIMIT),
+        Some(limit) => limit
+            .as_u64()
+            .filter(|&n| (1..=MAX_QUEUE as u64).contains(&n))
+            .map(|n| n as usize)
+            .ok_or_else(|| "MUSIC_INVALID_LIMIT".into()),
+    }
+}
 const MAX_URL_BYTES: usize = 2048;
 
-// Commands resolve only exact operator-approved sources and do not perform network I/O.
+// Provider metadata is resolved only through the configured localhost helper.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Source {
@@ -24,12 +36,14 @@ struct Source {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Track {
+pub(super) struct Track {
     id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     asset_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stream: Option<bool>,
+    #[serde(skip)]
+    provider_id: Option<String>,
     #[serde(flatten)]
     source: Source,
 }
@@ -81,7 +95,7 @@ fn loopback(url: &Url) -> bool {
     })
 }
 
-fn yandex_track_key(input: &str) -> Option<String> {
+fn yandex_path(input: &str) -> Option<(String, &str)> {
     // Check the raw authority/path before the URL parser can fold encoded hosts,
     // backslashes or dot segments. Ignore share-query parameters, not fragments.
     if input.len() > MAX_URL_BYTES
@@ -105,14 +119,69 @@ fn yandex_track_key(input: &str) -> Option<String> {
         return None;
     }
     let path = path.strip_suffix('/').unwrap_or(path);
-    let segments: Vec<_> = path.split('/').collect();
-    let digits = |value: &str| !value.is_empty() && value.bytes().all(|b| b.is_ascii_digit());
-    match segments.as_slice() {
-        ["track", track] if digits(track) => (),
-        ["album", album, "track", track] if digits(album) && digits(track) => (),
+    Some((authority, path))
+}
+
+fn provider_number(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 19
+        && value.bytes().all(|b| b.is_ascii_digit())
+        && value
+            .parse::<u64>()
+            .is_ok_and(|n| n > 0 && n.to_string() == value)
+}
+
+fn yandex_track_key(input: &str) -> Option<String> {
+    let (authority, path) = yandex_path(input)?;
+    match path.split('/').collect::<Vec<_>>().as_slice() {
+        ["track", track] if provider_number(track) => (),
+        ["album", album, "track", track] if provider_number(album) && provider_number(track) => (),
         _ => return None,
     }
     Some(format!("{authority}/{path}"))
+}
+
+pub(super) enum YandexInput {
+    Track(String),
+    Playlist(String),
+    UserPlaylist { owner: String, kind: String },
+}
+
+impl YandexInput {
+    fn parse(input: &str) -> Option<Self> {
+        let (_, path) = yandex_path(input)?;
+        match path.split('/').collect::<Vec<_>>().as_slice() {
+            ["track", id] if provider_number(id) => Some(Self::Track((*id).into())),
+            ["album", album, "track", id] if provider_number(album) && provider_number(id) => {
+                Some(Self::Track((*id).into()))
+            }
+            ["playlists", id] => {
+                let uuid = id.strip_prefix("lk.").unwrap_or(id);
+                if uuid.len() != 36
+                    || !uuid::Uuid::parse_str(uuid)
+                        .is_ok_and(|u| !u.is_nil() && u.to_string().eq_ignore_ascii_case(uuid))
+                {
+                    return None;
+                }
+                Some(Self::Playlist(id.to_ascii_lowercase()))
+            }
+            ["users", owner, "playlists", kind]
+                if !owner.is_empty()
+                    && owner.len() <= 64
+                    && owner
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'))
+                    && !matches!(*owner, "." | "..")
+                    && provider_number(kind) =>
+            {
+                Some(Self::UserPlaylist {
+                    owner: (*owner).into(),
+                    kind: (*kind).into(),
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -182,6 +251,7 @@ impl Catalog {
             id: id(),
             asset_id: None,
             stream: None,
+            provider_id: None,
             source: source.clone(),
         })
     }
@@ -197,11 +267,22 @@ struct Playback {
     running_since: Option<Instant>,
 }
 
+fn system_time_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
 fn elapsed_ms(start: Instant, end: Instant) -> u64 {
     end.saturating_duration_since(start).as_millis() as u64
 }
 
 impl Playback {
+    fn available(&self) -> usize {
+        MAX_QUEUE - self.queue.len() + usize::from(self.track.is_none())
+    }
+
     fn position(&self, at: Instant) -> u64 {
         self.offset_ms + self.running_since.map_or(0, |start| elapsed_ms(start, at))
     }
@@ -285,7 +366,11 @@ const MAX_PRIVATE_CONFIG: u64 = 8 * 1024;
 const MAX_PRIVATE_AUDIO: u64 = 10 * 1024 * 1024;
 const APPROVED_ROOM: &str = "cd1f4fa5-09b9-472e-8826-7ca5b981e187";
 const APPROVED_KEY: &str = "music.yandex.ru/album/5071484/track/39312848";
+#[cfg(test)]
 const PROVIDER_ID: &str = "39312848";
+// Allow 1000 validated titles (up to 120 Unicode characters each), even
+// when encoded as JSON surrogate pairs, with bounded room for other fields.
+const RESOLVE_BYTES_PER_TRACK: usize = 1536;
 const CHUNK_BYTES: u64 = 256 * 1024;
 const MAX_STREAM_AUDIO: u64 = 10 * 1024 * 1024;
 const STREAM_CONFIG_ERROR: &str = "Invalid MINES_MUSIC_STREAM_HELPER configuration";
@@ -297,6 +382,7 @@ pub(super) struct StreamHelper {
     endpoint: Url,
     client: reqwest::Client,
     inflight: Arc<tokio::sync::Semaphore>,
+    resolving: Arc<tokio::sync::Semaphore>,
 }
 
 impl StreamHelper {
@@ -318,17 +404,83 @@ impl StreamHelper {
             endpoint,
             client,
             inflight: Arc::new(tokio::sync::Semaphore::new(8)),
+            resolving: Arc::new(tokio::sync::Semaphore::new(2)),
         })
     }
 
-    pub(super) async fn read(&self, offset: u64) -> Result<Value, String> {
+    pub(super) async fn resolve(
+        &self,
+        input: YandexInput,
+        limit: usize,
+    ) -> Result<Vec<Track>, String> {
+        let _permit = self
+            .resolving
+            .try_acquire()
+            .map_err(|_| "MUSIC_STREAM_BUSY")?;
+        let mut url = self.endpoint.clone();
+        url.set_path("/resolve");
+        {
+            let mut query = url.query_pairs_mut();
+            match &input {
+                YandexInput::Track(id) => {
+                    query.append_pair("id", id);
+                }
+                YandexInput::Playlist(id) => {
+                    query.append_pair("playlist", id);
+                }
+                YandexInput::UserPlaylist { owner, kind } => {
+                    query.append_pair("owner", owner).append_pair("kind", kind);
+                }
+            }
+            query.append_pair("limit", &limit.to_string());
+        }
+        let mut response = self
+            .client
+            .get(url)
+            .timeout(Duration::from_secs(18))
+            .send()
+            .await
+            .map_err(stream_error)?;
+        match response.status() {
+            reqwest::StatusCode::OK => (),
+            reqwest::StatusCode::NOT_FOUND => return Err("MUSIC_SOURCE_NOT_APPROVED".into()),
+            reqwest::StatusCode::TOO_MANY_REQUESTS => return Err("MUSIC_STREAM_BUSY".into()),
+            _ => return Err(STREAM_UNAVAILABLE.into()),
+        }
+        let max_bytes = limit * RESOLVE_BYTES_PER_TRACK + 32;
+        if response
+            .content_length()
+            .is_some_and(|size| size > max_bytes as u64)
+        {
+            return Err(STREAM_UNAVAILABLE.into());
+        }
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await.map_err(stream_error)? {
+            if bytes.len() + chunk.len() > max_bytes {
+                return Err(STREAM_UNAVAILABLE.into());
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        let Resolved { tracks } = serde_json::from_slice(&bytes).map_err(|_| STREAM_UNAVAILABLE)?;
+        if tracks.is_empty() {
+            return Err("MUSIC_SOURCE_NOT_APPROVED".into());
+        }
+        if tracks.len() > limit
+            || matches!(&input, YandexInput::Track(id) if tracks.len() != 1 || tracks[0].id != *id)
+        {
+            return Err(STREAM_UNAVAILABLE.into());
+        }
+        tracks.into_iter().map(ResolvedTrack::into_track).collect()
+    }
+
+    pub(super) async fn read(&self, provider_id: &str, offset: u64) -> Result<Value, String> {
         let _permit = self
             .inflight
             .try_acquire()
             .map_err(|_| "MUSIC_STREAM_BUSY")?;
         let mut url = self.endpoint.clone();
         url.query_pairs_mut()
-            .append_pair("id", PROVIDER_ID)
+            .append_pair("id", provider_id)
             .append_pair("offset", &offset.to_string())
             .append_pair("limit", &CHUNK_BYTES.to_string());
         let mut response = self.client.get(url).send().await.map_err(stream_error)?;
@@ -378,6 +530,45 @@ impl StreamHelper {
             json!({"ok":true,"offset":offset,"nextOffset":next,"totalBytes":total,
             "mime":"audio/mpeg","data":STANDARD.encode(bytes),"eof":next == total}),
         )
+    }
+}
+
+#[derive(Deserialize)]
+struct Resolved {
+    tracks: Vec<ResolvedTrack>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ResolvedTrack {
+    id: String,
+    title: String,
+    duration_ms: u64,
+}
+
+impl ResolvedTrack {
+    fn into_track(self) -> Result<Track, String> {
+        let title = self.title.trim();
+        if !provider_number(&self.id)
+            || title.is_empty()
+            || title.chars().count() > 120
+            || self.title.chars().any(char::is_control)
+            || !(1..=24 * 60 * 60 * 1000).contains(&self.duration_ms)
+        {
+            return Err(STREAM_UNAVAILABLE.into());
+        }
+        let id = id();
+        Ok(Track {
+            asset_id: Some(id.clone()),
+            stream: Some(true),
+            provider_id: Some(self.id),
+            id,
+            source: Source {
+                title: title.into(),
+                url: String::new(),
+                duration_ms: self.duration_ms,
+            },
+        })
     }
 }
 
@@ -491,6 +682,7 @@ impl PrivateTrack {
         Track {
             asset_id: Some(id.clone()),
             stream: None,
+            provider_id: None,
             id,
             source: self.source.clone(),
         }
@@ -546,22 +738,6 @@ impl Music {
     }
 
     fn resolve(&self, room: &str, group_room: bool, input: &str) -> Result<Track, String> {
-        if self.stream.is_some() && yandex_track_key(input).as_deref() == Some(APPROVED_KEY) {
-            if !group_room || room != APPROVED_ROOM {
-                return Err("MUSIC_PROVIDER_NOT_CONFIGURED".into());
-            }
-            let id = id();
-            return Ok(Track {
-                asset_id: Some(id.clone()),
-                stream: Some(true),
-                id,
-                source: Source {
-                    title: "Яндекс Музыка".into(),
-                    url: String::new(),
-                    duration_ms: 251_534,
-                },
-            });
-        }
         if let Some(private) = &self.private {
             if yandex_track_key(input).as_deref() == Some(private.key.as_str()) {
                 if group_room && room == private.room {
@@ -624,14 +800,12 @@ impl Backend {
             None
         };
         let track = if action == Some("add") {
+            music_add_limit(v)?;
             Some(self.music.resolve(room, group_room, s(v, "url"))?)
         } else {
             None
         };
-        let time_ms = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64;
+        let time_ms = system_time_ms();
         let playback = self.music.rooms.entry(room.to_owned()).or_default();
         playback.advance(at);
         if let Some(action) = action {
@@ -670,7 +844,72 @@ impl Backend {
         Ok(group_room)
     }
 
-    pub(super) fn prepare_music_chunk(&mut self, v: &Value) -> Result<(StreamHelper, u64), String> {
+    pub(super) fn prepare_music_add(
+        &mut self,
+        v: &Value,
+    ) -> Result<Option<(StreamHelper, YandexInput, usize)>, String> {
+        let token = s(v, "token");
+        let user = self.authenticate(token)?;
+        self.cleanup_calls(super::now());
+        let room = s(v, "room");
+        let group_room =
+            self.authorize_music_room(room, s(&user, "id"), &super::token_hash(token))?;
+        let requested = music_add_limit(v)?;
+        let Some(input) = YandexInput::parse(s(v, "url")) else {
+            return Ok(None);
+        };
+        let Some(helper) = self.music.stream.clone() else {
+            return Ok(None);
+        };
+        if !group_room || room != APPROVED_ROOM {
+            return Err("MUSIC_PROVIDER_NOT_CONFIGURED".into());
+        }
+        let limit = self
+            .music
+            .rooms
+            .get_mut(room)
+            .map_or(requested, |playback| {
+                playback.advance(Instant::now());
+                playback.available().min(requested)
+            });
+        if limit == 0 {
+            return Err("MUSIC_QUEUE_FULL".into());
+        }
+        Ok(Some((helper, input, limit)))
+    }
+
+    pub(super) fn finish_music_add(
+        &mut self,
+        v: &Value,
+        mut tracks: Vec<Track>,
+    ) -> Result<Value, String> {
+        let token = s(v, "token");
+        let user = self.authenticate(token)?;
+        self.cleanup_calls(super::now());
+        let room = s(v, "room");
+        if !self.authorize_music_room(room, s(&user, "id"), &super::token_hash(token))?
+            || room != APPROVED_ROOM
+        {
+            return Err("MUSIC_ROOM_FORBIDDEN".into());
+        }
+        let at = Instant::now();
+        let playback = self.music.rooms.entry(room.to_owned()).or_default();
+        playback.advance(at);
+        let capacity = playback.available();
+        if capacity == 0 {
+            return Err("MUSIC_QUEUE_FULL".into());
+        }
+        tracks.truncate(capacity);
+        for track in tracks {
+            playback.command("add", Some(track), at)?;
+        }
+        Ok(playback.state(room, at, system_time_ms()))
+    }
+
+    pub(super) fn prepare_music_chunk(
+        &mut self,
+        v: &Value,
+    ) -> Result<(StreamHelper, String, u64), String> {
         let token = s(v, "token");
         let user = self.authenticate(token)?;
         self.cleanup_calls(super::now());
@@ -691,16 +930,21 @@ impl Backend {
             .ok_or("MUSIC_FILE_NOT_AVAILABLE")?;
         playback.advance(Instant::now());
         let asset_id = s(v, "id");
-        if !playback.track.as_ref().is_some_and(|t| {
-            t.stream == Some(true) && t.id == asset_id && t.asset_id.as_deref() == Some(asset_id)
-        }) {
-            return Err("MUSIC_FILE_NOT_AVAILABLE".into());
-        }
+        let provider_id = playback
+            .track
+            .as_ref()
+            .filter(|t| {
+                t.stream == Some(true)
+                    && t.id == asset_id
+                    && t.asset_id.as_deref() == Some(asset_id)
+            })
+            .and_then(|t| t.provider_id.clone())
+            .ok_or("MUSIC_FILE_NOT_AVAILABLE")?;
         let offset = v["offset"]
             .as_u64()
             .filter(|&n| n < MAX_STREAM_AUDIO)
             .ok_or(STREAM_OFFSET)?;
-        Ok((helper.clone(), offset))
+        Ok((helper.clone(), provider_id, offset))
     }
 }
 
@@ -740,7 +984,24 @@ mod tests {
                 entered.clone(),
                 release.clone(),
             );
-            Router::new().route(
+            Router::new().route("/resolve", get(|Query(query): Query<HashMap<String, String>>| async move {
+                let limit = query["limit"].parse::<usize>().unwrap();
+                if limit != DEFAULT_ADD_LIMIT {
+                    assert_eq!(limit, MAX_QUEUE - 1);
+                    assert!(query.contains_key("playlist"));
+                    let title = "🎵".repeat(120);
+                    let tracks: Vec<_> = (1..=limit)
+                        .map(|n| json!({"id":n.to_string(),"title":title,"durationMs":60_000}))
+                        .collect();
+                    return axum::Json(json!({"tracks":tracks}));
+                }
+                if query.get("id").map(String::as_str) == Some(PROVIDER_ID) {
+                    axum::Json(json!({"tracks":[{"id":PROVIDER_ID,"title":"Fixture track","durationMs":251534}]}))
+                } else {
+                    assert_eq!(query.get("playlist").map(String::as_str), Some("01234567-89ab-cdef-0123-456789abcdef"));
+                    axum::Json(json!({"tracks":[{"id":"123","title":"Another fixture","durationMs":10000}]}))
+                }
+            })).route(
                 "/chunk",
                 get(move |Query(query): Query<HashMap<String, String>>| {
                     let (calls, mode, entered, release) = (
@@ -753,7 +1014,7 @@ mod tests {
                         assert_eq!(
                             query,
                             HashMap::from([
-                                ("id".into(), PROVIDER_ID.into()),
+                                ("id".into(), if mode.load(Ordering::SeqCst) == 3 { "123" } else { PROVIDER_ID }.into()),
                                 ("offset".into(), "0".into()),
                                 ("limit".into(), CHUNK_BYTES.to_string())
                             ])
@@ -790,24 +1051,12 @@ mod tests {
         let other = backend.token(&owner, "other", false).unwrap();
         backend.db["groups"][0]["channels"][4]["id"] = json!(APPROVED_ROOM);
         backend.music.stream = Some(helper);
-        assert!(backend
-            .music
-            .resolve("other room", true, &format!("https://{APPROVED_KEY}"))
-            .is_err());
         let client_id = id();
         backend
             .request(
                 json!({"op":"voice_join","room":APPROVED_ROOM,"token":token,"client":client_id}),
             )
             .unwrap();
-        let add = json!({"op":"music_command","room":APPROVED_ROOM,"token":token,"action":"add","url":format!("https://{APPROVED_KEY}")});
-        let current = backend.request(add.clone()).unwrap();
-        let asset = s(&current["track"], "assetId");
-        assert_eq!(current["track"]["stream"], true);
-        assert_eq!(current["track"]["url"], "");
-        assert!(!current.to_string().contains(PROVIDER_ID));
-        let another = backend.request(add).unwrap();
-        let queued = s(&another["queue"][0], "assetId");
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}/api", listener.local_addr().unwrap());
         let api_task = tokio::spawn(async move {
@@ -822,6 +1071,46 @@ mod tests {
                 .header("cookie", format!("mines_session={token}"))
                 .json(&body)
         };
+        let add = |url: String| json!({"op":"music_command","room":APPROVED_ROOM,"action":"add","url":url});
+        let body = add(format!("https://{APPROVED_KEY}"));
+        assert_eq!(
+            request(body.clone(), "").send().await.unwrap().status(),
+            401
+        );
+        assert_eq!(
+            request(body.clone(), &other).send().await.unwrap().status(),
+            403
+        );
+        let current = request(body, &token)
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json::<Value>()
+            .await
+            .unwrap()["data"]
+            .clone();
+        let asset = s(&current["track"], "assetId");
+        assert_eq!(current["track"]["stream"], true);
+        assert_eq!(current["track"]["url"], "");
+        assert_eq!(current["track"]["title"], "Fixture track");
+        assert!(!current.to_string().contains(PROVIDER_ID));
+        let another = request(
+            add("https://music.yandex.ru/playlists/01234567-89ab-cdef-0123-456789abcdef".into()),
+            &token,
+        )
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json::<Value>()
+        .await
+        .unwrap()["data"]
+            .clone();
+        let queued = s(&another["queue"][0], "assetId");
+        assert_eq!(another["queue"][0]["title"], "Another fixture");
         let chunk = |asset: &str, offset: Value| json!({"op":"music_stream_chunk","room":APPROVED_ROOM,"id":asset,"offset":offset});
         for (body, session, status) in [
             (chunk(asset, json!(0)), "", 401),
@@ -878,9 +1167,98 @@ mod tests {
         );
         release.notify_one();
         assert_eq!(pending_read.await.unwrap().unwrap().status(), 404);
+        mode.store(3, Ordering::SeqCst);
+        assert_eq!(
+            request(
+                json!({"op":"music_stream_chunk","room":APPROVED_ROOM,"id":queued,"offset":0}),
+                &token
+            )
+            .send()
+            .await
+            .unwrap()
+            .status(),
+            200
+        );
+        let mut large =
+            add("https://music.yandex.ru/playlists/01234567-89ab-cdef-0123-456789abcdef".into());
+        // One waiting track is present when resolving the explicit maximum.
+        request(
+            add("https://music.yandex.ru/playlists/01234567-89ab-cdef-0123-456789abcdef".into()),
+            &token,
+        )
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+        large["limit"] = json!(MAX_QUEUE);
+        let full = request(large.clone(), &token)
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json::<Value>()
+            .await
+            .unwrap();
+        assert_eq!(full["data"]["queue"].as_array().unwrap().len(), MAX_QUEUE);
+        assert_eq!(
+            full["data"]["queue"][MAX_QUEUE - 1]["title"],
+            "🎵".repeat(120)
+        );
+        let full_error = request(large, &token).send().await.unwrap();
+        assert!(full_error
+            .text()
+            .await
+            .unwrap()
+            .contains("MUSIC_QUEUE_FULL"));
         api_task.abort();
         helper_task.abort();
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn music_add_limit_defaults_and_accepts_only_bounded_integers() {
+        assert_eq!(music_add_limit(&json!({})).unwrap(), 32);
+        for limit in [1, 32, 1000] {
+            assert_eq!(music_add_limit(&json!({"limit":limit})).unwrap(), limit);
+        }
+        for limit in [
+            json!(0),
+            json!(-1),
+            json!(1001),
+            json!(1.5),
+            json!("32"),
+            json!(null),
+            json!(true),
+        ] {
+            assert_eq!(
+                music_add_limit(&json!({"limit":limit})).unwrap_err(),
+                "MUSIC_INVALID_LIMIT"
+            );
+        }
+    }
+
+    #[test]
+    fn music_yandex_link_shapes_allow_only_canonical_provider_components() {
+        assert!(
+            matches!(YandexInput::parse("https://music.yandex.com/track/42?utm_source=share"), Some(YandexInput::Track(id)) if id == "42")
+        );
+        assert!(
+            matches!(YandexInput::parse("https://music.ya.ru/users/example.name/playlists/100/"), Some(YandexInput::UserPlaylist { owner, kind }) if owner == "example.name" && kind == "100")
+        );
+        for url in [
+            "https://music.yandex.ru.evil.test/track/42",
+            "https://music.yandex.ru:443/track/42",
+            "https://music.yandex.ru/album/x/track/42",
+            "https://music.yandex.ru/track/042",
+            "https://music.yandex.ru/users/../playlists/10",
+            "https://music.yandex.ru/users/x%2Fy/playlists/10",
+            "https://music.yandex.ru/track/42#x",
+            "https://music.yandex.ru/playlists/not-a-uuid",
+        ] {
+            assert!(YandexInput::parse(url).is_none(), "{url}");
+        }
     }
 
     #[test]

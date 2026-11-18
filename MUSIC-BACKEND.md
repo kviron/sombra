@@ -33,6 +33,12 @@ On Windows with Chrome installed, build the local `mines-server` binary and run 
 
 On Windows, with Chrome and FFmpeg installed and a locally authorized test token, run `uv run --no-project --with yandex-music python scripts/yandex_room_probe.py --sample`. This decodes one fixed track sample, keeps the audio in memory, and serves it at a random loopback-only URL. Pass the printed JSON object as `SOMBRA_QA_MUSIC_SOURCE` to `node check-room-music-browser.mjs` with a freshly built server. The same Yandex URL is tested through the widget and `/play`. Stop the probe when finished. This is not a general Yandex resolver or a multi-device streaming service.
 
+## Closed-room streaming
+
+When `MINES_MUSIC_STREAM_HELPER` is configured, the closed test room accepts Yandex HTTPS track links (`/track/<id>` or `/album/<id>/track/<id>`) and playlist links (`/playlists/<uuid>` or `/users/<owner>/playlists/<id>`). Share-query parameters are ignored. The widget and `/play` use the same server queue. Playlist order and duplicates are preserved, unavailable entries are skipped, and only available queue slots are filled (32 waiting tracks maximum).
+
+The helper binds only to loopback. It resolves metadata and fetches MP3 byte ranges without writing audio files. The browser requests `music_stream_chunk` with room ID, opaque current asset ID and byte offset. Every request requires an active voice lease from the same authenticated session; no source URL or provider token is returned.
+
 ## Yandex authorization
 
 A personal subscription is not authorization for third-party room streaming (see [Yandex Music Terms, §2.7](https://yandex.ru/legal/music_termsofuse/ru)). Before enabling a provider, obtain a documented authorization flow and permission for the target playback scenario. Store any authorized tokens only in the provider service's protected secret store, never in chat, the desktop client, the test catalog, or API responses. The current build deliberately has no login flow or account token field and has not tested a real Yandex account.

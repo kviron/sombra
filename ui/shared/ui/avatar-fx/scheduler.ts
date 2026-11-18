@@ -22,6 +22,7 @@ interface FxJob extends FxJobInput {
   priority: FxPriority;
   visible: boolean;
   painted: boolean;
+  lastPaintAt?: number;
 }
 
 const jobs = new Map<HTMLCanvasElement, FxJob>();
@@ -34,6 +35,8 @@ let observer: IntersectionObserver | undefined;
 let rafId: number | null = null;
 let dirty = false;
 let animated: FxJob[] = [];
+let ordinary: FxJob[] = [];
+let ordinaryCursor = 0;
 let staticQueue: FxJob[] = [];
 let staticIndex = 0;
 let lastAdvance: number | null = null;
@@ -74,12 +77,15 @@ function reconcile(): void {
   animated = [];
   staticQueue = [];
   staticIndex = 0;
-  for (const bucket of visibleByPriority.values()) {
-    for (const job of bucket) {
+  ordinary = [...visibleByPriority.get(null)!];
+  for (const priority of ['profile', 'picker'] as const) {
+    for (const job of visibleByPriority.get(priority)!) {
       if (animated.length < MAX_ANIMATED_FX) animated.push(job);
       else if (!job.painted) staticQueue.push(job);
     }
   }
+  const slots = MAX_ANIMATED_FX - animated.length;
+  if (ordinary.length > slots) for (const job of ordinary) if (!job.painted) staticQueue.push(job);
 }
 
 function stopLoop(): void {
@@ -92,7 +98,7 @@ function ensureLoop(): void {
   if (document.hidden || !visibleCount) {
     stopLoop();
     if (!visibleCount) reconcile();
-  } else if (rafId === null && (dirty || animated.length || staticIndex < staticQueue.length)) {
+  } else if (rafId === null && (dirty || animated.length || ordinary.length || staticIndex < staticQueue.length)) {
     rafId = window.requestAnimationFrame(tick);
   }
 }
@@ -112,8 +118,16 @@ function tick(now: number): void {
     const dt = lastAdvance === null ? 0 : Math.min(0.1, (now - lastAdvance) / 1000);
     nextPaint = lastAdvance === null ? now + FRAME_MS : Math.max(nextPaint + FRAME_MS, now);
     lastAdvance = now;
-    for (const job of animated) {
-      if (job.painted && dt > 0) job.advance(dt);
+    const frameJobs = [...animated];
+    const slots = Math.min(MAX_ANIMATED_FX - frameJobs.length, ordinary.length);
+    for (let i = 0; i < slots; i++) {
+      ordinaryCursor %= ordinary.length;
+      frameJobs.push(ordinary[ordinaryCursor++]);
+    }
+    for (const job of frameJobs) {
+      const elapsed = job.lastPaintAt === undefined || dt === 0 ? dt : Math.min(0.25, (now - job.lastPaintAt) / 1000);
+      if (job.painted && elapsed > 0) job.advance(elapsed);
+      job.lastPaintAt = now;
       paint(job);
     }
     stats.frames += 1;
@@ -121,7 +135,10 @@ function tick(now: number): void {
   }
   // An overflow burst should not block the renderer with dozens of first paints in one frame.
   const end = Math.min(staticQueue.length, staticIndex + STATIC_PAINTS_PER_FRAME);
-  while (staticIndex < end) paint(staticQueue[staticIndex++]);
+  while (staticIndex < end) {
+    const job = staticQueue[staticIndex++];
+    if (!job.painted) paint(job);
+  }
   if (staticIndex === staticQueue.length) {
     staticQueue = [];
     staticIndex = 0;
@@ -161,7 +178,7 @@ export function fxSchedulerState() {
   return {
     jobs: jobs.size,
     visible: visibleCount,
-    animated: animated.length,
+    animated: Math.min(MAX_ANIMATED_FX, animated.length + ordinary.length),
     painted: [...jobs.values()].filter((job) => job.visible && job.painted).length,
     hidden: hasDom() ? document.hidden : false,
     running: rafId !== null,

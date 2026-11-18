@@ -17,7 +17,13 @@ export function parseMusicCommand(text:string){
  const match=/^\/(play|pause|resume|skip|stop)(?:\s+(.*))?$/i.exec(text.trim());
  if(!match)return undefined;
  const action=commandActions[match[1].toLowerCase() as keyof typeof commandActions];
- return {action,url:match[2]?.trim()};
+ const args=match[2]?.trim();
+ const parts=action==='add'&&args?/^(\S+)\s+(\S+)$/.exec(args):null;
+ return {action,url:parts?.[1]??args,limit:parts?parseMusicLimit(parts[2]):undefined};
+}
+function parseMusicLimit(raw:string){
+ const n=Number(raw);
+ return /^\d{1,4}$/.test(raw)&&n>=1&&n<=1000?n:NaN;
 }
 const position=({state,received}:Reading)=>Math.max(0,Math.min(state.track?.durationMs??0,state.positionMs+(state.status==='playing'?performance.now()-received:0)));
 function message(error:unknown){
@@ -72,12 +78,13 @@ export function useRoomMusic(room:string|undefined,deaf:boolean,speaker:string){
   void poll();const timer=window.setInterval(poll,2000);
   return()=>{epoch.current++;clearInterval(timer)};
  },[room]);
- async function command(action:Action,url?:string){
+ async function command(action:Action,url?:string,limit?:number){
+   if(limit!==undefined&&(!Number.isInteger(limit)||limit<1||limit>1000))throw new Error('Укажите число треков от 1 до 1000.');
   if(!room)throw new Error('Сначала войдите в голосовую комнату.');
   if(action==='add'&&!url)throw new Error('Укажите ссылку после /play.');
   if(action!=='add'&&url)throw new Error('Эта команда не принимает ссылку.');
   const generation=epoch.current,started=performance.now();
-  try{const state=await api<Snapshot>('music_command',{room,action,...(url?{url}:{})});if(epoch.current===generation)accept(state,started)}
+  try{const state=await api<Snapshot>('music_command',{room,action,...(url?{url}:{}),...(limit!==undefined?{limit}:{})});if(epoch.current===generation)accept(state,started)}
   catch(error){throw new Error(message(error))}
  }
  useEffect(()=>{const el=engine.current;if(el){el.volume=volume/100;el.muted=deaf}},[volume,deaf]);
@@ -109,9 +116,10 @@ export function RoomMusic({music,joined}:{music:ReturnType<typeof useRoomMusic>;
  const state=joined?music.current?.state:null,track=state?.track,playing=state?.status==='playing',queue=state?.queue??[];
  const elapsed=joined&&music.current?position(music.current):0;
  useEffect(()=>{if(!playing)return;const timer=setInterval(()=>tick(value=>value+1),500);return()=>clearInterval(timer)},[playing]);
- async function act(action:Action,url?:string){
+ const [limit,setLimit]=useState('32'),[pageSize,setPageSize]=useState(40);
+ async function act(action:Action,url?:string,requested?:number){
   if(pending)return;setPending(true);setError('');
-  try{await music.command(action,url);if(action==='add')setLink('')}
+  try{await music.command(action,url,requested);if(action==='add')setLink('')}
   catch(e){setError((e as Error).message)}finally{setPending(false)}
  }
  return <section className="room-music" data-aui-theme="elements" data-aui="card" data-aui-surface="true" aria-label="Музыка в комнате">
@@ -121,8 +129,8 @@ export function RoomMusic({music,joined}:{music:ReturnType<typeof useRoomMusic>;
   {music.loadingPrivate&&<small role="status">Загружаем аудио комнаты…</small>}
    {music.privateFailure&&<div role="alert" className="room-music-error">{music.privateFailure} <button type="button" data-aui="button" data-aui-style="ghost" onClick={music.retryAudio}>Повторить</button></div>}
    {track&&music.blocked&&playing&&!music.loadingPrivate&&!music.privateFailure&&<button data-aui="button" data-aui-style="ghost" type="button" onClick={music.enableAudio}>Включить звук на этом устройстве</button>}
-  <div id={queueId} hidden={!expanded}>{queue.length?<div className="room-music-queue">{renderGenerativeUI({$type:"ListView",children:queue.map((item,i)=>({$type:"ListViewItem",$key:item.id,children:{$type:"Row",align:"center",gap:3,children:[{$type:"Text",value:String(i+1),size:"sm",color:"secondary"},{$type:"Text",value:item.title,weight:"medium"},{$type:"Spacer"},{$type:"Caption",text:time(item.durationMs)}]}}))},defaultGenerativeUILibrary,{status:"done"})}</div>:<p className="room-music-empty">В очереди пока нет треков.</p>}</div>
-  <form className="room-music-add" onSubmit={e=>{e.preventDefault();if(joined&&!music.unavailable&&!pending&&link.trim())void act('add',link.trim())}}><input data-aui="input" id={linkId} aria-label="Ссылка на трек" placeholder="Ссылка на трек" value={link} maxLength={2048} onChange={e=>setLink(e.target.value)} disabled={pending}/><button data-aui="button" data-aui-style="secondary" type="submit" disabled={!joined||music.unavailable||pending||!link.trim()}><Plus size={16}/> Добавить</button></form>
+  <div id={queueId} hidden={!expanded}>{queue.length?<div className="room-music-queue">{renderGenerativeUI({$type:"ListView",children:queue.slice(0,pageSize).map((item,i)=>({$type:"ListViewItem",$key:item.id,children:{$type:"Row",align:"center",gap:3,children:[{$type:"Text",value:String(i+1),size:"sm",color:"secondary"},{$type:"Text",value:item.title,weight:"medium"},{$type:"Spacer"},{$type:"Caption",text:time(item.durationMs)}]}}))},defaultGenerativeUILibrary,{status:"done"})}{queue.length>pageSize&&<button type="button" data-aui="button" data-aui-style="ghost" onClick={()=>setPageSize(n=>n+40)}>Показать ещё</button>}</div>:<p className="room-music-empty">В очереди пока нет треков.</p>}</div>
+  <form className="room-music-add" onSubmit={e=>{e.preventDefault();if(joined&&!music.unavailable&&!pending&&link.trim())void act('add',link.trim(),parseMusicLimit(limit))}}><input data-aui="input" id={linkId} aria-label="Ссылка на трек" placeholder="Ссылка на трек или плейлист" value={link} maxLength={2048} onChange={e=>setLink(e.target.value)} disabled={pending}/><label className="room-music-limit">Треков<input data-aui="input" type="number" min={1} max={1000} required value={limit} onChange={e=>setLimit(e.target.value)} disabled={pending}/></label><button data-aui="button" data-aui-style="secondary" type="submit" disabled={!joined||music.unavailable||pending||!link.trim()}><Plus size={16}/> Добавить</button></form>
   {error&&<p role="alert" className="room-music-error">{error}</p>}
  </section>;
 }

@@ -12,7 +12,9 @@
 .room-music-track small{display:block}
 .room-music-progress progress{flex:1;min-width:0;accent-color:var(--primary)}
 .room-music-actions label{flex:1;min-width:80px}
-.room-music-add input{flex:1 1 9rem}
+.room-music-add>input{flex:1 1 9rem;min-width:0}
+.room-music-limit{display:grid;gap:4px;font-size:12px;color:var(--muted-foreground)}
+.room-music-limit>input{width:5.5rem;min-width:0}
 .room-music-queue{max-height:132px;overflow:auto}
 .room-music [data-aui="button"]:disabled{opacity:.55;cursor:not-allowed}
 .room-music [role=alert]{color:var(--destructive)}
