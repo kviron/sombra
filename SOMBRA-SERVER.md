@@ -68,6 +68,16 @@ Native image/video producer result привязывается к текущем�
 
 ## Выпуск 0.1.19 — 18 ноября 2026
 
+### Навык `/frame` (рамки и обложки), 18 ноября 2026
+
+Добавлена bot-операция `bot_set_user_decoration {update_id,target,decoration|null}`: применяет украшение ТОЛЬКО к отправителю указанного update, одноразово на update (маркер в той же записи, атомарно), ошибки `BOT_DECORATION_INVALID/FORBIDDEN/CONFLICT` и `BOT_SOURCE_UNAVAILABLE`. Правила документа переиспользуют валидацию `set_profile_decoration`. Backend SHA `eee603a2ec1c2502056f3b6b61407aa535ebcdf38ed35723c73a22c68b1fbcc6`, PID2378760, backup `/root/sombra-backups/frame-backend-0.1.19-20261118T035901Z`, счётчики6/1/9/161/4 сохранены; откат — старый бинарь `3f8a5374…`.
+
+Плагин: новый модуль `decorations.py` (`dec290d82b47f38d336de8e7f84e0118742d13b4abc4261294fba64e93d42f0f`) и обновлённый `shared_host.py` (`ca581a9099b782e963f03a96f6823f85d0e4f8bbbbf05bdb50409b1ee9fe2d86`) в обеих копиях; `adapter.py`/`public_runner.py` не менялись. Диалог двухшаговый: предложение (nonce, TTL5минут, без изменения профиля) → точная команда `/frame@hermes confirm <nonce>` от того же человека и канала → применение. Поддерживаются огненная рамка, слайм в углу, звёздное сияние, сцена с бегущим героем и удаление. Backup `/root/sombra-backups/plugin-frame-20261118T035357Z`; roxy PID2376480, обе платформы connected, импорт модуля без ошибок, Telegram SOUL не изменился.
+
+Проверки:107 серверных и130 desktop Rust-тестов,114 оффлайн Python; A/B-проверка нового бинаря показала403 на неизвестном update вместо прежнего401 (операция реально маршрутизируется). Живая проверка: health200, manifest0.1.19, все6 файлов плагина совпадают с выложенными.
+
+
+
 Backend обновлён на SHA `3f8a53745582593b7229960945fd7e4b888ec246f5058332639bdb7aa438e71c` (PID2367821), с stopped-service приватной копией `/root/sombra-backups/release-0.1.19-backend-20261118T030556Z`. HTTPS health200; новые операции `set_profile_decoration`, `bot_update_settings`, `bot_get_model_settings`, `bot_owner_update_settings`, `bot_register_commands` без cookie отвечают401 (не 404/502); пользователи6/группы1/диалоги9/сообщения161/сессии4 сохранены. Сервисный конфиг, nginx, TURN и `.env` не менялись.
 
 Плагин Hermes обновлён до adapter `083f97d2a547b5004cd1f6744d36b7372b1b83d9b094bee77abe5a063da3e7f5`, shared_host `0993749b5790a4c951ea4dea1e942d5034b97490746c5781017bdf16a5970175`, public_runner `f5d156cbe3ed80c7cab69674de0fb10d30b53faeb5ee97ef6674377deadcd9ac` в обеих копиях (transport и named-profile `sombra`), backup `/root/sombra-backups/plugin-0.1.19-20261118T030243Z`. Новый gateway PID2366144, `gateway_state=running`, telegram/sombra connected, active_agents0, traceback нет; Telegram SOUL SHA `683f1135…6568` не изменился. Каталог `hermes-sombra-runtime/` (в `.gitignore`, используется только как source) на сервере не установлен и в этой выкладке не создавался.
