@@ -22,8 +22,12 @@ mod group_roles;
 mod human_typing;
 mod message_reads;
 mod mentions;
+mod music;
 mod profile_covers;
 mod profile_decorations;
+mod profile_effect_drafts;
+mod effect_catalog;
+mod sticker_catalog;
 fn id() -> String {
     uuid::Uuid::new_v4().to_string()
 }
@@ -102,6 +106,10 @@ struct UserDto {
     cover: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     decorations: Option<Value>,
+    #[serde(rename = "decorationRefs", skip_serializing_if = "Option::is_none", default)]
+    decoration_refs: Option<Value>,
+    #[serde(rename = "profileEffectAssets", skip_serializing_if = "Option::is_none", default)]
+    profile_effect_assets: Option<Value>,
     id: String,
     name: String,
     bio: String,
@@ -202,6 +210,7 @@ pub struct Backend {
     failures: u32,
     retry_at: u64,
     voice: Vec<Value>,
+    music: music::Music,
     signals: Vec<Value>,
     voice_seq: u64,
     dialog_calls: Vec<Value>,
@@ -209,9 +218,8 @@ pub struct Backend {
     presence: std::collections::HashMap<String, u64>,
     bot_typing: Vec<Value>,
     human_typing: std::collections::HashMap<String, (String, u64)>,
+    profile_effect_draft_bot_id: Option<String>,
 }
-#[cfg(feature = "desktop")]
-pub struct Store(pub Mutex<Backend>);
 impl Backend {
     pub fn open(path: PathBuf) -> Result<Self, String> {
         std::fs::create_dir_all(path.parent().ok_or("Invalid path")?).map_err(|e| e.to_string())?;
@@ -228,12 +236,14 @@ impl Backend {
         {
             return Err("Invalid database; refusing to overwrite".into());
         }
+        let music = music::Music::configured(path.parent().ok_or("Invalid path")?)?;
         let mut b = Self {
             db,
             path,
             failures: 0,
             retry_at: 0,
             voice: Vec::new(),
+            music,
             signals: Vec::new(),
             voice_seq: 0,
             dialog_calls: Vec::new(),
@@ -241,6 +251,7 @@ impl Backend {
             presence: Default::default(),
             bot_typing: Vec::new(),
             human_typing: Default::default(),
+            profile_effect_draft_bot_id: profile_effect_drafts::configured_bot(),
         };
         if b.db["sessions"].is_null() {
             b.db["sessions"] = json!([]);
@@ -272,6 +283,7 @@ impl Backend {
             }
         }
         b.migrate_bots();
+        b.open_profile_effect_drafts()?;
         b.save()?;
         if arr(&b.db["users"]).is_empty() {
             let password = format!("Mines-{}", &id()[..18]);
@@ -354,6 +366,9 @@ impl Backend {
         }
     }
     fn public(&self, u: &Value) -> Value {
+        self.public_for(u, "")
+    }
+    fn public_for(&self, u: &Value, viewer: &str) -> Value {
         let bot = arr(&self.db["bots"])
             .into_iter()
             .find(|b| b["id"] == u["id"]);
@@ -362,11 +377,15 @@ impl Backend {
                 .and_then(|b| b["last_seen"].as_u64())
                 .unwrap_or(0)
         });
+        let decorations = profile_decorations::public(&u["decorations"]);
+        let decoration_refs = decorations.as_ref().and_then(|d| self.effect_references(u, viewer, d));
         serde_json::to_value(UserDto {
             cover_supported: true,
             decoration_supported: true,
             cover: profile_covers::public_metadata(&u["profile_cover"]),
-            decorations: profile_decorations::public(&u["decorations"]),
+            decorations,
+            decoration_refs,
+            profile_effect_assets: self.profile_effect_assets(u),
             id: s(u, "id").into(),
             name: s(u, "name").into(),
             bio: s(u, "bio").into(),
@@ -617,12 +636,16 @@ impl Backend {
                     sticker["image"] = json!(self.sticker_image(original).ok()?);
                 }
                 sticker.as_object_mut().unwrap().remove("asset");
+                self.decorate_sticker_catalog_dto(original, uid, &mut sticker);
                 Some(sticker)
             })
             .collect();
-        json!({"decorationSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":self.public(u),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public(user)).collect::<Vec<_>>()})
+        json!({"decorationSupported":true,"profileEffectDraftsSupported":self.profile_effect_drafts_supported(u),"effectCatalogSupported":true,"profileEffectUploadsSupported":true,"stickerCatalogSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":self.public_for(u,uid),"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":arr(&self.db["users"]).iter().map(|user|self.public_for(user,uid)).collect::<Vec<_>>()})
     }
     fn sticker_in_library(&self, sticker: &Value, uid: &str) -> bool {
+        if self.sticker_pack_installed(sticker, uid) {
+            return true;
+        }
         if sticker["archived"] == true {
             return false;
         }
@@ -773,6 +796,9 @@ impl Backend {
         if v["op"] == "set_profile_decoration" {
             return self.set_profile_decoration(&v);
         }
+        if matches!(s(&v, "op"), "list_profile_effects" | "create_profile_effect" | "publish_profile_effect" | "unpublish_profile_effect" | "apply_profile_effect" | "upload_profile_effect" | "profile_effect_file") {
+            return self.effect_catalog_request(&v);
+        }
         if v["op"] == "attachment_file" {
             return self.attachment_file(&v);
         }
@@ -786,7 +812,8 @@ impl Backend {
                 .find(|sticker| {
                     sticker["id"] == v["sticker"]
                         && (self.sticker_in_library(sticker, uid)
-                            || self.sticker_in_history(sticker, uid))
+                            || self.sticker_in_history(sticker, uid)
+                            || self.sticker_pack_is_public(sticker))
                 })
                 .ok_or("Стикер не найден")?;
             return Ok(json!({"image":self.sticker_image(sticker)?}));
@@ -862,7 +889,7 @@ impl Backend {
             };
             let token = self.token(&u, &dto.device, dto.remember_me)?;
             self.touch_presence(s(&u, "id"));
-            return Ok(json!({"token":token,"user":self.public(&u)}));
+            return Ok(json!({"token":token,"user":self.public_for(&u,s(&u,"id"))}));
         }
         if [
             "bot_poll",
@@ -878,6 +905,8 @@ impl Backend {
             "bot_delete",
             "bot_typing",
             bot_decorations::OP,
+            profile_effect_drafts::CLAIM,
+            profile_effect_drafts::FINISH,
             bot_model_settings::OWNER_OP,
             "bot_get_settings",
             "bot_update_self",
@@ -886,6 +915,9 @@ impl Backend {
         .contains(&op)
         {
             return self.bot_worker(&v);
+        }
+        if matches!(op, profile_effect_drafts::CREATE | profile_effect_drafts::GET) {
+            return self.profile_effect_draft_user(&v);
         }
         let u = self.authenticate(s(&v, "token"))?;
         let uid = s(&u, "id");
@@ -936,6 +968,9 @@ impl Backend {
         if op.starts_with("dialog_call_") {
             return self.dialog_call_action(&v, uid);
         }
+        if matches!(op, "music_state" | "music_command" | "music_file") {
+            return self.music_action(&v, uid, &current);
+        }
         if op.starts_with("voice_") {
             return self.voice_action(&v, uid, &current);
         }
@@ -962,7 +997,7 @@ impl Backend {
             return self.group_management(&v, uid);
         }
         match op{
-   "me"=>return Ok(json!({"user":self.public(&u),"email":u["email"]})),
+   "me"=>return Ok(json!({"user":self.public_for(&u,uid),"email":u["email"]})),
    "sessions"=>return Ok(json!(arr(&self.db["sessions"]).iter().filter(|x|x["user_id"]==uid&&session_active(x,now())).map(|x|json!({"id":x["id"],"device":x["device"],"created_at":x["created_at"],"last_seen":x["last_seen"],"expires_at":x["expires_at"],"current":x["token_hash"]==current})).collect::<Vec<_>>())),
    "revoke_session"=>{let sessions=self.db["sessions"].as_array_mut().unwrap();if !sessions.iter().any(|x|x["user_id"]==uid&&x["id"]==v["session_id"]){return Err("Сессия не найдена".into())}sessions.retain(|x|!(x["user_id"]==uid&&x["id"]==v["session_id"]));},
    "logout_all"=>self.db["sessions"].as_array_mut().unwrap().retain(|x|x["user_id"]!=uid),
@@ -1030,6 +1065,7 @@ impl Backend {
     if op=="friend_accept" {if rows[i]["to"]!=uid{return Err("Заявку принимает получатель".into())}rows[i]["accepted"]=json!(true);}else{rows.remove(i);}
    },
    "import_sticker_pack"=>return self.import_sticker_pack(&v,uid),
+   "list_public_sticker_packs" | "set_sticker_pack_public" | "install_public_sticker_pack" | "remove_installed_sticker_pack" => return self.sticker_catalog_request(&v, uid),
    "remove_sticker"|"remove_sticker_pack"=>{
     let group=self.editable_sticker_scope(&v,uid)?;
     let mut changed=false;
@@ -1040,6 +1076,7 @@ impl Backend {
      if matches{sticker["archived"]=json!(true);changed=true;}
     }
     if !changed{return Err("Стикер или набор не найден".into())}
+     if group.is_empty(){self.prune_empty_public_sticker_packs(uid);}
    },
    "create_sticker"=>{
     let data=s(&v,"image");let name=s(&v,"name").trim();if name.is_empty()||name.chars().count()>40{return Err("Название стикера: 1–40 символов".into())}
@@ -1085,7 +1122,7 @@ impl Backend {
    },
    "message"=>{let channel=s(&v,"channel");if !self.allowed(uid,channel){return Err("Нет доступа к чату".into())}let text=s(&v,"text").trim();let sticker=s(&v,"sticker");
     if !sticker.is_empty(){
-     let sticker=self.db["stickers"].as_array().unwrap().iter().find(|row|row["id"]==sticker&&row["archived"]!=true).ok_or("Стикер не найден")?;
+     let sticker=self.db["stickers"].as_array().unwrap().iter().find(|row|row["id"]==sticker&&(row["archived"]!=true||self.sticker_pack_installed(row,uid))).ok_or("Стикер не найден")?;
      let group=s(sticker,"group");
      let sendable=if group.is_empty(){
       self.sticker_in_library(sticker,uid)||self.sticker_in_history(sticker,uid)
@@ -1114,15 +1151,6 @@ impl Backend {
         }
         Ok(json!({"ok":true}))
     }
-}
-#[cfg(feature = "desktop")]
-#[tauri::command]
-pub async fn api(state: tauri::State<'_, Store>, request: Value) -> Result<Value, String> {
-    state
-        .0
-        .lock()
-        .map_err(|_| "База недоступна")?
-        .request(request)
 }
 #[cfg(test)]
 mod tests {
@@ -1747,7 +1775,7 @@ mod tests {
     }
 }
 
-fn api_router(backend: Backend) -> axum::Router {
+pub(crate) fn api_router(backend: Backend) -> axum::Router {
     use axum::{
         extract::{rejection::JsonRejection, State},
         http::{HeaderMap, StatusCode},
@@ -1814,14 +1842,30 @@ fn api_router(backend: Backend) -> axum::Router {
                 .unwrap_or("Browser"));
         }
         let max_age = session_lifetime(request["remember_me"].as_bool().unwrap_or(false));
-        let result = tokio::task::spawn_blocking(move || {
-            state
-                .backend
-                .lock()
-                .map_err(|_| "STORAGE_UNAVAILABLE".to_string())?
-                .request(request)
-        })
-        .await;
+        let result = if operation == "music_stream_chunk" {
+            let prepare = || {
+                state.backend.lock().map_err(|_| "STORAGE_UNAVAILABLE".to_string())?
+                    .prepare_music_chunk(&request)
+            };
+            Ok(match prepare() {
+                Ok((helper, offset)) => match helper.read(offset).await {
+                    // A skip, expiry, or voice leave during the upstream read
+                    // must not release the bytes to a now-unauthorized caller.
+                    Ok(data) => prepare().map(|_| data),
+                    Err(error) => Err(error),
+                },
+                Err(error) => Err(error),
+            })
+        } else {
+            tokio::task::spawn_blocking(move || {
+                state
+                    .backend
+                    .lock()
+                    .map_err(|_| "STORAGE_UNAVAILABLE".to_string())?
+                    .request(request)
+            })
+            .await
+        };
         let (status, category, error) = match result {
             Ok(Ok(mut data)) => {
                 let cookie = if starts_session {
@@ -1849,14 +1893,27 @@ fn api_router(backend: Backend) -> axum::Router {
             }
             Ok(Err(error)) => match error.as_str() {
                 "AUTH_REQUIRED" => (StatusCode::UNAUTHORIZED, "authentication", error),
+                "PROFILE_EFFECT_DRAFT_FORBIDDEN" | "PROFILE_EFFECT_DRAFT_DISABLED" =>
+                    (StatusCode::FORBIDDEN, "authorization", error),
+                "PROFILE_EFFECT_DRAFT_NOT_FOUND" => (StatusCode::NOT_FOUND, "validation", error),
+                "PROFILE_EFFECT_DRAFT_CONFLICT" => (StatusCode::CONFLICT, "validation", error),
+                "PROFILE_EFFECT_DRAFT_LIMIT" => (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error),
                 "Нет доступа к изменению диалога" | "Нет доступа к участникам переписки" => (StatusCode::FORBIDDEN, "authorization", error),
                 "Диалог изменён. Обновите данные и повторите попытку" => (StatusCode::CONFLICT, "validation", error),
+                "MUSIC_ROOM_FORBIDDEN" | "MUSIC_VOICE_REQUIRED" =>
+                    (StatusCode::FORBIDDEN, "authorization", error),
+                "MUSIC_FILE_NOT_AVAILABLE" => (StatusCode::NOT_FOUND, "validation", error),
+                "MUSIC_STREAM_INVALID_OFFSET" => (StatusCode::RANGE_NOT_SATISFIABLE, "validation", error),
+                "MUSIC_STREAM_UNAVAILABLE" => (StatusCode::BAD_GATEWAY, "upstream", error),
+                "MUSIC_STREAM_TIMEOUT" => (StatusCode::GATEWAY_TIMEOUT, "upstream", error),
+                "MUSIC_STREAM_BUSY" => (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error),
                 "MESSAGE_READ_FORBIDDEN"
                 | "BOT_SETTINGS_FORBIDDEN"
                 | "BOT_POLICY_FORBIDDEN"
-                | "BOT_DECORATION_FORBIDDEN" => {
+                | "BOT_DECORATION_FORBIDDEN" | "PROFILE_EFFECT_FORBIDDEN" => {
                     (StatusCode::FORBIDDEN, "authorization", error)
                 },
+                "PROFILE_EFFECT_NOT_FOUND" => (StatusCode::NOT_FOUND, "authorization", error),
                 "DIAGNOSTICS_FORBIDDEN" => (
                     StatusCode::FORBIDDEN,
                     "authorization",

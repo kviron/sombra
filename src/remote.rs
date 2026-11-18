@@ -507,6 +507,47 @@ pub async fn clear_attachment_cache(state: tauri::State<'_, Remote>) -> Result<V
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    #[cfg(windows)]
+    async fn native_profile_decoration_round_trips_through_real_api_and_stored_session() {
+        let root = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+        let backend = crate::backend::Backend::open(root.join("server/db.json")).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}/api", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            axum::serve(listener, crate::backend::api_router(backend))
+                .await
+                .unwrap()
+        });
+        let session_path = root.join("desktop/session.dpapi");
+        let mut remote = Remote::new(session_path.clone()).unwrap();
+        remote.endpoint = endpoint.clone();
+        remote.request(json!({"op":"register","email":"native-profile@local.test","name":"Native profile","password":"Synthetic-Profile-123!"})).await.unwrap();
+        let avatar = json!({"v":1,"target":"avatar","seed":19,"layers":[{"effect":"holy/divine-shield","palette":"ember","anchor":"ring","intensity":0.9}]});
+        let saved = remote.request(json!({"op":"set_profile_decoration","token":"stale-webview-token","target":"avatar","decoration":avatar})).await.unwrap();
+        assert_eq!(saved["user"]["decorations"]["avatar"], avatar);
+        drop(remote);
+        let mut remote = Remote::new(session_path).unwrap();
+        remote.endpoint = endpoint;
+        let state = remote.request(json!({"op":"state"})).await.unwrap();
+        assert_eq!(state["me"]["decorations"]["avatar"], avatar);
+        let public = state["users"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|u| u["id"] == state["me"]["id"])
+            .unwrap();
+        assert_eq!(public["decorations"]["avatar"], avatar);
+        let removed = remote
+            .request(json!({"op":"set_profile_decoration","target":"avatar","decoration":null}))
+            .await
+            .unwrap();
+        assert!(removed["user"].get("decorations").is_none());
+        server.abort();
+        let _ = server.await;
+        let _ = fs::remove_dir_all(root);
+    }
     #[tokio::test]
     #[cfg(windows)]
     async fn attachment_cache_late_state_cannot_resurrect_revoked_scope() {

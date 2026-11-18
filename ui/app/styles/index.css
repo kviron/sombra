@@ -206,3 +206,17 @@
 .login-input::placeholder { color: var(--muted-foreground); }
 .login-input:focus-visible { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 25%, transparent); }
 .login-password { padding-right: 48px; }
+
+/* Native scroll containers share the compact ScrollArea palette without changing scroll ownership. */
+:root { --sombra-scroll-thumb: color-mix(in srgb, var(--foreground) 22%, transparent); }
+@media (forced-colors: none) {
+  @supports selector(::-webkit-scrollbar) {
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+    ::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--sombra-scroll-thumb); }
+    ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--foreground) 42%, transparent); }
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    :where(*) { scrollbar-width: thin; scrollbar-color: var(--sombra-scroll-thumb) transparent; }
+  }
+}

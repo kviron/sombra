@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {ConversationMaterialRows,type ProfileConversationMaterials} from './conversation-info-dialog';
-import { Check, Clock3, MessageCircle, UserMinus, UserPlus, X } from 'lucide-react';
-import type { Group, User } from '@/shared/api/backend';
+import { Check, Clock3, MessageCircle, Sparkles, UserMinus, UserPlus, X } from 'lucide-react';
+import type { Group, ProfileEffectTarget, User } from '@/shared/api/backend';
 import { UserAvatar } from '@/shared/ui/user-avatar';
 import { ProfileCover } from '@/shared/ui/profile-cover';
 import { useUserActions } from './user-actions';
@@ -28,6 +28,7 @@ export function UserProfile({
   onOpenGroup,
   conversationMaterials,
   restoreFocusRef,
+  onApplyEffect,
 }: {
   user: User;
   me: User;
@@ -36,9 +37,20 @@ export function UserProfile({
   onOpenGroup?: (id: string) => void;
   conversationMaterials?: ProfileConversationMaterials;
   restoreFocusRef?: RefObject<HTMLButtonElement|null>;
+  onApplyEffect?: (id: string, target: ProfileEffectTarget) => Promise<void>;
 }) {
   const actions = useUserActions();
   const isSelf = user.id === me.id;
+  const [effectFeedback,setEffectFeedback] = useState<{text:string;error?:boolean}>();
+  const [applyingEffect,setApplyingEffect] = useState(false);
+  const applyingLock = useRef(false);
+  async function applyEffect(id: string,target: ProfileEffectTarget) {
+    if (!onApplyEffect || applyingLock.current) return;
+    applyingLock.current=true;setApplyingEffect(true);setEffectFeedback(undefined);
+    try { await onApplyEffect(id,target);setEffectFeedback({text:target==='avatar'?'Рамка применена':'Эффект обложки применён'}); }
+    catch (reason) {setEffectFeedback({text:reason instanceof Error?reason.message:'Не удалось применить эффект',error:true});}
+    finally {applyingLock.current=false;setApplyingEffect(false);}
+  }
   const status = isSelf ? 'self' : actions?.friendStatus(user.id) ?? 'none';
   const shared = groups.filter((group) => group.members.includes(user.id));
   const noteKey = `sombra-profile-note:${me.id}:${user.id}`;
@@ -98,6 +110,7 @@ export function UserProfile({
         aria-modal="true"
         aria-labelledby="user-profile-name"
         className="user-profile"
+        data-avatar-fx-priority="profile"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <button ref={closeButton} type="button" className="user-profile-close" title="Закрыть профиль" aria-label="Закрыть профиль" onClick={onClose}>
@@ -152,6 +165,19 @@ export function UserProfile({
               </>
             )}
           </div>
+
+          {!isSelf && !me.bot && onApplyEffect && (['avatar','cover'] as const).map(target=>{
+            // For another user the server projects only currently public references.
+            const id=user.decorationRefs?.[target];
+            if(!id || !user.decorations?.[target])return null;
+            const applied=me.decorationRefs?.[target]===id;
+            const label=target==='avatar'?'Рамка аватара':'Эффект обложки';
+            return <div className="user-profile-effect-action" key={target}>
+              <span><Sparkles size={16} aria-hidden="true" /> {label}</span>
+              <button type="button" className="user-profile-secondary" disabled={applyingEffect||applied} aria-label={`Поставить себе: ${label.toLowerCase()}`} onClick={()=>void applyEffect(id,target)}>{applied?'Установлен':'Поставить себе'}</button>
+            </div>;
+          })}
+          {effectFeedback&&<p className="user-profile-effect-feedback" role={effectFeedback.error?'alert':'status'}>{effectFeedback.text}</p>}
 
           {conversationMaterials && <ConversationMaterialRows {...conversationMaterials} />}
           {friendNote}

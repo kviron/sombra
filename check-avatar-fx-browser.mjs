@@ -219,8 +219,11 @@ try {
   await tab.send('Network.enable');
   await tab.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 1000, deviceScaleFactor: 2, mobile: false });
   await tab.send('Page.addScriptToEvaluateOnNewDocument', {
-    source: `window.__qaErrors=[];addEventListener('error',e=>__qaErrors.push(String(e.message||e.error)));addEventListener('unhandledrejection',e=>__qaErrors.push(String(e.reason)));`,
+    source: `window.__qaErrors=[];addEventListener('error',e=>__qaErrors.push(String(e.message||e.error)));addEventListener('unhandledrejection',e=>__qaErrors.push(String(e.reason)));
+      window.__qaCanvasContexts=new WeakSet();const getContext=HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext=function(...args){__qaCanvasContexts.add(this);return getContext.apply(this,args)};`,
   });
+  await tab.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
   await tab.send('Page.navigate', { url: `${origin}/ui/shared/ui/avatar-fx/preview/index.html` });
   await tab.wait('!!window.__sombraAvatarFx');
 
@@ -252,7 +255,11 @@ try {
   const first = await tab.wait('window.__sombraAvatarFx.state().frames > 1 && window.__sombraAvatarFx.state()');
   ok(first.painted > 0, 'visible layers painted', `painted ${first.painted}`);
   ok(first.animated <= 4, 'no more than four canvases animate at once', `animated ${first.animated} of ${first.visible} visible`);
-  ok(first.painted >= Math.min(first.visible, 4), 'every visible layer has a frame (animated or static)', `${first.painted}/${first.visible}`);
+  const painted = await tab.wait('(()=>{const s=window.__sombraAvatarFx.state();return s.painted === s.visible && s})()');
+  ok(painted.visible > 4, 'the static queue eventually paints every visible layer', `${painted.painted}/${painted.visible}`);
+  const deferredCanvas = await tab.evaluate(`Array.from(document.querySelectorAll('.avatar-fx__canvas')).findIndex(canvas =>
+    canvas.getBoundingClientRect().top > innerHeight + 96 && !__qaCanvasContexts.has(canvas))`);
+  ok(deferredCanvas >= 0, 'off-screen canvases do not initialize a drawing context at mount');
 
   const framesBefore = first.frames;
   await sleep(400);
@@ -307,6 +314,11 @@ try {
 
   await shot('preview-top', null);
 
+  const deferred = `document.querySelectorAll('.avatar-fx__canvas')[${deferredCanvas}]`;
+  await tab.evaluate(`${deferred}.scrollIntoView({block:'center'})`);
+  await tab.wait(`__qaCanvasContexts.has(${deferred})`);
+  ok(true, 'the deferred drawing context initializes when the canvas scrolls into view');
+
   // ---- off-screen pause
   await tab.evaluate('scrollTo(0, document.body.scrollHeight)');
   await sleep(700);
@@ -338,25 +350,71 @@ try {
   const shown = await tab.evaluate('window.__sombraAvatarFx.state()');
   ok(shown.running === true && shown.frames > hiddenStill.frames, 'showing the document resumes the loop', `${hiddenStill.frames} -> ${shown.frames}`);
 
-  // ---- reduced motion: static frame only
+  // ---- real picker canvases animate together despite earlier registrations
+  const pickerCanvases = '.profile-effects-dialog .avatar-fx__canvas';
+  async function canvasPixels(selector = pickerCanvases) {
+    return tab.evaluate(`Array.from(document.querySelectorAll(${JSON.stringify(selector)}), canvas => {
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let hash = 2166136261;
+      for (const value of pixels) hash = Math.imul(hash ^ value, 16777619);
+      return { effect: canvas.dataset.avatarFxEffect, hash, painted: pixels.some(value => value !== 0) };
+    })`);
+  }
+  for (const [target, effects] of [['avatar', ['holy/divine-shield', 'critters/slime']], ['cover', ['scene', 'weather/aurora']]]) {
+    await tab.wait('window.__sombraAvatarFx.state().animated === 4');
+    await tab.evaluate(`document.querySelector('#qa-${target}-picker').click()`);
+    const initial = await until(async () => {
+      const pixels = await canvasPixels();
+      return pixels.length === effects.length && pixels.every(pixel => pixel.painted) && pixels;
+    }, `${target} picker canvases painted`);
+    assert.deepEqual(initial.map(pixel => pixel.effect), effects);
+    await until(async () => {
+      const pixels = await canvasPixels();
+      return pixels.length === initial.length && pixels.every((pixel, i) => pixel.hash !== initial[i].hash);
+    }, `${target} picker pixels changing in both cards`);
+    const competing = await tab.evaluate('window.__sombraAvatarFx.state()');
+    ok(competing.visible >= 6 && competing.animated === 4, `${target} picker canvases both change pixels with earlier canvases competing at the four-job cap`, effects.join(', '));
+    await shot(`${target}-picker`);
+    await tab.evaluate(`document.querySelector('.profile-effects-dialog header button').click()`);
+    await tab.wait(`!document.querySelector('.profile-effects-dialog')`);
+  }
+
+  // ---- reduced motion in WebView/RDP does not override autoplay
   await tab.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await tab.send('Page.reload', { ignoreCache: true });
-  await tab.wait('!!window.__sombraAvatarFx');
-  await tab.wait('window.__sombraAvatarFx.state().painted > 0 && window.__sombraAvatarFx.state()');
-  await sleep(400);
-  const reduced = await tab.evaluate('window.__sombraAvatarFx.state()');
-  ok(reduced.reducedMotion === true, 'the page sees prefers-reduced-motion: reduce');
-  ok(reduced.animated === 0, 'reduced motion animates nothing', `animated ${reduced.animated}`);
-  ok(reduced.painted > 0, 'reduced motion still paints a static frame', `painted ${reduced.painted}`);
-  ok(reduced.frames === 0, 'reduced motion never runs a frame loop', `frames ${reduced.frames}`);
-  const reducedRect = await tab.evaluate(rectExpression('#qa-ring .demo .user-avatar', 3));
-  const reducedImage = await shot('reduced-motion', { x: reducedRect.x - 8, y: reducedRect.y - 8, width: reducedRect.width + 16, height: reducedRect.height + 16 });
-  const reducedCentre = {
-    x: ((reducedRect.width / 2 + 8) * reducedImage.width) / (reducedRect.width + 16),
-    y: ((reducedRect.height / 2 + 8) * reducedImage.height) / (reducedRect.height + 16),
-  };
-  const reducedBand = countInRing(reducedImage, reducedCentre, (reducedRect.width / 2) * (reducedImage.width / (reducedRect.width + 16)), 0.92, 1.38, isEmber);
-  ok(reducedBand > 30, 'the static frame still shows the ring', `${reducedBand} hot pixels`);
+  await tab.wait('!!window.__sombraAvatarFx && window.__sombraAvatarFx.state().frames > 0');
+  ok(await tab.evaluate("matchMedia('(prefers-reduced-motion: reduce)').matches"), 'the page sees prefers-reduced-motion: reduce');
+  for (const target of ['avatar', 'cover']) {
+    await tab.wait('window.__sombraAvatarFx.state().animated === 4');
+    await tab.evaluate(`document.querySelector('#qa-${target}-picker').click()`);
+    const initial = await until(async () => {
+      const pixels = await canvasPixels();
+      return pixels.length === 2 && pixels.every(pixel => pixel.painted) && pixels;
+    }, `${target} reduced-motion picker painted`);
+    await until(async () => {
+      const pixels = await canvasPixels();
+      return pixels.length === initial.length && pixels.every((pixel, i) => pixel.hash !== initial[i].hash);
+    }, `${target} picker autoplay under reduced motion`);
+    const competing = await tab.evaluate('window.__sombraAvatarFx.state()');
+    ok(competing.visible >= 6 && competing.animated === 4, `${target} picker autoplays under reduced motion at the unchanged cap`);
+    ok(await tab.evaluate(`!document.querySelector('.profile-effect-play')`), 'the temporary play button is absent');
+    await tab.evaluate(`document.querySelector('.profile-effects-dialog header button').click()`);
+    await tab.wait(`!document.querySelector('.profile-effects-dialog')`);
+  }
+  const cardCanvases = '.user-profile .avatar-fx__canvas';
+  await tab.wait('window.__sombraAvatarFx.state().animated === 4');
+  await tab.evaluate(`document.querySelector('#qa-profile').click()`);
+  const initialProfile = await until(async () => {
+    const pixels = await canvasPixels(cardCanvases);
+    return pixels.length === 2 && pixels.every(pixel => pixel.painted) && pixels;
+  }, 'actual profile canvases painted');
+  await until(async () => {
+    const pixels = await canvasPixels(cardCanvases);
+    return pixels.length === 2 && pixels.every((pixel, i) => pixel.hash !== initialProfile[i].hash);
+  }, 'actual profile canvases autoplay under reduced motion');
+  const profileBudget = await tab.evaluate('window.__sombraAvatarFx.state()');
+  ok(profileBudget.visible >= 6 && profileBudget.animated === 4, 'both actual profile canvases autoplay ahead of earlier background registrations without raising the cap');
+  await tab.evaluate(`document.querySelector('.user-profile-close').click()`);
 
   // ---- privacy / errors
   const external = requests.filter((url) => !url.startsWith(origin) && !url.startsWith('data:') && !url.startsWith('blob:'));

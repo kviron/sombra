@@ -262,11 +262,12 @@ impl Backend {
         } else {
             self.db["users"][index]["decorations"] = Value::Object(decorations);
         }
+        effect_catalog::clear_reference(&mut self.db["users"][index], target);
         if let Err(e) = self.save() {
             self.db["users"][index] = previous;
             return Err(e);
         }
-        Ok(json!({"user":self.public(&self.db["users"][index])}))
+        Ok(json!({"user":self.public_for(&self.db["users"][index], s(&user, "id"))}))
     }
 }
 

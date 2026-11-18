@@ -13,14 +13,15 @@
   background: var(--sidebar);
   border-color: var(--border);
 }
-.account-modal [data-sidebar="header"] { flex-shrink: 0; }
-.account-modal button.settings-identity { display: flex; align-items: center; justify-content: flex-start; gap: 12px; min-width: 0; width: 100%; padding: 4px 0; text-align: left; border-radius: var(--radius-md); }
+.account-modal [data-sidebar="header"] { flex-shrink: 0; padding-inline: 0; }
+.chat-shell .account-modal button.settings-identity { display: flex; align-items: center; justify-content: flex-start; gap: 12px; min-width: 0; width: 100%; padding: 4px 8px; text-align: left; border-radius: var(--radius-md); background: transparent; }
+.chat-shell .account-modal button.settings-identity:is(:hover, :focus-visible) { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); }
 .account-modal .settings-identity-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .account-modal .settings-edit-profile { display: flex; align-items: center; gap: 4px; color: var(--muted-foreground); font-size: 11px; line-height: 16px; }
 .account-modal .settings-edit-profile svg { flex-shrink: 0; }
 .account-modal .settings-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .account-modal .settings-identity .avatar { flex-shrink: 0; width: 40px; height: 40px; }
-.account-modal aside [data-sidebar="menu-button"] {
+.chat-shell .account-modal aside [data-sidebar="menu-button"] {
   justify-content: flex-start;
   min-height: 36px;
   padding: 8px;
@@ -30,8 +31,8 @@
   line-height: 18px;
   color: var(--muted-foreground);
 }
-.account-modal aside [data-sidebar="menu-button"][data-active="true"],
-.account-modal aside [data-sidebar="menu-button"]:hover {
+.chat-shell .account-modal aside [data-sidebar="menu-button"][data-active="true"],
+.chat-shell .account-modal aside [data-sidebar="menu-button"]:hover {
   color: var(--sidebar-accent-foreground);
   background: var(--sidebar-accent);
 }
@@ -53,8 +54,6 @@
   padding: 24px;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted-foreground) transparent;
 }
 .account-modal h2 { margin: 0 0 24px; font-size: 18px; line-height: 26px; font-weight: 600; }
 .account-modal .settings-form { display: grid; gap: 16px; }
@@ -84,11 +83,11 @@
 @media (max-width: 480px) {
   .app-surface .account-modal { flex-direction: column; }
   .account-modal > aside.settings-sidebar { width: 100%; height: auto; padding: 8px; gap: 4px; border-right: 0; border-bottom: 1px solid var(--border); }
-  .account-modal [data-sidebar="header"] { padding: 0 8px 4px; }
+  .account-modal [data-sidebar="header"] { padding: 0 0 4px; }
   .account-modal [data-sidebar="content"] { overflow: visible; }
   .account-modal [data-sidebar="content"] [data-sidebar="menu"] { flex-direction: row; }
   .account-modal [data-sidebar="content"] [data-sidebar="menu-item"] { flex: 1; }
-  .account-modal aside [data-sidebar="menu-button"] { font-size: 11px; line-height: 14px; height: 100%; }
+  .chat-shell .account-modal aside [data-sidebar="menu-button"] { font-size: 11px; line-height: 14px; height: 100%; }
   .account-modal [data-sidebar="footer"] { padding: 4px 8px 0; }
   .account-modal [data-sidebar="footer"] [data-slot="separator"] { display: none; }
 }
@@ -134,11 +133,6 @@
 }
 
 .avatar > img,.message-avatar > img { width:100%;height:100%;object-fit:cover;border-radius:inherit; }
-.account-modal .avatar-editor { display:flex;align-items:center;gap:16px;min-width:0; }
-.account-modal .avatar-editor > .avatar { width:64px;height:64px;flex-shrink:0; }
-.account-modal .avatar-editor > div { min-width:0;flex:1; }
-.account-modal .avatar-editor input { padding:8px;font-size:12px; }
-.account-modal .avatar-editor .settings-hint { margin:6px 0 0; }
 .account-modal .email-form { border-top:1px solid var(--border);margin-top:28px;padding-top:24px; }
 .account-modal .email-form h2 { margin-bottom:0; }
 /* Responsive layout around the shared shadcn controls. */
@@ -185,8 +179,6 @@
 .account-modal #account-panel [data-slot="button"] { min-height: 36px; font-size: 14px; }
 .account-modal #account-panel .email-form { margin-top: 24px; padding-top: 24px; }
 .account-modal #account-panel .settings-hint { font-size: 12px; line-height: 18px; margin: 4px 0 8px; }
-.account-modal #account-panel .avatar-editor { gap: 12px; }
-.account-modal #account-panel .avatar-editor > .avatar { width: 48px; height: 48px; }
 .account-modal #account-panel .session-row { padding: 12px; margin-bottom: 8px; gap: 16px; }
 .account-modal #account-panel .voice-field { gap: 8px; }
 .account-modal #account-panel .voice-field > label { display: block; }

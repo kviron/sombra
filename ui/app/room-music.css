@@ -1,0 +1,18 @@
+/* Room placement and host theme; controls use the assistant-ui vocabulary. */
+.room-music.room-music{--music-solid:var(--sombra-menu-solid,var(--card,#202127));--aui-panel:var(--music-solid);flex:none;width:min(100%,416px);margin:16px auto 0;text-align:start;overflow-wrap:anywhere;border:1px solid var(--glass-line,var(--border))}
+@supports (backdrop-filter:blur(1px)){
+ @media (prefers-reduced-transparency:no-preference){
+  .room-music.room-music{--aui-panel:color-mix(in srgb,var(--music-solid) 84%,transparent);backdrop-filter:blur(24px) saturate(120%)}
+ }
+}
+.room-music-header,.room-music-track,.room-music-actions,.room-music-progress,.room-music-add{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.room-music-header{justify-content:space-between}
+.room-music-header>span,.room-music-actions label{display:inline-flex;align-items:center;gap:8px}
+.room-music-track>div{min-width:0}
+.room-music-track small{display:block}
+.room-music-progress progress{flex:1;min-width:0;accent-color:var(--primary)}
+.room-music-actions label{flex:1;min-width:80px}
+.room-music-add input{flex:1 1 9rem}
+.room-music-queue{max-height:132px;overflow:auto}
+.room-music [data-aui="button"]:disabled{opacity:.55;cursor:not-allowed}
+.room-music [role=alert]{color:var(--destructive)}

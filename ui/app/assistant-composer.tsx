@@ -5,6 +5,9 @@ import {composerTrigger,mentionCandidates,commandCandidates,localCommandCandidat
 import '@/shared/ui/menu-material.css';
 import {ComposerToolbar,ComposerActions,paper,composerInputClass} from '@/shared/ui/elements-composer';
 import './assistant-composer.css';
+import {parseMusicCommand} from './room-music';
+
+const musicCommands=[['play','Добавить трек · вставьте ссылку после команды'],['pause','Поставить музыку на паузу'],['resume','Продолжить воспроизведение'],['skip','Пропустить трек'],['stop','Остановить и очистить очередь']].map(([name,description])=>({id:`music:${name}`,type:'command',label:`/${name}`,description,metadata:{insert:`/${name}`,avatar:'',search:name}}));
 
 type Props={onMentionInserted?:(mention:{userId:string;start:number;end:number},text:string)=>void;state:ChatState;channel:string;group?:string;draft:string;setDraft:(text:string)=>void;onSubmit:(event:FormEvent)=>void;onSearch:()=>void;disabled:boolean;sendDisabled:boolean;hasAttachment:boolean;placeholder:string;textareaRef:RefObject<HTMLTextAreaElement|null>;onPaste:(event:ClipboardEvent<HTMLTextAreaElement>)=>void;children:ReactNode;attachments?:ReactNode;sendButton:ReactNode};
 const messages:ThreadMessage[]=[];
@@ -32,11 +35,17 @@ export function AssistantComposer(props:Props){
   if(text!==latest.current.draft)latest.current.setDraft(text);
  }),[runtime]);
  const mentions=useMemo(()=>mentionCandidates(props.state,props.channel,props.group),[props.state,props.channel,props.group]);
- const commands=useMemo(()=>[...localCommandCandidates,...commandCandidates(props.state,props.channel,props.group)],[props.state,props.channel,props.group]);
+ const roomMusic=props.state.groups.some(group=>group.id===props.group&&group.channels.some(channel=>channel.id===props.channel&&channel.kind==='voice'));
+ const commands=useMemo(()=>[...(roomMusic?musicCommands:[]),...localCommandCandidates,...commandCandidates(props.state,props.channel,props.group)],[roomMusic,props.state,props.channel,props.group]);
  function adapter(items:typeof mentions){return {categories:()=>[],categoryItems:()=>items,search:(query:string)=>props.disabled||props.sendDisabled?[]:items.filter(item=>String(item.metadata.search).toLocaleLowerCase().split(' ').some(part=>part.startsWith(query.toLocaleLowerCase()))).slice(0,12)}}
  const mentionAdapter=useMemo(()=>adapter(mentions),[mentions,props.disabled,props.sendDisabled]);
  const commandAdapter=useMemo(()=>adapter(commands),[commands,props.disabled,props.sendDisabled]);
- return <AssistantRuntimeProvider runtime={runtime}><ComposerPrimitive.TriggerPopoverRoot><ComposerPrimitive.Root data-slot="composer" className={`${paper} sombra-assistant-composer relative flex w-full flex-col gap-2 rounded-[24px] p-2.5 transition-colors`} onSubmit={props.onSubmit}>
+ return <AssistantRuntimeProvider runtime={runtime}><ComposerPrimitive.TriggerPopoverRoot><ComposerPrimitive.Root onKeyDownCapture={event=>{
+  if(!roomMusic||props.disabled||props.sendDisabled||event.target!==props.textareaRef.current||event.key!=='Enter'||event.shiftKey||event.ctrlKey||event.altKey||event.metaKey||event.nativeEvent.isComposing||event.keyCode===229)return;
+  const command=parseMusicCommand(props.textareaRef.current.value);
+  if(!command||(command.action==='add'&&!command.url))return;
+  event.preventDefault();event.stopPropagation();event.currentTarget.requestSubmit();
+ }} data-slot="composer" className={`${paper} sombra-assistant-composer relative flex w-full flex-col gap-2 rounded-[24px] p-2.5 transition-colors`} onSubmit={props.onSubmit}>
  {props.attachments}<ComposerPrimitive.Input className={composerInputClass} data-slot="composer-input" ref={props.textareaRef} rows={1} maxRows={5} maxLength={2000} aria-label="Сообщение" role="combobox" aria-autocomplete="list" placeholder={props.placeholder} cancelOnEscape={false} addAttachmentOnPaste={false} unstable_focusOnRunStart={false} unstable_focusOnScrollToBottom={false} onPaste={props.onPaste}/>
  <ComposerToolbar><ComposerActions>{props.children}</ComposerActions>{props.hasAttachment&&!props.draft.trim()?props.sendButton:<ComposerPrimitive.Send asChild disabled={props.sendDisabled} onClick={event=>{event.preventDefault();event.currentTarget.closest('form')?.requestSubmit()}}>{props.sendButton}</ComposerPrimitive.Send>}</ComposerToolbar>
  <ComposerPrimitive.TriggerPopover char="@" matcher={composerTrigger} adapter={mentionAdapter} className="sombra-composer-menu sombra-menu-surface" data-slot="mention-menu-content" aria-label="Участники чата">

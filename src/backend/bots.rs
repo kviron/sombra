@@ -4,6 +4,7 @@ mod command_registration;
 impl Backend {
     /// Offline maintenance only: caller must stop the server before opening its database.
     /// This method is intentionally not exposed through the HTTP operation router.
+    #[allow(dead_code, reason = "Used by the mines-server maintenance CLI, not by the desktop binary")]
     pub fn provision_group_bot(
         &mut self,
         group_name: &str,
@@ -518,6 +519,9 @@ impl Backend {
             self.db["messages"].as_array_mut().unwrap().push(json!({"id":id(),"channel":b["channel"],"user":b["id"],"bot_name":b["name"],"text":text,"time":now(),"mentions":mentions}));
             self.save()?;
             return Ok(json!({"ok":true}));
+        }
+        if matches!(op, super::profile_effect_drafts::CLAIM | super::profile_effect_drafts::FINISH) {
+            return self.profile_effect_draft_worker(v, &b);
         }
         if b["legacy"] == true {
             return Err("Legacy tokens are room-only".into());

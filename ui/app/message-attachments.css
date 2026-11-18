@@ -18,6 +18,7 @@
 /* assistant-ui Elements File/AudioPlayer are the card themselves; the message wrapper only sizes them. */
 .message-attachment.message-attachment-card{border:0;background:transparent;overflow:visible;width:320px}
 .attachment-file-card{min-width:0}
+.chat-shell .attachment-file-card [data-slot="file-download"]:hover:not(:disabled){background-color:#d2e0fa21;color:#eef4ff}
 .attachment-image-surface{position:relative;max-width:100%}
 .attachment-image-trigger{display:grid;width:320px;max-width:100%;height:300px;min-width:min(160px,100%);padding:0;border:0;border-radius:8px;overflow:hidden;cursor:zoom-in;background:transparent;text-align:center}
 .chat-shell .attachment-image-trigger,.chat-shell .attachment-image-trigger:hover{background:transparent}
@@ -43,13 +44,13 @@
 .attachment-player{position:relative;min-width:0;max-width:100%}
 .attachment-player [data-slot="audio-player"]{max-width:100%}
 /* Reserve the corner for the hover action so it never covers the seek time. */
-.attachment-player [data-slot="audio-player-time"]{padding-inline-end:30px}
-.chat-shell .attachment-player [data-slot="audio-player"] button:hover{background-color:var(--foreground);color:var(--background)}
+.attachment-player [data-slot="audio-player-time"]{padding-inline-end:30px;white-space:nowrap}
+.chat-shell .attachment-player [data-slot="audio-player"] button:hover:not(:disabled){background-color:#dce7fb;color:var(--background)}
 .message-attachment [data-slot="audio-player"] button{border-radius:50%}
 .message-attachment .attachment-player-download{position:absolute;z-index:1;top:6px;right:6px;display:flex;align-items:center;justify-content:center;width:30px;height:30px;min-height:30px;padding:0;border:0;border-radius:8px;background:#111725d9;color:#eef4ff;opacity:0;pointer-events:none;cursor:pointer;transition:opacity 150ms ease}
 .attachment-player-download::before{content:'';position:absolute;inset:-5px;border-radius:12px}
 .attachment-player:hover>.attachment-player-download,.attachment-player:focus-within>.attachment-player-download{opacity:1;pointer-events:auto}
-.attachment-player-download:hover{background:#1b263def;color:#fff}
+.chat-shell .attachment-player>.attachment-player-download:hover:not(:disabled){background:#1b263def;color:#fff}
 .attachment-player-download:focus-visible{outline:2px solid #abc7ff;outline-offset:2px}
 .attachment-player-download:disabled{cursor:wait}
 .attachment-audio-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0;padding:6px 2px 0;font-size:11px;color:var(--muted-foreground);white-space:normal;overflow-wrap:anywhere}

@@ -5,6 +5,7 @@ use super::*;
 mod tests;
 impl Backend {
     /// Offline maintenance only: stop the service and back up its single-writer database first.
+    #[allow(dead_code, reason = "Used by the mines-server maintenance CLI, not by the desktop binary")]
     pub(crate) fn configure_bot_offline(
         &mut self,
         username: &str,
@@ -30,7 +31,7 @@ impl Backend {
         v["op"] = json!("update_bot_settings");
         v["bot"] = bot["id"].clone();
         v["revision"] = json!(bot["settings_revision"].as_u64().unwrap_or(0));
-        self.bot_settings_action(&v, s(bot, "owner"))
+        self.bot_settings_action_inner(&v, s(bot, "owner"), true)
     }
     pub(super) fn bot_conversation(&self, b: &Value) -> Value {
         let c = &b["conversation"];
@@ -46,6 +47,9 @@ impl Backend {
         )
     }
     pub(super) fn bot_settings_action(&mut self, v: &Value, uid: &str) -> Result<Value, String> {
+        self.bot_settings_action_inner(v, uid, false)
+    }
+    fn bot_settings_action_inner(&mut self, v: &Value, uid: &str, offline: bool) -> Result<Value, String> {
         let i = self.db["bots"]
             .as_array()
             .unwrap()
@@ -100,6 +104,23 @@ impl Backend {
                             return Err("BOT_SETTINGS_INVALID".into());
                         }
                         profile[key] = json!(text.trim());
+                    }
+                    "username" if offline => {
+                        let handle = text.trim().trim_start_matches('@').to_ascii_lowercase();
+                        if !(3..=32).contains(&handle.len())
+                            || !handle.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
+                        {
+                            return Err("BOT_SETTINGS_INVALID".into());
+                        }
+                        if ["bots", "users"].iter().any(|table| {
+                            arr(&self.db[*table]).iter().any(|entry| {
+                                entry["id"] != b["id"]
+                                    && s(entry, "username").eq_ignore_ascii_case(&handle)
+                            })
+                        }) {
+                            return Err("BOT_SETTINGS_CONFLICT".into());
+                        }
+                        profile[key] = json!(handle);
                     }
                     "bio" => {
                         if text.chars().count() > 512 {
@@ -184,6 +205,9 @@ impl Backend {
         }
         if profile["name"].is_string() {
             self.db["bots"][i]["name"] = profile["name"].clone();
+        }
+        if profile["username"].is_string() {
+            self.db["bots"][i]["username"] = profile["username"].clone();
         }
         self.db["bots"][i]["conversation"] = conversation.clone();
         self.db["bots"][i]["settings_revision"] = json!(next);

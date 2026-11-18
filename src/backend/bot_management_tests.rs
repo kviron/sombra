@@ -59,6 +59,25 @@ async fn http_owner_settings_and_policy_use_cookie_actor_and_forbidden_status() 
     drop(reopened);std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }
 #[test]
+fn offline_handle_rename_preserves_bot_identity_and_routes_new_mentions() {
+    let (mut b, path, token, bot) = fixture();
+    let bid = bot["bot"]["id"].clone();
+    let channel = b.db["groups"][0]["channels"][0]["id"].clone();
+    let hash = b.db["bots"][0]["token_hash"].clone();
+    let renamed = b.configure_bot_offline("helper", &json!({"profile":{"username":"sombra"}})).unwrap();
+    assert_eq!(renamed["bot"]["username"], "sombra");
+    assert_eq!(renamed["bot"]["id"], bid);
+    assert_eq!(b.db["bots"][0]["token_hash"], hash);
+    assert!(arr(&b.db["users"]).iter().any(|u| u["id"] == bid && u["username"] == "sombra"));
+    send(&mut b, &token, &channel, "@helper hello");
+    send(&mut b, &token, &channel, "@sombra hello");
+    let updates = arr(&b.db["bot_updates"]);
+    assert_eq!(updates.len(), 1);
+    assert_eq!(updates[0]["reason"], "mention");
+    drop(b);
+    std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+}
+#[test]
 fn offline_configuration_uses_existing_owner_validators_without_credentials() {
     let (mut b, path, _token, _bot) = fixture();
     let before = b.db.clone();

@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react';
 import { cn } from '@/shared/lib/utils';
+import { ProfileEffectImage } from './profile-effect-image';
+import type { ProfileEffectAsset } from '@/shared/api/backend';
 import { AvatarFrame } from '@/shared/ui/avatar-fx';
 import type { AvatarDecoration, DecorationInput } from '@/shared/ui/avatar-fx';
 
@@ -9,6 +11,7 @@ export type UserIdentity = {
   avatar?: string;
   online?: boolean;
   bot?: boolean;
+  profileEffectAssets?: {avatar?: ProfileEffectAsset};
   /** Server-provided decorations (v1 documents); absent on an older server or an undecorated account. */
   decorations?: {
     avatar?: DecorationInput | AvatarDecoration | null;
@@ -32,9 +35,11 @@ export function UserAvatar({
   className,
   decorative = false,
   decoration,
+  effectAsset=user.profileEffectAssets?.avatar,
 }: {
   user: UserIdentity;
   size?: UserAvatarSize;
+  effectAsset?: ProfileEffectAsset|null;
   presence?: boolean;
   className?: string;
   decorative?: boolean;
@@ -56,6 +61,7 @@ export function UserAvatar({
       ) : (
         <span className="user-avatar-initial" aria-hidden="true">{initial}</span>
       )}
+      {effectAsset&&<ProfileEffectImage asset={effectAsset} className="profile-avatar-effect"/>}
       {decoration ? <AvatarFrame decoration={decoration} target="avatar" size={size} /> : null}
       {presence && (
         <span

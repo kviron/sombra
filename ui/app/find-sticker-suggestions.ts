@@ -9,7 +9,7 @@ export function findStickerSuggestions(draft:string,stickers:Sticker[],user:stri
  if(text.length<2)return [];
  const matches=[];
  for(const sticker of stickers){
-  if(sticker.archived||(sticker.group?sticker.group!==group:sticker.owner!==user))continue;
+  if(sticker.archived||(sticker.group?sticker.group!==group:sticker.owner!==user&&sticker.packInstalled!==true))continue;
   let longest=0;
   for(const keyword of [sticker.name,...sticker.keywords||[]]){
    const phrase=normalizedWords(keyword);

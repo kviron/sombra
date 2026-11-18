@@ -15,7 +15,7 @@ import './messages.css';
 import './bots.css';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import emojiData from '@emoji-mart/data/sets/15/native.json';
-import {StickerImage} from './sticker-library';
+import {SentSticker,StickerImage,personalSticker,stickerPackKey} from './sticker-library';
 import {MessageAttachment} from './message-attachments';
 import {MessageText} from './message-text';
 import {canGroup} from '@/shared/lib/group-permissions';
@@ -72,9 +72,9 @@ export function MessageItem({message:m,previous,state,refresh,onError,userName}:
     className="rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <MessageAvatar>{canOpenProfile?<button type="button" className="avatar-trigger" title={`Профиль ${name}`} onClick={openProfile}>{identity?<UserAvatar user={identity} size="md" presence={false} decorative decoration={grouped?undefined:identity.decorations?.avatar}/>:avatar?<img src={avatar} alt=""/>:name[0]}</button>:avatar?<img src={avatar} alt=""/>:name[0]}</MessageAvatar>
     <MessageContent>
-     <Bubble data-sticker-only={!!sticker&&!hasText} data-image-only={hasImage&&!hasText} data-image-message={hasImage}>
+     <Bubble data-inline-time={hasText&&!m.attachment&&!sticker&&reactionEmojis.length===0} data-sticker-only={!!sticker&&!hasText} data-image-only={hasImage&&!hasText} data-image-message={hasImage}>
       {!grouped&&<MessageHeader><strong>{canOpenProfile?<button type="button" className="message-author" title={`Профиль ${name}`} onClick={openProfile}>{name}</button>:name}</strong>{(m.bot_name||identity?.bot)&&<small className="bot-badge">БОТ</small>}</MessageHeader>}
-      <BubbleContent>{m.text&&(hasImage?<div className="message-image-caption"><MessageText text={m.text} mentions={m.mentions}/></div>:<MessageText text={m.text} mentions={m.mentions}/>)}{sticker&&<StickerImage key={sticker.id} className="sent-sticker" sticker={sticker}/ >}{m.attachment&&<MessageAttachment messageId={m.id} attachment={m.attachment}/>}</BubbleContent>
+      <BubbleContent>{m.text&&(hasImage?<div className="message-image-caption"><MessageText text={m.text} mentions={m.mentions}/></div>:<MessageText text={m.text} mentions={m.mentions}/>)}{sticker&&<SentSticker key={sticker.id} sticker={sticker} user={state.me.id} catalog={state.stickerCatalogSupported} refresh={refresh}/>}{m.attachment&&<MessageAttachment messageId={m.id} attachment={m.attachment}/>}</BubbleContent>
       <div className={reactionEmojis.length?'message-bottom-row':'message-bottom-inline'}>
        {reactionEmojis.length>0&&<div className="reactions">{reactionEmojis.map(emoji=><button
         type="button" disabled={busy} aria-label={`Реакция ${emoji}`} aria-pressed={m.reactions?.some(reaction=>reaction.emoji===emoji&&reaction.user===state.me.id)}
@@ -100,9 +100,10 @@ export function ExpressionPicker({state,onError,onEmoji,onSticker,disabled,group
  const [panel,setPanel]=useState<Panel>();
  const [busy,setBusy]=useState(false),[category,setCategory]=useState('people'),[query,setQuery]=useState('');
  const [scope,setScope]=useState<'personal'|'group'>('personal'),[pack,setPack]=useState('');
- const library=state.stickers.filter(sticker=>!sticker.archived&&(scope==='group'?!!group&&sticker.group===group.id:!sticker.group&&sticker.owner===state.me.id));
- const packs=[...new Set(library.map(sticker=>sticker.pack||''))];
- const filtered=library.filter(sticker=>!pack||sticker.pack===pack);
+ const library=state.stickers.filter(sticker=>!sticker.archived&&(scope==='group'?!!group&&sticker.group===group.id:personalSticker(sticker,state.me.id)));
+ const packs=new Map(library.map(sticker=>[stickerPackKey(sticker),sticker.pack||'']));
+ const activePack=packs.has(pack)?pack:'';
+ const filtered=library.filter(sticker=>!activePack||stickerPackKey(sticker)===activePack);
  const search=query.trim().toLowerCase();
  const emojiIds=search
   ?Object.keys(emojiById).filter(id=>{const item=emojiById[id];return [item.name,id,...item.keywords||[],item.skins[0]?.native].some(value=>value?.toLowerCase().includes(search))})
@@ -136,7 +137,7 @@ export function ExpressionPicker({state,onError,onEmoji,onSticker,disabled,group
      <button type="button" aria-pressed={scope==='personal'} onClick={()=>{setScope('personal');setPack('')}}>Мои стикеры</button>
      <button type="button" aria-pressed={scope==='group'} onClick={()=>{setScope('group');setPack('')}}>Стикеры группы</button>
     </nav>}
-    {packs.length>1&&<Select label="Набор стикеров" value={pack} onValueChange={setPack} options={[{value:'',label:'Все наборы'},...packs.filter(Boolean).map(name=>({value:name,label:name}))]}/>}
+    {packs.size>1&&<Select label="Набор стикеров" value={activePack} onValueChange={setPack} options={[{value:'',label:'Все наборы'},...[...packs].filter(([key])=>key).map(([value,label])=>({value,label}))]}/>}
     {filtered.length?<div className="sticker-grid">{filtered.map(sticker=><button type="button" key={sticker.id} disabled={disabled||busy} title={sticker.name} onClick={()=>void sendSticker(sticker.id)}><StickerImage sticker={sticker}/></button>)}</div>:<p>Пока нет стикеров.</p>}
     {(scope==='personal'||canGroup(group,state.me.id,'stickers.manage'))&&<button type="button" className="manage-stickers" onClick={()=>{setPanel(undefined);onManage(scope)}}>Управлять стикерами</button>}
    </>}

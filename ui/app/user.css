@@ -25,6 +25,7 @@
   border-radius: inherit;
   object-fit: cover;
 }
+.user-avatar > .profile-avatar-effect { position:absolute; inset:0; pointer-events:none; }
 .user-avatar[data-size="xs"] { --avatar-size: 20px; }
 .user-avatar[data-size="sm"] { --avatar-size: 24px; }
 .user-avatar[data-size="md"] { --avatar-size: 32px; }
@@ -124,7 +125,7 @@
   padding: 10px 8px;
   gap: 10px;
 }
-.chat-shell .user-row[data-variant="dialog"]:hover { color: #fff; }
+.chat-shell .dialog-row[data-variant="dialog"]:is(:hover, :focus-visible) { background: var(--glass-line); color: var(--accent-foreground); }
 .chat-shell .user-row[data-variant="dialog"][data-selected="true"] { background: rgba(125, 145, 180, 0.22); }
 .user-row[data-variant="dialog"] .user-row-title time {
   margin-left: auto;

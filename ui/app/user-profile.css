@@ -129,6 +129,9 @@
   gap: 10px;
   margin-top: 20px;
 }
+.user-profile-effect-action{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+.user-profile-effect-action span{display:flex;align-items:center;gap:8px;font-size:14px}
+.user-profile-effect-feedback{margin:8px 0 0;font-size:14px;overflow-wrap:anywhere}
 .chat-shell .user-profile-primary,
 .chat-shell .user-profile-secondary {
   display: inline-flex;

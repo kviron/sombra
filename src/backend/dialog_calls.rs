@@ -162,6 +162,7 @@ impl Backend {
         }
         self.voice
             .retain(|p| p["seen"].as_u64().unwrap_or(0).saturating_add(20) > timestamp);
+        self.music.cleanup(&self.voice);
         self.dialog_calls.retain(|c| {
             c["empty_since"]
                 .as_u64()

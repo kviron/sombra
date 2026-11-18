@@ -212,7 +212,7 @@ async fn http_group_mention_badge_is_per_viewer_and_binding_survives_rename() {
     let state = api.state(a).await;
     let mut flags = state.as_object().unwrap().keys().filter(|k| k.ends_with("Supported")).cloned().collect::<Vec<_>>();
     flags.sort();
-    assert_eq!(flags, ["conversationMemberSearchSupported","decorationSupported","dialogMetadataSupported","humanTypingSupported","readReceiptsSupported"]);
+    assert_eq!(flags, ["conversationMemberSearchSupported","decorationSupported","dialogMetadataSupported","effectCatalogSupported","humanTypingSupported","profileEffectDraftsSupported","profileEffectUploadsSupported","readReceiptsSupported","stickerCatalogSupported"]);
     assert!(!state.as_object().unwrap().keys().any(|k| k.to_ascii_lowercase().contains("mention")));
     let group_dto = arr(&state["groups"]).into_iter().find(|g| g["id"]==gid).unwrap();
     let channel_dto = arr(&group_dto["channels"]).into_iter().find(|c| c["id"]==channel).unwrap();

@@ -1,0 +1,25 @@
+[Unit]
+Description=Sombra private Yandex MP3 range bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+LoadCredential=yandex-token:/etc/sombra-yandex/token
+ExecStart=/opt/sombra-yandex/venv/bin/python /opt/sombra-yandex/yandex_stream_helper.py --port 18761
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+LimitCORE=0
+MemoryMax=128M
+TasksMax=24
+
+[Install]
+WantedBy=multi-user.target

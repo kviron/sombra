@@ -14,6 +14,20 @@ Full normal core tools require owner + explicitly selected immutable Sombra IDs.
 
 No second Hermes installation, daemon, Docker/OpenShell setup or provider proxy is needed. `SharedHostAdapter` is registered in the **existing gateway process**. Trusted turns use that gateway's normal full core/tools/provider runtime. Ordinary users use an **in-process restricted public callback** (not another poller/process): no automatic private memories/context files, per-actor/channel history, and only its explicitly verified safe public capability executor. Web/extract/image/video availability is determined by the real configured handlers; missing generation is reported, not invented.
 
+### Optional Pixelfx draft queue (off by default)
+
+Enable `SOMBRA_EFFECT_DRAFTS=1` in the existing shared-host adapter service configuration and bind the same immutable bot ID on the Sombra backend via `MINES_PROFILE_EFFECT_DRAFT_BOT_ID`. Configure a trusted OpenAI-compatible **chat completions** endpoint in the named Sombra profile's `config.yaml`:
+
+```yaml
+sombra_effect_drafts:
+  base_url: https://<approved-provider>/v1
+  model: <approved-chat-model>
+```
+
+Put `SOMBRA_EFFECT_DRAFT_API_KEY` only in that named profile's protected `.env`. Do not use the existing Codex OAuth route, which may refresh auth files and does not support a wire output token cap. This lane does not fall back to the chat model, Telegram, or another provider. Missing or invalid configuration disables claiming without affecting chat; no endpoint or credential is accepted from a draft job.
+
+The site's authenticated enqueue/status operations use the backend queue. One separate async tick in the existing adapter claims via `bot_claim_profile_effect_draft` and finishes that exact lease via `bot_finish_profile_effect_draft`. A separate system instruction restricts the model to a v1 decoration for the requested target; only the visual description goes in the user role. The completion requests no tools, has a 25-second local deadline and requests a 1024-token cap. The 4 KiB JSON body is validated independently; invalid output and provider errors return `generation_failed`, never raw model text. The worker writes no local draft files or chat/session state, and a successful result is a private draft, not a publish/equip operation. A canceled worker leaves unfinished leases to the backend expiry policy.
+
 ### Explicit acknowledgement / configuration
 
 The operator must set **both**:

@@ -68,7 +68,17 @@
 .modal-backdrop {
   inset-block-start: var(--title-bar-height);
   background: #00030a7a;
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+/* Portal overlays live outside .app-surface, so apply this to the overlays themselves. */
+:is(.modal-backdrop,.sombra-modal-overlay,.profile-effects-overlay,.image-crop-overlay,.group-roles-overlay,.attachment-viewer-overlay,.bot-management-overlay,.readers-overlay,.new-dialog-overlay,.sticker-preview-overlay,.message-link-overlay,.update-guest-overlay) {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  :is(.modal-backdrop,.sombra-modal-overlay,.profile-effects-overlay,.image-crop-overlay,.group-roles-overlay,.attachment-viewer-overlay,.bot-management-overlay,.readers-overlay,.new-dialog-overlay,.sticker-preview-overlay,.message-link-overlay,.update-guest-overlay) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 .app-surface .account-modal, .app-surface .group-modal {
   background: rgba(25,28,36,.86); border-color: #e6eeff33; border-radius: 16px;
@@ -80,12 +90,12 @@
 .account-modal aside button { background: #dce6fa14; }
 .account-modal p, .group-modal p { color: #b1b8c6; }
 .account-modal hr, .channel-list hr { border-color: var(--glass-line); }
-.voice-stage button {
+.voice-stage button:not(:where([data-aui])) {
   background: #ffffffe0;
   box-shadow: 0 5px 18px #0000002e, inset 0 1px 0 white;
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
 }
-.chat-shell .voice-stage button:hover { background: #fff; color: #111; }
+.chat-shell .voice-stage button:not(:where([data-aui])):hover { background: #fff; color: #111; }
 .auth-window > main > section { border-radius: 18px; box-shadow: var(--glass-shadow); }
 .auth-window .login-input { background: color-mix(in srgb, var(--background) 45%, transparent); }
 @media (prefers-reduced-transparency: reduce) {

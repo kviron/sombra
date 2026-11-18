@@ -11,7 +11,7 @@
 [data-own="true"] .message-image-caption{background:#303d62;border-color:#798dc22b}
 .chat-message .message-meta{gap:8px;min-height:20px;color:#b6c8e7;font-size:12px}
 .chat-message .message-meta button{opacity:1;display:flex;align-items:center;justify-content:center;min-width:24px;min-height:24px}
-.chat-message .message-content p{margin:0;line-height:1.5;font-size:14px;overflow-wrap:anywhere;white-space:pre-wrap}
+.chat-message .message-content .message-text{font-size:14px;line-height:1.4}
 .message-footer{display:flex;justify-content:flex-end;align-items:center;gap:4px;margin-top:3px;font-size:10px;color:#adb8ca;line-height:15px}
 [data-own="true"] .message-footer{color:#c0cdec}
 .chat-message .reactions:empty{display:none}
@@ -21,23 +21,29 @@
 .voice-messages .chat-message .message-content{max-width:85%}
 @media(max-width:760px){.chat-message[data-slot="message"] .message-content{max-width:90%}.chat-message[data-slot="message"] .message-avatar{display:none}}
 
-/* Attachment 23: compact bubbles and one author label per consecutive run. */
-.chat-message[data-slot="message"]{margin:6px 0 0}
+/* Compact bubble spacing; show the author once per consecutive run. */
+.chat-message[data-slot="message"]{margin:5px 0 0}
 .chat-message[data-slot="message"][data-grouped="true"]{margin-top:2px}
-.chat-message[data-grouped="true"] .message-avatar{visibility:hidden}
-.chat-message .message-bubble{position:relative;display:flow-root;padding:7px 10px 5px}
-.chat-message .message-meta{min-height:18px;margin-bottom:1px;padding-right:10px}
+.chat-message[data-slot="message"][data-grouped="true"] .message-avatar{height:0;margin-bottom:0;visibility:hidden}
+.chat-message .message-bubble{position:relative;display:flow-root;padding:4px 8px}
+.chat-message .message-meta{min-height:18px;margin-bottom:1px;padding-right:8px}
+.chat-message .message-meta .message-author{min-height:18px}
 /* Media starts on the same outer grid as a text bubble, not inside a second padded bubble. */
 .chat-message .message-bubble[data-image-message="true"]{padding:0;border:0;border-radius:0}
 .chat-message .message-bubble[data-image-message="true"]>.message-meta{padding:7px 21px 0 11px}
 .chat-message .bubble-content{display:contents}
-.chat-message .message-content p{display:inline;line-height:1.4}
-.chat-message .message-footer{float:right;display:inline-flex;margin:4px 0 0 10px;line-height:15px}
+.chat-message .message-footer{white-space:nowrap}
+/* A single paragraph can share its last line with an atomic footer; keep
+   lists, separate paragraphs, code blocks, tables and media in normal flow. */
+.chat-message .message-bubble[data-inline-time="true"]:has(>.bubble-content>.message-text>p:only-child){line-height:1.4}
+.chat-message .message-bubble[data-inline-time="true"]:has(>.bubble-content>.message-text>p:only-child) .message-text,
+.chat-message .message-bubble[data-inline-time="true"] .message-text>p:only-child{display:inline;line-height:inherit}
+.chat-message .message-bubble[data-inline-time="true"]:has(>.bubble-content>.message-text>p:only-child)>.message-bottom-inline>.message-footer{display:inline-flex;margin:0 0 0 7px;vertical-align:baseline}
 .chat-message .sent-sticker{display:block}
 .chat-message .message-avatar{flex-shrink:0}
 .chat-message .message-bottom-inline{display:contents}
-.chat-message .message-bottom-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:5px;clear:both}
-.chat-message .message-bottom-row .message-footer{float:none;flex-shrink:0;margin:0 0 1px}
+.chat-message .message-bottom-row{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:4px}
+.chat-message .message-bottom-row .message-footer{flex-shrink:0;margin:0 0 1px}
 .chat-message .message-bottom-row .reactions{margin:0;gap:4px;min-width:0}
 .chat-message .reactions>button{display:inline-flex;align-items:center;gap:3px;min-height:22px;padding:1px 7px;border-radius:12px}
 

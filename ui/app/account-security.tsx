@@ -1,26 +1,30 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {api,clearSession,session,type ChatState,type SessionDto,type User} from '@/shared/api/backend';
+import {api,applyProfileEffect,clearSession,session,type ChatState,type SessionDto,type User,type ProfileDecorationDoc} from '@/shared/api/backend';
 import {Button} from '@/shared/ui/button';
 import {Input} from '@/shared/ui/input';
 import {ImageCropDialog,type PreparedProfileImage} from '@/shared/ui/image-crop-dialog';
 import {ProfileCover} from '@/shared/ui/profile-cover';
-import {ProfileDecorationPicker} from './profile-decoration-picker';
+import {ProfileDecorationPicker,type MediaTarget} from './profile-decoration-picker';
+import {UserAvatar} from '@/shared/ui/user-avatar';
+import {Pencil,Sparkles,Trash2} from 'lucide-react';
 import {Label} from '@/shared/ui/label';
 import type {AccountSection} from './account-sidebar';
 
-export function AccountSecurity({state,refresh,section}:{state:ChatState|null;refresh:()=>Promise<ChatState>;section:AccountSection}) {
+export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:ChatState|null;refresh:()=>Promise<ChatState>;section:AccountSection;onMediaSaved:(user:User,field:MediaTarget|`decoration:${MediaTarget}`)=>void}) {
  const [sessions,setSessions]=useState<SessionDto[]>([]),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const [email,setEmail]=useState(state?.email||'');
  const [name,setName]=useState(state?.me.name||''),[bio,setBio]=useState(state?.me.bio||'');
- const avatar=state?.me.avatar;
+
  const [crop,setCrop]=useState<{file:File;kind:'avatar'|'cover'}>();
- const cropOrigin=useRef<HTMLInputElement|null>(null);
+ const cropOrigin=useRef<HTMLButtonElement|null>(null);
  useEffect(()=>{if(crop||!cropOrigin.current)return;const target=cropOrigin.current;cropOrigin.current=null;const frame=requestAnimationFrame(()=>{if(target.isConnected&&!target.disabled&&target.getClientRects().length)target.focus()});return()=>cancelAnimationFrame(frame)},[crop]);
+ const [effects,setEffects]=useState<MediaTarget>();
+ const effectOrigin=useRef<HTMLButtonElement>(null),avatarPicker=useRef<HTMLInputElement>(null),coverPicker=useRef<HTMLInputElement>(null);
  const mounted=useRef(true),epoch=useRef(0),lock=useRef(false),identity=useRef(state?.me.id);identity.current=state?.me.id;
  const coverSupported=!!state?.me.coverSupported;
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;epoch.current++}},[]);
- useEffect(()=>{epoch.current++;setCrop(undefined);setBusy(false);lock.current=false;setError('');setNotice('');setName(state?.me.name||'');setBio(state?.me.bio||'');setEmail(state?.email||'')},[state?.me.id]);
- useEffect(()=>{if(section!=='profile')setCrop(undefined)},[section]);
+ useEffect(()=>{epoch.current++;setCrop(undefined);setEffects(undefined);setBusy(false);lock.current=false;setError('');setNotice('');setName(state?.me.name||'');setBio(state?.me.bio||'');setEmail(state?.email||'')},[state?.me.id]);
+ useEffect(()=>{if(section!=='profile'){setCrop(undefined);setEffects(undefined)}},[section]);
  async function load(){setSessions(await api<SessionDto[]>('sessions'))}
  useEffect(()=>{void load().catch(e=>setError(e.message))},[]);
  useEffect(()=>{setError('');setNotice('')},[section]);
@@ -32,43 +36,54 @@ export function AccountSecurity({state,refresh,section}:{state:ChatState|null;re
   const current=()=>mounted.current&&request===epoch.current&&identity.current===account&&session()===token;
   lock.current=true;setBusy(true);setError('');setNotice('');
   try{
-   if(kind==='cover')await api('set_profile_cover',{cover:result?{dataUrl:result.dataUrl,crop:result.crop}:null});
-   else {const {user}=await api<{user:User}>('me');if(!current()||user.id!==account)throw new Error('Учётная запись изменилась');await api('update_profile',{profile:{name:user.name,bio:user.bio,avatar:result?.dataUrl??''}})}
-   if(!current())return;await refresh();if(!current())return;
+   let saved:User;
+   if(kind==='cover')({user:saved}=await api<{user:User}>('set_profile_cover',{cover:result?{dataUrl:result.dataUrl,crop:result.crop}:null}));
+   else {const {user}=await api<{user:User}>('me');if(!current()||user.id!==account)throw new Error('Учётная запись изменилась');await api('update_profile',{profile:{name:user.name,bio:user.bio,avatar:result?.dataUrl??''}});saved={...user,avatar:result?.dataUrl??''}}
+   if(!current()||saved.id!==account)return;
+   onMediaSaved(saved,kind);
    setCrop(undefined);setNotice(kind==='cover'?(result?'Обложка сохранена':'Обложка удалена'):(result?'Аватарка сохранена':'Аватарка удалена'));
   }catch(e){if(current())setError((e as Error).message);throw e}finally{if(current()){lock.current=false;setBusy(false)}}
+ }
+ async function saveEffect(target:MediaTarget,decoration:ProfileDecorationDoc|null,id?:string){
+  const account=identity.current,token=session();
+  const {user}=await (id?applyProfileEffect(id):api<{user:User}>('set_profile_decoration',{target,decoration}));
+  if(!mounted.current||user.id!==account||identity.current!==account||session()!==token)return;
+  onMediaSaved(user,`decoration:${target}`);
+  setError('');setNotice(id||decoration?'Украшение сохранено':'Украшение убрано');
  }
  function password(e:FormEvent<HTMLFormElement>){e.preventDefault();const data=new FormData(e.currentTarget);void run(async()=>{if(data.get('password')!==data.get('confirm'))throw new Error('Пароли не совпадают');await api('change_password',{current_password:data.get('current'),password:data.get('password')});clearSession()})}
  return <>
    {crop&&<ImageCropDialog file={crop.file} kind={crop.kind} onConfirm={result=>saveImage(crop.kind,result)} onClose={()=>{epoch.current++;lock.current=false;setBusy(false);setCrop(undefined)}}/>}
   <section hidden={section!=='profile'} aria-labelledby="profile-heading">
    <h2 id="profile-heading">Информация об учётной записи</h2>
-   <form className="settings-form" onSubmit={e=>{e.preventDefault();void run(async()=>{await api('update_profile',{profile:{name,bio}});await refresh();setNotice('Профиль сохранён')})}}>
-    <div className="settings-field">
-     <Label htmlFor="account-avatar">Аватарка</Label>
-     <div className="avatar-editor">
-      <span className="avatar">{avatar?<img src={avatar} alt="Аватарка профиля"/>:name[0]}</span>
-      <div>
-       <Input id="account-avatar" type="file" accept="image/png,image/jpeg,image/webp" disabled={busy||!state}
-        onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file){cropOrigin.current=e.currentTarget;setCrop({file,kind:'avatar'})}}}/>
-       <p className="settings-hint">PNG, JPEG или WebP до 20 МБ / 32 Мп. Сохранение: PNG 256 × 256, до 256 КБ.</p>
-       {avatar&&<Button type="button" variant="ghost" size="sm" disabled={busy} onClick={()=>void saveImage('avatar').catch(()=>{})}>Удалить аватарку</Button>}
-      </div>
-     </div>
-    </div>
-    <div className="settings-field">
-     <Label htmlFor="account-cover">Обложка профиля</Label>
-     {state&&section==='profile'&&<ProfileCover user={state.me} accountId={state.me.id} className="settings-cover-preview"/>}
-     <Input id="account-cover" type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={busy||!state||!coverSupported||!!state.me.bot} onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file){cropOrigin.current=e.currentTarget;setCrop({file,kind:'cover'})}}}/>
-     <p className="settings-hint">1200 × 400 (3:1). PNG, JPEG или WebP до 20 МБ / 32 Мп; GIF до 2 МБ с сохранением анимации. Сохранённая обложка — до 2 МБ.</p>
-     {!coverSupported&&<p className="settings-hint">Обложки появятся после обновления сервера. Аватарки доступны уже сейчас.</p>}
-     {state?.me.cover&&<Button type="button" variant="ghost" size="sm" disabled={busy||!coverSupported||!!state.me.bot} onClick={()=>void saveImage('cover').catch(()=>{})}>Удалить обложку</Button>}
-    </div>
+   <form className="settings-form" onSubmit={e=>{e.preventDefault();void run(async()=>{await api('update_profile',{profile:{name,bio}});await refresh();setNotice('Профиль сохранён')})}}>     {state&&section==='profile'&&<div className="profile-media">
+      {(['avatar','cover'] as const).map(target=>{
+       const avatar=target==='avatar',me=state.me;
+       const imageSupported=!me.bot&&(avatar||coverSupported);
+       const effectSupported=!me.bot&&(me.decorationSupported??state.decorationSupported??false);
+       const editLabel=avatar?'Изменить аватар':'Изменить обложку';
+       return <div key={target} className="profile-media-item" data-target={target}>
+        <div className="profile-media-preview">
+         {avatar?<UserAvatar user={me} size="xl" presence={false} decorative decoration={me.decorations?.avatar}/>:<ProfileCover user={me} accountId={me.id} className="settings-cover-preview"/>}
+         <div className="profile-media-controls">
+          {imageSupported&&<button type="button" title={editLabel} aria-label={editLabel} disabled={busy} onClick={()=> (avatar?avatarPicker:coverPicker).current?.click()}><Pencil size={17}/></button>}
+          {effectSupported&&<button type="button" title={avatar?'Рамка аватара':'Эффект обложки'} aria-label={avatar?'Рамка аватара':'Эффект обложки'} aria-haspopup="dialog" disabled={busy} onClick={event=>{effectOrigin.current=event.currentTarget;setEffects(target)}}><Sparkles size={17}/></button>}
+          {imageSupported&&(avatar?me.avatar:me.cover)&&<button type="button" title={avatar?'Удалить аватар':'Удалить обложку'} aria-label={avatar?'Удалить аватар':'Удалить обложку'} disabled={busy} onClick={event=>{const edit=event.currentTarget.parentElement?.querySelector('button');void saveImage(target).then(()=>requestAnimationFrame(()=>edit?.focus())).catch(()=>{})}}><Trash2 size={17}/></button>}
+         </div>
+        </div>
+        <span className="profile-media-label">{avatar?'Аватар':'Обложка'}</span>
+        <input hidden id={avatar?'account-avatar':'account-cover'} aria-label={editLabel} type="file" ref={avatar?avatarPicker:coverPicker} accept={`image/png,image/jpeg,image/webp${avatar?'':',image/gif'}`} disabled={busy||!imageSupported}
+         onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file){cropOrigin.current=event.currentTarget.parentElement?.querySelector('button')??null;setCrop({file,kind:target})}}}/>
+       </div>;
+      })}
+     </div>}
+     {state&&!coverSupported&&<p className="settings-hint">Обложки появятся после обновления сервера.</p>}
+     {state&&!(state.me.decorationSupported??state.decorationSupported)&&<p className="settings-hint">Украшения появятся после обновления сервера.</p>}
     <div className="settings-field"><Label htmlFor="account-name">Имя пользователя</Label><Input id="account-name" name="name" autoComplete="nickname" value={name} onChange={e=>setName(e.target.value)} minLength={2} maxLength={32} required/></div>
     <div className="settings-field"><Label htmlFor="account-bio">О себе</Label><Input id="account-bio" value={bio} onChange={e=>setBio(e.target.value)} maxLength={190}/></div>
     <div className="settings-actions"><Button variant="secondary" size="sm" disabled={busy}>{busy?'Сохраняем…':'Сохранить профиль'}</Button></div>
    </form>
-   <ProfileDecorationPicker state={state} refresh={refresh}/>
+   {state&&effects&&section==='profile'&&<ProfileDecorationPicker key={state.me.id+effects} user={state.me} target={effects} catalogSupported={!!state.effectCatalogSupported} draftsSupported={!!state.profileEffectDraftsSupported} uploadsSupported={!!state.profileEffectUploadsSupported} onSave={(doc,id)=>saveEffect(effects,doc,id)} onClose={()=>setEffects(undefined)} onRestoreFocus={()=>requestAnimationFrame(()=>effectOrigin.current?.focus())}/>}
    <form className="settings-form email-form" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void run(async()=>{await api('change_email',{email,current_password:data.get('current_password')});await refresh();form.reset();setNotice('Почта изменена. Используйте её при следующем входе.')})}}>
     <h2>Электронная почта</h2>
     <div className="settings-field"><Label htmlFor="account-email">Почта</Label><Input id="account-email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required maxLength={254}/></div>

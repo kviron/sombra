@@ -78,6 +78,7 @@ try{
  const pages=await until(async()=>{const list=await(await fetch(`http://127.0.0.1:${debugPort}/json`)).json();return list.length&&list},'CDP');
  tab=await connect(pages.find(page=>page.type==='page').webSocketDebuggerUrl);
  await tab.send('Page.enable');
+ await tab.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
  await tab.send('Emulation.setDeviceMetricsOverride',{width:1080,height:720,deviceScaleFactor:1,mobile:false});
  await tab.send('Page.addScriptToEvaluateOnNewDocument',{source:init});
  await tab.send('Page.navigate',{url:`http://127.0.0.1:${webPort}/#chat`});
@@ -186,16 +187,16 @@ try{
  ok(/\d/.test(legacy.time)&&legacy.count===1&&!legacy.card,'legacy startedAt drives the elapsed clock without a card');
  await setTyping([]);await sleep(2400);
 
- // 8. Voice channel: no card, exactly one status row in its own chat column.
+ // 8. Voice channel: image generation uses the same card inside its own chat column.
  await clickSelector('.server-rail button[title="QA Group"]');
  await tab.ev(`[...document.querySelectorAll('.channel-list .channel')].find(e=>e.textContent.includes('voice-room')).click()`);
  await tab.wait(`!!document.querySelector('.voice-messages')`);
  await setTyping([{bot:'bot_sombra',channel:'voice_qa',until:typingUntil,started_at:Math.floor(Date.now()/1000),activity:'image',status:'Генерирую изображение…'}]);
- await tab.wait(`!!document.querySelector('.voice-messages .bot-typing[role="status"]')`);
+ await tab.wait(`!!document.querySelector('.voice-messages .bot-image-activity [data-slot="image-generation"]')`);
  const voice=await tab.ev(`({voice:document.querySelectorAll('.voice-messages .bot-typing[role="status"]').length,composer:document.querySelectorAll('.composer-chrome .bot-typing').length,total:document.querySelectorAll('.bot-typing').length,cards:document.querySelectorAll('.bot-image-activity').length,overflowX:document.querySelector('.voice-messages').scrollWidth>document.querySelector('.voice-messages').clientWidth,bodyWidth:document.documentElement.scrollWidth,viewport:innerWidth})`);
  metrics.push({label:'voice',...voice});
- ok(voice.voice===1&&voice.composer===0&&voice.total===1,'voice typing stays in its own chat column, once');
- ok(voice.cards===0,'no image card is injected into the voice transcript');
+ ok(voice.voice===0&&voice.composer===0&&voice.total===0,'voice image card replaces the compact typing row');
+ ok(voice.cards===1,'exactly one image card is shown in the voice transcript');
  ok(!voice.overflowX&&voice.bodyWidth<=voice.viewport+1,'voice layout stays inside the window');
  await shot('voice-typing');
  await setTyping([]);await sleep(2400);

@@ -51,7 +51,7 @@ fn crop(value: &Value, w: u32, h: u32) -> Result<Value, String> {
 // Walk container bytes before any codec/LZW work. image's GIF decoder permits
 // descriptors outside the logical screen; without this check a tiny screen could
 // hide huge decoded frames and bypass the logical-canvas work budget.
-fn gif_preflight(bytes: &[u8]) -> Result<u64, String> {
+pub(super) fn gif_preflight(bytes: &[u8]) -> Result<u64, String> {
     fn take<'a>(bytes: &'a [u8], offset: &mut usize, length: usize) -> Result<&'a [u8], String> {
         let end = offset.checked_add(length).ok_or(INVALID)?;
         let part = bytes.get(*offset..end).ok_or(INVALID)?;
@@ -201,7 +201,7 @@ fn validate(value: &Value) -> Result<(Value, Vec<u8>), String> {
         bytes,
     ))
 }
-fn ordinary(path: &Path, dir: bool) -> Result<(), String> {
+pub(super) fn ordinary(path: &Path, dir: bool) -> Result<(), String> {
     let m = std::fs::symlink_metadata(path).map_err(|_| STORAGE)?;
     if m.file_type().is_symlink() || if dir { !m.is_dir() } else { !m.is_file() } {
         return Err(STORAGE.into());
@@ -218,7 +218,7 @@ fn ordinary(path: &Path, dir: bool) -> Result<(), String> {
 impl Backend {
     // Rename is the commit point. A post-commit directory-sync failure must not
     // trigger removal of the asset now referenced by the committed database.
-    fn commit_cover(&self) -> Result<(), String> {
+    pub(super) fn commit_profile_media(&self) -> Result<(), String> {
         ordinary(self.path.parent().ok_or(STORAGE)?, true)?;
         ordinary(&self.path, false)?;
         let temporary = self.path.with_extension("tmp");
@@ -309,7 +309,7 @@ impl Backend {
         let previous = self.db["users"][index].clone();
         let old_path = self.cover_path(&previous["profile_cover"]).ok();
         self.db["users"][index]["profile_cover"] = metadata;
-        if let Err(e) = self.commit_cover() {
+        if let Err(e) = self.commit_profile_media() {
             self.db["users"][index] = previous;
             if let Some(path) = created {
                 let _ = std::fs::remove_file(path);

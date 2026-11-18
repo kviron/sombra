@@ -13,7 +13,7 @@ type Props={
  onClose:()=>void;
 };
 
-const overlayClass='fixed inset-0 z-[110] bg-black/60';
+const overlayClass='sombra-modal-overlay fixed inset-0 z-[110] bg-black/60';
 const contentClass='fixed top-1/2 left-1/2 z-[111] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-xl';
 const titleClass='text-base font-semibold';
 const actionsClass='mt-5 flex justify-end gap-2';

@@ -3,8 +3,13 @@ import { createRoot } from 'react-dom/client';
 import { UserAvatar } from '@/shared/ui/user-avatar';
 import { AvatarFrame, DECORATION_PRESETS, fxSchedulerState } from '@/shared/ui/avatar-fx';
 import type { DecorationInput, PaletteName } from '@/shared/ui/avatar-fx';
+import { ProfileDecorationPicker } from '@/app/profile-decoration-picker'; // The local QA page exercises the real app modal.
+import { UserProfile } from '@/app/user-profile';
+import type { User } from '@/shared/api/backend';
 import '@/shared/ui/profile-cover.css';
 import '@/app/user.css';
+import '@/app/chat.css';
+import '@/app/glass.css';
 import './preview.css';
 
 const AVATAR = 'data:image/svg+xml,' + encodeURIComponent(
@@ -53,6 +58,8 @@ function App() {
   const [palette, setPalette] = useState<PaletteName>('ember');
   const [intensity, setIntensity] = useState(0.9);
   const [showDebug, setShowDebug] = useState(true);
+  const [picker, setPicker] = useState<'avatar' | 'cover'>();
+  const [showProfile, setShowProfile] = useState(false);
   const [stats, setStats] = useState(() => fxSchedulerState());
 
   const ringDecoration = useMemo<DecorationInput>(
@@ -106,8 +113,11 @@ function App() {
     };
   }, []);
 
+  const profileUser: User = { ...USERS.mira, bio: '', created_at: 0, decorations: { avatar: DECORATION_PRESETS['ember-crown'].decoration, cover: sceneDecoration } };
   return (
     <main className="preview">
+      {showProfile && <UserProfile user={profileUser} me={profileUser} groups={[]} onClose={() => setShowProfile(false)} />}
+      {picker && <ProfileDecorationPicker target={picker} user={{ ...USERS.mira, bio: '', created_at: 0 }} onSave={async () => {}} onClose={() => setPicker(undefined)} onRestoreFocus={() => {}} />}
       <header className="preview__head">
         <div>
           <p className="preview__eyebrow">Sombra · оформление профиля</p>
@@ -118,10 +128,13 @@ function App() {
           </p>
         </div>
         <div className="preview__stats" id="qa-debug">
+          <button id="qa-avatar-picker" onClick={() => setPicker('avatar')}>Рамки</button>
+          <button id="qa-cover-picker" onClick={() => setPicker('cover')}>Обложки</button>
+          <button id="qa-profile" onClick={() => setShowProfile(true)}>Карточка профиля</button>
           <span>Активных: {stats.animated}/{stats.visible}</span>
           <span>Кадров: {stats.frames}</span>
           <span>Последний: {stats.lastPaintMs.toFixed(2)} мс</span>
-          <span>{stats.reducedMotion ? 'reduced motion' : stats.hidden ? 'hidden' : 'live'}</span>
+          <span>{stats.hidden ? 'hidden' : 'live'}</span>
         </div>
       </header>
 

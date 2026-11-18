@@ -324,6 +324,7 @@ class SharedHostAdapter(SombraAdapter):
         self._scopes, self._tasks = {}, {}
         self._connected = False
         self._poll_task = None
+        self._effect_draft_task = None
         self._locks = []
         self._semaphore = asyncio.Semaphore(1)  # Bound Sombra work only; never alter Telegram's global concurrency.
         self.public_runner = public_runner
@@ -1169,6 +1170,36 @@ class SharedHostAdapter(SombraAdapter):
             log.warning("Sombra command registration unavailable; no unsupported group command availability claimed")
         return self._registered_commands
 
+    async def _poll_effect_drafts(self):
+        from .effect_drafts import configured_client, process_effect_draft, sdk_completion
+
+        # Off-turn: bind the named Sombra home and only the dedicated provider key.
+        # This lane never installs INVOCATION, accesses chat state, or runs any agent.
+        client = None
+        try:
+            from gateway.run import _profile_runtime_scope
+            from hermes_cli.config_effective import load_user_config_effective
+            from tui_gateway.launch_profile_policy import owner_secret_scope
+
+            home = self._public_home()
+            key = (await asyncio.to_thread(owner_secret_scope, home)).get("SOMBRA_EFFECT_DRAFT_API_KEY")
+            with _profile_runtime_scope(home, {"SOMBRA_EFFECT_DRAFT_API_KEY": key} if key else {}):
+                config = (await asyncio.to_thread(load_user_config_effective)).get("sombra_effect_drafts")
+                client, model = configured_client(config, key)
+                complete = sdk_completion(client, model)
+                while self._connected:
+                    try:
+                        await process_effect_draft(self.broker.acall, complete)
+                    except Exception:
+                        # Never echo prompt, provider error, lease, or raw response.
+                        log.debug("Sombra effect draft queue tick failed")
+                    await asyncio.sleep(3)
+        except Exception:
+            log.warning("Sombra effect draft lane unavailable; drafts will not be claimed")
+        finally:
+            if client is not None:
+                await client.close()
+
     async def connect(self, *, is_reconnect=False):
         # Same lock as the previous worker: parent must stop it before enabling this
         # platform. There is one poll owner, not a second worker racing the old token.
@@ -1199,6 +1230,8 @@ class SharedHostAdapter(SombraAdapter):
         self._connected = True
         log.warning("Sombra SHARED HOST enabled by explicit operator acknowledgement: trusted tools can access host/Telegram-readable files; logical profile separation is NOT a sandbox")
         self._poll_task = asyncio.create_task(self._poll())
+        if self.env.get("SOMBRA_EFFECT_DRAFTS") == "1":
+            self._effect_draft_task = asyncio.create_task(self._poll_effect_drafts())
         return True
 
     async def disconnect(self):
@@ -1208,6 +1241,9 @@ class SharedHostAdapter(SombraAdapter):
         tasks = [*self._tasks.values(), *getattr(self, "_session_tasks", {}).values()]
         if self._poll_task:
             tasks.append(self._poll_task)
+        if self._effect_draft_task:
+            tasks.append(self._effect_draft_task)
+            self._effect_draft_task = None
         for task in tasks:
             task.cancel()
         if tasks:

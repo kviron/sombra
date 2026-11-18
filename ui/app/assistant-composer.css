@@ -18,6 +18,14 @@
    text keeps its contrast. Colours only; geometry stays with the Elements classes. */
 .composer-chrome .sombra-assistant-composer{background:rgba(20,22,30,.64);border-color:rgba(160,174,198,.16);-webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%);box-shadow:0 12px 34px rgba(0,0,0,.42)}
 .composer-chrome .sombra-assistant-composer textarea::placeholder{color:#8e94a4}
+/* Keep both halves of the send palette together: the shell's unlayered
+   button:hover otherwise replaces only the Tailwind button background. */
+.sombra-assistant-composer [data-slot="composer-send"]{
+ --sombra-send-bg:#dce6fa;--sombra-send-hover:#c6d6f6;--sombra-send-ink:#1b263a;
+ background-color:var(--sombra-send-bg);color:var(--sombra-send-ink)
+}
+.sombra-assistant-composer [data-slot="composer-send"]:hover:not(:disabled){background-color:var(--sombra-send-hover)}
+.sombra-assistant-composer [data-slot="composer-send"]:disabled:hover{background-color:var(--sombra-send-bg)}
 @media(prefers-reduced-transparency:reduce){
  .composer-chrome .sombra-assistant-composer{background:#16181f;border-color:#2b2e3a;-webkit-backdrop-filter:none;backdrop-filter:none}
 }

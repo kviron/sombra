@@ -92,6 +92,7 @@ impl Backend {
         }
         // The marker rides on the same save as the decoration, so a rejected document or a failed
         // write leaves neither the new value nor a consumed update behind.
+        effect_catalog::clear_reference(&mut self.db["users"][index], target);
         self.db["bot_updates"][ui][APPLIED] = json!(true);
         if let Err(error) = self.save() {
             self.db = snapshot;

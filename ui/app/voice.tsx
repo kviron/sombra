@@ -18,6 +18,7 @@ import {UserContextMenu} from './user-menu';
 import {useUserActions} from './user-actions';
 import type {User} from '@/shared/api/backend';
 import './voice.css';
+import {RoomMusic,type useRoomMusic} from './room-music';
 type PlaybackGain={context:AudioContext;source:MediaStreamAudioSourceNode;gain:GainNode;output:MediaStreamAudioDestinationNode};
 export function Media({stream,muted,volume,speaker,audioOnly=false}:{stream:MediaStream;muted:boolean;volume:number;speaker?:string;audioOnly?:boolean}){
  const ref=useRef<HTMLMediaElement>(null);const [blocked,setBlocked]=useState(false),[error,setError]=useState('');
@@ -144,7 +145,7 @@ export function VoicePeerVisual({stream,user,onOpen}:{stream?:MediaStream;user:U
  },[stream]);
  return hasVisibleVideo(stream)?<Media stream={stream!} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title={`Профиль ${user.name}`} onClick={onOpen}><UserAvatar user={user} size="xl" decoration={user.decorations?.avatar}/></button>;
 }
-export function VoiceStage({voice:v,id,title,userName,me,meUser,users,onSettings}:{voice:Voice;id:string;title:string;userName:(id:string)=>string;me:string;meUser?:User;users?:User[];onSettings:()=>void}){
+export function VoiceStage({voice:v,id,title,userName,me,meUser,users,onSettings,music}:{voice:Voice;id:string;title:string;userName:(id:string)=>string;me:string;meUser?:User;users?:User[];onSettings:()=>void;music?:ReturnType<typeof useRoomMusic>}){
  const joined=v.room===id;
  const actions=useUserActions();
  const microphoneOff=v.muted||v.deaf;
@@ -157,7 +158,7 @@ export function VoiceStage({voice:v,id,title,userName,me,meUser,users,onSettings
   return <UserContextMenu key={p.client} user={identity}>{tile}</UserContextMenu>;
  })}</div>}
  {v.error&&<p className="voice-error" role="alert">{v.error}</p>}
- <div className="voice-controls">{joined?<><Button variant="secondary" title={microphoneOff?'Включить микрофон':'Выключить микрофон'} aria-label="Микрофон" aria-pressed={microphoneOff} onClick={v.toggleMic}>{microphoneOff?<MotionIcon icon={MicOff} kind="device"/>:<MotionIcon icon={Mic} kind="device"/>}</Button><Button variant="secondary" title={v.deaf?'Включить звук':'Отключить звук'} aria-label="Наушники" aria-pressed={v.deaf} onClick={v.toggleDeaf}>{v.deaf?<MotionIcon icon={HeadphoneOff} kind="device"/>:<MotionIcon icon={Headphones} kind="device"/>}</Button><Button variant="secondary" disabled={v.busy} title={v.camera?'Выключить камеру':'Включить камеру'} onClick={()=>void v.toggleCamera()}>{v.camera?<Video/>:<VideoOff/>}</Button><Button variant="secondary" className="voice-hangup" title="Отключиться" onClick={v.leave}><PhoneOff/></Button></>:<Button variant="secondary" disabled={v.busy} onClick={()=>void v.join(id)}>{v.busy?'Подключение…':'Присоединиться к голосовому каналу'}</Button>}<Button variant="secondary" title="Настройки голоса и видео" onClick={onSettings}><MotionIcon icon={Settings} kind="settings"/></Button></div></div>
+ <div className="voice-controls">{joined?<><Button variant="secondary" title={microphoneOff?'Включить микрофон':'Выключить микрофон'} aria-label="Микрофон" aria-pressed={microphoneOff} onClick={v.toggleMic}>{microphoneOff?<MotionIcon icon={MicOff} kind="device"/>:<MotionIcon icon={Mic} kind="device"/>}</Button><Button variant="secondary" title={v.deaf?'Включить звук':'Отключить звук'} aria-label="Наушники" aria-pressed={v.deaf} onClick={v.toggleDeaf}>{v.deaf?<MotionIcon icon={HeadphoneOff} kind="device"/>:<MotionIcon icon={Headphones} kind="device"/>}</Button><Button variant="secondary" disabled={v.busy} title={v.camera?'Выключить камеру':'Включить камеру'} onClick={()=>void v.toggleCamera()}>{v.camera?<Video/>:<VideoOff/>}</Button><Button variant="secondary" className="voice-hangup" title="Отключиться" onClick={v.leave}><PhoneOff/></Button></>:<Button variant="secondary" disabled={v.busy} onClick={()=>void v.join(id)}>{v.busy?'Подключение…':'Присоединиться к голосовому каналу'}</Button>}<Button variant="secondary" title="Настройки голоса и видео" onClick={onSettings}><MotionIcon icon={Settings} kind="settings"/></Button></div>{music&&<RoomMusic key={id} music={music} joined={joined}/>}</div>
 }
 const noiseOptions:{value:NoiseSuppression;label:string}[]=[
  {value:'enhanced',label:'Усиленное (RNNoise)'},

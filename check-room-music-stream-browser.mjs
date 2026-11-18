@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {mkdirSync,writeFileSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {browser,fixtureServer,stopProcess} from './check-voice-navigation-browser.mjs';
+const out=`voice-qa/stream-${Date.now()}`,chunk=262144,sockets=[];
+mkdirSync(out,{recursive:true});
+const media=spawnSync('ffmpeg',['-nostdin','-v','error','-f','lavfi','-i','sine=frequency=330:duration=35','-b:a','192k','-f','mp3','pipe:1'],{maxBuffer:2*1024*1024});
+assert.equal(media.status,0);const bytes=media.stdout;assert(bytes.length>2*chunk);
+writeFileSync(`${out}/index.html`,'<!doctype html><audio id="audio"></audio><script type="module" src="./fixture.ts"></script>');
+writeFileSync(`${out}/fixture.ts`, `import {openRoomMusicStream} from '/ui/app/room-music-stream'; const a=document.querySelector('audio')!; try {const stream=openRoomMusicStream('room','track',35000,a,()=>window.qaError='stream');window.qaStream=stream;a.src=stream.url;a.play().catch(e=>window.qaError=String(e))}catch(e){window.qaError=String(e)}`);
+let server,chrome;const offsets=[];
+const plugin={name:'music-stream-fixture',configureServer(server){server.middlewares.use('/api',async(req,res)=>{let body='';for await(const part of req)body+=part;const p=JSON.parse(body);assert.equal(p.op,'music_stream_chunk');assert.equal(p.id,'track');assert.equal(p.room,'room');offsets.push(p.offset);const b=bytes.subarray(p.offset,p.offset+chunk),end=p.offset+b.length;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({data:{offset:p.offset,nextOffset:end,totalBytes:bytes.length,mime:'audio/mpeg',data:b.toString('base64'),eof:end===bytes.length}}))})}};
+try{const started=await fixtureServer(out,[plugin]);server=started.server;const actor=await browser(`${out}/profile`,sockets);chrome=actor.chrome;const tab=actor.tab;await tab.send('Page.navigate',{url:`http://127.0.0.1:${started.webPort}/${out}/index.html`});await tab.wait(`window.qaError||document.querySelector('audio')?.currentTime>0.2`);assert.equal(await tab.ev('window.qaError'),undefined);assert.deepEqual(offsets.slice(0,3),[0,chunk,2*chunk]);const available=await tab.ev(`(()=>{const a=document.querySelector('audio');return a.buffered.end(a.buffered.length-1)})()`);assert(available>20);await tab.ev(`document.querySelector('audio').currentTime=availableTime();function availableTime(){const a=document.querySelector('audio');return Math.min(30,a.buffered.end(a.buffered.length-1)-1)}`);await tab.wait(`document.querySelector('audio')?.currentTime>30`);assert.equal(await tab.ev('window.qaError'),undefined);assert(offsets.includes(chunk*3));await tab.ev('window.qaStream.close()');console.log('PASS: real Chromium MP3 MSE progressively downloads and plays beyond 30 seconds');}
+finally{for(const ws of sockets)ws.close();await stopProcess(chrome);if(server)await server.close()}

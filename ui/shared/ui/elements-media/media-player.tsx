@@ -183,7 +183,7 @@ export function AudioPlayer({
         )}
       </button>
       <div className="flex min-w-0 grow basis-16 flex-col gap-1.5">
-        <span className="truncate text-[13.5px] font-medium">
+        <span className="truncate text-[13.5px] font-medium" title={title}>
           {displayTitle}
         </span>
         <input
