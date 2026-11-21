@@ -3,6 +3,8 @@ import {invoke,isTauri} from '@tauri-apps/api/core';
 import {getVersion} from '@tauri-apps/api/app';
 import {Channel} from '@tauri-apps/api/core';
 import {Button} from '@/shared/ui/button';
+import {Badge} from '@/shared/ui/badge';
+import {Check,RefreshCw} from 'lucide-react';
 import {createUpdater} from './update-controller';
 
 import './updates.css';
@@ -52,5 +54,20 @@ export function UpdateSettings({inCall}:{inCall:boolean}){
  useEffect(()=>{void configured().then(setEnabled);if(isTauri())void getVersion().then(setVersion).catch(()=>{})},[]);
  const busy=['checking','downloading','installing'].includes(state.phase);
  const action=state.phase==='available'?()=>updater.download():state.phase==='ready'?()=>updater.install():state.phase==='restart'?()=>updater.restart():()=>updater.check();
- return <section className="update-settings"><h2>Обновления Sombra</h2>{version&&<p className="settings-hint">Текущая версия {version}</p>}<p role="status">{enabled===null?'Проверяем настройки…':!enabled?isTauri()?'Канал обновлений ещё не настроен для этой сборки.':'Обновления доступны в установленном приложении.':message(state)}</p>{enabled&&<>{state.message&&state.phase!=='error'&&<p role="alert">{state.message}</p>}{state.phase==='downloading'&&<progress aria-label="Загрузка обновления" max={100} value={state.percent}/>}<p className="settings-hint">Установка закроет приложение. Сначала завершите разговор; черновики сообщений сохраняются.</p>{inCall&&<p className="settings-hint">Завершите звонок перед установкой.</p>}<Button variant="secondary" size="sm" disabled={busy||(inCall&&(state.phase==='ready'||state.phase==='restart'))} onClick={()=>void action()}>{state.phase==='available'?'Скачать обновление':state.phase==='ready'?'Установить и перезапустить':state.phase==='restart'?'Перезапустить':busy?'Подождите…':'Проверить обновления'}</Button>{state.notes&&<><h3>Что нового в {state.version}</h3><p className="update-notes">{state.notes}</p></>}</>}</section>;
+ return <section className="update-settings" aria-label="Обновления Sombra">
+  <div className="update-version-panel">
+   <div><h2>Sombra {version&&<Badge variant="secondary">{version}</Badge>}</h2>
+   <p role="status">{enabled&&state.phase==='current'&&<Check size={14} aria-hidden="true"/>}{enabled===null?'Проверяем настройки…':!enabled?isTauri()?'Канал обновлений ещё не настроен для этой сборки.':'Обновления доступны в установленном приложении.':message(state)}</p></div>
+   {enabled&&<Button disabled={busy||(inCall&&(state.phase==='ready'||state.phase==='restart'))} onClick={()=>void action()}>
+    {!busy&&['idle','current','error'].includes(state.phase)&&<RefreshCw data-icon="inline-start"/>}{state.phase==='available'?'Скачать обновление':state.phase==='ready'?'Установить и перезапустить':state.phase==='restart'?'Перезапустить':busy?'Подождите…':'Проверить обновления'}
+   </Button>}
+  </div>
+  {enabled&&<div className="update-settings-body">
+   {state.message&&state.phase!=='error'&&<p role="alert">{state.message}</p>}
+   {state.phase==='downloading'&&<progress aria-label="Загрузка обновления" max={100} value={state.percent}/>}
+   <p className="settings-hint">Установка закроет приложение. Сначала завершите разговор; черновики сообщений сохраняются.</p>
+   {inCall&&<p className="settings-hint">Завершите звонок перед установкой.</p>}
+   {state.notes&&<section className="update-release"><h3>Что нового в {state.version}</h3><ul>{state.notes.trim().split(/\r?\n\s*\r?\n/).map((part,index)=><li key={index} className="update-notes">{part}</li>)}</ul></section>}
+  </div>}
+ </section>;
 }

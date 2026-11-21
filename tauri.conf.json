@@ -1,6 +1,6 @@
 {
   "productName": "Sombra",
-  "version": "0.1.22",
+  "version": "0.1.24",
   "identifier": "local.mines.chat",
   "build": {
     "beforeDevCommand": "npm run dev",

@@ -7,7 +7,6 @@ import {useAudioDevices,isDeviceSelectionMissing} from './use-audio-devices';
 import {AudioDeviceAccess} from './audio-device-access';
 import {Label} from '@/shared/ui/label';
 import {Progress} from '@/shared/ui/progress';
-import {Separator} from '@/shared/ui/separator';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Mic,MicOff,Headphones,HeadphoneOff,Video,VideoOff,PhoneOff,Settings} from 'lucide-react';
 import {mediaError,type Voice} from './use-voice';
@@ -18,6 +17,7 @@ import {UserContextMenu} from './user-menu';
 import {useUserActions} from './user-actions';
 import type {User} from '@/shared/api/backend';
 import './voice.css';
+import './account-media-settings.css';
 import {RoomMusic,type useRoomMusic} from './room-music';
 type PlaybackGain={context:AudioContext;source:MediaStreamAudioSourceNode;gain:GainNode;output:MediaStreamAudioDestinationNode};
 export function Media({stream,muted,volume,speaker,audioOnly=false}:{stream:MediaStream;muted:boolean;volume:number;speaker?:string;audioOnly?:boolean}){
@@ -44,9 +44,14 @@ export function Media({stream,muted,volume,speaker,audioOnly=false}:{stream:Medi
   const el=ref.current!;
   let active=true;
   el.srcObject=input;
-  void el.play().then(()=>{if(active)setBlocked(false)},failure=>{if(active)playbackFailed(failure)});
+  const play=()=>{void el.play().then(()=>{if(active)setBlocked(false)},failure=>{if(active)playbackFailed(failure)})};
+   const receiver=audioOnly?input.getAudioTracks()[0]:undefined;
+   const retryWhenReceiving=()=>{if(active&&el.paused)play()};
+   receiver?.addEventListener('unmute',retryWhenReceiving);
+   play();
   return()=>{
    active=false;
+   receiver?.removeEventListener('unmute',retryWhenReceiving);
    el.srcObject=null;
    const graph=processing.current;
    if(graph){
@@ -77,6 +82,7 @@ export function Media({stream,muted,volume,speaker,audioOnly=false}:{stream:Medi
     );
    }catch{
     if(context)void context.close();
+    if(speaker!==undefined)recordDesktopDiagnostic('voice_output','playback_failed');
     setGainError('Не удалось усилить звук.');
    }
   }
@@ -95,7 +101,10 @@ export function Media({stream,muted,volume,speaker,audioOnly=false}:{stream:Medi
      setError('Не удалось выбрать динамики. Проверьте настройки.');
     }
    });
-   else if(speaker)setError('Выбор динамиков недоступен в этом режиме.');
+   else if(speaker){
+    recordDesktopDiagnostic('voice_output','output_device_failed');
+    setError('Выбор динамиков недоступен в этом режиме.');
+   }
   }
   return()=>{active=false};
  },[speaker]);
@@ -120,7 +129,9 @@ export function Media({stream,muted,volume,speaker,audioOnly=false}:{stream:Medi
 // Keep one audible element per room/client; visual tiles always remain muted.
 export function VoicePlayback({voice,volumeForUser}:{voice:Voice;volumeForUser:(id:string)=>number}){
  return <div className="voice-playback" data-voice-room={voice.room}>{Object.entries(voice.streams).map(([client,stream])=>{
-  const peer=voice.peers.find(peer=>peer.client===client);
+  // WebRTC can deliver video before audio. Don't start playback on an empty stream.
+   if(!stream.getAudioTracks().some(track=>track.readyState==='live'))return null;
+   const peer=voice.peers.find(peer=>peer.client===client);
   const volume=voice.preferences.volume*(peer?volumeForUser(peer.user)/100:1);
   return <Media key={`${voice.room}:${client}`} stream={stream} muted={voice.deaf} volume={volume} speaker={voice.preferences.speaker} audioOnly/>;
  })}</div>;
@@ -175,12 +186,30 @@ export function VoiceSettings({voice:v}:{voice:Voice}){
  useEffect(()=>()=>{epoch.current++;owned.current?.getTracks().forEach(stopCapturedTrack)},[]);
  useEffect(()=>{if(!preview?.getAudioTracks().length)return;const ctx=new AudioContext(),analyser=ctx.createAnalyser();ctx.createMediaStreamSource(preview).connect(analyser);const data=new Uint8Array(analyser.fftSize);const timer=setInterval(()=>{analyser.getByteTimeDomainData(data);setLevel(Math.min(100,Math.max(...data.map(x=>Math.abs(x-128)))*3))},100);return()=>{clearInterval(timer);void ctx.close()}},[preview]);
  async function test(video:boolean){stop();const token=epoch.current;setBusy(true);setError('');try{if(!navigator.mediaDevices)throw new Error('Устройства доступны через HTTPS или localhost.');const stream=await (video?navigator.mediaDevices.getUserMedia({audio:false,video:{deviceId:p.camera?{exact:p.camera}:undefined}}):captureVoiceStream(p,false));if(token!==epoch.current){stream.getTracks().forEach(stopCapturedTrack);return}owned.current=stream;setPreview(stream);await audioDevices.refresh()}catch(e){recordDesktopDiagnostic(video?'voice_camera':'voice_microphone',(e as DOMException).name==='NotAllowedError'?'device_permission':'device_error');setError(mediaError(e))}finally{setBusy(false)}}
- return <section className="voice-settings">
-  <h2>Голос и видео</h2>
-  <p>{v.room?'Устройства можно менять прямо во время звонка.':'Выберите устройства и проверьте их перед входом в комнату.'}</p>
-  <AudioDeviceAccess devices={audioDevices} disabled={busy||v.busy}/>
-  <div className="voice-device-fields">
-   {(['audioinput','audiooutput','videoinput'] as const).map((kind,i)=>{
+ return <section className="voice-settings account-media-voice">
+   <p>{v.room?'Устройства можно менять прямо во время звонка.':'Выберите устройства для звонков.'}</p>
+   <AudioDeviceAccess devices={audioDevices} disabled={busy||v.busy}/>
+   <section className="media-settings-panel" aria-label="Аудиоустройства">
+    <div className="voice-device-fields">{renderDevice('audioinput',0)}{renderDevice('audiooutput',1)}<div className="voice-field voice-volume"><Label id="voice-volume-label">Громкость собеседников · {p.volume}%</Label><Slider aria-label="Громкость собеседников" min={0} max={100} value={[p.volume]} onValueChange={([volume])=>v.savePreferences('volume',volume)}/></div></div>
+    <div className="voice-test-actions"><Button variant="secondary" disabled={busy||!!v.room} onClick={()=>void test(false)}>Проверить микрофон</Button><Progress aria-label="Уровень микрофона" value={level}/></div>
+   </section>
+   <section className="media-settings-panel"><h2>Обработка звука</h2><div className="voice-processing">
+    <div className="voice-switch"><Label htmlFor="voice-echo">Эхоподавление</Label>
+     <Switch id="voice-echo" disabled={v.busy} checked={p.echo} onCheckedChange={checked=>{stop();v.savePreferences('echo',checked)}}/>
+    </div>
+    <div className="voice-field"><Label htmlFor="voice-noise">Шумоподавление</Label>
+     <Select id="voice-noise" label="Шумоподавление" value={p.noise} disabled={v.busy} options={noiseOptions}
+      onValueChange={value=>{const option=noiseOptions.find(option=>option.value===value);if(option){stop();v.savePreferences('noise',option.value)}}}/>
+    </div>
+   </div></section>
+   <section className="media-settings-panel"><h2>Камера</h2><div className="voice-device-fields">{renderDevice('videoinput',2)}<Button variant="secondary" disabled={busy||!!v.room} onClick={()=>void test(true)}>Проверить камеру</Button></div>
+    {preview?.getVideoTracks().length? <Media stream={preview} muted volume={0}/>:null}
+   </section>
+   {preview&&<Button variant="secondary" onClick={stop}>Остановить проверку</Button>}
+   <p>При проверке разрешите доступ к устройствам. Звук не передаётся другим участникам.</p>
+   {(error||v.room&&v.error)&&<p role="alert">{error||v.error}</p>}
+  </section>;
+  function renderDevice(kind: MediaDeviceKind, i: number){
     const key=(['mic','speaker','camera'] as const)[i];
     const label=['Устройство ввода · микрофон','Устройство вывода · динамики','Камера'][i];
     const missing=isDeviceSelectionMissing(devices,audioDevices.loaded,kind,p[key]);
@@ -190,26 +219,5 @@ export function VoiceSettings({voice:v}:{voice:Voice}){
      <Select id={`voice-${key}`} label={label} value={p[key]} disabled={v.busy||audioDevices.requesting} onValueChange={value=>{stop();v.savePreferences(key,value)}} options={options}/>
       {missing&&<div className="audio-device-missing"><p role="status">Выбранное устройство недоступно. Настройка сохранена.</p><Button type="button" variant="secondary" size="sm" className="audio-device-reset" data-device-kind={kind} disabled={v.busy||audioDevices.requesting} onClick={()=>{stop();v.savePreferences(key,'')}}>Использовать по умолчанию · {['микрофон','динамики','камера'][i]}</Button></div>}
     </div>;
-   })}
-  </div>
-  <div className="voice-audio-fields">
-   <div className="voice-field voice-volume"><Label id="voice-volume-label">Громкость собеседников · {p.volume}%</Label><Slider aria-label="Громкость собеседников" min={0} max={100} value={[p.volume]} onValueChange={([volume])=>v.savePreferences('volume',volume)}/></div>
-   <div className="voice-processing">
-    <div className="voice-switch"><Label htmlFor="voice-echo">Эхоподавление</Label>
-     <Switch id="voice-echo" disabled={v.busy} checked={p.echo} onCheckedChange={checked=>{stop();v.savePreferences('echo',checked)}}/>
-    </div>
-    <div className="voice-field"><Label htmlFor="voice-noise">Шумоподавление</Label>
-     <Select id="voice-noise" label="Шумоподавление" value={p.noise} disabled={v.busy} options={noiseOptions}
-      onValueChange={value=>{const option=noiseOptions.find(option=>option.value===value);if(option){stop();v.savePreferences('noise',option.value)}}}/>
-    </div>
-   </div>
-  </div>
-  <Separator className="voice-divider"/>
-  <h2>Проверка устройств</h2>
-  <div className="voice-test-actions"><Button variant="secondary" disabled={busy||!!v.room} onClick={()=>void test(false)}>Проверить микрофон</Button><Button variant="secondary" disabled={busy||!!v.room} onClick={()=>void test(true)}>Проверить камеру</Button>{preview&&<Button variant="secondary" onClick={stop}>Остановить проверку</Button>}</div>
-  <p>При проверке разрешите доступ к устройствам. Звук не передаётся другим участникам.</p>
-  <Progress aria-label="Уровень микрофона" value={level}/>
-  {preview?.getVideoTracks().length? <Media stream={preview} muted volume={0}/>:null}
-  {(error||v.room&&v.error)&&<p role="alert">{error||v.error}</p>}
- </section>
+  }
 }

@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {api,ApiConnectionError} from '@/shared/api/backend';
-import {recordDesktopDiagnostic} from '@/shared/api/diagnostics';
+import {desktopDiagnosticsAvailable,recordDesktopDiagnostic} from '@/shared/api/diagnostics';
+import {createVoiceTransportMonitor,iceIsConnected} from './voice-diagnostics';
 import {captureVoiceStream,readMedia,setCapturedTrackEnabled,stopCapturedTrack,type MediaPreferences} from './voice-input';
 export function mediaError(e:unknown){const name=(e as DOMException).name;return name==='NotAllowedError'?'Разрешите доступ к микрофону или камере в настройках приложения и Windows.':name==='NotFoundError'?'Устройство не найдено. Подключите микрофон или камеру.':name==='NotReadableError'?'Устройство занято другим приложением. Освободите его и повторите.':(e as Error).message||'Не удалось подключить устройство.'}
 function videoConstraints(p:MediaPreferences){return {deviceId:p.camera?{exact:p.camera}:undefined,width:{ideal:1280},height:{ideal:720}}}
@@ -29,7 +30,7 @@ function otherMembers(peers:Peer[],client:string){
  return new Set(peers.filter(peer=>peer.client!==client&&peer.user!==ownUser).map(peer=>peer.user));
 }
 
-async function captureTrack(kind:TrackKind,preferences:MediaPreferences){
+async function captureTrack(kind:TrackKind,preferences:MediaPreferences,shouldReport=()=>true){
  try{
   const stream=kind==='audio'?await captureVoiceStream(preferences):await navigator.mediaDevices.getUserMedia({video:videoConstraints(preferences)});
   const track=stream.getTracks().find(t=>t.kind===kind);
@@ -37,7 +38,7 @@ async function captureTrack(kind:TrackKind,preferences:MediaPreferences){
   stream.getTracks().forEach(stopCapturedTrack);
   throw new DOMException('Устройство не найдено','NotFoundError');
  }catch(error){
-  recordDesktopDiagnostic(kind==='audio'?'voice_microphone':'voice_camera',(error as DOMException).name==='NotAllowedError'?'device_permission':'device_error');
+  if(shouldReport())recordDesktopDiagnostic(kind==='audio'?'voice_microphone':'voice_camera',(error as DOMException).name==='NotAllowedError'?'device_permission':'device_error');
   throw error;
  }
 }
@@ -67,6 +68,7 @@ export function useVoice(){
  const [room,setRoom]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[camera,setCamera]=useState(false),[local,setLocal]=useState<MediaStream|null>(null),[peers,setPeers]=useState<Peer[]>([]),[streams,setStreams]=useState<Record<string,MediaStream>>({}),[connections,setConnections]=useState<Record<string,string>>({}),[preferences,setPreferences]=useState(readMedia);
  const [availability,setAvailability]=useState<VoiceAvailability>({muted:false,deaf:false});
  const latestAvailability=useRef(availability);
+  const availabilityRevision=useRef(0);
  const [micVolume,setMicVolumeValue]=useState(100);
  const preferredMicVolume=useRef(100);
  useEffect(()=>{if(room&&preferredMicVolume.current!==100)setMicVolume(preferredMicVolume.current)},[room]);
@@ -94,15 +96,22 @@ export function useVoice(){
   // any device track returned after timeout/cancellation without touching a newer call.
   const capture=(kind:TrackKind)=>new Promise<MediaStreamTrack>((resolve,reject)=>{
    let settled=false;
-   const timer=setTimeout(()=>{settled=true;reject(new Error('Истекло время ожидания доступа к устройству. Повторите подключение.'))},30000);
-   void captureTrack(kind,preferred.current).then(track=>{
+   const timer=setTimeout(()=>{
+     settled=true;
+     if(kind==='audio'&&epoch===generation.current)recordDesktopDiagnostic('voice_output','input_device_failed');
+     reject(new Error('Истекло время ожидания доступа к устройству. Повторите подключение.'));
+    },30000);
+   void captureTrack(kind,preferred.current,()=>!settled&&epoch===generation.current).then(track=>{
     clearTimeout(timer);
     if(settled||epoch!==generation.current){stopCapturedTrack(track);if(!settled)reject(new Error('Подключение отменено.'));return}
     settled=true;resolve(track);
    },error=>{clearTimeout(timer);if(!settled){settled=true;reject(error)}});
   });
  try{
-  if(!navigator.mediaDevices)throw new Error('Для доступа к устройствам откройте приложение через HTTPS или localhost.');
+  if(!navigator.mediaDevices){
+    recordDesktopDiagnostic('voice_output','input_device_failed');
+    throw new Error('Для доступа к устройствам откройте приложение через HTTPS или localhost.');
+   }
   acquired=new MediaStream([await capture('audio')]);
   if(withVideo)acquired.addTrack(await capture('video'));
   if(epoch!==generation.current){acquired.getTracks().forEach(stopCapturedTrack);return false}
@@ -118,6 +127,10 @@ export function useVoice(){
   setRoom(destination);setLocal(acquired);setCamera(withVideo);let cursor=0;
   let lastPoll=performance.now();
   const signal=(target:string,payload:unknown)=>request('voice_signal',{target,payload});
+  const diagnostics=desktopDiagnosticsAvailable();
+  const samplers=new Map<string,(peer:Peer,time:number)=>void>();
+  let nextSample=0, sampleOffset=0;
+  let diagnosticPeers=new Map<string,Peer>();
   const make=(id:string,initiator=false)=>{
    const pc=new RTCPeerConnection({iceServers:first.iceServers});c.pcs.set(id,pc);
    if(initiator){pc.addTransceiver(c.stream.getAudioTracks()[0],{direction:'sendrecv'});
@@ -132,6 +145,44 @@ export function useVoice(){
    };
    pc.onicecandidate=e=>{if(e.candidate&&!c.stop)void signal(id,{candidate:e.candidate.toJSON()}).catch(e=>setError(e.message))};
    pc.onconnectionstatechange=()=>{if(!c.stop)setConnections(old=>({...old,[id]:pc.connectionState}))};
+   if(diagnostics){
+    const monitor=createVoiceTransportMonitor(category=>recordDesktopDiagnostic('voice_transport',category));
+    const active=()=>!c.stop&&c.pcs.get(id)===pc&&pc.signalingState!=='closed';
+    let revision=0, inFlight=false, availabilityAtSample=availabilityRevision.current;
+    const expected=(peer:Peer)=>({
+     send:!latestAvailability.current.muted&&!latestAvailability.current.deaf&&
+      c.microphone.readyState==='live'&&!c.microphone.muted&&
+      pc.getSenders().some(({track})=>track?.kind==='audio'&&track.enabled&&track.readyState==='live'),
+     receive:!latestAvailability.current.deaf&&peer.muted===false&&peer.deaf===false&&
+      remote.getAudioTracks().some(track=>track.readyState==='live'),
+    });
+    pc.oniceconnectionstatechange=()=>{if(active()){revision++;monitor.ice(pc.iceConnectionState);}};
+    samplers.set(id,(peer,time)=>{
+     if(!active()||!iceIsConnected(pc.iceConnectionState))return;
+     if(availabilityAtSample!==availabilityRevision.current){
+      monitor.reset();
+      availabilityAtSample=availabilityRevision.current;
+     }
+     const before=expected(peer);
+     if(!before.send)monitor.reset('send');
+     if(!before.receive)monitor.reset('receive');
+     if(inFlight)return;
+     const sampledRevision=revision, sampledAvailability=availabilityRevision.current;
+     inFlight=true;
+     // Never wait for diagnostics in signaling; a hung read costs at most one slot per peer.
+     void (async()=>{
+      try{
+       const stats=await pc.getStats();
+       const latest=diagnosticPeers.get(id);
+       if(!latest||!active()||revision!==sampledRevision||availabilityRevision.current!==sampledAvailability||!iceIsConnected(pc.iceConnectionState))return;
+       if(performance.now()-time>5_000){monitor.reset();return;}
+       const after=expected(latest);
+       monitor.sample(stats,{receive:before.receive&&after.receive,send:before.send&&after.send},time);
+      }catch{monitor.reset();}
+      finally{inFlight=false;}
+     })();
+    });
+   }
    return pc;
   };
   const candidates=new Map<string,RTCIceCandidateInit[]>();
@@ -155,7 +206,21 @@ export function useVoice(){
     if(someoneLeft)void playVoiceCue('left',preferred.current.speaker);
     else if(someoneJoined)void playVoiceCue('joined',preferred.current.speaker);
    }
-   for(const [id,pc] of c.pcs)if(!data.peers.some(p=>p.client===id)){pc.close();c.pcs.delete(id);setStreams(old=>{const next={...old};delete next[id];return next})}
+   for(const [id,pc] of c.pcs)if(!data.peers.some(p=>p.client===id)){samplers.delete(id);pc.close();c.pcs.delete(id);setStreams(old=>{const next={...old};delete next[id];return next})}
+   if(diagnostics){
+    diagnosticPeers=new Map(data.peers.map(peer=>[peer.client,peer]));
+    if(lastPoll>=nextSample&&samplers.size){
+     nextSample=lastPoll+5_000;
+     // Bound stats work in large calls and give each peer a turn.
+     const entries=[...samplers];
+     for(let i=0;i<Math.min(4,entries.length);i++){
+      const [id,sample]=entries[sampleOffset++%entries.length];
+      const peer=diagnosticPeers.get(id);
+      if(peer)sample(peer,lastPoll);
+     }
+     sampleOffset%=entries.length;
+    }
+   }
    for(const peer of data.peers)if(peer.client!==c.client&&!c.pcs.has(peer.client)&&c.client<peer.client){const pc=make(peer.client,true);await pc.setLocalDescription(await pc.createOffer());await signal(peer.client,{description:pc.localDescription})}
    for(const message of data.signals){const id=message.from;if(!data.peers.some(p=>p.client===id))continue;const pc=c.pcs.get(id)||make(id);const payload=message.payload;
     if(payload.description){await pc.setRemoteDescription(payload.description);for(const ice of candidates.get(id)||[])await pc.addIceCandidate(ice);candidates.delete(id);if(payload.description.type==='offer'){for(const t of pc.getTransceivers()){t.direction='sendrecv';await t.sender.replaceTrack(c.stream.getTracks().find(track=>track.kind===t.receiver.track.kind)||null)}await pc.setLocalDescription(await pc.createAnswer());await signal(id,{description:pc.localDescription})}}
@@ -167,6 +232,7 @@ export function useVoice(){
   return true;
  }catch(e){acquired?.getTracks().forEach(stopCapturedTrack);if(epoch===generation.current){leave();setError(mediaError(e))}return false}finally{if(pending.current===operation){pending.current=null;setBusy(false)}}}
  function updateAvailability(next:VoiceAvailability){
+  availabilityRevision.current++;
   latestAvailability.current=next;
   setAvailability(next);
   const c=current.current;
@@ -177,10 +243,16 @@ export function useVoice(){
  }
  function toggleMic(){
   const {muted,deaf}=latestAvailability.current;
-  updateAvailability({muted:!muted&&!deaf,deaf:false});
+  const next={muted:!muted&&!deaf,deaf:false};
+  if(current.current&&!current.current.stop){
+   if(muted!==next.muted)recordDesktopDiagnostic('voice_output',next.muted?'mic_muted':'mic_unmuted');
+   if(deaf)recordDesktopDiagnostic('voice_output','output_undeafened');
+  }
+  updateAvailability(next);
  }
  function toggleDeaf(){
   const previous=latestAvailability.current;
+  if(current.current&&!current.current.stop)recordDesktopDiagnostic('voice_output',previous.deaf?'output_undeafened':'output_deafened');
   updateAvailability({...previous,deaf:!previous.deaf});
  }
  async function replaceLocalTrack(c:Call,kind:TrackKind,track:MediaStreamTrack|null,{keepPrevious=false}={}){

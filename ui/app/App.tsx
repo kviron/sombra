@@ -7,6 +7,7 @@ import { RegisterPage } from "./register-page";
 import { isTauri } from "@/shared/api";
 import { Toaster } from "@/shared/ui";
 import { LoginPage } from "./login-page";
+import { AuthAmbient } from './auth-ambient';
 import { useTheme } from "@/app/theme";
 import { useWindowMaximized } from "@/app/model/use-window-maximized";
 import { TitleBar } from "@/app/layout/title-bar";
@@ -41,7 +42,8 @@ export function App() {
   const isMaximized = useWindowMaximized(inTauri);
 
   return (
-    <div className={`app-surface relative flex h-svh flex-col overflow-hidden bg-background text-foreground ${auth === "ready" ? "chat-window" : "auth-window"}`}>
+    <div className={`app-surface relative flex h-svh flex-col overflow-hidden bg-background text-foreground ${auth === "ready" ? "chat-window" : "auth-window mira-auth"}`}>
+      {auth !== 'ready' && <AuthAmbient />}
       <TitleBar inTauri={inTauri} isMaximized={isMaximized} />
       {auth === 'ready' ? <LiveChat /> : route === '#register' ? <RegisterPage /> : route === '#login' || auth === 'guest' ? <LoginPage /> : <main className="m-auto text-center"><p role="status">{auth === 'checking' ? 'Проверяем сессию…' : 'Не удалось проверить сессию.'}</p>{auth === 'error' && <button onClick={() => setAttempt(n => n+1)}>Повторить</button>}</main>}
       <WindowResizeHandles inTauri={inTauri} isMaximized={isMaximized} />

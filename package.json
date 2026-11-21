@@ -1,6 +1,6 @@
 {
   "name": "mines",
-  "version": "0.1.22",
+  "version": "0.1.24",
   "private": true,
   "type": "module",
   "scripts": {

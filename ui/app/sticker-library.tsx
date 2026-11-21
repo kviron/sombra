@@ -262,11 +262,13 @@ export function StickerLibrary({stickers,user,group,catalog,refresh}:LibraryProp
    {importForm}{feedback}
    <Button type="button" variant="ghost" disabled={busy} onClick={()=>{setAdding(false);requestAnimationFrame(()=>addTrigger.current?.focus())}}><ArrowLeft/>Назад к наборам</Button>
   </div>:<Tabs.Root value={tab} onValueChange={setTab}>
-   <div className="sticker-collection-toolbar">
-    <Tabs.List className="sticker-collection-tabs" aria-label="Коллекция стикеров"><Tabs.Trigger value="library">Личное</Tabs.Trigger><Tabs.Trigger value="catalog">Общее</Tabs.Trigger></Tabs.List>
+   <div className="sticker-collection-toolbar settings-sticker-banner"><div className="settings-sticker-intro"><StickerIcon aria-hidden="true"/><div><strong>Свой набор</strong><p>Загрузите ZIP-архив со стикерами.</p></div></div>
+
     <Button ref={addTrigger} type="button" variant="outline" disabled={busy} onClick={()=>{setTab('library');setProgress('');setError('');setAdding(true)}}><Plus/>Добавить свой набор</Button>
    </div>
-   <Tabs.Content value="library" className="sticker-collection-panel">
+   <h2 className="settings-sticker-heading">Коллекция стикеров</h2>
+<Tabs.List className="sticker-collection-tabs" aria-label="Коллекция стикеров"><Tabs.Trigger value="library">Личное</Tabs.Trigger><Tabs.Trigger value="catalog">Общее</Tabs.Trigger></Tabs.List>
+    <Tabs.Content value="library" className="sticker-collection-panel">
     {feedback}{!packs.size&&<p className="sticker-collection-empty">Пока нет личных наборов. Импортируйте свой набор или найдите его в общем каталоге.</p>}{packList}
    </Tabs.Content>
    <Tabs.Content value="catalog" className="sticker-collection-panel">

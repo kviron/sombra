@@ -6,9 +6,11 @@ import {ImageCropDialog,type PreparedProfileImage} from '@/shared/ui/image-crop-
 import {ProfileCover} from '@/shared/ui/profile-cover';
 import {ProfileDecorationPicker,type MediaTarget} from './profile-decoration-picker';
 import {UserAvatar} from '@/shared/ui/user-avatar';
-import {Pencil,Sparkles,Trash2} from 'lucide-react';
+import {Monitor,Pencil,Sparkles,Trash2} from 'lucide-react';
 import {Label} from '@/shared/ui/label';
 import type {AccountSection} from './account-sidebar';
+
+import './account-approved.css';
 
 export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:ChatState|null;refresh:()=>Promise<ChatState>;section:AccountSection;onMediaSaved:(user:User,field:MediaTarget|`decoration:${MediaTarget}`)=>void}) {
  const [sessions,setSessions]=useState<SessionDto[]>([]),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
@@ -55,8 +57,8 @@ export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:Chat
  return <>
    {crop&&<ImageCropDialog file={crop.file} kind={crop.kind} onConfirm={result=>saveImage(crop.kind,result)} onClose={()=>{epoch.current++;lock.current=false;setBusy(false);setCrop(undefined)}}/>}
   <section hidden={section!=='profile'} aria-labelledby="profile-heading">
-   <h2 id="profile-heading">Информация об учётной записи</h2>
-   <form className="settings-form" onSubmit={e=>{e.preventDefault();void run(async()=>{await api('update_profile',{profile:{name,bio}});await refresh();setNotice('Профиль сохранён')})}}>     {state&&section==='profile'&&<div className="profile-media">
+   <h2 id="profile-heading" className="sr-only">Информация об учётной записи</h2>
+   <form className="settings-form" onSubmit={e=>{e.preventDefault();void run(async()=>{await api('update_profile',{profile:{name,bio}});await refresh();setNotice('Профиль сохранён')})}}>     <div className="approved-profile-grid"><div className="approved-profile-fields"><h3>Основная информация</h3><div className="settings-field"><Label htmlFor="account-name">Имя пользователя</Label><Input id="account-name" name="name" autoComplete="nickname" value={name} onChange={e=>setName(e.target.value)} minLength={2} maxLength={32} required/></div><div className="settings-field"><Label htmlFor="account-bio">О себе</Label><Input id="account-bio" value={bio} onChange={e=>setBio(e.target.value)} maxLength={190}/></div><div className="settings-actions"><Button size="sm" disabled={busy}>{busy?'Сохраняем…':'Сохранить профиль'}</Button></div></div>{state&&section==='profile'&&<div className="profile-media">
       {(['avatar','cover'] as const).map(target=>{
        const avatar=target==='avatar',me=state.me;
        const imageSupported=!me.bot&&(avatar||coverSupported);
@@ -76,15 +78,15 @@ export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:Chat
          onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file){cropOrigin.current=event.currentTarget.parentElement?.querySelector('button')??null;setCrop({file,kind:target})}}}/>
        </div>;
       })}
-     </div>}
+<div className="approved-profile-identity"><strong>{name.trim()||'Имя пользователя'}</strong><p>{bio||'Описание пока не добавлено.'}</p><small>Так профиль выглядит для собеседников</small></div><div className="approved-profile-media-actions">
+        <Button type="button" variant="outline" disabled={busy||state.me.bot} onClick={()=>avatarPicker.current?.click()}>Изменить аватар</Button>
+        <Button type="button" variant="outline" disabled={busy||state.me.bot||!coverSupported} onClick={()=>coverPicker.current?.click()}>Изменить обложку</Button>
+       </div></div>}</div>
      {state&&!coverSupported&&<p className="settings-hint">Обложки появятся после обновления сервера.</p>}
      {state&&!(state.me.decorationSupported??state.decorationSupported)&&<p className="settings-hint">Украшения появятся после обновления сервера.</p>}
-    <div className="settings-field"><Label htmlFor="account-name">Имя пользователя</Label><Input id="account-name" name="name" autoComplete="nickname" value={name} onChange={e=>setName(e.target.value)} minLength={2} maxLength={32} required/></div>
-    <div className="settings-field"><Label htmlFor="account-bio">О себе</Label><Input id="account-bio" value={bio} onChange={e=>setBio(e.target.value)} maxLength={190}/></div>
-    <div className="settings-actions"><Button variant="secondary" size="sm" disabled={busy}>{busy?'Сохраняем…':'Сохранить профиль'}</Button></div>
    </form>
    {state&&effects&&section==='profile'&&<ProfileDecorationPicker key={state.me.id+effects} user={state.me} target={effects} catalogSupported={!!state.effectCatalogSupported} draftsSupported={!!state.profileEffectDraftsSupported} uploadsSupported={!!state.profileEffectUploadsSupported} onSave={(doc,id)=>saveEffect(effects,doc,id)} onClose={()=>setEffects(undefined)} onRestoreFocus={()=>requestAnimationFrame(()=>effectOrigin.current?.focus())}/>}
-   <form className="settings-form email-form" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void run(async()=>{await api('change_email',{email,current_password:data.get('current_password')});await refresh();form.reset();setNotice('Почта изменена. Используйте её при следующем входе.')})}}>
+   <form className="settings-form email-form approved-email" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void run(async()=>{await api('change_email',{email,current_password:data.get('current_password')});await refresh();form.reset();setNotice('Почта изменена. Используйте её при следующем входе.')})}}>
     <h2>Электронная почта</h2>
     <div className="settings-field"><Label htmlFor="account-email">Почта</Label><Input id="account-email" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required maxLength={254}/></div>
     <div className="settings-field"><Label htmlFor="email-password">Текущий пароль</Label><Input id="email-password" name="current_password" type="password" autoComplete="current-password" required maxLength={256}/></div>
@@ -92,20 +94,21 @@ export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:Chat
    </form>
   </section>
   <section hidden={section!=='security'} aria-labelledby="security-heading">
-   <h2 id="security-heading">Пароль и безопасность</h2>
-   <form className="settings-form" onSubmit={password}>
+   <h2 id="security-heading" className="sr-only">Пароль и безопасность</h2>
+   <form className="settings-form approved-password" onSubmit={password}><div className="approved-password-step"><h3>1. Подтвердите текущий пароль</h3>
     <div className="settings-field"><Label htmlFor="password-current">Текущий пароль</Label><Input id="password-current" name="current" type="password" autoComplete="current-password" required maxLength={256}/></div>
+</div><div className="approved-password-step"><h3>2. Задайте новый пароль</h3>
     <div className="settings-field"><Label htmlFor="password-new">Новый пароль</Label><Input id="password-new" name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={256} aria-describedby="password-hint"/></div>
     <div className="settings-field"><Label htmlFor="password-confirm">Повторите пароль</Label><Input id="password-confirm" name="confirm" type="password" autoComplete="new-password" required minLength={8} maxLength={256}/></div>
     <p id="password-hint" className="settings-hint">Не менее 8 символов. После смены пароля потребуется войти заново на всех устройствах.</p>
-    <div className="settings-actions"><Button variant="secondary" size="sm" disabled={busy}>{busy?'Сохраняем…':'Изменить пароль'}</Button></div>
+</div>    <div className="settings-actions"><Button size="sm" disabled={busy}>{busy?'Сохраняем…':'Изменить пароль'}</Button></div>
    </form>
   </section>
   <section hidden={section!=='sessions'} aria-labelledby="sessions-heading">
-   <h2 id="sessions-heading">Активные сеансы</h2>
+   <h2 id="sessions-heading" className="sr-only">Активные сеансы</h2>
    <p className="settings-hint">С опцией «Оставаться в системе» вход сохраняется на год. Без неё — до 30 дней или 7 дней бездействия.</p>
-   {sessions.map(session=><div key={session.id} className="session-row"><div><strong>{session.current?'Это устройство':session.device.includes('Windows')?'Windows':session.device.includes('Mac')?'Mac':'Браузер / приложение'}</strong><p title={session.device}>{session.device.slice(0,70)}</p><small>Последняя активность: {new Date(session.last_seen*1000).toLocaleString('ru')}</small></div><Button variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await api('revoke_session',{session_id:session.id});if(session.current)clearSession();else await load()})}>Завершить</Button></div>)}
-   <Button variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await api('logout_all');clearSession()})}>Выйти на всех устройствах</Button>
+   <h3 className="approved-session-count">Устройства <span>{sessions.length}</span></h3><ul className="approved-sessions">{sessions.map(session=><li key={session.id} className="approved-session-card" data-current={session.current}><Monitor size={24} aria-hidden="true"/><div><strong>{session.current?'Это устройство':session.device.includes('Windows')?'Windows':session.device.includes('Mac')?'Mac':'Браузер / приложение'}</strong><p title={session.device}>{session.device.slice(0,70)}</p><small>Последняя активность: {new Date(session.last_seen*1000).toLocaleString('ru')}</small></div><Button variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await api('revoke_session',{session_id:session.id});if(session.current)clearSession();else await load()})}>Завершить</Button></li>)}</ul><div className="approved-session-actions">
+   <Button variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await api('logout_all');clearSession()})}>Выйти на всех устройствах</Button></div>
   </section>
   {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
  </>;

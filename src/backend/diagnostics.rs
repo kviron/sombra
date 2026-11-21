@@ -117,6 +117,8 @@ pub(crate) fn operation(name: &str) -> &'static str {
         "voice_camera",
         "voice_speaker",
         "voice_playback",
+        "voice_transport",
+        "voice_output",
     ];
     OPERATIONS
         .iter()
@@ -137,6 +139,33 @@ pub(crate) fn desktop_runtime_category(operation: &str, category: &str) -> Optio
         }
         ("voice_playback", "autoplay_blocked") => Some("autoplay_blocked"),
         ("voice_playback", "playback_error") => Some("playback_error"),
+        ("voice_transport", category) => [
+            "ice_checking",
+            "ice_connected",
+            "ice_disconnected",
+            "ice_failed",
+            "path_direct",
+            "path_relay",
+            "audio_receive_stalled",
+            "audio_receive_recovered",
+            "audio_send_stalled",
+            "audio_send_recovered",
+            "audio_send_silent",
+            "audio_send_silent_recovered",
+        ]
+        .into_iter()
+        .find(|allowed| *allowed == category),
+        ("voice_output", category) => [
+            "mic_muted",
+            "mic_unmuted",
+            "output_deafened",
+            "output_undeafened",
+            "playback_failed",
+            "output_device_failed",
+            "input_device_failed",
+        ]
+        .into_iter()
+        .find(|allowed| *allowed == category),
         _ => None,
     }
 }
@@ -341,6 +370,27 @@ impl Diagnostics {
 #[cfg(test)]
 mod file_tests {
     use super::*;
+
+    #[test]
+    fn voice_runtime_reports_are_allowlisted_and_strip_details() {
+        let report = json!({"operation":"voice_transport","category":"path_relay","address":"private","peer":"private"});
+        let event = serde_json::to_value(Event::from_report(&report).unwrap()).unwrap();
+        assert_eq!(event["category"], "path_relay");
+        assert!(event["status"].is_null());
+        assert!(!event.to_string().contains("private"));
+        for (operation, category) in [("voice_output", "path_relay"), ("voice_transport", "192.168.1.1"), ("voice_poll", "ice_failed")] {
+            assert!(Event::from_report(&json!({"operation":operation,"category":category})).is_none());
+        }
+    }
+
+    #[test]
+    fn outbound_silence_reports_are_allowlisted() {
+        // Added so one-way audio can be told apart from packet loss in the journal.
+        for category in ["audio_send_silent", "audio_send_silent_recovered"] {
+            let event = Event::from_report(&json!({"operation":"voice_transport","category":category})).unwrap();
+            assert_eq!(event.category, category);
+        }
+    }
 
     #[test]
     fn server_file_keeps_voice_context_and_validated_reports() {

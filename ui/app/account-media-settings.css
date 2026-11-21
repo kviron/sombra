@@ -1,0 +1,12 @@
+.account-media-voice,.notification-settings.account-media-notifications{display:grid;gap:16px;align-content:start}
+.account-media-voice .media-settings-panel{min-width:0;display:grid;gap:12px;padding:16px;border:1px solid var(--border);border-radius:var(--radius);background:color-mix(in srgb,var(--foreground) 4%,transparent)}
+.account-media-voice .media-settings-panel h2,.account-media-notifications .notification-help h2{font-size:16px;margin:0}
+.account-media-voice .voice-test-actions,.account-media-voice .voice-device-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:end}
+.account-media-voice .voice-test-actions button,.account-media-voice .voice-device-fields>button{justify-self:start}
+.account-media-voice .voice-test-actions [role=progressbar],.account-media-voice .voice-volume{grid-column:1/-1}
+.account-media-voice .voice-processing{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end}
+.account-media-notifications .notification-option{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent}
+.account-media-notifications .notification-option label{display:grid;gap:4px;min-width:0;cursor:pointer}
+.account-media-notifications .notification-option label span,.account-media-notifications>p:not([role]),.account-media-notifications .notification-help p{color:var(--muted-foreground)}
+.account-media-notifications .notification-help{display:grid;gap:8px;padding:0;border:0;background:transparent}
+@media(max-width:700px){.account-media-voice .voice-device-fields,.account-media-voice .voice-processing,.account-media-voice .voice-test-actions{grid-template-columns:minmax(0,1fr)}}
