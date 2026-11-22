@@ -181,11 +181,7 @@ pub struct Event {
 }
 
 impl Event {
-    pub fn desktop(
-        operation: &'static str,
-        category: &'static str,
-        status: Option<u16>,
-    ) -> Self {
+    pub fn desktop(operation: &'static str, category: &'static str, status: Option<u16>) -> Self {
         Self {
             time: super::now(),
             source: "desktop",
@@ -204,7 +200,7 @@ impl Event {
         )
     }
 
-        pub fn from_local_line(line: &[u8]) -> Option<Self> {
+    pub fn from_local_line(line: &[u8]) -> Option<Self> {
         #[derive(serde::Deserialize)]
         struct Row {
             time: u64,
@@ -223,7 +219,7 @@ impl Event {
         Self::validated_desktop(row.time, &row.operation, &row.category, &row.status)
     }
 
-        pub fn timestamp(&self) -> u64 {
+    pub fn timestamp(&self) -> u64 {
         self.time
     }
 
@@ -377,8 +373,14 @@ mod file_tests {
         assert_eq!(event["category"], "path_relay");
         assert!(event["status"].is_null());
         assert!(!event.to_string().contains("private"));
-        for (operation, category) in [("voice_output", "path_relay"), ("voice_transport", "192.168.1.1"), ("voice_poll", "ice_failed")] {
-            assert!(Event::from_report(&json!({"operation":operation,"category":category})).is_none());
+        for (operation, category) in [
+            ("voice_output", "path_relay"),
+            ("voice_transport", "192.168.1.1"),
+            ("voice_poll", "ice_failed"),
+        ] {
+            assert!(
+                Event::from_report(&json!({"operation":operation,"category":category})).is_none()
+            );
         }
     }
 
@@ -386,7 +388,9 @@ mod file_tests {
     fn outbound_silence_reports_are_allowlisted() {
         // Added so one-way audio can be told apart from packet loss in the journal.
         for category in ["audio_send_silent", "audio_send_silent_recovered"] {
-            let event = Event::from_report(&json!({"operation":"voice_transport","category":category})).unwrap();
+            let event =
+                Event::from_report(&json!({"operation":"voice_transport","category":category}))
+                    .unwrap();
             assert_eq!(event.category, category);
         }
     }

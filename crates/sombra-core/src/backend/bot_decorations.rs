@@ -14,7 +14,14 @@ pub(super) const APPLIED: &str = "decoration_applied";
 /// One error for every malformed request or document: the rejected document is never echoed.
 const INVALID: &str = "BOT_DECORATION_INVALID";
 /// Every key this operation may carry. `token`/`bot_token` are injected by the HTTP layer.
-const REQUEST_KEYS: &[&str] = &["op", "token", "bot_token", "update_id", "target", "decoration"];
+const REQUEST_KEYS: &[&str] = &[
+    "op",
+    "token",
+    "bot_token",
+    "update_id",
+    "target",
+    "decoration",
+];
 
 impl Backend {
     /// Bot-token write scoped to the sender of one live invocation. The bot and the person both

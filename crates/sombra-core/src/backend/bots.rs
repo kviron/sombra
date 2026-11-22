@@ -4,7 +4,10 @@ mod command_registration;
 impl Backend {
     /// Offline maintenance only: caller must stop the server before opening its database.
     /// This method is intentionally not exposed through the HTTP operation router.
-    #[allow(dead_code, reason = "Used by the mines-server maintenance CLI, not by the desktop binary")]
+    #[allow(
+        dead_code,
+        reason = "Used by the mines-server maintenance CLI, not by the desktop binary"
+    )]
     pub fn provision_group_bot(
         &mut self,
         group_name: &str,
@@ -119,7 +122,14 @@ impl Backend {
         } else {
             "commands_only"
         });
-        for key in ["token_hash", "ack", "seq", "tool_policy", "followups", "settings"] {
+        for key in [
+            "token_hash",
+            "ack",
+            "seq",
+            "tool_policy",
+            "followups",
+            "settings",
+        ] {
             out.as_object_mut().unwrap().remove(key);
         }
         out
@@ -520,7 +530,10 @@ impl Backend {
             self.save()?;
             return Ok(json!({"ok":true}));
         }
-        if matches!(op, super::profile_effect_drafts::CLAIM | super::profile_effect_drafts::FINISH) {
+        if matches!(
+            op,
+            super::profile_effect_drafts::CLAIM | super::profile_effect_drafts::FINISH
+        ) {
             return self.profile_effect_draft_worker(v, &b);
         }
         if b["legacy"] == true {
@@ -531,7 +544,10 @@ impl Backend {
         }
         if op == "bot_register_commands" {
             let commands = command_registration::merge(&b["commands"], v)?;
-            if b["commands"] != commands { self.db["bots"][i]["commands"] = commands.clone(); self.save()?; }
+            if b["commands"] != commands {
+                self.db["bots"][i]["commands"] = commands.clone();
+                self.save()?;
+            }
             return Ok(json!({"commands":commands}));
         }
         if op == "bot_get_updates" {

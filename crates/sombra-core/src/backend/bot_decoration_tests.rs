@@ -126,10 +126,9 @@ fn owner_invocation_applies_once_to_sender_and_leaves_other_records_alone() {
     let bt = f.bot_token.clone();
     let owner_id = f.owner["id"].clone();
     let before = f.b.db.clone();
-    let result = f
-        .b
-        .request(call(&bt, f.owner_update, "avatar", &avatar_doc()))
-        .unwrap();
+    let result =
+        f.b.request(call(&bt, f.owner_update, "avatar", &avatar_doc()))
+            .unwrap();
     assert_eq!(
         result,
         json!({"user":{"id":owner_id,"decorations":{"avatar":avatar_doc()}}}),
@@ -145,15 +144,13 @@ fn owner_invocation_applies_once_to_sender_and_leaves_other_records_alone() {
         assert!(!result.to_string().contains(secret), "{secret} leaked");
     }
     // The owner's document is readable through the existing human projections.
-    let me = f
-        .b
-        .request(json!({"op":"me","token":f.owner_token}))
-        .unwrap();
+    let me =
+        f.b.request(json!({"op":"me","token":f.owner_token}))
+            .unwrap();
     assert_eq!(me["user"]["decorations"]["avatar"], avatar_doc());
-    let state = f
-        .b
-        .request(json!({"op":"state","token":f.owner_token}))
-        .unwrap();
+    let state =
+        f.b.request(json!({"op":"state","token":f.owner_token}))
+            .unwrap();
     let rows = arr(&state["users"]);
     let owner_row = rows.iter().find(|u| u["id"] == owner_id).unwrap();
     assert_eq!(owner_row["decorations"]["avatar"], avatar_doc());
@@ -166,13 +163,7 @@ fn owner_invocation_applies_once_to_sender_and_leaves_other_records_alone() {
     let oi = user_index(&f.b, &owner_id);
     let gi = user_index(&f.b, &f.guest["id"]);
     for key in [
-        "bots",
-        "groups",
-        "dialogs",
-        "messages",
-        "sessions",
-        "friends",
-        "stickers",
+        "bots", "groups", "dialogs", "messages", "sessions", "friends", "stickers",
     ] {
         assert_eq!(after[key], before[key], "{key} must not change");
     }
@@ -277,8 +268,7 @@ fn invalid_documents_and_requests_change_nothing_and_do_not_consume_the_update()
     ];
     for (target, document) in bad_documents {
         assert_eq!(
-            f.b.request(call(&bt, next, target, &document))
-                .unwrap_err(),
+            f.b.request(call(&bt, next, target, &document)).unwrap_err(),
             INVALID,
             "document {document}"
         );
@@ -307,13 +297,7 @@ fn invalid_documents_and_requests_change_nothing_and_do_not_consume_the_update()
         assert_eq!(f.b.db, pending, "request {request}");
     }
     // Missing, string, null and float update ids are invalid before anything is looked up.
-    for update_id in [
-        Value::Null,
-        json!("1"),
-        json!(1.0),
-        json!(-1),
-        json!(true),
-    ] {
+    for update_id in [Value::Null, json!("1"), json!(1.0), json!(-1), json!(true)] {
         let mut request = call(&bt, next, "avatar", &avatar_doc());
         request["update_id"] = update_id.clone();
         assert_eq!(
@@ -328,10 +312,9 @@ fn invalid_documents_and_requests_change_nothing_and_do_not_consume_the_update()
     assert_eq!(f.b.request(missing).unwrap_err(), INVALID);
     assert_eq!(f.b.db, pending);
     // The refused attempts left the update usable: a valid document applies exactly once.
-    let applied = f
-        .b
-        .request(call(&bt, next, "avatar", &avatar_doc()))
-        .unwrap();
+    let applied =
+        f.b.request(call(&bt, next, "avatar", &avatar_doc()))
+            .unwrap();
     assert_eq!(applied["user"]["decorations"]["avatar"], avatar_doc());
     assert_eq!(update_row(&f.b, next)[APPLIED], true);
     assert_eq!(
@@ -363,13 +346,8 @@ fn foreign_unknown_cancelled_human_deleted_and_legacy_sources_are_refused() {
     assert_eq!(f.b.db, before);
     // Unknown update ids are forbidden exactly like another bot's update.
     assert_eq!(
-        f.b.request(call(
-            &bt,
-            f.owner_update + 1000,
-            "avatar",
-            &avatar_doc()
-        ))
-        .unwrap_err(),
+        f.b.request(call(&bt, f.owner_update + 1000, "avatar", &avatar_doc()))
+            .unwrap_err(),
         "BOT_DECORATION_FORBIDDEN"
     );
     assert_eq!(f.b.db, before);
@@ -388,13 +366,8 @@ fn foreign_unknown_cancelled_human_deleted_and_legacy_sources_are_refused() {
     .unwrap();
     let cancelled = f.b.db.clone();
     assert_eq!(
-        f.b.request(call(
-            &bt,
-            cancelled_update,
-            "avatar",
-            &avatar_doc()
-        ))
-        .unwrap_err(),
+        f.b.request(call(&bt, cancelled_update, "avatar", &avatar_doc()))
+            .unwrap_err(),
         "BOT_SOURCE_UNAVAILABLE"
     );
     assert_eq!(f.b.db, cancelled);
@@ -407,13 +380,8 @@ fn foreign_unknown_cancelled_human_deleted_and_legacy_sources_are_refused() {
     f.b.save().unwrap();
     let revoked = f.b.db.clone();
     assert_eq!(
-        f.b.request(call(
-            &bt,
-            f.guest_update,
-            "cover",
-            &cover_scene()
-        ))
-        .unwrap_err(),
+        f.b.request(call(&bt, f.guest_update, "cover", &cover_scene()))
+            .unwrap_err(),
         "BOT_SOURCE_UNAVAILABLE"
     );
     assert_eq!(f.b.db, revoked);
@@ -455,24 +423,21 @@ fn null_removes_only_its_target_and_repeats_are_idempotent_by_final_state() {
     let bt = f.bot_token.clone();
     let owner_id = f.owner["id"].clone();
     let oi = user_index(&f.b, &owner_id);
-    let first = f
-        .b
-        .request(call(&bt, f.owner_update, "avatar", &avatar_doc()))
-        .unwrap();
+    let first =
+        f.b.request(call(&bt, f.owner_update, "avatar", &avatar_doc()))
+            .unwrap();
     assert_eq!(first["user"]["decorations"]["avatar"], avatar_doc());
     let (_, cover_update) = push_message(&mut f.b, &f.channel, &f.owner, "/ask cover");
-    let second = f
-        .b
-        .request(call(&bt, cover_update, "cover", &cover_scene()))
-        .unwrap();
+    let second =
+        f.b.request(call(&bt, cover_update, "cover", &cover_scene()))
+            .unwrap();
     assert_eq!(second["user"]["decorations"]["avatar"], avatar_doc());
     assert_eq!(second["user"]["decorations"]["cover"], cover_scene());
     // Removing the avatar leaves the cover untouched.
     let (_, remove_avatar) = push_message(&mut f.b, &f.channel, &f.owner, "/ask remove avatar");
-    let removed = f
-        .b
-        .request(call(&bt, remove_avatar, "avatar", &Value::Null))
-        .unwrap();
+    let removed =
+        f.b.request(call(&bt, remove_avatar, "avatar", &Value::Null))
+            .unwrap();
     assert!(removed["user"]["decorations"].get("avatar").is_none());
     assert_eq!(removed["user"]["decorations"]["cover"], cover_scene());
     assert_eq!(
@@ -482,26 +447,23 @@ fn null_removes_only_its_target_and_repeats_are_idempotent_by_final_state() {
     // A second null for the same target is a no-op in the final state.
     let (_, remove_avatar_again) =
         push_message(&mut f.b, &f.channel, &f.owner, "/ask remove avatar again");
-    let removed_again = f
-        .b
-        .request(call(&bt, remove_avatar_again, "avatar", &Value::Null))
-        .unwrap();
+    let removed_again =
+        f.b.request(call(&bt, remove_avatar_again, "avatar", &Value::Null))
+            .unwrap();
     assert_eq!(removed_again["user"], removed["user"]);
     // Removing the last target drops the whole field, exactly like an account that never had it.
     let (_, remove_cover) = push_message(&mut f.b, &f.channel, &f.owner, "/ask remove cover");
-    let last = f
-        .b
-        .request(call(&bt, remove_cover, "cover", &Value::Null))
-        .unwrap();
+    let last =
+        f.b.request(call(&bt, remove_cover, "cover", &Value::Null))
+            .unwrap();
     assert_eq!(last["user"]["decorations"], json!({}));
     assert!(f.b.db["users"][oi].get("decorations").is_none());
     let no_decorations = f.b.db["users"][oi].clone();
     let (_, remove_cover_again) =
         push_message(&mut f.b, &f.channel, &f.owner, "/ask remove cover again");
-    let last_again = f
-        .b
-        .request(call(&bt, remove_cover_again, "cover", &Value::Null))
-        .unwrap();
+    let last_again =
+        f.b.request(call(&bt, remove_cover_again, "cover", &Value::Null))
+            .unwrap();
     assert_eq!(last_again["user"]["decorations"], json!({}));
     assert_eq!(f.b.db["users"][oi], no_decorations);
     // The sender's profile is the only one ever touched.
@@ -532,10 +494,9 @@ fn failed_write_rolls_back_marker_and_value_and_both_survive_reopen() {
     f.b.path = saved_path.clone();
     let _ = std::fs::remove_file(saved_path.parent().unwrap().with_extension("tmp"));
     // The same update is still usable after the failed write.
-    let applied = f
-        .b
-        .request(call(&bt, update, "avatar", &avatar_doc()))
-        .unwrap();
+    let applied =
+        f.b.request(call(&bt, update, "avatar", &avatar_doc()))
+            .unwrap();
     assert_eq!(applied["user"]["decorations"]["avatar"], avatar_doc());
     assert_eq!(update_row(&f.b, update)[APPLIED], true);
     let applied_db = f.b.db.clone();
@@ -563,7 +524,10 @@ fn failed_write_rolls_back_marker_and_value_and_both_survive_reopen() {
         avatar_doc()
     );
     assert_eq!(update_row(&reopened, update)[APPLIED], true);
-    assert_eq!(applied_db["users"][oi]["decorations"]["avatar"], avatar_doc());
+    assert_eq!(
+        applied_db["users"][oi]["decorations"]["avatar"],
+        avatar_doc()
+    );
     drop(reopened);
     std::fs::remove_dir_all(saved_path.parent().unwrap()).unwrap();
 }
@@ -572,33 +536,27 @@ fn failed_write_rolls_back_marker_and_value_and_both_survive_reopen() {
 fn marker_stays_internal_and_other_responses_keep_their_shape() {
     let mut f = fixture();
     let bt = f.bot_token.clone();
-    let state_before = f
-        .b
-        .request(json!({"op":"state","token":f.owner_token}))
-        .unwrap();
-    let me_before = f
-        .b
-        .request(json!({"op":"me","token":f.owner_token}))
-        .unwrap();
-    let bot_before = f
-        .b
-        .request(json!({"op":"bot_get_me","bot_token":bt}))
-        .unwrap();
-    let updates_before = f
-        .b
-        .request(json!({"op":"bot_get_updates","bot_token":bt}))
-        .unwrap();
+    let state_before =
+        f.b.request(json!({"op":"state","token":f.owner_token}))
+            .unwrap();
+    let me_before =
+        f.b.request(json!({"op":"me","token":f.owner_token}))
+            .unwrap();
+    let bot_before =
+        f.b.request(json!({"op":"bot_get_me","bot_token":bt}))
+            .unwrap();
+    let updates_before =
+        f.b.request(json!({"op":"bot_get_updates","bot_token":bt}))
+            .unwrap();
     let update_keys = sorted_keys(&updates_before["updates"][0]);
-    let result = f
-        .b
-        .request(call(&bt, f.owner_update, "avatar", &avatar_doc()))
-        .unwrap();
+    let result =
+        f.b.request(call(&bt, f.owner_update, "avatar", &avatar_doc()))
+            .unwrap();
     assert_eq!(sorted_keys(&result), vec!["user"]);
     assert_eq!(sorted_keys(&result["user"]), vec!["decorations", "id"]);
-    let updates_after = f
-        .b
-        .request(json!({"op":"bot_get_updates","bot_token":bt}))
-        .unwrap();
+    let updates_after =
+        f.b.request(json!({"op":"bot_get_updates","bot_token":bt}))
+            .unwrap();
     assert!(!updates_after.to_string().contains(APPLIED));
     for update in arr(&updates_after["updates"]) {
         assert!(update.get(APPLIED).is_none(), "the marker must not leave");
@@ -608,18 +566,15 @@ fn marker_stays_internal_and_other_responses_keep_their_shape() {
             "the update DTO shape is unchanged"
         );
     }
-    let state_after = f
-        .b
-        .request(json!({"op":"state","token":f.owner_token}))
-        .unwrap();
-    let me_after = f
-        .b
-        .request(json!({"op":"me","token":f.owner_token}))
-        .unwrap();
-    let bot_after = f
-        .b
-        .request(json!({"op":"bot_get_me","bot_token":bt}))
-        .unwrap();
+    let state_after =
+        f.b.request(json!({"op":"state","token":f.owner_token}))
+            .unwrap();
+    let me_after =
+        f.b.request(json!({"op":"me","token":f.owner_token}))
+            .unwrap();
+    let bot_after =
+        f.b.request(json!({"op":"bot_get_me","bot_token":bt}))
+            .unwrap();
     assert_eq!(
         sorted_keys(&state_after),
         sorted_keys(&state_before),

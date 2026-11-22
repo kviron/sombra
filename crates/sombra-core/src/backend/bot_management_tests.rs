@@ -13,50 +13,129 @@ fn send(b: &mut Backend, token: &Value, channel: &Value, text: &str) {
 }
 #[tokio::test]
 async fn http_owner_settings_and_policy_use_cookie_actor_and_forbidden_status() {
-    let (mut b,path,owner_token,bot)=fixture();
-    let owner=b.db["users"][0]["id"].clone();let bid=bot["bot"]["id"].clone();
-    let guest=json!({"id":id(),"name":"Other Admin","active":true});
+    let (mut b, path, owner_token, bot) = fixture();
+    let owner = b.db["users"][0]["id"].clone();
+    let bid = bot["bot"]["id"].clone();
+    let guest = json!({"id":id(),"name":"Other Admin","active":true});
     b.db["users"].as_array_mut().unwrap().push(guest.clone());
-    let guest_token=b.token(&guest,"test",false).unwrap();
-    let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let url=format!("http://{}/api",listener.local_addr().unwrap());
-    let server=tokio::spawn(async move {axum::serve(listener,api_router(b)).await.unwrap()});
-    let _=rustls::crypto::ring::default_provider().install_default();
-    let client=reqwest::Client::new();
-    let owner_cookie=format!("mines_session={}",owner_token.as_str().unwrap());
-    let guest_cookie=format!("mines_session={guest_token}");
-    for op in ["get_bot_settings","get_bot_tool_users"] {
-        let response=client.post(&url).header("cookie",&owner_cookie).json(&json!({"op":op,"bot":bid,"token":guest_token})).send().await.unwrap();
-        assert_eq!(response.status(),200,"owner {op} must use cookie, not forged body token");
-        assert_eq!(response.headers()["cache-control"],"no-store");
+    let guest_token = b.token(&guest, "test", false).unwrap();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/api", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move { axum::serve(listener, api_router(b)).await.unwrap() });
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let client = reqwest::Client::new();
+    let owner_cookie = format!("mines_session={}", owner_token.as_str().unwrap());
+    let guest_cookie = format!("mines_session={guest_token}");
+    for op in ["get_bot_settings", "get_bot_tool_users"] {
+        let response = client
+            .post(&url)
+            .header("cookie", &owner_cookie)
+            .json(&json!({"op":op,"bot":bid,"token":guest_token}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            200,
+            "owner {op} must use cookie, not forged body token"
+        );
+        assert_eq!(response.headers()["cache-control"], "no-store");
         let response=client.post(&url).header("cookie",&guest_cookie).json(&json!({"op":op,"bot":bid,"token":owner_token,"requester_id":owner,"user":owner,"owner":owner})).send().await.unwrap();
-        assert_eq!(response.status(),403,"nonowner {op} must remain forbidden despite forged identity fields");
-        let body:Value=response.json().await.unwrap();
-        assert_eq!(body["error"],if op=="get_bot_settings"{"BOT_SETTINGS_FORBIDDEN"}else{"BOT_POLICY_FORBIDDEN"});
-        let response=client.post(&url).json(&json!({"op":op,"bot":bid,"token":owner_token,"requester_id":owner})).send().await.unwrap();
-        assert_eq!(response.status(),401,"body owner token is not a human cookie session");
-        let response=client.post(&url).bearer_auth(bot["token"].as_str().unwrap()).json(&json!({"op":op,"bot":bid,"token":owner_token})).send().await.unwrap();
-        assert_eq!(response.status(),401,"bot Bearer must not grant human owner API access");
+        assert_eq!(
+            response.status(),
+            403,
+            "nonowner {op} must remain forbidden despite forged identity fields"
+        );
+        let body: Value = response.json().await.unwrap();
+        assert_eq!(
+            body["error"],
+            if op == "get_bot_settings" {
+                "BOT_SETTINGS_FORBIDDEN"
+            } else {
+                "BOT_POLICY_FORBIDDEN"
+            }
+        );
+        let response = client
+            .post(&url)
+            .json(&json!({"op":op,"bot":bid,"token":owner_token,"requester_id":owner}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            401,
+            "body owner token is not a human cookie session"
+        );
+        let response = client
+            .post(&url)
+            .bearer_auth(bot["token"].as_str().unwrap())
+            .json(&json!({"op":op,"bot":bid,"token":owner_token}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            401,
+            "bot Bearer must not grant human owner API access"
+        );
     }
-    for (op,patch,error) in [
-        ("update_bot_settings",json!({"profile":{"bio":"Updated by actual owner"}}),"BOT_SETTINGS_FORBIDDEN"),
-        ("set_bot_tool_users",json!({"users":[guest["id"]]}),"BOT_POLICY_FORBIDDEN")
+    for (op, patch, error) in [
+        (
+            "update_bot_settings",
+            json!({"profile":{"bio":"Updated by actual owner"}}),
+            "BOT_SETTINGS_FORBIDDEN",
+        ),
+        (
+            "set_bot_tool_users",
+            json!({"users":[guest["id"]]}),
+            "BOT_POLICY_FORBIDDEN",
+        ),
     ] {
-        let mut request=json!({"op":op,"bot":bid,"revision":0,"token":guest_token});
-        for(key,value)in patch.as_object().unwrap(){request[key]=value.clone();}
-        let response=client.post(&url).header("cookie",&owner_cookie).json(&request).send().await.unwrap();
-        assert_eq!(response.status(),200,"actual owner {op} must succeed");
-        let body:Value=response.json().await.unwrap();assert_eq!(body["data"]["revision"],1);
-        request["revision"]=json!(1);request["token"]=owner_token.clone();request["requester_id"]=owner.clone();request["owner"]=owner.clone();
-        let response=client.post(&url).header("cookie",&guest_cookie).json(&request).send().await.unwrap();
+        let mut request = json!({"op":op,"bot":bid,"revision":0,"token":guest_token});
+        for (key, value) in patch.as_object().unwrap() {
+            request[key] = value.clone();
+        }
+        let response = client
+            .post(&url)
+            .header("cookie", &owner_cookie)
+            .json(&request)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 200, "actual owner {op} must succeed");
+        let body: Value = response.json().await.unwrap();
+        assert_eq!(body["data"]["revision"], 1);
+        request["revision"] = json!(1);
+        request["token"] = owner_token.clone();
+        request["requester_id"] = owner.clone();
+        request["owner"] = owner.clone();
+        let response = client
+            .post(&url)
+            .header("cookie", &guest_cookie)
+            .json(&request)
+            .send()
+            .await
+            .unwrap();
         assert_eq!(response.status(),403,"nonowner {op} must not become a grant holder via body spoofing or selected tool policy");
-        let body:Value=response.json().await.unwrap();assert_eq!(body["error"],error);
+        let body: Value = response.json().await.unwrap();
+        assert_eq!(body["error"], error);
     }
-    server.abort();let _=server.await;
-    let mut reopened=Backend::open(path.clone()).unwrap();let settings=reopened.request(json!({"op":"get_bot_settings","token":owner_token,"bot":bid})).unwrap();
-    assert_eq!(settings["revision"],1);assert_eq!(settings["profile"]["bio"],"Updated by actual owner");
-    assert_eq!(reopened.request(json!({"op":"get_bot_tool_users","token":owner_token,"bot":bid})).unwrap()["users"],json!([guest["id"]]));
-    drop(reopened);std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    server.abort();
+    let _ = server.await;
+    let mut reopened = Backend::open(path.clone()).unwrap();
+    let settings = reopened
+        .request(json!({"op":"get_bot_settings","token":owner_token,"bot":bid}))
+        .unwrap();
+    assert_eq!(settings["revision"], 1);
+    assert_eq!(settings["profile"]["bio"], "Updated by actual owner");
+    assert_eq!(
+        reopened
+            .request(json!({"op":"get_bot_tool_users","token":owner_token,"bot":bid}))
+            .unwrap()["users"],
+        json!([guest["id"]])
+    );
+    drop(reopened);
+    std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }
 #[test]
 fn offline_handle_rename_preserves_bot_identity_and_routes_new_mentions() {
@@ -64,11 +143,15 @@ fn offline_handle_rename_preserves_bot_identity_and_routes_new_mentions() {
     let bid = bot["bot"]["id"].clone();
     let channel = b.db["groups"][0]["channels"][0]["id"].clone();
     let hash = b.db["bots"][0]["token_hash"].clone();
-    let renamed = b.configure_bot_offline("helper", &json!({"profile":{"username":"sombra"}})).unwrap();
+    let renamed = b
+        .configure_bot_offline("helper", &json!({"profile":{"username":"sombra"}}))
+        .unwrap();
     assert_eq!(renamed["bot"]["username"], "sombra");
     assert_eq!(renamed["bot"]["id"], bid);
     assert_eq!(b.db["bots"][0]["token_hash"], hash);
-    assert!(arr(&b.db["users"]).iter().any(|u| u["id"] == bid && u["username"] == "sombra"));
+    assert!(arr(&b.db["users"])
+        .iter()
+        .any(|u| u["id"] == bid && u["username"] == "sombra"));
     send(&mut b, &token, &channel, "@helper hello");
     send(&mut b, &token, &channel, "@sombra hello");
     let updates = arr(&b.db["bot_updates"]);
@@ -108,15 +191,51 @@ fn offline_configuration_uses_existing_owner_validators_without_credentials() {
     std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }
 #[test]
-fn zero_followups_membership_revocation_and_disabled_bots_do_not_capture(){
- let(mut b,path,token,bot)=fixture();let bid=bot["bot"]["id"].clone();let owner=b.db["users"][0]["id"].clone();let channel=b.db["groups"][0]["channels"][0]["id"].clone();
- b.request(json!({"op":"update_bot_settings","token":token,"bot":bid,"revision":0,"conversation":{"mode":"name_dialog","aliases":["Sombra"],"followupSeconds":0}})).unwrap();send(&mut b,&token,&channel,"Sombra hello");send(&mut b,&token,&channel,"private not followup");assert_eq!(arr(&b.db["bot_updates"]).len(),1);
- b.request(json!({"op":"update_bot_settings","token":token,"bot":bid,"revision":1,"conversation":{"followupSeconds":180,"followupMessages":0}})).unwrap();send(&mut b,&token,&channel,"Sombra hello");send(&mut b,&token,&channel,"still private");assert_eq!(arr(&b.db["bot_updates"]).len(),2);
- b.request(json!({"op":"update_bot_settings","token":token,"bot":bid,"revision":2,"conversation":{"followupMessages":1}})).unwrap();send(&mut b,&token,&channel,"Sombra start");assert_eq!(arr(&b.db["bots"][0]["followups"]).len(),1);
- let guest=json!({"id":id(),"name":"Guest","active":true});b.db["users"].as_array_mut().unwrap().push(guest.clone());let gt=json!(b.token(&guest,"test",false).unwrap());b.db["groups"][0]["members"].as_array_mut().unwrap().push(guest["id"].clone());b.db["groups"][0]["members"].as_array_mut().unwrap().retain(|u|u!=&owner);
- b.enqueue_bots(&json!({"id":id(),"user":owner,"channel":channel,"text":"Sombra removed actor"})).unwrap();assert_eq!(arr(&b.db["bot_updates"]).len(),3);send(&mut b,&gt,&channel,"other actor private");assert!(arr(&b.db["bots"][0]["followups"]).is_empty());
- b.db["groups"][0]["members"].as_array_mut().unwrap().push(owner);send(&mut b,&token,&channel,"no session after revoke");assert_eq!(arr(&b.db["bot_updates"]).len(),3);b.db["bots"][0]["enabled"]=json!(false);send(&mut b,&token,&channel,"Sombra disabled");assert_eq!(arr(&b.db["bot_updates"]).len(),3);
- drop(b);std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+fn zero_followups_membership_revocation_and_disabled_bots_do_not_capture() {
+    let (mut b, path, token, bot) = fixture();
+    let bid = bot["bot"]["id"].clone();
+    let owner = b.db["users"][0]["id"].clone();
+    let channel = b.db["groups"][0]["channels"][0]["id"].clone();
+    b.request(json!({"op":"update_bot_settings","token":token,"bot":bid,"revision":0,"conversation":{"mode":"name_dialog","aliases":["Sombra"],"followupSeconds":0}})).unwrap();
+    send(&mut b, &token, &channel, "Sombra hello");
+    send(&mut b, &token, &channel, "private not followup");
+    assert_eq!(arr(&b.db["bot_updates"]).len(), 1);
+    b.request(json!({"op":"update_bot_settings","token":token,"bot":bid,"revision":1,"conversation":{"followupSeconds":180,"followupMessages":0}})).unwrap();
+    send(&mut b, &token, &channel, "Sombra hello");
+    send(&mut b, &token, &channel, "still private");
+    assert_eq!(arr(&b.db["bot_updates"]).len(), 2);
+    b.request(json!({"op":"update_bot_settings","token":token,"bot":bid,"revision":2,"conversation":{"followupMessages":1}})).unwrap();
+    send(&mut b, &token, &channel, "Sombra start");
+    assert_eq!(arr(&b.db["bots"][0]["followups"]).len(), 1);
+    let guest = json!({"id":id(),"name":"Guest","active":true});
+    b.db["users"].as_array_mut().unwrap().push(guest.clone());
+    let gt = json!(b.token(&guest, "test", false).unwrap());
+    b.db["groups"][0]["members"]
+        .as_array_mut()
+        .unwrap()
+        .push(guest["id"].clone());
+    b.db["groups"][0]["members"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|u| u != &owner);
+    b.enqueue_bots(
+        &json!({"id":id(),"user":owner,"channel":channel,"text":"Sombra removed actor"}),
+    )
+    .unwrap();
+    assert_eq!(arr(&b.db["bot_updates"]).len(), 3);
+    send(&mut b, &gt, &channel, "other actor private");
+    assert!(arr(&b.db["bots"][0]["followups"]).is_empty());
+    b.db["groups"][0]["members"]
+        .as_array_mut()
+        .unwrap()
+        .push(owner);
+    send(&mut b, &token, &channel, "no session after revoke");
+    assert_eq!(arr(&b.db["bot_updates"]).len(), 3);
+    b.db["bots"][0]["enabled"] = json!(false);
+    send(&mut b, &token, &channel, "Sombra disabled");
+    assert_eq!(arr(&b.db["bot_updates"]).len(), 3);
+    drop(b);
+    std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }
 #[test]
 fn owner_settings_profile_cas_and_transactional_rollback() {

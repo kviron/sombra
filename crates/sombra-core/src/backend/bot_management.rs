@@ -5,7 +5,10 @@ use super::*;
 mod tests;
 impl Backend {
     /// Offline maintenance only: stop the service and back up its single-writer database first.
-    #[allow(dead_code, reason = "Used by the mines-server maintenance CLI, not by the desktop binary")]
+    #[allow(
+        dead_code,
+        reason = "Used by the mines-server maintenance CLI, not by the desktop binary"
+    )]
     pub fn configure_bot_offline(
         &mut self,
         username: &str,
@@ -49,7 +52,12 @@ impl Backend {
     pub(super) fn bot_settings_action(&mut self, v: &Value, uid: &str) -> Result<Value, String> {
         self.bot_settings_action_inner(v, uid, false)
     }
-    fn bot_settings_action_inner(&mut self, v: &Value, uid: &str, offline: bool) -> Result<Value, String> {
+    fn bot_settings_action_inner(
+        &mut self,
+        v: &Value,
+        uid: &str,
+        offline: bool,
+    ) -> Result<Value, String> {
         let i = self.db["bots"]
             .as_array()
             .unwrap()
@@ -108,7 +116,9 @@ impl Backend {
                     "username" if offline => {
                         let handle = text.trim().trim_start_matches('@').to_ascii_lowercase();
                         if !(3..=32).contains(&handle.len())
-                            || !handle.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_')
+                            || !handle
+                                .bytes()
+                                .all(|c| c.is_ascii_alphanumeric() || c == b'_')
                         {
                             return Err("BOT_SETTINGS_INVALID".into());
                         }

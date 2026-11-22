@@ -1,5 +1,5 @@
 import {useRef, useState} from 'react';
-import {Check, CheckCheck, Eye, Forward, Pencil, Copy, Trash2, Reply} from 'lucide-react';
+import {Check, CheckCheck, CircleAlert, Eye, Forward, Pencil, Copy, Trash2, Reply} from 'lucide-react';
 import {ContextMenu} from 'radix-ui';
 import {toast} from 'sonner';
 import {type ChatState, type ChatMessage} from '@/shared/types';
@@ -21,6 +21,7 @@ import {MessageQuote} from '@/features/message-actions';
 import {SentSticker} from '@/entities/sticker';
 import {MessageAttachment, MessageText, messageService} from '@/entities/message';
 import {useUserActions} from '@/shared/lib/user-actions';
+import {failedMessageHint, isLocalMessage} from '../model/chat-rules';
 import './messages.css';
 
 export const emojis = ['👍', '❤️', '😂', '🔥', '🎉', '👀'];
@@ -33,7 +34,10 @@ export function MessageItem({
  userName,
  onReply,
  onForward,
- onJump
+ onJump,
+ pending,
+ pendingError,
+ onRetry
 }: {
  message: ChatMessage;
  previous?: ChatMessage;
@@ -41,6 +45,10 @@ export function MessageItem({
  onReply?: (message: ChatMessage) => void;
  onForward?: (message: ChatMessage) => void;
  onJump?: (id: string) => void;
+ /** Оптимистичная отправка: пока сервер не ответил, статус рисуется вместо галочек. */
+ pending?: 'sending' | 'failed';
+ pendingError?: string;
+ onRetry?: () => void;
 } & {state: ChatState; refresh: () => Promise<unknown>; onError: (message: string) => void}) {
  const [busy, setBusy] = useState(false);
  const [dialog, setDialog] = useState<'edit' | 'delete'>();
@@ -106,6 +114,9 @@ export function MessageItem({
   </ContextMenu.Group>
  );
  const read = state.readReceiptsSupported === true && author && (m.readCount || 0) > 0;
+ const pendingHint = failedMessageHint(pendingError);
+ // Временное сообщение нельзя ни править, ни пересылать: у него ещё нет серверного id.
+ const localOnly = !!pending || isLocalMessage(m.id);
  const actions = [
   ...(onReply ? [{label: 'Ответить', icon: Reply, onSelect: () => onReply(m)}] : []),
   ...(onForward && !m.attachment && !m.sticker && !m.gif && hasText
@@ -129,7 +140,7 @@ export function MessageItem({
  ];
  return (
   <>
-   <EntityContextMenu controls={reactionMenu} actions={actions}>
+   <EntityContextMenu controls={localOnly ? undefined : reactionMenu} actions={localOnly ? [] : actions}>
     <Message
      ref={row}
      data-read-message-id={m.id}
@@ -236,7 +247,19 @@ export function MessageItem({
           {new Date(m.time * 1000).toLocaleTimeString('ru', {hour: '2-digit', minute: '2-digit'})}
          </time>
          {author &&
-          (read ? (
+          (pending === 'sending' ? (
+           <span className="message-pending" role="status" aria-label="Отправляется" />
+          ) : pending === 'failed' ? (
+           <button
+            type="button"
+            className="message-retry"
+            aria-label={pendingHint}
+            title={pendingHint}
+            onClick={onRetry}
+           >
+            <CircleAlert size={13} aria-hidden="true" />
+           </button>
+          ) : read ? (
            <button
             type="button"
             className="message-read-check"

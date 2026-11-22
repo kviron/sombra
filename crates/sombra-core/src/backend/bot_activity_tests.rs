@@ -31,7 +31,8 @@ fn fixture() -> Fixture {
         .request(json!({"op":"create_bot","token":owner_token,"group":other_group,"name":"Other","username":"otherbot"}))
         .unwrap();
     let other_bot_token = other["token"].as_str().unwrap().to_owned();
-    let message = json!({"id":id(),"channel":channel,"user":owner["id"],"text":"/ask hello","time":now()});
+    let message =
+        json!({"id":id(),"channel":channel,"user":owner["id"],"text":"/ask hello","time":now()});
     b.db["messages"]
         .as_array_mut()
         .unwrap()
@@ -75,10 +76,17 @@ fn sorted_keys(value: &Value) -> Vec<String> {
 }
 
 fn typing_row_keys() -> Vec<String> {
-    ["activity", "bot", "channel", "started_at", "status", "until"]
-        .iter()
-        .map(|key| key.to_string())
-        .collect::<Vec<String>>()
+    [
+        "activity",
+        "bot",
+        "channel",
+        "started_at",
+        "status",
+        "until",
+    ]
+    .iter()
+    .map(|key| key.to_string())
+    .collect::<Vec<String>>()
 }
 
 #[test]
@@ -182,7 +190,10 @@ fn strict_typing_validation_refuses_unknown_codes_and_client_start() {
             "BOT_OUTPUT_INVALID",
             "payload {bad}"
         );
-        assert_eq!(f.b.bot_typing, before, "refused payload changed typing: {bad}");
+        assert_eq!(
+            f.b.bot_typing, before,
+            "refused payload changed typing: {bad}"
+        );
     }
     // Every declared code and both length boundaries are accepted.
     for activity in BOT_ACTIVITIES {
@@ -226,12 +237,8 @@ fn typing_stays_scoped_to_the_own_live_update_and_its_audience() {
     );
     // Another bot's token cannot address this bot's update; unknown ids stay unknown.
     assert_eq!(
-        f.b.request(typing(
-            &other_bot_token,
-            1,
-            json!({"activity":"thinking"})
-        ))
-        .unwrap_err(),
+        f.b.request(typing(&other_bot_token, 1, json!({"activity":"thinking"})))
+            .unwrap_err(),
         "BOT_SOURCE_UNAVAILABLE"
     );
     assert_eq!(
@@ -284,7 +291,8 @@ async fn http_state_shape_and_strict_typing_status_codes() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}/api", listener.local_addr().unwrap());
     let backend = f.b;
-    let server = tokio::spawn(async move { axum::serve(listener, api_router(backend)).await.unwrap() });
+    let server =
+        tokio::spawn(async move { axum::serve(listener, api_router(backend)).await.unwrap() });
     let _ = rustls::crypto::ring::default_provider().install_default();
     let client = reqwest::Client::new();
     let valid = json!({"op":"bot_typing","update_id":1,"typing":true,"activity":"image","status":"Рисую карточку"});

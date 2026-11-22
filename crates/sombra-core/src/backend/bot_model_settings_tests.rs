@@ -162,9 +162,14 @@ fn strict_validation_is_atomic_and_preserves_owner_policy_commands_installs() {
     let (mut b, path, token, bot) = fixture();
     let bid = bot["bot"]["id"].clone();
     let owner_id = b.db["users"][0]["id"].clone();
-    b.request(json!({"op":"bot_set_commands","token":token,"bot":bid,"commands":["help","ask","model"]}))
-        .unwrap();
-    b.request(json!({"op":"set_bot_tool_users","token":token,"bot":bid,"revision":0,"users":[owner_id]})).unwrap();
+    b.request(
+        json!({"op":"bot_set_commands","token":token,"bot":bid,"commands":["help","ask","model"]}),
+    )
+    .unwrap();
+    b.request(
+        json!({"op":"set_bot_tool_users","token":token,"bot":bid,"revision":0,"users":[owner_id]}),
+    )
+    .unwrap();
     let before = b.db.clone();
     for bad in [
         json!({}),
@@ -194,22 +199,43 @@ fn strict_validation_is_atomic_and_preserves_owner_policy_commands_installs() {
             "BOT_SETTINGS_INVALID",
             "patch {bad}"
         );
-        assert_eq!(b.db, before, "rejected patch must not change anything: {bad}");
+        assert_eq!(
+            b.db, before,
+            "rejected patch must not change anything: {bad}"
+        );
     }
     for reasoning in ["low", "medium", "high", ""] {
-        let saved =
-            b.request(patch(&token, &bid, &json!({"model":"openai-codex/gpt-6-luna","reasoning":reasoning}))).unwrap();
+        let saved = b
+            .request(patch(
+                &token,
+                &bid,
+                &json!({"model":"openai-codex/gpt-6-luna","reasoning":reasoning}),
+            ))
+            .unwrap();
         assert_eq!(saved["model"], "openai-codex/gpt-6-luna");
         assert_eq!(saved["reasoning"], reasoning);
     }
-    let saved = b.request(patch(&token, &bid, &json!({"model":"a".repeat(120)}))).unwrap();
+    let saved = b
+        .request(patch(&token, &bid, &json!({"model":"a".repeat(120)})))
+        .unwrap();
     assert_eq!(saved["model"], "a".repeat(120));
-    let saved = b.request(patch(&token, &bid, &json!({"model":"anthropic:claude-sonnet@2+v1.1"}))).unwrap();
+    let saved = b
+        .request(patch(
+            &token,
+            &bid,
+            &json!({"model":"anthropic:claude-sonnet@2+v1.1"}),
+        ))
+        .unwrap();
     assert_eq!(saved["model"], "anthropic:claude-sonnet@2+v1.1");
-    let cleared = b.request(patch(&token, &bid, &json!({"model":"","reasoning":""}))).unwrap();
+    let cleared = b
+        .request(patch(&token, &bid, &json!({"model":"","reasoning":""})))
+        .unwrap();
     assert_eq!(cleared["modelDefault"], true);
     assert_eq!(cleared["reasoningDefault"], true);
-    assert_eq!(b.db["bots"][0]["settings"], json!({"model":"","reasoning":"","revision":cleared["revision"]}));
+    assert_eq!(
+        b.db["bots"][0]["settings"],
+        json!({"model":"","reasoning":"","revision":cleared["revision"]})
+    );
     let after = b.db.clone();
     for key in [
         "owner",
@@ -227,7 +253,10 @@ fn strict_validation_is_atomic_and_preserves_owner_policy_commands_installs() {
         "settings_revision",
         "privacy",
     ] {
-        assert_eq!(after["bots"][0][key], before["bots"][0][key], "{key} unchanged");
+        assert_eq!(
+            after["bots"][0][key], before["bots"][0][key],
+            "{key} unchanged"
+        );
     }
     assert_eq!(
         after["bots"][0].as_object().unwrap().len(),
@@ -238,7 +267,10 @@ fn strict_validation_is_atomic_and_preserves_owner_policy_commands_installs() {
     assert_eq!(after["groups"], before["groups"]);
     assert_eq!(after["sessions"], before["sessions"]);
     assert_eq!(after["bot_updates"], before["bot_updates"]);
-    assert_eq!(b.request(read(&token, &bid)).unwrap()["commands"], Value::Null);
+    assert_eq!(
+        b.request(read(&token, &bid)).unwrap()["commands"],
+        Value::Null
+    );
     drop(b);
     std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }
@@ -270,8 +302,12 @@ fn defaults_for_old_bots_state_projection_and_reopen_persistence() {
     drop(b);
     let mut b = Backend::open(path.clone()).unwrap();
     assert_eq!(b.request(read(&token, &bid)).unwrap()["model"], "");
-    b.request(patch(&token, &bid, &json!({"model":"openai-codex/gpt-6-luna","reasoning":"medium"})))
-        .unwrap();
+    b.request(patch(
+        &token,
+        &bid,
+        &json!({"model":"openai-codex/gpt-6-luna","reasoning":"medium"}),
+    ))
+    .unwrap();
     drop(b);
     let mut reopened = Backend::open(path.clone()).unwrap();
     assert_eq!(
@@ -290,7 +326,9 @@ fn defaults_for_old_bots_state_projection_and_reopen_persistence() {
     assert!(!dto.to_string().contains("sk-do-not-leak"));
     assert!(!dto.to_string().contains("internal.invalid"));
     assert_eq!(sorted_keys(&dto), safe_dto_keys());
-    let state = reopened.request(json!({"op":"state","token":token})).unwrap();
+    let state = reopened
+        .request(json!({"op":"state","token":token}))
+        .unwrap();
     assert!(!state.to_string().contains("sk-do-not-leak"));
     assert!(!state.to_string().contains("internal.invalid"));
     assert!(!state.to_string().contains("base_url"));
@@ -302,24 +340,42 @@ fn cas_revision_is_independent_of_profile_settings_and_failures_roll_back() {
     let (mut b, path, token, bot) = fixture();
     let bid = bot["bot"]["id"].clone();
     assert_eq!(
-        b.request(patch(&token, &bid, &json!({"model":"a","revision":1}))).unwrap_err(),
+        b.request(patch(&token, &bid, &json!({"model":"a","revision":1})))
+            .unwrap_err(),
         "BOT_SETTINGS_CONFLICT"
     );
     assert_eq!(
-        b.request(patch(&token, &bid, &json!({"model":"a","revision":"0"}))).unwrap_err(),
+        b.request(patch(&token, &bid, &json!({"model":"a","revision":"0"})))
+            .unwrap_err(),
         "BOT_SETTINGS_CONFLICT"
     );
     assert_eq!(
-        b.request(patch(&token, &bid, &json!({"model":"openai-codex/gpt-6-luna","revision":0}))).unwrap()["revision"],
+        b.request(patch(
+            &token,
+            &bid,
+            &json!({"model":"openai-codex/gpt-6-luna","revision":0})
+        ))
+        .unwrap()["revision"],
         1
     );
     assert_eq!(
-        b.request(patch(&token, &bid, &json!({"model":"openai-codex/gpt-6-luna","revision":0}))).unwrap_err(),
+        b.request(patch(
+            &token,
+            &bid,
+            &json!({"model":"openai-codex/gpt-6-luna","revision":0})
+        ))
+        .unwrap_err(),
         "BOT_SETTINGS_CONFLICT"
     );
-    assert_eq!(b.request(patch(&token, &bid, &json!({"model":"gpt-6-luna"}))).unwrap()["revision"], 2);
+    assert_eq!(
+        b.request(patch(&token, &bid, &json!({"model":"gpt-6-luna"})))
+            .unwrap()["revision"],
+        2
+    );
     // Profile settings keep their own revision and publish the model through bot_public.
-    let profile = b.request(json!({"op":"get_bot_settings","token":token,"bot":bid})).unwrap();
+    let profile = b
+        .request(json!({"op":"get_bot_settings","token":token,"bot":bid}))
+        .unwrap();
     assert_eq!(profile["revision"], 0);
     assert_eq!(profile["bot"]["modelSettings"]["model"], "gpt-6-luna");
     assert_eq!(profile["bot"]["modelSettings"]["revision"], 2);
@@ -333,46 +389,72 @@ fn cas_revision_is_independent_of_profile_settings_and_failures_roll_back() {
     let saved_path = b.path.clone();
     b.path = path.parent().unwrap().to_path_buf();
     assert_eq!(
-        b.request(patch(&token, &bid, &json!({"model":"claude-next","revision":2}))).unwrap_err(),
+        b.request(patch(
+            &token,
+            &bid,
+            &json!({"model":"claude-next","revision":2})
+        ))
+        .unwrap_err(),
         "STORAGE_UNAVAILABLE"
     );
     assert_eq!(b.db, snapshot);
     b.path = saved_path;
     let _ = std::fs::remove_file(path.parent().unwrap().with_extension("tmp"));
     // The service token still routes to bot_worker operations and reads its own settings.
-    let bt = b.request(json!({"op":"bot_rotate_token","token":token,"bot":bid})).unwrap()["token"].clone();
+    let bt = b
+        .request(json!({"op":"bot_rotate_token","token":token,"bot":bid}))
+        .unwrap()["token"]
+        .clone();
     assert_eq!(
-        b.request(json!({"op":"bot_get_settings","bot_token":bt})).unwrap_err(),
+        b.request(json!({"op":"bot_get_settings","bot_token":bt}))
+            .unwrap_err(),
         "BOT_SOURCE_UNAVAILABLE"
     );
     assert_eq!(
-        b.request(json!({"op":"bot_get_model_settings","bot_token":bt})).unwrap_err(),
+        b.request(json!({"op":"bot_get_model_settings","bot_token":bt}))
+            .unwrap_err(),
         "AUTH_REQUIRED"
     );
     assert_eq!(
-        b.request(json!({"op":"bot_update_settings","bot_token":bt,"bot":bid,"model":"x"})).unwrap_err(),
+        b.request(json!({"op":"bot_update_settings","bot_token":bt,"bot":bid,"model":"x"}))
+            .unwrap_err(),
         "AUTH_REQUIRED"
     );
-    let me = b.request(json!({"op":"bot_get_me","bot_token":bt})).unwrap();
+    let me = b
+        .request(json!({"op":"bot_get_me","bot_token":bt}))
+        .unwrap();
     assert_eq!(me["bot"]["modelSettings"]["model"], "gpt-6-luna");
     assert!(!me.to_string().contains("token_hash"));
     // Legacy, disabled and foreign-owned bots keep the established refusals.
     b.db["bots"][0]["legacy"] = json!(true);
-    assert_eq!(b.request(read(&token, &bid)).unwrap_err(), "BOT_SETTINGS_FORBIDDEN");
     assert_eq!(
-        b.request(patch(&token, &bid, &json!({"model":"legacy"}))).unwrap_err(),
+        b.request(read(&token, &bid)).unwrap_err(),
+        "BOT_SETTINGS_FORBIDDEN"
+    );
+    assert_eq!(
+        b.request(patch(&token, &bid, &json!({"model":"legacy"})))
+            .unwrap_err(),
         "BOT_SETTINGS_FORBIDDEN"
     );
     b.db["bots"][0]["legacy"] = json!(false);
     b.db["bots"][0]["enabled"] = json!(false);
-    assert_eq!(b.request(read(&token, &bid)).unwrap_err(), "BOT_SETTINGS_FORBIDDEN");
+    assert_eq!(
+        b.request(read(&token, &bid)).unwrap_err(),
+        "BOT_SETTINGS_FORBIDDEN"
+    );
     b.db["bots"][0]["enabled"] = json!(true);
     let guest = json!({"id":id(),"name":"New Owner","active":true});
     b.db["users"].as_array_mut().unwrap().push(guest.clone());
     b.db["bots"][0]["owner"] = guest["id"].clone();
-    assert_eq!(b.request(read(&token, &bid)).unwrap_err(), "BOT_SETTINGS_FORBIDDEN");
+    assert_eq!(
+        b.request(read(&token, &bid)).unwrap_err(),
+        "BOT_SETTINGS_FORBIDDEN"
+    );
     let guest_token = b.token(&guest, "new-owner", false).unwrap();
-    assert_eq!(b.request(read(&guest_token, &bid)).unwrap()["model"], "gpt-6-luna");
+    assert_eq!(
+        b.request(read(&guest_token, &bid)).unwrap()["model"],
+        "gpt-6-luna"
+    );
     drop(b);
     std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
 }

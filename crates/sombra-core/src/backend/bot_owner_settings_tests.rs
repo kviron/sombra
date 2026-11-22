@@ -135,9 +135,8 @@ fn owner_update_applies_once_and_refuses_foreign_completed_or_forged_sources() {
     let bt = f.bot_token.clone();
     let bid = f.bot["bot"]["id"].clone();
     let before = f.b.db["bots"][0].clone();
-    let dto = f
-        .b
-        .request(owner_call(
+    let dto =
+        f.b.request(owner_call(
             &bt,
             json!(f.owner_update),
             json!({"model":"openai-codex/gpt-6-luna","reasoning":"high"}),
@@ -159,10 +158,9 @@ fn owner_update_applies_once_and_refuses_foreign_completed_or_forged_sources() {
         json!({"model":"openai-codex/gpt-6-luna","reasoning":"high","revision":1})
     );
     // The response is the same projection an owner reads over a cookie session.
-    let owner_read = f
-        .b
-        .request(json!({"op":"bot_get_model_settings","token":f.owner_token,"bot":bid}))
-        .unwrap();
+    let owner_read =
+        f.b.request(json!({"op":"bot_get_model_settings","token":f.owner_token,"bot":bid}))
+            .unwrap();
     assert_eq!(owner_read, dto);
     // Only the model settings may ever move.
     for key in [
@@ -260,9 +258,8 @@ fn owner_update_applies_once_and_refuses_foreign_completed_or_forged_sources() {
     // A fresh owner update still applies with its own CAS revision.
     let next = push_message(&mut f.b, &f.channel, &f.owner, "/ask model medium");
     assert_eq!(next, f.owner_update + 2);
-    let dto = f
-        .b
-        .request(owner_call(
+    let dto =
+        f.b.request(owner_call(
             &bt,
             json!(next),
             json!({"model":"openai-codex/gpt-6-luna","reasoning":"medium","revision":1}),
@@ -283,9 +280,8 @@ fn owner_update_applies_once_and_refuses_foreign_completed_or_forged_sources() {
         "BOT_SETTINGS_CONFLICT"
     );
     assert_eq!(f.b.db, pending);
-    let dto = f
-        .b
-        .request(owner_call(
+    let dto =
+        f.b.request(owner_call(
             &bt,
             json!(fresh),
             json!({"model":"x","revision":2}),
@@ -347,9 +343,8 @@ fn invalid_patches_are_atomic_and_do_not_consume_the_owner_update() {
         );
     }
     // The refused attempts left the update usable: a valid command applies exactly once.
-    let dto = f
-        .b
-        .request(owner_call(
+    let dto =
+        f.b.request(owner_call(
             &bt,
             json!(next),
             json!({"reasoning":"high","revision":1}),
@@ -381,10 +376,9 @@ fn settings_and_the_consumed_marker_survive_reopen() {
     ))
     .unwrap();
     // The update DTO never exposes the internal one-shot marker.
-    let updates = f
-        .b
-        .request(json!({"op":"bot_get_updates","bot_token":bt}))
-        .unwrap();
+    let updates =
+        f.b.request(json!({"op":"bot_get_updates","bot_token":bt}))
+            .unwrap();
     assert!(!updates.to_string().contains(OWNER_APPLIED));
     assert!(arr(&updates["updates"])
         .iter()
@@ -527,7 +521,10 @@ async fn http_statuses_for_owner_member_foreign_replay_and_invalid_values() {
     let response = client
         .post(&url)
         .bearer_auth(&bt)
-        .json(&call(pending_owner, json!({"reasoning":"low","revision":1})))
+        .json(&call(
+            pending_owner,
+            json!({"reasoning":"low","revision":1}),
+        ))
         .send()
         .await
         .unwrap();
