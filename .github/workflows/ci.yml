@@ -41,12 +41,15 @@ jobs:
       - run: npm ci
       - name: Types
         run: npx tsc --noEmit
+      - name: FSD boundaries
+        run: npm run check:fsd
       - name: Build
         run: npm run build
       - name: Unit tests
         run: |
           npm run test:updater
           npm run test:avatars
+          npm run test:src
 
   rust:
     name: Rust tests

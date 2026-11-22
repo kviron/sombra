@@ -3,8 +3,8 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import '@fontsource-variable/geist';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
-import { DirectMessageToast, type DirectMessage } from './direct-message-toast';
-import {validNotificationTarget} from './notification-target';
+import { DirectMessageToast, type DirectMessage } from '@/features/notifications/index.popup';
+import {validNotificationTarget} from '@/features/notifications/index.popup';
 
 const container = document.getElementById('notifications')!;
 const root = createRoot(container);

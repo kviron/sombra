@@ -12,6 +12,8 @@
     "tauri:dev": "node tauri-dev.mjs",
     "release:windows": "node release-build.mjs",
     "check:release": "node scripts/check-release-config.mjs",
+    "check:fsd": "node scripts/check-fsd.mjs",
+    "test:src": "node --experimental-strip-types --test \"src/**/*.test.mjs\"",
     "verify:release": "node scripts/verify-release.mjs",
     "test:updater": "node --experimental-strip-types --test check-updater.mjs",
     "test:avatars": "node --test check-avatar-assets.mjs"

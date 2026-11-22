@@ -1,22 +1,22 @@
-import { UpdateNotice, UpdateSettings } from './updates';
-import { LiveChat } from './live-chat';
+import { UpdateNotice, UpdateSettings } from '@/features/updates';
+import { LiveChat } from '@/pages/chat';
 import { api } from '@/shared/api/backend';
 import { useEffect, useState } from "react";
 
-import { RegisterPage } from "./register-page";
+import { RegisterPage } from "@/pages/register";
 import { isTauri } from "@/shared/api";
 import { Toaster } from "@/shared/ui";
-import { LoginPage } from "./login-page";
-import { AuthAmbient } from './auth-ambient';
+import { LoginPage } from "@/pages/login";
+import { AuthAmbient } from '../shared/ui/auth-ambient';
 import { useTheme } from "@/app/theme";
 import { useWindowMaximized } from "@/app/model/use-window-maximized";
 import { TitleBar } from "@/app/layout/title-bar";
 import { WindowResizeHandles } from "@/app/layout/window-resize-handles";
 
-import './glass.css';
-import './settings.css';
-import './chat-extras.css';
-import './hologram.css';
+import './styles/glass.css';
+import './styles/settings.css';
+import './styles/chat-extras.css';
+import './styles/hologram.css';
 
 export function App() {
   const [showUpdates,setShowUpdates]=useState(false);

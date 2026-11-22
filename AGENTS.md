@@ -14,4 +14,5 @@
 - Версию меняют сразу в трёх местах: корневой `Cargo.toml` (`[workspace.package]`), `src-tauri/tauri.conf.json`, `package.json`.
 - Клиент не должен знать секретов: ключи подписи и SSH-доступ лежат вне репозитория (`release-secrets/`, `.env`), оба пути в `.gitignore`.
 - Схему базы и операции API меняют вместе с тестами (`cargo test`), фронтенд — вместе с `npx tsc --noEmit`.
+- Фронтенд разложен по Feature-Sliced Design: `app → pages → features → entities → shared`. Новый модуль кладут в срез своего слоя, импортируют только вниз и только через `index.ts` среза. Карта слоёв, правила и таблица «куда класть код» — в [docs/FRONTEND-STRUCTURE.md](docs/FRONTEND-STRUCTURE.md); границы проверяет `npm run check:fsd`, модульные тесты — `npm run test:src`.
 - Сборка сервера и деплой описаны в `docs/DEPLOY.md`; изменения на живом сервере фиксируются в `docs/SOMBRA-SERVER.md`.
