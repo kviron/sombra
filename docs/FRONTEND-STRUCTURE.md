@@ -23,16 +23,24 @@ src/
   app/
     App.tsx  entrypoint.tsx  direct-message-popup.tsx
     layout/              заголовок окна, кнопки окна, ручки ресайза, переключатель темы
-    lib/                 window-actions (обёртки над Tauri)
-    model/               use-window-maximized
+    lib/                 window-actions (обёртки над Tauri), use-window-maximized
+    providers/
+      ErrorBoundary/     index.ts, ui/{ErrorBoundary,ErrorScreen,BugButton}.tsx, lib/error-summary.ts
+      ThemeProvider/     index.ts, ui/{ThemeProvider,withTheme}.tsx, lib/{theme-context,useTheme}.ts
+      router/            index.ts, config/routeConfig.tsx, ui/{AppRouter,RequireAuth}.tsx
     styles/              index.css, glass.css, settings.css, chat-extras.css, hologram.css
-    theme/               ThemeProvider, useTheme
     dev/avatar-fx-preview/  стенд предпросмотра эффектов аватара (вне сборки приложения)
 ```
 
-`app/entrypoint.tsx` и `app/direct-message-popup.tsx` — две точки входа приложения: главное окно и окно-попап уведомлений (`direct-message-popup.html`). Обе создают свой React-корень, поэтому ни одна из них не входит в публичный API среза и не импортируется ниоткуда.
+Провайдеры собраны по одной форме: срез-папка в `PascalCase`, внутри `index.ts` как публичный API, `ui/` с компонентами, `config/` со настройками и `lib/` с хуками и чистыми функциями. Исключение по названию — `router/` строчными, как в проекте-образце. Компонент провайдера наружу отдаётся из `ui/`, а не из `index.ts`, поэтому `index.ts` остаётся только точкой импорта.
 
-`app/providers/errorBaundari/` — граница ошибок (`ErrorBoundary` по документации React: `getDerivedStateFromError` + `componentDidCatch`) и провайдер `ErrorBoundaryProvider`, который оборачивает всё дерево в `entrypoint.tsx`: пишет сбой в журнал диагностики категорией `webview: render_error`, показывает экран восстановления и пересобирает поддерево по кнопке. В окне уведомлений та же граница оборачивает каждое уведомление отдельно, чтобы одно битое не гасило остальные. Ошибки обработчиков событий и промисов граница не ловит — их фиксирует `window.onerror` в `shared/api/diagnostics.ts`.
+`app/entrypoint.tsx` и `app/direct-message-popup.tsx` — две точки входа приложения: главное окно и окно-попап уведомлений (`direct-message-popup.html`). Обе создают свой React-корень, поэтому ни одна из них не входит в публичный API среза и не импортируется ниоткуда. Провайдеры подключаются в точке входа, а не в `App.tsx`: `ErrorBoundary` оборачивает всё дерево вместе с провайдером темы, поэтому сбой темы тоже ловится.
+
+`app/providers/ErrorBoundary/` — граница ошибок по документации React (`getDerivedStateFromError` + `componentDidCatch`) прямо в классе, без отдельного компонента-обёртки: сбой пишется в журнал диагностики категорией `webview: render_error`, экран восстановления собирается из Tailwind-классов и не зависит от UI-кита, повтор сбрасывает состояние и монтирует поддерево заново. В окне уведомлений та же граница оборачивает каждое уведомление отдельно, чтобы одно битое не гасило остальные. `BugButton` и адрес `?crash=1` роняют интерфейс только в разработке. Ошибки обработчиков событий и промисов граница не ловит — их фиксирует `window.onerror` в `shared/api/diagnostics.ts`.
+
+`app/providers/router/` — маршрутизация по hash: `config/routeConfig.tsx` описывает открытые экраны (`#login`, `#register`), `ui/AppRouter.tsx` выбирает экран, `ui/RequireAuth.tsx` пускает в чат только с подтверждённой сессией и показывает статус проверки. Состояние сессии живёт в `App.tsx` и передаётся роутеру пропсами — так роутер остаётся без собственного источника правды.
+
+`app/providers/ThemeProvider/` — тема (`light`/`dark`, следует за системой, пока пользователь не переключил вручную), хук `useTheme` и HOC `withTheme`, которым обёрнут `App`. Обёртка применяется в `App.tsx` (`export const App = withTheme(AppContent)`), поэтому `useTheme` доступен и внутри дерева, и в `layout/theme-toggle.tsx`.
 
 ```
   pages/

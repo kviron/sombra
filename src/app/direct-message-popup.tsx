@@ -5,7 +5,7 @@ import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { DirectMessageToast, type DirectMessage } from '@/features/notifications/index.popup';
 import {validNotificationTarget} from '@/features/notifications/index.popup';
-import { ErrorBoundary } from '@/app/providers/errorBaundari';
+import { ErrorBoundary } from '@/app/providers/ErrorBoundary';
 
 const container = document.getElementById('notifications')!;
 const root = createRoot(container);
