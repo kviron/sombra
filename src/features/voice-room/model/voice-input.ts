@@ -45,10 +45,16 @@ export function stopCapturedTrack(track:MediaStreamTrack) {
  if(track.readyState!=='ended')track.stop();
 }
 
+/** A track ends on its own when the device is unplugged, permission is revoked or the
+ *  system mute switch cuts the source. Calling stop() ourselves does not fire it. */
+function watchCaptureEnd(track:MediaStreamTrack) {
+ track.addEventListener('ended',()=>recordDesktopDiagnostic('voice_microphone','device_error'),{once:true});
+}
+
 export async function captureVoiceStream(preferences:MediaPreferences,video:MediaTrackConstraints|false=false) {
  const stream=await navigator.mediaDevices.getUserMedia({audio:audioConstraints(preferences),video});
  const input=stream.getAudioTracks()[0];
- if(input&&preferences.noise!=='enhanced')return stream;
+ if(input&&preferences.noise!=='enhanced'){watchCaptureEnd(input);return stream;}
  if(!input){
   stream.getTracks().forEach(stopCapturedTrack);
   throw new DOMException('Устройство не найдено','NotFoundError');
@@ -80,7 +86,7 @@ export async function captureVoiceStream(preferences:MediaPreferences,video:Medi
    stopCapturedTrack(input);
    void audio.close();
   }
-  function onInputEnded(){stopCapturedTrack(track)}
+  function onInputEnded(){recordDesktopDiagnostic('voice_microphone','device_error');stopCapturedTrack(track)}
   processedTracks.set(track,{input,dispose});
   input.addEventListener('ended',onInputEnded,{once:true});
   filter.addEventListener('processorerror',()=>{
