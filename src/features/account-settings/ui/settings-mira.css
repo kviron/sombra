@@ -13,14 +13,17 @@
   height:min(660px,100%);
   color:var(--foreground);
   /* Матовое стекло: тёмная полупрозрачная панель над размытым чатом. */
-  background:color-mix(in srgb, #1b1621 74%, transparent);
+  background:color-mix(in srgb, #1b1621 68%, transparent);
   background-image:linear-gradient(180deg, #ffffff12, #ffffff00 38%), radial-gradient(130% 90% at 100% 0%, #5d0ec02e, transparent 58%);
-  border:1px solid #ffffff26;
+  border:1px solid #ffffff2e;
   border-radius:14px;
-  -webkit-backdrop-filter:blur(34px) saturate(150%);
-  backdrop-filter:blur(34px) saturate(150%);
-  box-shadow:0 32px 90px #000000a6, inset 0 1px 0 #ffffff26;
+  -webkit-backdrop-filter:blur(30px) saturate(150%);
+  backdrop-filter:blur(30px) saturate(150%);
+  box-shadow:0 32px 90px #000000a6, inset 0 1px 0 #ffffff2e;
 }
+/* Подложка под окном настроек светлее обычной модальной: иначе чат за стеклом
+   сначала гасится на половину, и матовость панели не видно. */
+.modal-backdrop.settings-backdrop{background:rgb(4 6 12 / .34);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 /* Прозрачность — украшение: при системной настройке «уменьшить прозрачность» панель непрозрачна. */
 @media (prefers-reduced-transparency: reduce) {
   .app-surface .account-modal.settings-mira {
