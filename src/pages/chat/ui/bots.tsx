@@ -1,12 +1,12 @@
-import {useState} from 'react';
 import {Bot as BotIcon, Copy} from 'lucide-react';
 import {type ChatState} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
-import {botService} from '@/features/bots';
-import {BotToolAccess} from '@/features/bots';
 import {BotSettingsDialog} from '@/features/bots';
+import {BotToolAccess} from '@/features/bots';
+import {useChatBots} from '../model/use-chat-bots';
 import '@/features/bots/ui/bots.css';
 
+/** Окно «Подключения»: разметка без логики — строки, права и действия приходят из модели. */
 export function Bots({
  state,
  refresh,
@@ -19,36 +19,14 @@ export function Bots({
  group?: string;
  owner: boolean;
 }) {
- const [name, setName] = useState(''),
-  [username, setUsername] = useState(''),
-  [token, setToken] = useState(''),
-  [busy, setBusy] = useState(false),
-  [copied, setCopied] = useState(false);
- const [managementId, setManagementId] = useState('');
- const managedBot = state.bots?.find(b => b.id === managementId && b.owner === state.me.id);
- async function act(action: () => Promise<unknown>) {
-  setBusy(true);
-  try {
-   const result = (await action()) as {token?: string} | undefined;
-   if (result?.token) {
-    setToken(result.token);
-    setCopied(false);
-   }
-   await refresh();
-  } catch {
-   onError('Не удалось обновить подключение бота. Попробуйте снова.');
-  } finally {
-   setBusy(false);
-  }
- }
- const bots =
-  state.bots?.filter(b =>
-   group
-    ? b.groups
-      ? b.groups.includes(group) || b.channel === channel
-      : b.group === group || b.channel === channel
-    : b.channel === channel
-  ) || [];
+ const {rows, managed, name, username, token, busy, copied, createDisabled, actions} = useChatBots({
+  state,
+  refresh,
+  onError,
+  channel,
+  group,
+  owner
+ });
  return (
   <section className="bot-settings">
    <BotIcon size={28} />
@@ -57,83 +35,50 @@ export function Bots({
     Бот — отдельный участник. По умолчанию получает команды и упоминания в группе, сообщения в личном диалоге. ИИ
     работает через отдельный сервис; доступ к инструментам автоматически не предоставляется.
    </p>
-   {bots.map(b => {
-    const user = state.users.find(u => u.id === b.id) || {id: b.id, name: b.name};
-    return (
-     <article className="bot-installation" key={b.id}>
-      <div className="bot-installation-heading">
-       <UserAvatar user={user} size="sm" presence={false} />
-       <div>
-        <strong>{b.name}</strong> <small className="bot-badge">БОТ</small>
-        {b.username && <p>@{b.username}</p>}
-       </div>
+   {rows.map(row => (
+    <article className="bot-installation" key={row.bot.id}>
+     <div className="bot-installation-heading">
+      <UserAvatar user={row.user} size="sm" presence={false} />
+      <div>
+       <strong>{row.bot.name}</strong> <small className="bot-badge">БОТ</small>
+       {row.bot.username && <p>@{row.bot.username}</p>}
       </div>
-      <p>
-       {b.enabled === false
-        ? 'Отключён'
-        : b.last_seen && Date.now() / 1000 - b.last_seen < 120
-          ? 'Сервис подключён'
-          : 'Нет недавней активности сервиса'}
-      </p>
-      <p>
-       {b.channel
-        ? 'Доступ к истории этой комнаты'
-        : b.privacy === false || b.privacy === 'all'
-          ? 'Читает все сообщения разрешённых чатов'
-          : 'Команды и упоминания; личные сообщения — в отдельном диалоге'}
-      </p>
-      {b.commands?.length ? (
-       <ul>
-        {b.commands.map(c => (
-         <li key={c.command}>
-          <code>/{c.command.replace(/^\//, '')}</code> — {c.description}
-         </li>
-        ))}
-       </ul>
-      ) : (
-       <p>Команды: /help</p>
+     </div>
+     <p>{row.status}</p>
+     <p>{row.privacy}</p>
+     {row.commands.length ? (
+      <ul>
+       {row.commands.map(command => (
+        <li key={command.command}>
+         <code>/{command.command.replace(/^\//, '')}</code> — {command.description}
+        </li>
+       ))}
+      </ul>
+     ) : (
+      <p>Команды: /help</p>
+     )}
+     <div className="bot-installation-actions">
+      {row.settings && (
+       <button type="button" onClick={() => actions.openManagement(row.bot.id)}>
+        Настроить бота
+       </button>
       )}
-      <div className="bot-installation-actions">
-       {!state.me.bot && b.owner === state.me.id && (
-        <button type="button" onClick={() => setManagementId(b.id)}>
-         Настроить бота
-        </button>
-       )}
-       {b.owner === state.me.id && (!b.channel || owner) && (
-        <button
-         type="button"
-         disabled={busy}
-         onClick={() => {
-          if (window.confirm('Заменить ключ? Старый ключ немедленно перестанет работать.'))
-           void act(() => botService.rotateToken({bot: b.id}));
-         }}
-        >
-         Заменить ключ
-        </button>
-       )}
-       {owner && (
-        <button
-         type="button"
-         disabled={busy}
-         onClick={() => {
-          if (window.confirm('Отключить бота от этого чата?'))
-           void act(() =>
-            group && !b.channel ? botService.removeFromGroup({bot: b.id, group}) : botService.remove({bot: b.id})
-           );
-         }}
-        >
-         Отключить
-        </button>
-       )}
-      </div>
-      {b.owner === state.me.id && <BotToolAccess bot={b} state={state} rootBusy={busy} />}
-     </article>
-    );
-   })}
-   {managedBot && (
-    <BotSettingsDialog bot={managedBot} state={state} refresh={refresh} onClose={() => setManagementId('')} />
-   )}
-   {!bots.length && <p>Здесь пока нет подключённых ботов.</p>}
+      {row.token && (
+       <button type="button" disabled={busy} onClick={() => actions.rotate(row.bot)}>
+        Заменить ключ
+       </button>
+      )}
+      {row.remove && (
+       <button type="button" disabled={busy} onClick={() => actions.remove(row.bot)}>
+        Отключить
+       </button>
+      )}
+     </div>
+     {row.settings && <BotToolAccess bot={row.bot} state={state} rootBusy={busy} />}
+    </article>
+   ))}
+   {managed && <BotSettingsDialog bot={managed} state={state} refresh={refresh} onClose={actions.closeManagement} />}
+   {!rows.length && <p>Здесь пока нет подключённых ботов.</p>}
    {owner && (
     <>
      <label>
@@ -142,7 +87,7 @@ export function Bots({
        aria-label="Имя бота"
        maxLength={32}
        value={name}
-       onChange={e => setName(e.target.value)}
+       onChange={event => actions.setName(event.target.value)}
        placeholder="Помощник команды"
       />
      </label>
@@ -153,25 +98,14 @@ export function Bots({
         aria-label="Уникальное имя бота"
         maxLength={32}
         value={username}
-        onChange={e => setUsername(e.target.value)}
+        onChange={event => actions.setUsername(event.target.value)}
         placeholder="team_bot"
         autoCapitalize="none"
         autoCorrect="off"
        />
       </label>
      )}
-     <button
-      type="button"
-      className="small-button"
-      disabled={busy || !name.trim() || (!!group && !username.trim())}
-      onClick={() =>
-       void act(() =>
-        botService.create(
-         group ? {group, name: name.trim(), username: username.trim().replace(/^@/, '')} : {channel, name: name.trim()}
-        )
-       )
-      }
-     >
+     <button type="button" className="small-button" disabled={createDisabled} onClick={actions.create}>
       Создать бота
      </button>
     </>
@@ -180,26 +114,11 @@ export function Bots({
     <div className="bot-token">
      <p>Новый ключ показан только сейчас. Сохраните его на машине сервиса бота. Не отправляйте в чат.</p>
      <input type="password" aria-label="Новый ключ бота" readOnly value={token} autoComplete="off" />
-     <button
-      type="button"
-      className="small-button"
-      onClick={() =>
-       void navigator.clipboard
-        .writeText(token)
-        .then(() => setCopied(true))
-        .catch(() => onError('Не удалось скопировать ключ. Проверьте доступ к буферу обмена.'))
-      }
-     >
+     <button type="button" className="small-button" onClick={actions.copyToken}>
       <Copy size={16} />
       {copied ? 'Скопировано' : 'Скопировать ключ'}
      </button>
-     <button
-      type="button"
-      onClick={() => {
-       setToken('');
-       setCopied(false);
-      }}
-     >
+     <button type="button" onClick={actions.dismissToken}>
       Я сохранил ключ
      </button>
     </div>

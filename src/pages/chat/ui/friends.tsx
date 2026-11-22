@@ -1,10 +1,9 @@
-import {useState} from 'react';
 import {Check, MessageCircle, UserPlus, X} from 'lucide-react';
 import {type ChatState} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
-import {conversationService} from '@/entities/conversation';
-import {friendService} from '@/entities/user';
+import {useChatFriends} from '../model/use-chat-friends';
 
+/** Друзья: разметка без логики — вкладка, поиск и действия приходят из модели. */
 export function Friends({
  state,
  refresh,
@@ -13,42 +12,20 @@ export function Friends({
 }: {state: ChatState; refresh: () => Promise<unknown>; onError: (message: string) => void} & {
  onDialog: (id: string) => void;
 }) {
- const [tab, setTab] = useState('all'),
-  [query, setQuery] = useState(''),
-  [busy, setBusy] = useState(false);
- async function act<T>(action: () => Promise<T>, done?: (result: T) => void) {
-  setBusy(true);
-  try {
-   const result = await action();
-   await refresh();
-   done?.(result);
-  } catch (e) {
-   onError((e as Error).message);
-  } finally {
-   setBusy(false);
-  }
- }
- const friends = state.friends || [];
- const users = state.users
-  .filter(u => !u.bot && u.id !== state.me.id && u.name.toLowerCase().includes(query.toLowerCase()))
-  .filter(u => {
-   const f = friends.find(f => f.from === u.id || f.to === u.id);
-   return tab === 'add' ? !f : tab === 'pending' ? f && !f.accepted : f?.accepted;
-  });
+ const {tabs, tab, query, busy, count, incoming, empty, rows, actions} = useChatFriends({
+  state,
+  refresh,
+  onError,
+  onDialog
+ });
  return (
   <section className="friends-page">
    <nav aria-label="Список друзей">
-    {[
-     ['all', 'Все друзья'],
-     ['pending', 'Заявки'],
-     ['add', 'Добавить друга']
-    ].map(([id, label]) => (
-     <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
-      {id === 'add' && <UserPlus size={16} />}
-      {label}
-      {id === 'pending' && friends.filter(f => !f.accepted && f.to === state.me.id).length > 0 && (
-       <small>{friends.filter(f => !f.accepted && f.to === state.me.id).length}</small>
-      )}
+    {tabs.map(item => (
+     <button key={item.id} aria-pressed={tab === item.id} onClick={() => actions.setTab(item.id)}>
+      {item.id === 'add' && <UserPlus size={16} />}
+      {item.label}
+      {item.id === 'pending' && incoming > 0 && <small>{incoming}</small>}
      </button>
     ))}
    </nav>
@@ -57,86 +34,54 @@ export function Friends({
     aria-label="Найти человека"
     placeholder="Поиск по имени"
     value={query}
-    onChange={e => setQuery(e.target.value)}
+    onChange={event => actions.setQuery(event.target.value)}
    />
    <p className="friends-count">
-    {tab === 'pending' ? 'Ожидают ответа' : tab === 'add' ? 'Люди в Sombra' : 'Ваши друзья'} · {users.length}
+    {count} · {rows.length}
    </p>
-   {users.map(u => {
-    const f = friends.find(f => f.from === u.id || f.to === u.id);
-    return (
-     <div className="friend-row" key={u.id}>
-      <UserAvatar user={u} size="md" presence={false} decoration={u.decorations?.avatar} />
-      <div>
-       <strong>{u.name}</strong>
-       <small>
-        {f && !f.accepted
-         ? f.from === state.me.id
-           ? 'Заявка отправлена'
-           : 'Хочет добавить вас в друзья'
-         : u.bio || 'Пользователь Sombra'}
-       </small>
-      </div>
-      <div className="friend-actions">
-       {!f ? (
-        <button
-         disabled={busy}
-         title="Отправить заявку"
-         onClick={() => void act(() => friendService.request({user: u.id}))}
-        >
-         <UserPlus size={19} />
-        </button>
-       ) : f.accepted ? (
-        <>
-         <button
-          disabled={busy}
-          title="Написать"
-          onClick={() =>
-           void act(
-            () => conversationService.createDialog({members: [u.id], name: u.name}),
-            dialog => onDialog(dialog.id)
-           )
-          }
-         >
-          <MessageCircle size={19} />
-         </button>
-         <button disabled={busy} title="Удалить из друзей" onClick={() => void act(() => friendService.remove(f.id))}>
-          <X size={16} />
-         </button>
-        </>
-       ) : (
-        <>
-         {f.to === state.me.id && (
-          <button title="Принять заявку" disabled={busy} onClick={() => void act(() => friendService.accept(f.id))}>
-           <Check size={19} />
-          </button>
-         )}
-         <button
-          title="Отклонить или отменить заявку"
-          disabled={busy}
-          onClick={() => void act(() => friendService.remove(f.id))}
-         >
-          <X size={19} />
-         </button>
-        </>
-       )}
-      </div>
+   {rows.map(row => (
+    <div className="friend-row" key={row.user.id}>
+     <UserAvatar user={row.user} size="md" presence={false} decoration={row.user.decorations?.avatar} />
+     <div>
+      <strong>{row.user.name}</strong>
+      <small>{row.note}</small>
      </div>
-    );
-   })}
-   {!users.length && (
+     <div className="friend-actions">
+      {row.kind === 'add' ? (
+       <button disabled={busy} title="Отправить заявку" onClick={() => actions.request(row.user.id)}>
+        <UserPlus size={19} />
+       </button>
+      ) : row.kind === 'friend' ? (
+       <>
+        <button disabled={busy} title="Написать" onClick={() => actions.startDialog(row.user)}>
+         <MessageCircle size={19} />
+        </button>
+        <button disabled={busy} title="Удалить из друзей" onClick={() => actions.remove(row.friendId)}>
+         <X size={16} />
+        </button>
+       </>
+      ) : (
+       <>
+        {row.accept && (
+         <button title="Принять заявку" disabled={busy} onClick={() => actions.accept(row.friendId)}>
+          <Check size={19} />
+         </button>
+        )}
+        <button title="Отклонить или отменить заявку" disabled={busy} onClick={() => actions.decline(row.friendId)}>
+         <X size={19} />
+        </button>
+       </>
+      )}
+     </div>
+    </div>
+   ))}
+   {empty && (
     <div className="friends-empty">
      <UserPlus size={36} />
-     <h2>
-      {tab === 'pending' ? 'Новых заявок пока нет' : tab === 'add' ? 'Никого не нашли' : 'Здесь будут ваши друзья'}
-     </h2>
-     <p>
-      {tab === 'all'
-       ? 'Добавьте знакомых, чтобы быстро начинать разговор.'
-       : 'Попробуйте поискать по имени или загляните позже.'}
-     </p>
-     {tab === 'all' && (
-      <button className="small-button" onClick={() => setTab('add')}>
+     <h2>{empty.title}</h2>
+     <p>{empty.note}</p>
+     {empty.add && (
+      <button className="small-button" onClick={() => actions.setTab('add')}>
        Добавить друга
       </button>
      )}
