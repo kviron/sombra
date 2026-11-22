@@ -3,16 +3,13 @@ import {Button} from '@/shared/ui/button';
 import {Switch} from '@/shared/ui/switch';
 import {Slider} from '@/shared/ui/slider';
 import {Select} from '@/shared/ui/select';
-import {useAudioDevices, isDeviceSelectionMissing} from '../model/use-audio-devices';
 import {AudioDeviceAccess} from './audio-device-access';
 import {useLevelRail} from '../model/use-level-rail';
 import {Label} from '@/shared/ui/label';
 import {Progress} from '@/shared/ui/progress';
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useState} from 'react';
 import {Mic, MicOff, Headphones, HeadphoneOff, Video, VideoOff, PhoneOff, Settings} from 'lucide-react';
-import {mediaError, type Voice} from '../model/use-voice';
-import {captureVoiceStream, stopCapturedTrack, type NoiseSuppression} from '../model/voice-input';
-import {recordDesktopDiagnostic} from '@/shared/api/diagnostics';
+import type {Voice} from '../model/use-voice';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {UserContextMenu} from '@/entities/user';
 import {useUserActions} from '@/shared/lib/user-actions';
@@ -20,12 +17,10 @@ import type {User} from '@/shared/types';
 import './voice.css';
 import '@/shared/ui/account-media-settings.css';
 import {RoomMusic, type useRoomMusic} from './room-music';
-type PlaybackGain = {
- context: AudioContext;
- source: MediaStreamAudioSourceNode;
- gain: GainNode;
- output: MediaStreamAudioDestinationNode;
-};
+import {useMediaPlayback} from '../model/use-media-playback';
+import {useVoiceSettings, type VoiceSettingsModel} from '../model/use-voice-settings';
+
+/** Один поток комнаты: разметка элемента и кнопка возврата звука; воспроизведение — в модели. */
 export function Media({
  stream,
  muted,
@@ -39,154 +34,20 @@ export function Media({
  speaker?: string;
  audioOnly?: boolean;
 }) {
- const ref = useRef<HTMLMediaElement>(null);
- const [blocked, setBlocked] = useState(false),
-  [error, setError] = useState('');
- const processing = useRef<PlaybackGain | null>(null),
-  [gainError, setGainError] = useState('');
- // Receiver streams can gain/replace audio without changing their MediaStream identity.
- const [, refreshAudio] = useState(0);
- const audioTrack = stream.getAudioTracks().find(track => track.readyState === 'live');
- useEffect(() => {
-  const sync = () => refreshAudio(value => value + 1);
-  stream.addEventListener('addtrack', sync);
-  stream.addEventListener('removetrack', sync);
-  return () => {
-   stream.removeEventListener('addtrack', sync);
-   stream.removeEventListener('removetrack', sync);
-  };
- }, [stream]);
- // Video-only updates must not detach an otherwise unchanged audio receiver.
- const audioInput = useMemo(() => new MediaStream(audioTrack ? [audioTrack] : []), [audioTrack]);
- const input = audioOnly ? audioInput : stream;
- function playbackFailed(failure: unknown) {
-  if (failure instanceof DOMException && failure.name === 'AbortError') return;
-  if (speaker !== undefined)
-   recordDesktopDiagnostic(
-    'voice_playback',
-    failure instanceof DOMException && failure.name === 'NotAllowedError' ? 'autoplay_blocked' : 'playback_error'
-   );
-  setBlocked(true);
- }
- useEffect(() => {
-  const el = ref.current!;
-  let active = true;
-  el.srcObject = input;
-  const play = () => {
-   void el.play().then(
-    () => {
-     if (active) setBlocked(false);
-    },
-    failure => {
-     if (active) playbackFailed(failure);
-    }
-   );
-  };
-  const receiver = audioOnly ? input.getAudioTracks()[0] : undefined;
-  const retryWhenReceiving = () => {
-   if (active && el.paused) play();
-  };
-  receiver?.addEventListener('unmute', retryWhenReceiving);
-  play();
-  return () => {
-   active = false;
-   receiver?.removeEventListener('unmute', retryWhenReceiving);
-   el.srcObject = null;
-   const graph = processing.current;
-   if (graph) {
-    processing.current = null;
-    graph.source.disconnect();
-    graph.gain.disconnect();
-    graph.output.stream.getTracks().forEach(track => track.stop());
-    void graph.context.close();
-   }
-  };
- }, [input]);
- useEffect(() => {
-  const el = ref.current!;
-  setGainError('');
-  let context: AudioContext | undefined;
-  if (volume > 100 && !processing.current && input.getAudioTracks().length) {
-   try {
-    context = new AudioContext();
-    const source = context.createMediaStreamSource(input),
-     gain = context.createGain(),
-     output = context.createMediaStreamDestination();
-    source.connect(gain).connect(output);
-    const graph = {context, source, gain, output};
-    processing.current = graph;
-    // Keep the amplified audio on the same element so its output device and mute state still apply.
-    el.srcObject = new MediaStream([...input.getVideoTracks(), ...output.stream.getAudioTracks()]);
-    void Promise.all([context.resume(), el.play()]).then(
-     () => {
-      if (processing.current === graph) setBlocked(false);
-     },
-     failure => {
-      if (processing.current === graph) playbackFailed(failure);
-     }
-    );
-   } catch {
-    if (context) void context.close();
-    if (speaker !== undefined) recordDesktopDiagnostic('voice_output', 'playback_failed');
-    setGainError('Не удалось усилить звук.');
-   }
-  }
-  const graph = processing.current;
-  if (graph) graph.gain.gain.value = volume / 100;
-  el.volume = graph ? 1 : Math.min(1, volume / 100);
- }, [input, volume]);
- useEffect(() => {
-  const el = ref.current!;
-  let active = true;
-  setError('');
-  if (speaker !== undefined) {
-   if (el.setSinkId)
-    void el.setSinkId(speaker).catch(error => {
-     if (active) {
-      recordDesktopDiagnostic('voice_speaker', error.name === 'NotAllowedError' ? 'device_permission' : 'device_error');
-      setError('Не удалось выбрать динамики. Проверьте настройки.');
-     }
-    });
-   else if (speaker) {
-    recordDesktopDiagnostic('voice_output', 'output_device_failed');
-    setError('Выбор динамиков недоступен в этом режиме.');
-   }
-  }
-  return () => {
-   active = false;
-  };
- }, [speaker]);
- async function resumePlayback() {
-  try {
-   const el = ref.current;
-   if (el?.error && el.srcObject) {
-    const playbackStream = el.srcObject;
-    el.srcObject = null;
-    el.srcObject = playbackStream;
-   }
-   await Promise.all([el?.play(), processing.current?.context.resume()]);
-   setBlocked(false);
-  } catch (failure) {
-   playbackFailed(failure);
-  }
- }
- const attach = (element: HTMLMediaElement | null) => {
-  ref.current = element;
- };
- const onError = () => playbackFailed(ref.current?.error);
+ const playback = useMediaPlayback({stream, volume, speaker, audioOnly});
  return (
   <>
    {audioOnly ? (
-    <audio ref={attach} autoPlay muted={muted} onError={onError} />
+    <audio ref={playback.attach} autoPlay muted={muted} onError={playback.onError} />
    ) : (
-    <video ref={attach} autoPlay playsInline muted={muted} onError={onError} />
+    <video ref={playback.attach} autoPlay playsInline muted={muted} onError={playback.onError} />
    )}
-   {blocked && (
-    <Button variant="secondary" onClick={() => void resumePlayback()}>
+   {playback.blocked && (
+    <Button variant="secondary" onClick={() => void playback.resume()}>
      Включить воспроизведение
     </Button>
    )}
-   {(error || gainError) && <small role="alert">{error || gainError}</small>}
+   {playback.message && <small role="alert">{playback.message}</small>}
   </>
  );
 }
@@ -414,86 +275,51 @@ export function VoiceStage({
   </div>
  );
 }
-const noiseOptions: {value: NoiseSuppression; label: string}[] = [
- {value: 'enhanced', label: 'Усиленное (RNNoise)'},
- {value: 'standard', label: 'Стандартное'},
- {value: 'off', label: 'Выключено'}
-];
+/** Одно поле выбора устройства: только разметка, данные и колбэки приходят из модели. */
+function DeviceField({field}: {field: VoiceSettingsModel['fields'][number]}) {
+ return (
+  <div className="voice-field">
+   <Label htmlFor={`voice-${field.key}`}>{field.label}</Label>
+   <Select
+    id={`voice-${field.key}`}
+    label={field.label}
+    value={field.value}
+    disabled={field.disabled}
+    onValueChange={field.select}
+    options={field.options}
+   />
+   {field.missing && (
+    <div className="audio-device-missing">
+     <p role="status">Выбранное устройство недоступно. Настройка сохранена.</p>
+     <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      className="audio-device-reset"
+      data-device-kind={field.kind}
+      disabled={field.disabled}
+      onClick={field.reset}
+     >
+      Использовать по умолчанию · {field.resetLabel}
+     </Button>
+    </div>
+   )}
+  </div>
+ );
+}
 
 export function VoiceSettings({voice: v}: {voice: Voice}) {
- const audioDevices = useAudioDevices();
- const {devices} = audioDevices;
- const [preview, setPreview] = useState<MediaStream | null>(null),
-  [error, setError] = useState(''),
-  [level, setLevel] = useState(0),
-  [busy, setBusy] = useState(false);
- const owned = useRef<MediaStream | null>(null),
-  epoch = useRef(0);
+ const settings = useVoiceSettings({voice: v});
  const p = v.preferences;
- function stop() {
-  epoch.current++;
-  owned.current?.getTracks().forEach(stopCapturedTrack);
-  owned.current = null;
-  setPreview(null);
-  setLevel(0);
- }
- useEffect(
-  () => () => {
-   epoch.current++;
-   owned.current?.getTracks().forEach(stopCapturedTrack);
-  },
-  []
- );
- useEffect(() => {
-  if (!preview?.getAudioTracks().length) return;
-  const ctx = new AudioContext(),
-   analyser = ctx.createAnalyser();
-  ctx.createMediaStreamSource(preview).connect(analyser);
-  const data = new Uint8Array(analyser.fftSize);
-  const timer = setInterval(() => {
-   analyser.getByteTimeDomainData(data);
-   setLevel(Math.min(100, Math.max(...data.map(x => Math.abs(x - 128))) * 3));
-  }, 100);
-  return () => {
-   clearInterval(timer);
-   void ctx.close();
-  };
- }, [preview]);
- async function test(video: boolean) {
-  stop();
-  const token = epoch.current;
-  setBusy(true);
-  setError('');
-  try {
-   if (!navigator.mediaDevices) throw new Error('Устройства доступны через HTTPS или localhost.');
-   const stream = await (video
-    ? navigator.mediaDevices.getUserMedia({audio: false, video: {deviceId: p.camera ? {exact: p.camera} : undefined}})
-    : captureVoiceStream(p, false));
-   if (token !== epoch.current) {
-    stream.getTracks().forEach(stopCapturedTrack);
-    return;
-   }
-   owned.current = stream;
-   setPreview(stream);
-   await audioDevices.refresh();
-  } catch (e) {
-   recordDesktopDiagnostic(
-    video ? 'voice_camera' : 'voice_microphone',
-    (e as DOMException).name === 'NotAllowedError' ? 'device_permission' : 'device_error'
-   );
-   setError(mediaError(e));
-  } finally {
-   setBusy(false);
-  }
- }
  return (
   <section className="voice-settings account-media-voice">
    <p>{v.room ? 'Устройства можно менять прямо во время звонка.' : 'Выберите устройства для звонков.'}</p>
-   <AudioDeviceAccess devices={audioDevices} disabled={busy || v.busy} />
+   <AudioDeviceAccess devices={settings.devices} disabled={settings.devicesDisabled} />
    <section className="media-settings-panel" aria-label="Аудиоустройства">
     <div className="voice-device-fields">
-     {renderDevice('audioinput', 0)}
-     {renderDevice('audiooutput', 1)}
+     {settings.fields.slice(0, 2).map(field => (
+      <DeviceField key={field.kind} field={field} />
+     ))}
      <div className="voice-field voice-volume">
       <Label id="voice-volume-label">Громкость собеседников · {p.volume}%</Label>
       <Slider
@@ -506,10 +332,10 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
      </div>
     </div>
     <div className="voice-test-actions">
-     <Button variant="secondary" disabled={busy || !!v.room} onClick={() => void test(false)}>
+     <Button variant="secondary" disabled={settings.testDisabled} onClick={() => void settings.testMicrophone()}>
       Проверить микрофон
      </Button>
-     <Progress aria-label="Уровень микрофона" value={level} />
+     <Progress aria-label="Уровень микрофона" value={settings.level} />
     </div>
    </section>
    <section className="media-settings-panel">
@@ -517,15 +343,7 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
     <div className="voice-processing">
      <div className="voice-switch">
       <Label htmlFor="voice-echo">Эхоподавление</Label>
-      <Switch
-       id="voice-echo"
-       disabled={v.busy}
-       checked={p.echo}
-       onCheckedChange={checked => {
-        stop();
-        v.savePreferences('echo', checked);
-       }}
-      />
+      <Switch id="voice-echo" disabled={v.busy} checked={p.echo} onCheckedChange={settings.applyEcho} />
      </div>
      <div className="voice-field">
       <Label htmlFor="voice-noise">Шумоподавление</Label>
@@ -534,14 +352,8 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
        label="Шумоподавление"
        value={p.noise}
        disabled={v.busy}
-       options={noiseOptions}
-       onValueChange={value => {
-        const option = noiseOptions.find(option => option.value === value);
-        if (option) {
-         stop();
-         v.savePreferences('noise', option.value);
-        }
-       }}
+       options={settings.noiseOptions}
+       onValueChange={settings.applyNoise}
       />
      </div>
     </div>
@@ -568,77 +380,20 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
    <section className="media-settings-panel">
     <h2>Камера</h2>
     <div className="voice-device-fields">
-     {renderDevice('videoinput', 2)}
-     <Button variant="secondary" disabled={busy || !!v.room} onClick={() => void test(true)}>
+     <DeviceField field={settings.fields[2]} />
+     <Button variant="secondary" disabled={settings.testDisabled} onClick={() => void settings.testCamera()}>
       Проверить камеру
      </Button>
     </div>
-    {preview?.getVideoTracks().length ? <Media stream={preview} muted volume={0} /> : null}
+    {settings.preview?.getVideoTracks().length ? <Media stream={settings.preview} muted volume={0} /> : null}
    </section>
-   {preview && (
-    <Button variant="secondary" onClick={stop}>
+   {settings.preview && (
+    <Button variant="secondary" onClick={() => settings.stop()}>
      Остановить проверку
     </Button>
    )}
    <p>При проверке разрешите доступ к устройствам. Звук не передаётся другим участникам.</p>
-   {(error || (v.room && v.error)) && <p role="alert">{error || v.error}</p>}
+   {settings.error && <p role="alert">{settings.error}</p>}
   </section>
  );
- function renderDevice(kind: MediaDeviceKind, i: number) {
-  const key = (['mic', 'speaker', 'camera'] as const)[i];
-  const label = ['Устройство ввода · микрофон', 'Устройство вывода · динамики', 'Камера'][i];
-  const missing = isDeviceSelectionMissing(devices, audioDevices.loaded, kind, p[key]);
-  const options = [
-   {value: '', label: 'По умолчанию'},
-   ...devices
-    .filter(d => d.kind === kind && d.deviceId)
-    .map((d, n) => ({value: d.deviceId, label: d.label || `Устройство ${n + 1}`}))
-  ];
-  if (p[key] && !options.some(option => option.value === p[key]))
-   options.push({
-    value: p[key],
-    label: missing
-     ? 'Выбранное устройство (недоступно)'
-     : p[key] === 'default'
-       ? 'По умолчанию'
-       : p[key] === 'communications'
-         ? 'Устройство связи по умолчанию'
-         : 'Выбранное устройство'
-   });
-  return (
-   <div className="voice-field" key={kind}>
-    <Label htmlFor={`voice-${key}`}>{label}</Label>
-    <Select
-     id={`voice-${key}`}
-     label={label}
-     value={p[key]}
-     disabled={v.busy || audioDevices.requesting}
-     onValueChange={value => {
-      stop();
-      v.savePreferences(key, value);
-     }}
-     options={options}
-    />
-    {missing && (
-     <div className="audio-device-missing">
-      <p role="status">Выбранное устройство недоступно. Настройка сохранена.</p>
-      <Button
-       type="button"
-       variant="secondary"
-       size="sm"
-       className="audio-device-reset"
-       data-device-kind={kind}
-       disabled={v.busy || audioDevices.requesting}
-       onClick={() => {
-        stop();
-        v.savePreferences(key, '');
-       }}
-      >
-       Использовать по умолчанию · {['микрофон', 'динамики', 'камера'][i]}
-      </Button>
-     </div>
-    )}
-   </div>
-  );
- }
 }

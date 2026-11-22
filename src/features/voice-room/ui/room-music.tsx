@@ -1,288 +1,42 @@
 import {useEffect, useId, useRef, useState} from 'react';
 import {ListMusic, Music2, Pause, Play, Plus, SkipForward, Square, Volume2} from 'lucide-react';
-import {musicService} from '../model/services/music-service';
-import {parseMusicLimit} from '@/shared/lib/music-command';
 import {defaultGenerativeUILibrary, renderGenerativeUI} from '@assistant-ui/generative-ui/react';
 import './room-music-elements.css';
 import './room-music.css';
+import {useRoomMusic as useRoomMusicModel} from '../model/use-room-music';
 
-import {openRoomMusicStream} from '../model/room-music-stream';
-
-type Track = {id: string; title: string; url?: string; assetId?: string; stream?: boolean; durationMs: number};
-const MAX_PRIVATE_AUDIO = 10 * 1024 * 1024;
-type Snapshot = {
- room: string;
- revision: number;
- serverTimeMs: number;
- positionMs: number;
- status: 'idle' | 'playing' | 'paused';
- track: Track | null;
- queue: Track[];
-};
-type Action = 'add' | 'pause' | 'resume' | 'skip' | 'stop';
-type Reading = {state: Snapshot; received: number};
-const position = ({state, received}: Reading) =>
- Math.max(
-  0,
-  Math.min(
-   state.track?.durationMs ?? 0,
-   state.positionMs + (state.status === 'playing' ? performance.now() - received : 0)
-  )
- );
-function message(error: unknown) {
- const raw = String(error);
- if (raw.includes('MUSIC_PROVIDER_NOT_CONFIGURED')) return 'Яндекс Музыка пока не подключена на сервере.';
- if (raw.includes('MUSIC_SOURCE_NOT_APPROVED')) return 'Эта ссылка не входит в разрешённый каталог комнаты.';
- return 'Не удалось выполнить команду музыки. Проверьте подключение к комнате.';
-}
+/**
+ * Тонкая обёртка над моделью: создаёт элемент проигрывателя и отдаёт его в модель ссылкой.
+ * Всё остальное — опрос, команды, приватное аудио и синхронизация позиции — в модели.
+ */
 export function useRoomMusic(room: string | undefined, deaf: boolean, speaker: string) {
- const [reading, setReading] = useState<Reading | null>(null),
-  [volume, setVolume] = useState(65),
-  [blocked, setBlocked] = useState(false),
-  [unavailable, setUnavailable] = useState(false);
- const engine = useRef<HTMLAudioElement>(null),
-  epoch = useRef(0),
-  lastTrack = useRef<string | undefined>(undefined);
- const current = room && reading?.state.room === room ? reading : null;
- const track = current?.state.track ?? null;
- const assetId = track?.assetId,
-  trackId = track?.id;
- const [privateAudio, setPrivateAudio] = useState<{room: string; trackId: string; url: string}>();
- const [privateFailure, setPrivateFailure] = useState(''),
-  [retry, setRetry] = useState(0);
- const playbackUrl = assetId
-  ? privateAudio?.room === room && privateAudio?.trackId === trackId
-    ? privateAudio?.url
-    : undefined
-  : track?.url;
- useEffect(() => {
-  setPrivateAudio(undefined);
-  setPrivateFailure('');
-  if (!room || !assetId || !trackId) return;
-  if (track?.stream) {
-   if (!engine.current) return;
-   try {
-    const stream = openRoomMusicStream(room, assetId, track.durationMs, engine.current, () =>
-     setPrivateFailure('Не удалось продолжить поток Яндекс Музыки.')
-    );
-    setPrivateAudio({room, trackId, url: stream.url});
-    return stream.close;
-   } catch {
-    setPrivateFailure('Этот клиент не поддерживает потоковое воспроизведение MP3.');
-    return;
-   }
-  }
-  let disposed = false,
-   objectUrl: string | undefined;
-  void musicService
-   .file<{mime: string; base64: string}>({room, id: assetId})
-   .then(file => {
-    if (disposed) return;
-    if (
-     file.mime !== 'audio/mpeg' ||
-     typeof file.base64 !== 'string' ||
-     !file.base64 ||
-     file.base64.length > 4 * Math.ceil(MAX_PRIVATE_AUDIO / 3)
-    )
-     throw new Error('Invalid media');
-    const raw = atob(file.base64);
-    if (raw.length > MAX_PRIVATE_AUDIO) throw new Error('Media too large');
-    objectUrl = URL.createObjectURL(new Blob([Uint8Array.from(raw, c => c.charCodeAt(0))], {type: file.mime}));
-    setPrivateAudio({room, trackId, url: objectUrl});
-   })
-   .catch(() => {
-    if (!disposed) setPrivateFailure('Не удалось загрузить аудио этой комнаты.');
-   });
-  return () => {
-   disposed = true;
-   if (objectUrl) URL.revokeObjectURL(objectUrl);
-  };
- }, [room, assetId, trackId, track?.stream, track?.durationMs, retry]);
- function accept(state: Snapshot, started: number) {
-  const received = performance.now() - (performance.now() - started) / 2;
-  setReading(previous =>
-   previous && previous.state.room === state.room && previous.state.serverTimeMs > state.serverTimeMs
-    ? previous
-    : {state, received}
-  );
- }
- useEffect(() => {
-  const generation = ++epoch.current;
-  setReading(null);
-  setUnavailable(false);
-  setBlocked(false);
-  if (!room) return;
-  let pending = false,
-   timer = 0;
-  // Nothing playing: poll slower. A new track is noticed within a few seconds and the
-  // room stops paying for an idle snapshot every two seconds.
-  function schedule(delay: number) {
-   window.clearTimeout(timer);
-   timer = window.setTimeout(() => {
-    if (epoch.current === generation) void poll();
-   }, delay);
-  }
-  async function poll() {
-   if (pending || epoch.current !== generation) return;
-   pending = true;
-   const started = performance.now();
-   let delay = 4000;
-   try {
-    const state = await musicService.state<Snapshot>({room});
-    if (epoch.current === generation) {
-     accept(state, started);
-     setUnavailable(false);
-     if (state.track || state.status !== 'idle') delay = 2000;
-    }
-   } catch {
-    if (epoch.current === generation) {
-     setUnavailable(true);
-     setReading(null);
-    }
-   } finally {
-    pending = false;
-    if (epoch.current === generation) schedule(delay);
-   }
-  }
-  void poll();
-  return () => {
-   epoch.current++;
-   window.clearTimeout(timer);
-  };
- }, [room]);
- async function command(action: Action, url?: string, limit?: number) {
-  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 1000))
-   throw new Error('Укажите число треков от 1 до 1000.');
-  if (!room) throw new Error('Сначала войдите в голосовую комнату.');
-  if (action === 'add' && !url) throw new Error('Укажите ссылку после /play.');
-  if (action !== 'add' && url) throw new Error('Эта команда не принимает ссылку.');
-  const generation = epoch.current,
-   started = performance.now();
-  try {
-   const state = await musicService.command<Snapshot>({
-    room,
-    action,
-    ...(url ? {url} : {}),
-    ...(limit !== undefined ? {limit} : {})
-   });
-   if (epoch.current === generation) accept(state, started);
-  } catch (error) {
-   throw new Error(message(error), {cause: error});
-  }
- }
- useEffect(() => {
-  const el = engine.current;
-  if (el) {
-   el.volume = volume / 100;
-   el.muted = deaf;
-  }
- }, [volume, deaf]);
- useEffect(() => {
-  const el = engine.current;
-  if (el?.setSinkId) void el.setSinkId(speaker).catch(() => {});
- }, [speaker]);
- useEffect(() => {
-  const el = engine.current;
-  if (!el) return;
-  let active = true;
-  const sync = () => {
-   if (!current?.state.track || !playbackUrl) {
-    el.pause();
-    lastTrack.current = undefined;
-    return;
-   }
-   const target = position(current) / 1000;
-   if (el.readyState >= 1) {
-    const changed = lastTrack.current !== current.state.track.id;
-    lastTrack.current = current.state.track.id;
-    if (changed || Math.abs(el.currentTime - target) > (el.paused ? 0.2 : 1.25)) el.currentTime = target;
-   }
-   if (current.state.status === 'playing' && el.paused)
-    void el.play().then(
-     () => {
-      if (active) setBlocked(false);
-     },
-     () => {
-      if (active) setBlocked(true);
-     }
-    );
-   else if (current.state.status !== 'playing') {
-    el.pause();
-    setBlocked(false);
-   }
-  };
-  sync();
-  el.addEventListener('loadedmetadata', sync);
-  return () => {
-   active = false;
-   el.removeEventListener('loadedmetadata', sync);
-  };
- }, [current, playbackUrl]);
- const enableAudio = () =>
-  void engine.current?.play().then(
-   () => setBlocked(false),
-   () => setBlocked(true)
-  );
+ const engine = useRef<HTMLAudioElement>(null);
+ const music = useRoomMusicModel(room, deaf, speaker, engine);
  return {
-  current,
-  unavailable,
-  volume,
-  setVolume,
-  blocked,
-  enableAudio,
-  command,
-  privateFailure,
-  retryAudio: () => setRetry(value => value + 1),
-  loadingPrivate: !!assetId && !playbackUrl && !privateFailure,
-  audio: (
-   <audio
-    ref={engine}
-    src={playbackUrl}
-    preload="metadata"
-    onError={() => {
-     if (playbackUrl) setBlocked(true);
-    }}
-   />
-  )
+  ...music,
+  audio: <audio ref={engine} src={music.playbackUrl} preload="metadata" onError={music.onAudioError} />
  };
 }
-const time = (ms: number) => {
- const seconds = Math.floor(ms / 1000);
- return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-};
+
+/** Очередь и добавление трека: только разметка, данные и действия приходят из модели. */
 export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusic>; joined: boolean}) {
- const [link, setLink] = useState(''),
-  [error, setError] = useState(''),
-  [pending, setPending] = useState(false),
-  [expanded, setExpanded] = useState(false),
+ const [expanded, setExpanded] = useState(false),
+  [pageSize, setPageSize] = useState(40),
   [, tick] = useState(0);
  const queueId = useId(),
   linkId = useId();
- const state = joined ? music.current?.state : null,
-  track = state?.track,
-  playing = state?.status === 'playing',
-  queue = state?.queue ?? [];
- const elapsed = joined && music.current ? position(music.current) : 0;
+ const resetDraft = music.resetDraft;
+ const track = joined ? music.track : null,
+  playing = joined && music.playing,
+  queue = joined ? music.queue : [],
+  elapsed = joined ? music.elapsed() : 0;
  useEffect(() => {
   if (!playing) return;
   const timer = setInterval(() => tick(value => value + 1), 500);
   return () => clearInterval(timer);
  }, [playing]);
- const [limit, setLimit] = useState('32'),
-  [pageSize, setPageSize] = useState(40);
- async function act(action: Action, url?: string, requested?: number) {
-  if (pending) return;
-  setPending(true);
-  setError('');
-  try {
-   await music.command(action, url, requested);
-   if (action === 'add') setLink('');
-  } catch (e) {
-   setError((e as Error).message);
-  } finally {
-   setPending(false);
-  }
- }
+ // Панель открылась заново — черновик и ошибка прошлого открытия к ней не относятся.
+ useEffect(() => resetDraft(), [resetDraft]);
  return (
   <section
    className="room-music"
@@ -312,25 +66,15 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
     </span>
     <div>
      <strong>{track?.title ?? 'Сейчас ничего не играет'}</strong>
-     <small>
-      {joined
-       ? music.unavailable
-         ? 'Музыка недоступна на этом сервере'
-         : track
-           ? playing
-             ? 'Сейчас играет'
-             : 'На паузе'
-           : 'Добавьте трек в общую очередь'
-       : 'Войдите в комнату, чтобы включить музыку'}
-     </small>
+     <small>{music.statusText(joined)}</small>
     </div>
    </div>
    {track && (
     <>
      <div className="room-music-progress">
-      <span>{time(elapsed)}</span>
+      <span>{music.trackTime(elapsed)}</span>
       <progress aria-label="Позиция воспроизведения" value={elapsed} max={Math.max(1, track.durationMs)} />
-      <span>{time(track.durationMs)}</span>
+      <span>{music.trackTime(track.durationMs)}</span>
      </div>
      <div className="room-music-actions">
       <button
@@ -339,8 +83,8 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
        type="button"
        title={playing ? 'Пауза' : 'Продолжить'}
        aria-label={playing ? 'Пауза' : 'Продолжить'}
-       disabled={pending}
-       onClick={() => void act(playing ? 'pause' : 'resume')}
+       disabled={music.pending}
+       onClick={() => void music.run(playing ? 'pause' : 'resume')}
       >
        {playing ? <Pause size={18} /> : <Play size={18} />}
       </button>
@@ -350,8 +94,8 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
        type="button"
        title="Следующий трек"
        aria-label="Следующий трек"
-       disabled={pending}
-       onClick={() => void act('skip')}
+       disabled={music.pending}
+       onClick={() => void music.run('skip')}
       >
        <SkipForward size={18} />
       </button>
@@ -361,8 +105,8 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
        type="button"
        title="Остановить и очистить очередь"
        aria-label="Остановить и очистить очередь"
-       disabled={pending}
-       onClick={() => void act('stop')}
+       disabled={music.pending}
+       onClick={() => void music.run('stop')}
       >
        <Square size={16} />
       </button>
@@ -375,7 +119,7 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
         min="0"
         max="100"
         value={music.volume}
-        onChange={e => music.setVolume(+e.target.value)}
+        onChange={event => music.setVolume(+event.target.value)}
        />
       </label>
      </div>
@@ -401,7 +145,7 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
       {renderGenerativeUI(
        {
         $type: 'ListView',
-        children: queue.slice(0, pageSize).map((item, i) => ({
+        children: music.queuePage(pageSize).map((item, index) => ({
          $type: 'ListViewItem',
          $key: item.id,
          children: {
@@ -409,10 +153,10 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
           align: 'center',
           gap: 3,
           children: [
-           {$type: 'Text', value: String(i + 1), size: 'sm', color: 'secondary'},
+           {$type: 'Text', value: String(index + 1), size: 'sm', color: 'secondary'},
            {$type: 'Text', value: item.title, weight: 'medium'},
            {$type: 'Spacer'},
-           {$type: 'Caption', text: time(item.durationMs)}
+           {$type: 'Caption', text: music.trackTime(item.durationMs)}
           ]
          }
         }))
@@ -420,7 +164,7 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
        defaultGenerativeUILibrary,
        {status: 'done'}
       )}
-      {queue.length > pageSize && (
+      {music.hasMore(pageSize) && (
        <button type="button" data-aui="button" data-aui-style="ghost" onClick={() => setPageSize(n => n + 40)}>
         Показать ещё
        </button>
@@ -432,9 +176,9 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
    </div>
    <form
     className="room-music-add"
-    onSubmit={e => {
-     e.preventDefault();
-     if (joined && !music.unavailable && !pending && link.trim()) void act('add', link.trim(), parseMusicLimit(limit));
+    onSubmit={event => {
+     event.preventDefault();
+     if (!music.addDisabled(joined)) void music.addTrack();
     }}
    >
     <label className="room-music-link">
@@ -444,10 +188,10 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
       id={linkId}
       aria-label="Ссылка на трек или плейлист"
       placeholder="Трек или плейлист"
-      value={link}
+      value={music.link}
       maxLength={2048}
-      onChange={e => setLink(e.target.value)}
-      disabled={pending}
+      onChange={event => music.setLink(event.target.value)}
+      disabled={music.pending}
      />
     </label>
     <label className="room-music-limit">
@@ -458,23 +202,18 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
       min={1}
       max={1000}
       required
-      value={limit}
-      onChange={e => setLimit(e.target.value)}
-      disabled={pending}
+      value={music.limit}
+      onChange={event => music.setLimit(event.target.value)}
+      disabled={music.pending}
      />
     </label>
-    <button
-     data-aui="button"
-     data-aui-style="secondary"
-     type="submit"
-     disabled={!joined || music.unavailable || pending || !link.trim()}
-    >
+    <button data-aui="button" data-aui-style="secondary" type="submit" disabled={music.addDisabled(joined)}>
      <Plus size={16} /> Добавить
     </button>
    </form>
-   {error && (
+   {music.error && (
     <p role="alert" className="room-music-error">
-     {error}
+     {music.error}
     </p>
    )}
   </section>
