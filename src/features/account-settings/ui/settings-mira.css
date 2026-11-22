@@ -31,9 +31,12 @@
   }
 }
 .app-surface .account-modal.settings-mira[data-section="journal"]{height:min(752px,100%);position:relative}
-.settings-mira[data-section=journal]>article>header{position:absolute;inset:14px 14px auto auto;min-height:0;padding:0;border:0;z-index:1}
+/* Журнал рисует собственную шапку (.journal-heading), поэтому штатная шапка окна
+   схлопывается до кнопки закрытия — в те же координаты, что и в остальных разделах.
+   Селектор с .app-surface и атрибутом нужен, чтобы перебить общее правило шапки ниже. */
+.app-surface .account-modal.settings-mira[data-section="journal"]>article>header{position:absolute;inset:18px 24px auto auto;min-height:0;padding:0;border:0;background:none;z-index:1}
 .settings-mira[data-section=journal]>article>header>div{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-.settings-mira #account-panel .journal-heading{padding:0 40px 20px 0;border-bottom:1px solid var(--border)}
+.settings-mira #account-panel .journal-heading{margin-inline:-24px;padding:0 64px 20px 24px;border-bottom:1px solid var(--border)}
 .settings-mira #account-panel .journal-summary{gap:4px;padding:0;background:transparent;border-radius:0}
 .settings-mira #account-panel .journal-summary>div{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px}
 .settings-mira #account-panel .journal-total{font-size:inherit;color:var(--foreground)}
@@ -83,6 +86,8 @@
   .settings-mira .settings-sticker-banner .sticker-collection-tabs{grid-row:auto}
   .app-surface .account-modal.settings-mira > aside.settings-sidebar{width:184px}
   .app-surface .account-modal.settings-mira article > #account-panel,.account-modal.settings-mira > article > header{padding-inline:16px}
+  /* Панель сузила отступы до 16px — шапка журнала следует за ними, как pane-head в макете. */
+  .settings-mira #account-panel .journal-heading{margin-inline:-16px;padding:0 56px 16px 16px}
 }
 @media(max-width:480px){
   .app-surface .account-modal.settings-mira > aside.settings-sidebar{width:100%;max-height:38%;overflow:auto}

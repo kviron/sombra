@@ -44,7 +44,7 @@ export function DiagnosticJournal({read=readEntries,available=isTauri()}:{read?:
     setRequest(previous=>previous+1);
   };
   return <section className="diagnostic-journal" aria-label="Журнал диагностики">
-    <div className="journal-heading"><div><h2>Журнал</h2><p>Диагностика Sombra за последние 48 часов</p></div><div className="journal-actions"><Button type="button" disabled={!available||loading} onClick={refresh}><RefreshCw/>Обновить</Button><Button type="button" variant="outline" disabled={!entries?.length} onClick={download}><Download/>Скачать</Button><Button type="button" variant="outline" disabled={!entries?.length} onClick={()=>void copy()}><Copy/>Копировать</Button></div></div>
+    <div className="journal-heading"><div><h2>Журнал</h2><p>Диагностика Sombra за последние 48 часов</p></div><div className="journal-actions"><Button type="button" disabled={!available||loading} onClick={refresh}><RefreshCw/>Обновить</Button><Button type="button" variant="ghost" size="icon" title="Скачать журнал" aria-label="Скачать журнал" disabled={!entries?.length} onClick={download}><Download/></Button><Button type="button" variant="ghost" size="icon" title="Копировать журнал" aria-label="Копировать журнал" disabled={!entries?.length} onClick={()=>void copy()}><Copy/></Button></div></div>
     {feedback&&<p role="status">{feedback}</p>}
     <div className="journal-summary" role="status"><strong className="journal-total">{entries?.length??'—'}</strong><div><strong>Ошибки</strong><p>В сохранённых записях</p></div></div>
     <h3>Хронология ошибок</h3>
