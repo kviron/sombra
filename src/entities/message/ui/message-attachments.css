@@ -104,12 +104,19 @@
  position: relative;
  max-width: 100%;
 }
+:root {
+ --attachment-image-max-height: 420px;
+}
 .attachment-image-trigger {
  display: grid;
- width: 320px;
+ /* Ширина остаётся прежней, высота подстраивается под пропорции картинки. */
+ width: min(320px, 100%);
  max-width: 100%;
- height: 300px;
+ height: auto;
+ max-height: var(--attachment-image-max-height);
  min-width: min(160px, 100%);
+ align-content: center;
+ justify-content: center;
  padding: 0;
  border: 0;
  border-radius: 8px;
@@ -118,6 +125,31 @@
  background: transparent;
  text-align: center;
 }
+/* Пропорции берутся из файла: широкое фото не получает пустые поля сверху и снизу,
+   а высокое упирается в потолок и уменьшается по ширине. */
+/* Пока картинки нет, рамка держит минимальную высоту, чтобы не схлопнуться в полоску. */
+.attachment-image-trigger:has(.attachment-image-placeholder) {
+ min-height: 180px;
+}
+
+.attachment-image-trigger img {
+ display: block;
+ width: auto;
+ height: auto;
+ max-width: 100%;
+ max-height: var(--attachment-image-max-height);
+ object-fit: contain;
+}
+
+/* В просмотрщике картинка тоже ограничена по высоте, но занимает всю доступную ширину. */
+.attachment-viewer img {
+ max-width: 100%;
+ max-height: min(80vh, var(--attachment-image-max-height));
+ width: auto;
+ height: auto;
+ object-fit: contain;
+}
+
 .chat-shell .attachment-image-trigger,
 .chat-shell .attachment-image-trigger:hover {
  background: transparent;
