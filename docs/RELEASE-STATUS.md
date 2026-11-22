@@ -1,5 +1,15 @@
 # Выпуски Sombra
 
+## Sombra 0.1.31 — 22 ноября 2026
+
+Архитектура данных: единый объект `api`, сервисы сущностей и фич, константы в `shared/const`.
+
+Опубликованы [GitHub v0.1.31](https://github.com/kviron/sombra/releases/tag/v0.1.31) и зеркало на VPS. Установщик `Sombra_0.1.31_x64-setup.exe`, 11 595 497 байт, SHA-256 `dfeeda81368b1343ecf3b801a13c238a583a16cd81ba54594b7dd4d1b1adcf07`; копии на GitHub и VPS совпадают, подпись сходится с ключом `594FDFFC0E4DE222`. Предыдущий манифест — `/root/sombra-backups/release-manifest-20261122T195157Z/`.
+
+Что сделано: `shared/const` (ключи хранилища, маршруты, тема), `shared/api/api.ts` — один объект с методами по всем операциям, сгруппированными по владельцу данных; сервисы `entities/{message,user,conversation,group,sticker}/model/services`, `features/{voice-room,bots,account-settings}/model/services`, `shared/api/services/{state,file,session,attachment-cache}`. Вход и выход — `authService`, состояние сеанса — `sessionService`, кэш вложений — `attachmentCacheService`.
+
+Проверки: `tsc`, `npm run lint` (0 ошибок), `check:fsd`, 92 теста, сборка; скриптом подтверждено, что вне `shared/api` не осталось функциональных импортов транспорта — только типы. В браузере проверено: регистрация через `authService` открывает чат, настройки и журнал открываются.
+
 ## Sombra 0.1.30 — 22 ноября 2026
 
 Честная диагностика микрофона, спокойное переподключение, релейный режим выключен по умолчанию.
