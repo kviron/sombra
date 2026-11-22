@@ -1,24 +1,14 @@
-import {useState} from 'react';
 import {Smile, Sticker as StickerIcon, X} from 'lucide-react';
-import emojiData from '@emoji-mart/data/sets/15/native.json';
 import type {ChatState, Group} from '@/shared/types';
 import {ComposerIconButton} from '@/shared/ui/elements-composer';
 import {Select} from '@/shared/ui/select';
-import {canGroup} from '@/entities/group';
-import {StickerImage, personalSticker, stickerPackKey} from '@/entities/sticker';
+import {StickerImage} from '@/entities/sticker';
+import {useExpressionPicker} from '../model/use-expression-picker';
 
-const categories: Record<string, string> = {
- people: 'Люди',
- nature: 'Природа',
- foods: 'Еда',
- activity: 'Занятия',
- places: 'Места',
- objects: 'Предметы',
- symbols: 'Символы',
- flags: 'Флаги'
-};
-const emojiById = emojiData.emojis as Record<string, {name: string; keywords?: string[]; skins: {native: string}[]}>;
-type Panel = 'emoji' | 'stickers';
+/**
+ * Панель только показывает: вкладка, поиск и набор приходят из модели среза.
+ * Состояние не переживает смену переписки — компонент пересоздаётся по ключу канала.
+ */
 export function ExpressionPicker({
  state,
  onError,
@@ -34,50 +24,16 @@ export function ExpressionPicker({
  group?: Group;
  onManage: (scope: 'personal' | 'group') => void;
 } & {state: ChatState; refresh: () => Promise<unknown>; onError: (message: string) => void}) {
- const [panel, setPanel] = useState<Panel>();
- const [busy, setBusy] = useState(false),
-  [category, setCategory] = useState('people'),
-  [query, setQuery] = useState('');
- const [scope, setScope] = useState<'personal' | 'group'>('personal'),
-  [pack, setPack] = useState('');
- const library = state.stickers.filter(
-  sticker =>
-   !sticker.archived &&
-   (scope === 'group' ? !!group && sticker.group === group.id : personalSticker(sticker, state.me.id))
- );
- const packs = new Map(library.map(sticker => [stickerPackKey(sticker), sticker.pack || '']));
- const activePack = packs.has(pack) ? pack : '';
- const filtered = library.filter(sticker => !activePack || stickerPackKey(sticker) === activePack);
- const search = query.trim().toLowerCase();
- const emojiIds = search
-  ? Object.keys(emojiById).filter(id => {
-     const item = emojiById[id];
-     return [item.name, id, ...(item.keywords || []), item.skins[0]?.native].some(value =>
-      value?.toLowerCase().includes(search)
-     );
-    })
-  : emojiData.categories.find(item => item.id === category)?.emojis || [];
- function toggle(next: Panel) {
-  setPanel(panel === next ? undefined : next);
- }
- async function sendSticker(id: string) {
-  setBusy(true);
-  try {
-   await onSticker(id);
-   setPanel(undefined);
-  } catch (e) {
-   onError((e as Error).message);
-  } finally {
-   setBusy(false);
-  }
- }
+ const model = useExpressionPicker({state, group, onEmoji, onSticker, onError, onManage});
+ const {panel, busy, category, query, scope, activePack, filtered, actions} = model;
+
  return (
   <div className="expression-control flex items-center gap-1.5">
    <ComposerIconButton
     title="Эмодзи"
     disabled={disabled}
     aria-expanded={panel === 'emoji'}
-    onClick={() => toggle('emoji')}
+    onClick={() => actions.toggle('emoji')}
    >
     <Smile size={16} />
    </ComposerIconButton>
@@ -85,7 +41,7 @@ export function ExpressionPicker({
     title="Стикеры"
     disabled={disabled}
     aria-expanded={panel === 'stickers'}
-    onClick={() => toggle('stickers')}
+    onClick={() => actions.toggle('stickers')}
    >
     <StickerIcon size={16} />
    </ComposerIconButton>
@@ -97,14 +53,14 @@ export function ExpressionPicker({
     >
      <header>
       <nav className="expression-tabs" aria-label="Тип вложения">
-       <button type="button" aria-pressed={panel === 'emoji'} onClick={() => setPanel('emoji')}>
+       <button type="button" aria-pressed={panel === 'emoji'} onClick={() => actions.show('emoji')}>
         Эмодзи
        </button>
-       <button type="button" aria-pressed={panel === 'stickers'} onClick={() => setPanel('stickers')}>
+       <button type="button" aria-pressed={panel === 'stickers'} onClick={() => actions.show('stickers')}>
         Стикеры
        </button>
       </nav>
-      <button type="button" title="Закрыть панель" onClick={() => setPanel(undefined)}>
+      <button type="button" title="Закрыть панель" onClick={actions.close}>
        <X size={16} />
       </button>
      </header>
@@ -118,77 +74,38 @@ export function ExpressionPicker({
          onKeyDown={event => {
           if (event.key === 'Enter') event.preventDefault();
          }}
-         onChange={event => setQuery(event.target.value)}
+         onChange={event => actions.setQuery(event.target.value)}
         />
         <Select
          label="Категория эмодзи"
          value={category}
-         onValueChange={value => {
-          setCategory(value);
-          setQuery('');
-         }}
-         options={emojiData.categories.map(item => ({value: item.id, label: categories[item.id] || item.id}))}
+         onValueChange={actions.chooseCategory}
+         options={model.categoryOptions}
         />
        </div>
        <div className="emoji-grid" key={category}>
-        {emojiIds.map(id => {
-         const item = emojiById[id],
-          emoji = item?.skins[0]?.native;
-         return (
-          emoji && (
-           <button
-            key={id}
-            type="button"
-            title={item.name}
-            onClick={() => {
-             onEmoji(emoji);
-             setPanel(undefined);
-            }}
-           >
-            {emoji}
-           </button>
-          )
-         );
-        })}
+        {model.emojiItems.map(item => (
+         <button key={item.id} type="button" title={item.name} onClick={() => actions.chooseEmoji(item.emoji)}>
+          {item.emoji}
+         </button>
+        ))}
        </div>
-       {!emojiIds.length && <p>Эмодзи не найдены.</p>}
+       {!model.emojiItems.length && <p>Эмодзи не найдены.</p>}
       </>
      ) : (
       <>
        {group && (
         <nav className="expression-tabs sticker-scopes" aria-label="Библиотека стикеров">
-         <button
-          type="button"
-          aria-pressed={scope === 'personal'}
-          onClick={() => {
-           setScope('personal');
-           setPack('');
-          }}
-         >
+         <button type="button" aria-pressed={scope === 'personal'} onClick={() => actions.chooseScope('personal')}>
           Мои стикеры
          </button>
-         <button
-          type="button"
-          aria-pressed={scope === 'group'}
-          onClick={() => {
-           setScope('group');
-           setPack('');
-          }}
-         >
+         <button type="button" aria-pressed={scope === 'group'} onClick={() => actions.chooseScope('group')}>
           Стикеры группы
          </button>
         </nav>
        )}
-       {packs.size > 1 && (
-        <Select
-         label="Набор стикеров"
-         value={activePack}
-         onValueChange={setPack}
-         options={[
-          {value: '', label: 'Все наборы'},
-          ...[...packs].filter(([key]) => key).map(([value, label]) => ({value, label}))
-         ]}
-        />
+       {model.packsCount > 1 && (
+        <Select label="Набор стикеров" value={activePack} onValueChange={actions.setPack} options={model.packOptions} />
        )}
        {filtered.length ? (
         <div className="sticker-grid">
@@ -198,7 +115,7 @@ export function ExpressionPicker({
            key={sticker.id}
            disabled={disabled || busy}
            title={sticker.name}
-           onClick={() => void sendSticker(sticker.id)}
+           onClick={() => actions.send(sticker.id)}
           >
            <StickerImage sticker={sticker} />
           </button>
@@ -207,15 +124,8 @@ export function ExpressionPicker({
        ) : (
         <p>Пока нет стикеров.</p>
        )}
-       {(scope === 'personal' || canGroup(group, state.me.id, 'stickers.manage')) && (
-        <button
-         type="button"
-         className="manage-stickers"
-         onClick={() => {
-          setPanel(undefined);
-          onManage(scope);
-         }}
-        >
+       {model.manageVisible && (
+        <button type="button" className="manage-stickers" onClick={actions.manage}>
          Управлять стикерами
         </button>
        )}

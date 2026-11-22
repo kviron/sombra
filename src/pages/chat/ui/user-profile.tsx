@@ -1,25 +1,16 @@
-import {useEffect, useRef, useState, type RefObject} from 'react';
+import type {RefObject} from 'react';
 import {ConversationMaterialRows, type ProfileConversationMaterials} from '@/features/conversation-details';
 import {Check, Clock3, MessageCircle, Sparkles, UserMinus, UserPlus, X} from 'lucide-react';
 import type {Group, ProfileEffectTarget, User} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {ProfileCover} from '@/shared/ui/profile-cover';
-import {useUserActions} from '@/shared/lib/user-actions';
+import {useUserProfile} from '../model/use-user-profile';
 import './user-profile.css';
 
-function formatDay(timestamp: number) {
- return new Intl.DateTimeFormat('ru', {day: 'numeric', month: 'long', year: 'numeric'}).format(timestamp * 1000);
-}
-
-function formatMoment(timestamp: number) {
- const date = new Date(timestamp * 1000);
- const today = new Date();
- const sameDay = date.toDateString() === today.toDateString();
- return sameDay
-  ? `сегодня в ${date.toLocaleTimeString('ru', {hour: '2-digit', minute: '2-digit'})}`
-  : `${date.toLocaleDateString('ru', {day: 'numeric', month: 'short'})} в ${date.toLocaleTimeString('ru', {hour: '2-digit', minute: '2-digit'})}`;
-}
-
+/**
+ * Компонент только показывает: заметка, украшения, фокус в окне и вычисленные строки
+ * приходят из модели страницы, поэтому здесь нет ни эффектов, ни localStorage.
+ */
 export function UserProfile({
  user,
  me,
@@ -39,110 +30,21 @@ export function UserProfile({
  restoreFocusRef?: RefObject<HTMLButtonElement | null>;
  onApplyEffect?: (id: string, target: ProfileEffectTarget) => Promise<void>;
 }) {
- const actions = useUserActions();
- const isSelf = user.id === me.id;
- const [effectFeedback, setEffectFeedback] = useState<{text: string; error?: boolean}>();
- const [applyingEffect, setApplyingEffect] = useState(false);
- const applyingLock = useRef(false);
- async function applyEffect(id: string, target: ProfileEffectTarget) {
-  if (!onApplyEffect || applyingLock.current) return;
-  applyingLock.current = true;
-  setApplyingEffect(true);
-  setEffectFeedback(undefined);
-  try {
-   await onApplyEffect(id, target);
-   setEffectFeedback({text: target === 'avatar' ? 'Рамка применена' : 'Эффект обложки применён'});
-  } catch (reason) {
-   setEffectFeedback({text: reason instanceof Error ? reason.message : 'Не удалось применить эффект', error: true});
-  } finally {
-   applyingLock.current = false;
-   setApplyingEffect(false);
-  }
- }
- const status = isSelf ? 'self' : (actions?.friendStatus(user.id) ?? 'none');
- const shared = groups.filter(group => group.members.includes(user.id));
- const noteKey = `sombra-profile-note:${me.id}:${user.id}`;
- const [note, setNote] = useState(() => {
-  try {
-   return localStorage.getItem(noteKey) ?? '';
-  } catch {
-   return '';
-  }
- });
- const [saved, setSaved] = useState(false);
- const closeButton = useRef<HTMLButtonElement>(null);
- const closeRef = useRef(onClose);
- closeRef.current = onClose;
- const restoreRef = useRef(restoreFocusRef);
- restoreRef.current = restoreFocusRef;
-
- useEffect(() => {
-  const previous = document.activeElement as HTMLElement | null;
-  closeButton.current?.focus();
-  function onKeyDown(event: KeyboardEvent) {
-   if (event.key === 'Escape') {
-    event.preventDefault();
-    event.stopPropagation();
-    closeRef.current();
-   }
-   if (event.key === 'Tab') {
-    const dialog = closeButton.current?.closest('[role="dialog"]');
-    const items = Array.from(
-     dialog?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,textarea') ?? []
-    ).filter(item => item.getClientRects().length);
-    const first = items[0],
-     last = items.at(-1);
-    if (event.shiftKey && document.activeElement === first) {
-     event.preventDefault();
-     last?.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-     event.preventDefault();
-     first?.focus();
-    }
-   }
-  }
-  window.addEventListener('keydown', onKeyDown, true);
-  return () => {
-   window.removeEventListener('keydown', onKeyDown, true);
-   const target = restoreRef.current?.current ?? previous;
-   if (target?.isConnected) target.focus();
-  };
- }, []);
-
- function updateNote(value: string) {
-  setNote(value);
-  try {
-   localStorage.setItem(noteKey, value);
-   setSaved(true);
-  } catch {
-   /* local note is optional */
-  }
- }
-
- useEffect(() => {
-  if (!saved) return;
-  const timer = window.setTimeout(() => setSaved(false), 1800);
-  return () => window.clearTimeout(timer);
- }, [saved]);
-
- const statusText = user.online ? 'В сети' : 'Не в сети';
- const friendNote = (() => {
-  if (isSelf || user.bot) return null;
-  if (status === 'friends')
-   return (
-    <span className="user-profile-friend">
-     <Check size={13} /> В друзьях
-    </span>
-   );
-  if (status === 'outgoing')
-   return (
-    <span className="user-profile-friend is-muted">
-     <Clock3 size={13} /> Заявка отправлена
-    </span>
-   );
-  if (status === 'incoming') return <span className="user-profile-friend is-waiting">Хочет добавить вас</span>;
-  return null;
- })();
+ const model = useUserProfile({user, me, groups, onClose, onOpenGroup, onApplyEffect, restoreFocusRef});
+ const {
+  isSelf,
+  status,
+  statusText,
+  lastSeen,
+  friendNote,
+  shared,
+  effects,
+  note,
+  noteLabel,
+  applying,
+  feedback,
+  actions
+ } = model;
 
  return (
   <div
@@ -163,7 +65,7 @@ export function UserProfile({
     onMouseDown={event => event.stopPropagation()}
    >
     <button
-     ref={closeButton}
+     ref={model.closeButton}
      type="button"
      className="user-profile-close"
      title="Закрыть профиль"
@@ -184,9 +86,7 @@ export function UserProfile({
        <p className="user-profile-status" data-online={user.online ? 'true' : 'false'}>
         <span className="user-profile-status-dot" aria-hidden="true" />
         {statusText}
-        {!user.online && user.last_seen ? (
-         <span className="user-profile-last">· {formatMoment(user.last_seen)}</span>
-        ) : null}
+        {lastSeen ? <span className="user-profile-last">· {lastSeen}</span> : null}
         {isSelf && <span className="user-profile-self-tag">Это вы</span>}
        </p>
       </div>
@@ -194,39 +94,21 @@ export function UserProfile({
 
      <div className="user-profile-actions">
       {isSelf ? (
-       <button
-        type="button"
-        className="user-profile-primary"
-        onClick={() => {
-         onClose();
-         actions?.editOwnProfile();
-        }}
-       >
+       <button type="button" className="user-profile-primary" onClick={actions.editOwnProfile}>
         Редактировать профиль
        </button>
       ) : (
        <>
-        <button
-         type="button"
-         className="user-profile-primary"
-         onClick={() => {
-          actions?.messageUser(user.id);
-          onClose();
-         }}
-        >
+        <button type="button" className="user-profile-primary" onClick={actions.message}>
          <MessageCircle size={16} /> Сообщение
         </button>
         {!user.bot && status === 'none' && (
-         <button type="button" className="user-profile-secondary" onClick={() => actions?.addFriend(user.id)}>
+         <button type="button" className="user-profile-secondary" onClick={actions.addFriend}>
           <UserPlus size={16} /> Добавить в друзья
          </button>
         )}
         {!user.bot && status === 'incoming' && (
-         <button
-          type="button"
-          className="user-profile-secondary is-accept"
-          onClick={() => actions?.acceptFriend(user.id)}
-         >
+         <button type="button" className="user-profile-secondary is-accept" onClick={actions.acceptFriend}>
           <Check size={16} /> Принять заявку
          </button>
         )}
@@ -236,7 +118,7 @@ export function UserProfile({
          </button>
         )}
         {!user.bot && status === 'friends' && (
-         <button type="button" className="user-profile-secondary" onClick={() => actions?.removeFriend(user.id)}>
+         <button type="button" className="user-profile-secondary" onClick={actions.removeFriend}>
           <UserMinus size={16} /> Удалить из друзей
          </button>
         )}
@@ -244,40 +126,40 @@ export function UserProfile({
       )}
      </div>
 
-     {!isSelf &&
-      !me.bot &&
-      onApplyEffect &&
-      (['avatar', 'cover'] as const).map(target => {
-       // For another user the server projects only currently public references.
-       const id = user.decorationRefs?.[target];
-       if (!id || !user.decorations?.[target]) return null;
-       const applied = me.decorationRefs?.[target] === id;
-       const label = target === 'avatar' ? 'Рамка аватара' : 'Эффект обложки';
-       return (
-        <div className="user-profile-effect-action" key={target}>
-         <span>
-          <Sparkles size={16} aria-hidden="true" /> {label}
-         </span>
-         <button
-          type="button"
-          className="user-profile-secondary"
-          disabled={applyingEffect || applied}
-          aria-label={`Поставить себе: ${label.toLowerCase()}`}
-          onClick={() => void applyEffect(id, target)}
-         >
-          {applied ? 'Установлен' : 'Поставить себе'}
-         </button>
-        </div>
-       );
-      })}
-     {effectFeedback && (
-      <p className="user-profile-effect-feedback" role={effectFeedback.error ? 'alert' : 'status'}>
-       {effectFeedback.text}
+     {effects.map(effect => (
+      <div className="user-profile-effect-action" key={effect.target}>
+       <span>
+        <Sparkles size={16} aria-hidden="true" /> {effect.label}
+       </span>
+       <button
+        type="button"
+        className="user-profile-secondary"
+        disabled={applying || effect.applied}
+        aria-label={`Поставить себе: ${effect.label.toLowerCase()}`}
+        onClick={() => actions.applyEffect(effect.id, effect.target)}
+       >
+        {effect.applied ? 'Установлен' : 'Поставить себе'}
+       </button>
+      </div>
+     ))}
+     {feedback && (
+      <p className="user-profile-effect-feedback" role={feedback.error ? 'alert' : 'status'}>
+       {feedback.text}
       </p>
      )}
 
      {conversationMaterials && <ConversationMaterialRows {...conversationMaterials} />}
-     {friendNote}
+     {friendNote === 'friends' && (
+      <span className="user-profile-friend">
+       <Check size={13} /> В друзьях
+      </span>
+     )}
+     {friendNote === 'outgoing' && (
+      <span className="user-profile-friend is-muted">
+       <Clock3 size={13} /> Заявка отправлена
+      </span>
+     )}
+     {friendNote === 'incoming' && <span className="user-profile-friend is-waiting">Хочет добавить вас</span>}
      {user.bot && (
       <section aria-label="Команды бота">
        <h3>Команды</h3>
@@ -301,7 +183,7 @@ export function UserProfile({
      <dl className="user-profile-facts">
       <div>
        <dt>В Sombra</dt>
-       <dd>с {formatDay(user.created_at)}</dd>
+       <dd>с {model.joinedText}</dd>
       </div>
       <div>
        <dt>Общие группы</dt>
@@ -309,7 +191,7 @@ export function UserProfile({
       </div>
       <div>
        <dt>Последняя активность</dt>
-       <dd>{user.online ? 'сейчас' : user.last_seen ? formatMoment(user.last_seen) : 'неизвестно'}</dd>
+       <dd>{model.activityText}</dd>
       </div>
      </dl>
 
@@ -319,15 +201,12 @@ export function UserProfile({
       </h3>
       {shared.length ? (
        <ul>
-        {shared.map(group => (
+        {shared.map(({group, memberLabel}) => (
          <li key={group.id}>
           <button
            type="button"
            disabled={!onOpenGroup}
-           onClick={() => {
-            onOpenGroup?.(group.id);
-            onClose();
-           }}
+           onClick={() => actions.openGroup(group.id)}
            title={onOpenGroup ? `Открыть «${group.name}»` : group.name}
           >
            <span className="user-profile-group-avatar" aria-hidden="true">
@@ -335,10 +214,7 @@ export function UserProfile({
            </span>
            <span className="user-profile-group-text">
             <strong>{group.name}</strong>
-            <small>
-             {group.members.length}{' '}
-             {group.members.length === 1 ? 'участник' : group.members.length < 5 ? 'участника' : 'участников'}
-            </small>
+            <small>{memberLabel}</small>
            </span>
           </button>
          </li>
@@ -352,7 +228,7 @@ export function UserProfile({
      <section className="user-profile-note">
       <div className="user-profile-note-head">
        <h3>Заметка</h3>
-       <span>{saved ? 'Сохранено' : 'Видна только вам'}</span>
+       <span>{noteLabel}</span>
       </div>
       <textarea
        aria-label={`Заметка о ${user.name}`}
@@ -360,7 +236,7 @@ export function UserProfile({
        rows={3}
        placeholder="Например: часовой пояс, чем занимается, о чём поговорить"
        value={note}
-       onChange={event => updateNote(event.target.value)}
+       onChange={event => actions.setNote(event.target.value)}
       />
      </section>
     </div>
