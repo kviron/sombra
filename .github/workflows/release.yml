@@ -171,6 +171,12 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "${{ env.TAG }}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: actions/github-script@v7
         env:
           RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
@@ -179,3 +185,6 @@ jobs:
             await github.rest.repos.updateRelease({
               ...context.repo, release_id: Number(process.env.RELEASE_ID), draft: false,
             });
+      # Тот же клиентский путь: манифест из releases/latest, установщик и подпись по ключу из конфига.
+      - name: Verify the published update
+        run: node scripts/verify-release.mjs --tag "$TAG" --repo "$GITHUB_REPOSITORY"
