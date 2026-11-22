@@ -132,11 +132,20 @@ export function useMessageAttachment({messageId, attachment, root}: Options) {
   preview: shownPreview,
   error: state.error,
   busy: state.busy,
+  copying: state.copying,
+  copyError: state.copyError,
   open: state.open,
   actions: {
    setOpen: model.actions.setOpen,
    setError: model.actions.setError,
    retry: model.actions.retryLoad,
+   copy: () =>
+    model.actions.copy({
+     preview: shownPreview,
+     available,
+     mime: attachment.mime,
+     isAlive: () => alive.current
+    }),
    download: () => model.actions.download({messageId, available, isAlive: () => alive.current})
   }
  };

@@ -1,10 +1,11 @@
-import {useRef} from 'react';
+import {useRef, useState} from 'react';
 import {Download, FileWarning, RotateCw, X} from 'lucide-react';
 import {Dialog} from 'radix-ui';
 import {type MessageAttachmentMetadata} from '@/shared/types';
-import {cacheNote} from '../model/message-attachment-rules';
+import {attachmentMenuItems, cacheNote} from '../model/message-attachment-rules';
 import {useMessageAttachment} from '../model/use-message-attachment';
 import {useAttachmentAudio} from '../model/use-attachment-audio';
+import {AttachmentContextMenu} from './attachment-context-menu';
 import {
  AudioPlayer,
  FileDownload,
@@ -27,10 +28,19 @@ export function MessageAttachment(props: MessageAttachmentProps) {
 function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
  const root = useRef<HTMLDivElement>(null);
  const trigger = useRef<HTMLButtonElement>(null);
- const {isImage, isAudio, available, preview, error, busy, open, actions} = useMessageAttachment({
+ const [menuAt, setMenuAt] = useState<{x: number; y: number} | undefined>(undefined);
+ const {isImage, isAudio, available, preview, error, busy, copying, copyError, open, actions} = useMessageAttachment({
   messageId,
   attachment,
   root
+ });
+ const menuItems = attachmentMenuItems({
+  available,
+  mime: attachment.mime,
+  loaded: !!preview && !error,
+  copying,
+  saving: busy,
+  name: attachment.name
  });
 
  if (isImage) {
@@ -65,14 +75,29 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
   );
   return (
    <div ref={root} className="message-attachment message-attachment-image" aria-label="Изображение">
-    <div className="attachment-image-surface">
+    <div
+     className="attachment-image-surface"
+     onContextMenu={event => {
+      // Меню картинки не должно открывать меню сообщения и нативное меню WebView.
+      event.preventDefault();
+      event.stopPropagation();
+      setMenuAt({x: event.clientX, y: event.clientY});
+     }}
+    >
      <button
       ref={trigger}
       type="button"
       className="attachment-preview attachment-image-trigger"
       disabled={!available}
       aria-label={`Открыть фото ${attachment.name}`}
+      title="Открыть фото"
       onClick={() => actions.setOpen(true)}
+      onKeyDown={event => {
+       if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+       event.preventDefault();
+       const bounds = event.currentTarget.getBoundingClientRect();
+       setMenuAt({x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2});
+      }}
      >
       {available && preview && !error ? (
        <img
@@ -97,6 +122,26 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
      )}
     </div>
     {attachment.cached && <p className="attachment-cache-status">{cacheNote(attachment)}</p>}
+    {copyError && (
+     <p className="attachment-copy-status" role="status">
+      {copyError}
+     </p>
+    )}
+    {menuAt && (
+     <AttachmentContextMenu
+      key={`${menuAt.x}:${menuAt.y}`}
+      x={menuAt.x}
+      y={menuAt.y}
+      items={menuItems}
+      label={`Действия с изображением ${attachment.name}`}
+      returnFocus={trigger}
+      onClose={() => setMenuAt(undefined)}
+      onSelect={id => {
+       if (id === 'copy') void actions.copy();
+       else actions.download();
+      }}
+     />
+    )}
     <Dialog.Root open={open && available} onOpenChange={actions.setOpen}>
      <Dialog.Portal>
       <Dialog.Overlay className="attachment-viewer-overlay" />

@@ -20,6 +20,62 @@ export function cacheNote(attachment: {expired?: boolean}) {
  return attachment.expired ? 'Локальная копия · файл очищен на сервере' : 'Сохранено на этом устройстве';
 }
 
+/** Подписи действий над картинкой: одни и те же в меню, кнопках и подсказках. */
+export const attachmentActionLabels = {copy: 'Скопировать', download: 'Скачать'} as const;
+
+/** Единственная причина отказа копирования: браузер или WebView не разрешили запись в буфер. */
+export const attachmentCopyError = 'Браузер не разрешил скопировать изображение';
+
+export type AttachmentActionId = keyof typeof attachmentActionLabels;
+
+export type AttachmentActionItem = {
+ id: AttachmentActionId;
+ label: string;
+ disabled: boolean;
+ /** Причина недоступности или описание действия — показывается в `title`. */
+ title: string;
+};
+
+export type CopyAvailability = {available: boolean; mime: string; loaded: boolean; copying?: boolean};
+export type DownloadAvailability = {available: boolean; saving?: boolean};
+export type AttachmentMenuInput = CopyAvailability & DownloadAvailability & {name?: string};
+
+/** Копировать можно только уже загруженную растровую картинку, и не параллельно. */
+export const canCopyAttachment = ({available, mime, loaded, copying = false}: CopyAvailability) =>
+ available && isImageMime(mime) && loaded && !copying;
+
+/** Скачивание — тот же путь сохранения, что у кнопки скачивания: только для доступного файла. */
+export const canDownloadAttachment = ({available, saving = false}: DownloadAvailability) => available && !saving;
+
+/** Пункты контекстного меню картинки: порядок, подписи и причины недоступности в одном месте. */
+export function attachmentMenuItems(input: AttachmentMenuInput): AttachmentActionItem[] {
+ const {available, mime, loaded, copying = false, saving = false, name = ''} = input;
+ const copyReason = !available
+  ? 'Файл больше недоступен'
+  : !isImageMime(mime)
+    ? 'Этот файл нельзя скопировать как изображение'
+    : !loaded
+      ? 'Изображение ещё не загружено'
+      : copying
+        ? 'Изображение уже копируется'
+        : '';
+ const downloadReason = !available ? 'Файл больше недоступен' : saving ? 'Файл уже сохраняется' : '';
+ return [
+  {
+   id: 'copy',
+   label: attachmentActionLabels.copy,
+   disabled: !!copyReason,
+   title: copyReason || 'Скопировать изображение в буфер обмена'
+  },
+  {
+   id: 'download',
+   label: attachmentActionLabels.download,
+   disabled: !!downloadReason,
+   title: downloadReason || `Сохранить ${safeAttachmentName(name)}`
+  }
+ ];
+}
+
 /** Область предпросмотра: аккаунт, поколение кэша и запись в кэш. */
 export const previewScopeId = (token: string, generation: number, writeEpoch: number) =>
  JSON.stringify([token, generation, writeEpoch]);

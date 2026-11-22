@@ -417,3 +417,82 @@
   transition: none;
  }
 }
+/* Контекстное меню картинки живёт в портале под body, поэтому тема берётся с :root. */
+.attachment-context-menu {
+ position: fixed;
+ z-index: 160;
+ display: flex;
+ flex-direction: column;
+ gap: 2px;
+ min-width: 176px;
+ max-width: calc(100vw - 16px);
+ padding: 4px;
+ border: 1px solid var(--border);
+ border-radius: var(--radius-md, 10px);
+ background: var(--popover);
+ color: var(--popover-foreground);
+ box-shadow:
+  0 16px 40px #0005,
+  inset 0 1px 0 #ffffff10;
+ animation: attachment-context-menu-in 120ms ease-out;
+}
+.attachment-context-menu-item {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ width: 100%;
+ min-height: 36px;
+ padding: 0 8px;
+ border: 0;
+ border-radius: calc(var(--radius-md, 10px) - 4px);
+ background: transparent;
+ color: inherit;
+ font: inherit;
+ font-size: 13px;
+ text-align: left;
+ cursor: pointer;
+}
+.attachment-context-menu-item:not([data-disabled]):hover,
+.attachment-context-menu-item:not([data-disabled]):focus-visible {
+ background: var(--accent);
+ color: var(--accent-foreground);
+}
+.attachment-context-menu-item:focus-visible {
+ outline: 2px solid #abc7ff;
+ outline-offset: -2px;
+}
+.attachment-context-menu-item[data-disabled] {
+ opacity: 0.5;
+ cursor: default;
+}
+.attachment-context-menu-item > svg {
+ flex: none;
+ color: var(--muted-foreground);
+}
+.attachment-context-menu-item:not([data-disabled]):hover > svg,
+.attachment-context-menu-item:not([data-disabled]):focus-visible > svg {
+ color: inherit;
+}
+.message-attachment .attachment-copy-status {
+ margin: 0;
+ padding: 6px 2px 0;
+ font-size: 12px;
+ color: var(--muted-foreground);
+ white-space: normal;
+ overflow-wrap: anywhere;
+}
+@keyframes attachment-context-menu-in {
+ from {
+  opacity: 0;
+  transform: translateY(-2px);
+ }
+ to {
+  opacity: 1;
+  transform: none;
+ }
+}
+@media (prefers-reduced-motion: reduce) {
+ .attachment-context-menu {
+  animation: none;
+ }
+}

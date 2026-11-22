@@ -2,10 +2,15 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
+ attachmentActionLabels,
  attachmentAvailable,
  attachmentBlob,
+ attachmentCopyError,
  attachmentIdentity,
+ attachmentMenuItems,
  cacheNote,
+ canCopyAttachment,
+ canDownloadAttachment,
  isImageMime,
  MAX_ATTACHMENT_BYTES,
  previewScopeId,
@@ -63,4 +68,60 @@ test('слишком большое или битое тело вложения 
   /Некорректный размер вложения/
  );
  assert.throws(() => attachmentBlob({data: undefined, mime: 'image/png', name: 'a'}), /Некорректный размер вложения/);
+});
+
+test('меню картинки: два пункта, «Скопировать» ждёт загрузки предпросмотра', () => {
+ const items = attachmentMenuItems({available: true, mime: 'image/png', loaded: true, name: 'фото.png'});
+ assert.deepEqual(
+  items.map(item => [item.id, item.label, item.disabled, item.title]),
+  [
+   ['copy', 'Скопировать', false, 'Скопировать изображение в буфер обмена'],
+   ['download', 'Скачать', false, 'Сохранить фото.png']
+  ]
+ );
+ assert.equal(attachmentActionLabels.copy, 'Скопировать');
+ assert.equal(attachmentActionLabels.download, 'Скачать');
+
+ const pending = attachmentMenuItems({available: true, mime: 'image/jpeg', loaded: false, name: 'фото.jpg'});
+ assert.equal(pending[0].disabled, true);
+ assert.equal(pending[0].title, 'Изображение ещё не загружено');
+ assert.equal(pending[1].disabled, false);
+ assert.equal(attachmentMenuItems({available: true, mime: 'image/png', loaded: true})[1].title, 'Сохранить Вложение');
+});
+
+test('«Скопировать» недоступно для нерастровых и удалённых файлов, «Скачать» — только для доступных', () => {
+ const vector = attachmentMenuItems({available: true, mime: 'image/svg+xml', loaded: true, name: 'иконка.svg'});
+ assert.equal(vector[0].disabled, true);
+ assert.equal(vector[0].title, 'Этот файл нельзя скопировать как изображение');
+
+ const expired = attachmentMenuItems({available: false, mime: 'image/png', loaded: false, name: 'фото.png'});
+ assert.deepEqual(
+  expired.map(item => [item.disabled, item.title]),
+  [
+   [true, 'Файл больше недоступен'],
+   [true, 'Файл больше недоступен']
+  ]
+ );
+});
+
+test('идущее копирование и сохранение блокируют повторный запуск', () => {
+ const busy = attachmentMenuItems({available: true, mime: 'image/png', loaded: true, copying: true, saving: true});
+ assert.deepEqual(
+  busy.map(item => [item.disabled, item.title]),
+  [
+   [true, 'Изображение уже копируется'],
+   [true, 'Файл уже сохраняется']
+  ]
+ );
+ assert.equal(canCopyAttachment({available: true, mime: 'image/png', loaded: true}), true);
+ assert.equal(canCopyAttachment({available: true, mime: 'image/png', loaded: true, copying: true}), false);
+ assert.equal(canCopyAttachment({available: true, mime: 'image/webp', loaded: false}), false);
+ assert.equal(canDownloadAttachment({available: true}), true);
+ assert.equal(canDownloadAttachment({available: true, saving: true}), false);
+ assert.equal(canDownloadAttachment({available: false}), false);
+});
+
+test('ошибка копирования одна и понятна пользователю', () => {
+ assert.equal(attachmentCopyError, 'Браузер не разрешил скопировать изображение');
+ assert.match(attachmentCopyError, /не разрешил/);
 });
