@@ -1,7 +1,7 @@
 import type {ReactNode,Ref} from 'react';
 import {X} from 'lucide-react';
 import {Button} from '@/shared/ui/button';
-import type {User} from '@/shared/api/backend';
+import type {User} from '@/shared/types';
 import {AccountSidebar,accountSections,type AccountSection} from './account-sidebar';
 
 import './settings-mira.css';

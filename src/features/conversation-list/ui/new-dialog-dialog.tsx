@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { Checkbox, Dialog as RadixDialog } from 'radix-ui';
 import { Check, LoaderCircle, Search, X } from 'lucide-react';
-import { type ChatState, type Dialog, type User } from '@/shared/api/backend';
+import { type ChatState, type Dialog, type User } from '@/shared/types';
 import {conversationService} from '@/entities/conversation';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';

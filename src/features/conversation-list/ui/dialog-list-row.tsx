@@ -1,5 +1,5 @@
 import {Bell,BellOff,Pin,PinOff} from 'lucide-react';
-import type {ChatMessage,Dialog,DialogPreferences,User} from '@/shared/api/backend';
+import type {ChatMessage,Dialog,DialogPreferences,User} from '@/shared/types';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {UserRow} from '@/entities/user';
 import {UnreadMentionBadge} from '@/entities/conversation';

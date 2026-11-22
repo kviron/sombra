@@ -1,7 +1,7 @@
 import {useRef, type ClipboardEvent} from 'react';
 import {Paperclip} from 'lucide-react';
 import {ComposerIconButton} from '@/shared/ui/elements-composer';
-import type {AttachmentDraft} from '@/shared/api/backend';
+import type {AttachmentDraft} from '@/shared/types';
 import '@/entities/message/ui/message-attachments.css';
 
 export const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;

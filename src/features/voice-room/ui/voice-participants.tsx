@@ -1,5 +1,5 @@
 import {MicOff,HeadphoneOff,LogOut} from 'lucide-react';
-import type {User,VoicePresence} from '@/shared/api/backend';
+import type {User,VoicePresence} from '@/shared/types';
 import {Slider} from '@/shared/ui/slider';
 import type {Voice} from '../model/use-voice';
 import {VoiceLevel} from './voice-level';

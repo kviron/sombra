@@ -1,5 +1,5 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
-import type {ChatState,User} from '@/shared/api/backend';
+import type {ChatState,User} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {Message,MessageAvatar,MessageContent,MessageHeader,Bubble,BubbleContent} from '@/shared/ui/message';
 import {ImageGeneration,JobProgress,TypingIndicator} from '@/shared/ui/elements-progress';

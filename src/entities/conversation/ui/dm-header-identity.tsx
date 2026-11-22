@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import type {User} from '@/shared/api/backend';
+import type {User} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {peerStatus} from '../model/dm-header-status';
 import './dm-header-identity.css';

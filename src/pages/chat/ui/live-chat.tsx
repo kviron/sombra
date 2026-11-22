@@ -9,7 +9,7 @@ import {Friends} from './friends';
 import {Bots} from './bots';
 import {ExpressionPicker} from '@/features/message-composer';
 import {ForwardPicker,ReferenceDraft,type ForwardDestination} from '@/features/message-actions';
-import type {ChatMessage} from '@/shared/api/backend';
+import type {ChatMessage} from '@/shared/types';
 import {AssistantComposer} from '@/features/message-composer';
 import {BotTyping,BotImageActivity,hasLiveImageActivity} from '@/features/bots';
 import {useHumanTyping,friendService} from '@/entities/user';
@@ -40,7 +40,7 @@ import {useDialogCalls,DialogCallBanner,IncomingDialogCall} from '@/features/voi
 import {AttachmentComposer,readAttachment,pastedAttachment} from '@/features/message-composer';
 import {AttachmentDropZone} from '@/features/message-composer';
 import {AttachmentDraftPreview} from '@/features/message-composer';
-import type {AttachmentDraft} from '@/shared/api/backend';
+import type {AttachmentDraft} from '@/shared/types';
 
 import {useVoice} from '@/features/voice-room';
 import {VoiceParticipants} from '@/features/voice-room';
@@ -59,7 +59,7 @@ import {toast} from 'sonner';
 import {useEffect,useLayoutEffect,useRef,useState,type FormEvent} from 'react';
 import {ShieldCheck,PanelRight,Home,Phone,Video,Bot,ChevronDown,Volume2,Plus,MessageCircle,Users,Settings,LogOut,Send,X,Search,Mic,MicOff,Headphones,HeadphoneOff} from 'lucide-react';
 import {stateService} from '@/shared/api';
-import {type ProfileEffectTarget,type ChatState,type ChatPreferences,type DialogPreferences,type Group,type GroupPermission,type Channel,type Dialog,type User} from '@/shared/api/backend';
+import {type ProfileEffectTarget,type ChatState,type ChatPreferences,type DialogPreferences,type Group,type GroupPermission,type Channel,type Dialog,type User} from '@/shared/types';
 import {sessionService} from '@/shared/api';
 import {authService} from '@/entities/user';
 import './chat.css';

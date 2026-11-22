@@ -1,5 +1,5 @@
 import {useEffect,useRef} from 'react';
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 import {userService} from './services/user-service';
 type Context={account:string;channel:string;epoch:number;live:boolean;wanted:boolean;lastInput:number;lastPulse:number;timer?:ReturnType<typeof setTimeout>};
 /** Only a boolean activity signal leaves this hook; restored drafts never trigger it. */

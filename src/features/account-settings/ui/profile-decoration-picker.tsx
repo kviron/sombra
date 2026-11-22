@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {Dialog,ScrollArea} from 'radix-ui';
 import {Check,Plus,Upload,X} from 'lucide-react';
-import {type ProfileDecorationDoc,type ProfileEffect,type ProfileEffectAsset,type ProfileEffectDraft,type ProfileEffectTarget,type User} from '@/shared/api/backend';
+import {type ProfileDecorationDoc,type ProfileEffect,type ProfileEffectAsset,type ProfileEffectDraft,type ProfileEffectTarget,type User} from '@/shared/types';
 import {sessionService} from '@/shared/api';
 import {accountService} from '../model/services/account-service';
 import {DECORATION_PRESETS,normalizeDecoration} from '@/shared/ui/avatar-fx';

@@ -3,7 +3,7 @@ import {Search,Mic,UserRound,ShieldCheck,Monitor,RefreshCw,LogOut,Pencil,Sticker
 import {Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton} from '@/shared/ui/sidebar';
 import {Separator} from '@/shared/ui/separator';
 import {UserAvatar} from '@/shared/ui/user-avatar';
-import type {User} from '@/shared/api/backend';
+import type {User} from '@/shared/types';
 
 export type AccountSection='profile'|'security'|'sessions'|'voice'|'updates'|'stickers'|'notifications'|'storage'|'journal';
 export const accountSections=[

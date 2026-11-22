@@ -1,4 +1,4 @@
-import type { User, Group } from '@/shared/api/backend';
+import type { User, Group } from '@/shared/types';
 import { UserRow } from '@/entities/user';
 import { useUserActions } from '@/shared/lib/user-actions';
 import {getGroupRoles} from '@/entities/group';

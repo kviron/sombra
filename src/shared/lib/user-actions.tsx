@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import type { User } from '@/shared/api/backend';
+import type { User } from '@/shared/types';
 
 export type FriendStatus = 'self' | 'none' | 'outgoing' | 'incoming' | 'friends';
 

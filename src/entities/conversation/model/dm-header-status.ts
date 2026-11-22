@@ -1,4 +1,4 @@
-import type {User} from '@/shared/api/backend';
+import type {User} from '@/shared/types';
 function plural(value:number,forms:readonly [string,string,string]):string{
  const tail=value%100,last=value%10;
  return tail>=11&&tail<=14?forms[2]:last===1?forms[0]:last>=2&&last<=4?forms[1]:forms[2];

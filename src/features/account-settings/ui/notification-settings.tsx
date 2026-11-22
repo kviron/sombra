@@ -1,6 +1,6 @@
 import {useRef,useState} from 'react';
 import {LoaderCircle} from 'lucide-react';
-import {type ChatPreferences} from '@/shared/api/backend';
+import {type ChatPreferences} from '@/shared/types';
 import {accountService} from '../model/services/account-service';
 import {Switch} from '@/shared/ui/switch';
 import './notification-settings.css';

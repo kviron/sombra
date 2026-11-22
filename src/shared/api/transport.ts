@@ -29,6 +29,7 @@ export async function request<T = any>(op:string,data:Record<string,unknown>={})
  try{return await request}
  finally{if(readRequests.get(key)===request)readRequests.delete(key)}
 }
+import type {AttachmentFile, ChatState, User} from '@/shared/types';
 import {uniqueIds,uniqueRows} from './unique-rows';
 export {uniqueRows} from './unique-rows';
 function normalizeState(state: ChatState): ChatState {
@@ -104,43 +105,4 @@ export async function authenticate(op: 'login' | 'register', data: Record<string
 export async function logout() {
  await request('logout'); clearSession();
 }
-export type SessionDto = {id:string;device:string;created_at:number;last_seen:number;expires_at:number;current:boolean};
-export type ProfileDto = {name:string;bio:string};
-export type BotCommand = {command:string;description:string};
-export type ImageCropArea = {x:number;y:number;width:number;height:number};
-export type ProfileCoverMetadata = {id:string;mime:string;width:number;height:number;crop:ImageCropArea;animated:boolean;bytes:number};
-export type ProfileCoverFile = ProfileCoverMetadata & {user:string;data:string};
-/** Документ украшения профиля v1: пиксельная рамка аватара или сцена обложки. Разбор и проверка — avatar-fx/normalize.ts; сервер отдаёт только белый список полей. */
-export type ProfileDecorationDoc = {v?:unknown;target?:unknown;mode?:unknown;loop?:unknown;seed?:unknown;layers?:unknown};
-/** Украшения профиля по целям. Поле отсутствует — украшения нет; неизвестные цели сервер не отдаёт. */
-export type ProfileDecorations = {avatar?:ProfileDecorationDoc;cover?:ProfileDecorationDoc};
-export type ProfileEffectTarget = keyof ProfileDecorations;
-export type ProfileEffectScope = 'personal'|'catalog';
-export type ProfileEffectRefs = Partial<Record<ProfileEffectTarget,string>>;
-export type ProfileEffectAsset={id:string;mime:'image/gif';width:number;height:number;frames:number;size:number};
-export type ProfileEffect = {id:string;target:ProfileEffectTarget;title:string;decoration:ProfileDecorationDoc|null;asset?:ProfileEffectAsset;ownerId:string;public:boolean};
-export type ProfileEffectDraft = {id:string;status:'queued'|'running'|'ready'|'failed';result?:{title:string;decoration:ProfileDecorationDoc};error?:string};
-export type User = {id:string;name:string;bio:string;avatar?:string;/** Content hash of the avatar when the server withholds the inline picture. */avatarHash?:string;coverSupported?:boolean;decorationSupported?:boolean;cover?:ProfileCoverMetadata;decorations?:ProfileDecorations;decorationRefs?:ProfileEffectRefs;profileEffectAssets?:Partial<Record<ProfileEffectTarget,ProfileEffectAsset>>;created_at:number;online?:boolean;last_seen?:number;bot?:boolean;username?:string;commands?:BotCommand[]};
-export type Channel = {id:string;name:string;kind:string;unreadCount?:number;unreadMentionCount?:number};
-export type GroupPermission = 'group.rename' | 'group.avatar' | 'channels.create_text' | 'channels.create_voice' | 'channels.rename' | 'channels.delete' | 'members.invite' | 'invite.rotate' | 'members.kick' | 'messages.delete_any' | 'stickers.manage' | 'bots.manage';
-export type GroupRole = {id:string;name:string;permissions:GroupPermission[]};
-export type Group = {id:string;name:string;owner:string;invite:string;members:string[];channels:Channel[];avatar?:string;avatarHash?:string;roles?:GroupRole[];memberRoles?:Record<string,string>;rolesRevision?:number;membersCanInvite?:boolean;permissions?:GroupPermission[]};
-export type Dialog = {id:string;name:string;members:string[];owner?:string;avatar?:string;revision?:number;unreadCount?:number;unreadMentionCount?:number};
-export type VoicePresence = {user:string;muted:boolean;deaf:boolean};
-export type DialogCall = {id:string;dialog:string;caller:string;video:boolean;created_at:number;participants:string[];declined:string[];empty_since?:number};
-export type DialogPreferences = {pinned:boolean;muted:boolean};
-export type ChatPreferences = {revision?:number;notifications:{direct:boolean;groups:boolean};dialogs:Record<string,DialogPreferences>};
-export type ChatState = {features?:{messageReferences?:boolean;/** Snapshot carries avatar hashes instead of inline pictures. */avatarAssets?:boolean};profileEffectUploadsSupported?:boolean;stickerCatalogSupported?:boolean;effectCatalogSupported?:boolean;profileEffectDraftsSupported?:boolean;decorationSupported?:boolean;conversationMemberSearchSupported?:boolean;dialogMetadataSupported?:boolean;humanTypingSupported?:boolean;humanTyping?:{user:string;channel:string;until:number}[];readReceiptsSupported?:boolean;botTyping?:{bot:string;channel:string;until:number}[];chatPreferences?:ChatPreferences;me:User;email:string;users:User[];groups:Group[];dialogs:Dialog[];messages:ChatMessage[];stickers:Sticker[];friends:Friend[];bots:Bot[];voicePresence?:Record<string,VoicePresence[]>;dialogCalls?:DialogCall[]};
 
-export type AttachmentDraft = {name:string;data:string;mime?:string};
-export type MessageAttachmentMetadata = {id:string;name:string;size:number;mime:string;expired?:boolean;cached?:boolean};
-export type AttachmentFile = {data:string;mime:string;name:string;cached?:boolean};
-export type MessageReply = {id:string;author?:string;text?:string};
-export type ChatMessage = {replyTo?:MessageReply;forwardedFrom?:{author:string};gif?:string;mentions?:{userId:string;start:number;end:number}[];readCount?:number;readAt?:number;id:string;channel:string;user:string;text:string;time:number;sticker?:string;attachment?:MessageAttachmentMetadata;bot_name?:string;reactions?:{user:string;emoji:string}[]};
-export type Sticker = {id:string;owner:string;name:string;image?:string;group?:string;pack?:string;archived?:boolean;keywords?:string[];packId?:string;packPublic?:boolean;packInstalled?:boolean;packAdded?:boolean};
-export type Friend = {id:string;from:string;to:string;accepted:boolean};
-export type Bot = {id:string;name:string;username?:string;channel?:string;group?:string;groups?:string[];owner:string;commands?:BotCommand[];privacy?:string|boolean;last_seen?:number;enabled?:boolean;transportVersion?:number;managementVersion?:number;modelSettings?:BotModelSettings};
-/** Модель и уровень размышления бота: app/BOT-MODEL-SETTINGS.md. */
-export type BotReasoning = '' | 'low' | 'medium' | 'high';
-/** Безопасная проекция bot.settings (сырой settings сервер не отдаёт); revision независима от settings_revision профиля. `models` — необязательный каталог, который публикует провайдер/плагин, backend его не хранит. */
-export type BotModelSettings = {model:string;reasoning:BotReasoning;revision:number;modelDefault:boolean;reasoningDefault:boolean;models?:string[]};

@@ -3,7 +3,7 @@ import {Download,FileWarning,RotateCw,X} from 'lucide-react';
 import {Dialog} from 'radix-ui';
 import {invoke,isTauri} from '@tauri-apps/api/core';
 import {toast} from 'sonner';
-import {type AttachmentFile,type MessageAttachmentMetadata} from '@/shared/api/backend';
+import {type AttachmentFile,type MessageAttachmentMetadata} from '@/shared/types';
 import {messageService} from '../model/services/message-service';
 import {sessionService} from '@/shared/api';
 import {attachmentCacheGeneration,attachmentCacheWriteEpoch} from '@/shared/api/attachment-cache';

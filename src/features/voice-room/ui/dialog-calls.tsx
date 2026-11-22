@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog as DialogPrimitive} from 'radix-ui';
 import {Phone,PhoneOff,Video,Users} from 'lucide-react';
-import {type ChatState,type DialogCall} from '@/shared/api/backend';
+import {type ChatState,type DialogCall} from '@/shared/types';
 import {callService} from '../model/services/call-service';
 import {Button} from '@/shared/ui/button';
 import {UserAvatar} from '@/shared/ui/user-avatar';

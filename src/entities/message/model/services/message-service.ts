@@ -1,5 +1,5 @@
 import {api} from '@/shared/api';
-import type {AttachmentFile, ChatMessage} from '@/shared/api/backend';
+import type {AttachmentFile, ChatMessage} from '@/shared/types';
 
 type MessageReader = {user: string; seenAt: number};
 

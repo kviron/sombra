@@ -1,4 +1,4 @@
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 
 export type ChatNotificationPreferences = {
  notifications?: {direct?:boolean;groups?:boolean};

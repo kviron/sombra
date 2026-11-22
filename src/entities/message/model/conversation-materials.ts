@@ -1,4 +1,4 @@
-import type {ChatMessage} from '@/shared/api/backend';
+import type {ChatMessage} from '@/shared/types';
 import {parseMessageLinks} from '@/shared/lib/message-links.ts';
 export type MaterialCategory='photos'|'videos'|'files'|'audio'|'links';
 export type ConversationMaterial={id:string;category:MaterialCategory;message:ChatMessage;title:string;href?:string};

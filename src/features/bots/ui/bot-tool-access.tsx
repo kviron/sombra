@@ -1,5 +1,5 @@
 import {useEffect,useId,useRef,useState} from 'react';
-import {type Bot,type ChatState} from '@/shared/api/backend';
+import {type Bot,type ChatState} from '@/shared/types';
 import {botService} from '../model/services/bot-service';
 import './bot-tool-access.css';
 

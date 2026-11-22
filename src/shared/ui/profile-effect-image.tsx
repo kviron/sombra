@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {type ProfileEffectAsset} from '@/shared/api/backend';
+import {type ProfileEffectAsset} from '@/shared/types';
 import {sessionService} from '@/shared/api';
 import {fileService} from '@/shared/api';
 

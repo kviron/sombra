@@ -1,5 +1,5 @@
 import {api} from '@/shared/api';
-import type {DialogCall} from '@/shared/api/backend';
+import type {DialogCall} from '@/shared/types';
 
 /** Звонки в переписке: начать, отменить и отклонить. */
 export const callService = {

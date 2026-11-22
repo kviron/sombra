@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog} from 'radix-ui';
 import {Settings,ShieldCheck,X} from 'lucide-react';
-import {type ChatState,type Group} from '@/shared/api/backend';
+import {type ChatState,type Group} from '@/shared/types';
 import {canGroup,groupService} from '@/entities/group';
 import {ImageCropDialog,type PreparedProfileImage} from '@/shared/ui/image-crop-dialog';
 import {GroupRolesPanel} from './group-roles-dialog';

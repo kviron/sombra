@@ -1,4 +1,4 @@
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 import './bots.css';
 import '@/shared/ui/menu-material.css';
 

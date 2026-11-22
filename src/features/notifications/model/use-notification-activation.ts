@@ -3,7 +3,7 @@ import {invoke,isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
 import {toast} from 'sonner';
 import {stateService} from '@/shared/api';
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 import {notificationRoute,validNotificationTarget,type NotificationTarget,type NotificationRoute} from './notification-target';
 
 export function useNotificationActivation(state:ChatState|null,onOpen:(next:ChatState,route:NotificationRoute)=>void){

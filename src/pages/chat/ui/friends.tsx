@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {Check,MessageCircle,UserPlus,X} from 'lucide-react';
-import {type ChatState} from '@/shared/api/backend';
+import {type ChatState} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {conversationService} from '@/entities/conversation';
 import {friendService} from '@/entities/user';

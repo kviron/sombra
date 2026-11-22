@@ -1,5 +1,5 @@
 import {api} from '../api';
-import type {ProfileEffectAsset} from '../backend';
+import type {ProfileEffectAsset} from '@/shared/types';
 
 /**
  * Файлы профиля: картинки нужны и `shared/ui`, а shared не может импортировать из сущностей.

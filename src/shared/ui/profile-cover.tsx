@@ -1,12 +1,12 @@
 import {useEffect,useRef,useState} from 'react';
-import {type User,type ProfileCoverMetadata,type ProfileCoverFile} from '@/shared/api/backend';
+import {type User,type ProfileCoverMetadata,type ProfileCoverFile} from '@/shared/types';
 import {sessionService} from '@/shared/api';
 import {fileService} from '@/shared/api';
 import {AvatarFrame,normalizeDecoration,type DecorationInput} from '@/shared/ui/avatar-fx';
 import {inspectImage} from '@/shared/lib/image-crop';
 import './profile-cover.css';
 import {ProfileEffectImage} from './profile-effect-image';
-import type {ProfileEffectAsset} from '@/shared/api/backend';
+import type {ProfileEffectAsset} from '@/shared/types';
 const LIMIT=2*1024*1024;
 function valid(meta:ProfileCoverMetadata):boolean {
  const c=meta?.crop;

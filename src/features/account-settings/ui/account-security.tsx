@@ -2,7 +2,7 @@
 // последнюю строку) намеренно переопределяет старую раскладку карточки профиля.
 import './account-approved.css';
 import {useEffect,useRef,useState,type FormEvent,type KeyboardEvent} from 'react';
-import {type ChatState,type SessionDto,type User,type ProfileDecorationDoc} from '@/shared/api/backend';
+import {type ChatState,type SessionDto,type User,type ProfileDecorationDoc} from '@/shared/types';
 import {sessionService} from '@/shared/api';
 import {userService} from '@/entities/user';
 import {accountService} from '../model/services/account-service';

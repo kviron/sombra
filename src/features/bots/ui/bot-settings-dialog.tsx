@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog} from 'radix-ui';
 import {X} from 'lucide-react';
-import {type Bot,type BotModelSettings,type BotReasoning,type User,type ChatState} from '@/shared/api/backend';
+import {type Bot,type BotModelSettings,type BotReasoning,type User,type ChatState} from '@/shared/types';
 import {botService} from '../model/services/bot-service';
 import {SettingsPanel} from '@/shared/ui/elements-settings';
 import {ImageCropDialog} from '@/shared/ui/image-crop-dialog';

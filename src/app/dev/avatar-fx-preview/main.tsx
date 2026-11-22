@@ -5,7 +5,7 @@ import { AvatarFrame, DECORATION_PRESETS, fxSchedulerState } from '@/shared/ui/a
 import type { DecorationInput, PaletteName } from '@/shared/ui/avatar-fx';
 import { ProfileDecorationPicker } from '@/features/account-settings'; // The local QA page exercises the real app modal.
 import { UserProfile } from '@/pages/chat';
-import type { User } from '@/shared/api/backend';
+import type { User } from '@/shared/types';
 import '@/shared/ui/profile-cover.css';
 import '@/entities/user/ui/user.css';
 import '@/pages/chat/ui/chat.css';

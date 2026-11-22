@@ -1,6 +1,6 @@
 import {useMemo} from 'react';
 import {ComposerAttachments,ComposerAttachmentChip} from '@/shared/ui/elements-composer';
-import type {AttachmentDraft} from '@/shared/api/backend';
+import type {AttachmentDraft} from '@/shared/types';
 import {MAX_ATTACHMENT_SIZE} from './attachment-composer';
 
 /** Decode only bounded raw base64; metadata never authorizes an image preview. */

@@ -1,5 +1,5 @@
 import {api} from '@/shared/api';
-import type {SessionDto, User} from '@/shared/api/backend';
+import type {SessionDto, User} from '@/shared/types';
 
 /** Профиль, устройства и сигнал «печатает» текущего пользователя. */
 export const userService = {

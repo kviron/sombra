@@ -1,5 +1,5 @@
 import {api} from '../api';
-import type {ChatState} from '../backend';
+import type {ChatState} from '@/shared/types';
 
 /** Снапшот состояния приложения: не принадлежит ни одной сущности, поэтому лежит в shared. */
 export const stateService = {

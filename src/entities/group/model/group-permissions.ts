@@ -1,4 +1,4 @@
-import type { Group, GroupPermission, GroupRole } from '@/shared/api/backend.ts';
+import type { Group, GroupPermission, GroupRole } from '@/shared/types';
 
 export const GROUP_PERMISSION_CATALOG: {group:string;items:{key:GroupPermission;label:string;description:string}[]}[] = [
  {group:'Группа',items:[{key:'group.rename',label:'Название группы',description:'Изменять название группы.'},{key:'group.avatar',label:'Аватар группы',description:'Менять и удалять изображение группы.'}]},

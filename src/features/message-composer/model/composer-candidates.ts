@@ -1,4 +1,4 @@
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 
 /** Only the caret's queried fragment is replaced; emails never activate mentions. */
 export function composerTrigger(text:string,char:string,caret:number){

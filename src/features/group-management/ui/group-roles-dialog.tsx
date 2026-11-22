@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Checkbox, Switch, Dialog as RadixDialog } from 'radix-ui';
 import { Check, X } from 'lucide-react';
-import { type ChatState, type Group, type GroupPermission } from '@/shared/api/backend';
+import { type ChatState, type Group, type GroupPermission } from '@/shared/types';
 import { canGroup, DEFAULT_MEMBER_ROLE, getGroupRoles, GROUP_PERMISSION_CATALOG, groupService } from '@/entities/group';
 import { Select } from '@/shared/ui/select';
 import './group-roles-dialog.css';

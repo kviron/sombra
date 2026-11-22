@@ -2,7 +2,7 @@ import {useRef,useState} from 'react';
 import {Check,CheckCheck,Eye,Forward,Pencil,Copy,Trash2,Reply} from 'lucide-react';
 import {ContextMenu} from 'radix-ui';
 import {toast} from 'sonner';
-import {type ChatState,type ChatMessage} from '@/shared/api/backend';
+import {type ChatState,type ChatMessage} from '@/shared/types';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {Message,MessageAvatar,MessageContent,MessageHeader,MessageFooter,Bubble,BubbleContent} from '@/shared/ui/message';
 import {UserAvatar} from '@/shared/ui/user-avatar';

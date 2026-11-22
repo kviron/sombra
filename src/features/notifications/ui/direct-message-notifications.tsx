@@ -2,7 +2,7 @@ import {useEffect,useRef} from 'react';
 import {invoke,isTauri} from '@tauri-apps/api/core';
 import {getCurrentWindow} from '@tauri-apps/api/window';
 import {toast} from 'sonner';
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 import {DirectMessageToast} from './direct-message-toast';
 import {batchChatNotifications,createChatNotificationCursor,newChatMessages,notificationEligible} from '@/entities/conversation';
 import type {ChatNotification,ChatNotificationCursor} from '@/entities/conversation';

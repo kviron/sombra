@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog as DialogPrimitive} from 'radix-ui';
 import {Camera,ChevronRight,File,Headphones,Image,Link2,Pencil,Settings,Video,X} from 'lucide-react';
-import {type ChatMessage,type ChatState,type Dialog,type User} from '@/shared/api/backend';
+import {type ChatMessage,type ChatState,type Dialog,type User} from '@/shared/types';
 import {conversationService} from '@/entities/conversation';
 import {conversationMaterials,type MaterialCategory} from '@/entities/message';
 import {UserAvatar} from '@/shared/ui/user-avatar';

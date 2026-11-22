@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,type FormEvent,type ReactNode,type RefObject,type ClipboardEvent} from 'react';
 import {AssistantRuntimeProvider,ComposerPrimitive,useExternalStoreRuntime,type ThreadMessage} from '@assistant-ui/react';
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 import {composerTrigger,mentionCandidates,commandCandidates,localCommandCandidates} from '../model/composer-candidates';
 import '@/shared/ui/menu-material.css';
 import {ComposerToolbar,ComposerActions,paper,composerInputClass} from '@/shared/ui/elements-composer';

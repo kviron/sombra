@@ -1,4 +1,4 @@
-import type {AttachmentFile,MessageAttachmentMetadata} from '../api/backend.ts';
+import type {AttachmentFile,MessageAttachmentMetadata} from '@/shared/types';
 export const MAX_MEDIA_BYTES=10*1024*1024;
 const aliases:Record<string,string>={'audio/x-wav':'audio/wav','audio/wave':'audio/wav','audio/mp3':'audio/mpeg','audio/x-flac':'audio/flac','audio/x-m4a':'audio/mp4','video/quicktime':'video/mp4'};
 const canonical=(mime:string)=>aliases[mime.toLowerCase()]||mime.toLowerCase();

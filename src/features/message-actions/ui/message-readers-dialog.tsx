@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState,type RefObject} from 'react';
 import {Dialog} from 'radix-ui';
 import {X} from 'lucide-react';
-import {type ChatState,type ChatMessage} from '@/shared/api/backend';
+import {type ChatState,type ChatMessage} from '@/shared/types';
 import {messageService} from '@/entities/message';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import './message-readers-dialog.css';

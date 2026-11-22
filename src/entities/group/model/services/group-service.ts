@@ -1,5 +1,5 @@
 import {api} from '@/shared/api';
-import type {Channel, Group} from '@/shared/api/backend';
+import type {Channel, Group} from '@/shared/types';
 
 /** Группы и каналы: участники, приглашения, роли и настройки. */
 export const groupService = {

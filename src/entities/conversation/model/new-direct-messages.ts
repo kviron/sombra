@@ -1,4 +1,4 @@
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 
 export function newDirectMessages(state:Pick<ChatState,'me'|'users'|'dialogs'|'messages'>,seen:Set<string>,initial=false){
  const dialogs=new Set(state.dialogs.map(dialog=>dialog.id));

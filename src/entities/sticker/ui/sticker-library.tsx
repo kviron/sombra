@@ -4,7 +4,7 @@ import {Dialog,ScrollArea,Tabs} from 'radix-ui';
 import {ArrowLeft,Plus,Sticker as StickerIcon,Upload,X} from 'lucide-react';
 import './sticker-catalog.css';
 import {Button} from '@/shared/ui/button';
-import type {Sticker} from '@/shared/api/backend';
+import type {Sticker} from '@/shared/types';
 import {stickerService} from '../model/services/sticker-service';
 
 const imageExtension=/\.(png|webp)$/i;

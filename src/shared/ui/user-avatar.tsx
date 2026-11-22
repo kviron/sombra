@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { cn } from '@/shared/lib/utils';
 import { ProfileEffectImage } from './profile-effect-image';
-import type { ProfileEffectAsset } from '@/shared/api/backend';
+import type { ProfileEffectAsset } from '@/shared/types';
 import { AvatarFrame } from '@/shared/ui/avatar-fx';
 import type { AvatarDecoration, DecorationInput } from '@/shared/ui/avatar-fx';
 

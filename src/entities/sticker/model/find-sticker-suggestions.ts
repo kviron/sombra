@@ -1,4 +1,4 @@
-import type {Sticker} from '@/shared/api/backend';
+import type {Sticker} from '@/shared/types';
 
 function normalizedWords(text:string){
  return text.toLowerCase().replaceAll('ё','е').match(/[\p{L}\p{N}]+/gu)?.join(' ')||'';

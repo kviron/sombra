@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog} from 'radix-ui';
 import {Sparkles,Upload,X} from 'lucide-react';
-import type {ProfileDecorationDoc,User} from '@/shared/api/backend';
+import type {ProfileDecorationDoc,User} from '@/shared/types';
 import {DECORATION_PRESETS,normalizeDecoration} from '@/shared/ui/avatar-fx';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {ProfileCover} from '@/shared/ui/profile-cover';

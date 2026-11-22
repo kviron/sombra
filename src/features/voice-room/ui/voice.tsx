@@ -16,7 +16,7 @@ import {recordDesktopDiagnostic} from '@/shared/api/diagnostics';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {UserContextMenu} from '@/entities/user';
 import {useUserActions} from '@/shared/lib/user-actions';
-import type {User} from '@/shared/api/backend';
+import type {User} from '@/shared/types';
 import './voice.css';
 import '@/shared/ui/account-media-settings.css';
 import {RoomMusic,type useRoomMusic} from './room-music';

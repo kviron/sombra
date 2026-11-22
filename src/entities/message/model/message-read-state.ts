@@ -1,5 +1,5 @@
 import {useEffect,useRef} from 'react';
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 import {messageService} from './services/message-service';
 
 /** Long messages use the viewport as denominator, not their entire height. */

@@ -1,4 +1,4 @@
-import {authenticate, logout, request} from './backend';
+import {authenticate, logout, request} from './transport';
 
 type Payload = Record<string, unknown>;
 type Method = <T = unknown>(payload?: Payload) => Promise<T>;

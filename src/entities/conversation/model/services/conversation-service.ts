@@ -1,5 +1,5 @@
 import {api} from '@/shared/api';
-import type {ChatPreferences, Dialog, User} from '@/shared/api/backend';
+import type {ChatPreferences, Dialog, User} from '@/shared/types';
 
 /** Переписки: создание диалога, правка и поиск участников. */
 export const conversationService = {

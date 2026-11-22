@@ -1,4 +1,4 @@
-import type {ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/types';
 export type NotificationTarget={account:string;channel:string;message:string};
 export type NotificationRoute={home:boolean;channel:string;group?:string;message?:string};
 export function validNotificationTarget(value:unknown):value is NotificationTarget{

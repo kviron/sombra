@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowLeft,ArrowUpRight,ChevronRight,File,Headphones,Image,Link2,Search,Video,X} from 'lucide-react';
-import type {ChatMessage} from '@/shared/api/backend';
+import type {ChatMessage} from '@/shared/types';
 import {conversationMaterials,filterMaterials,type MaterialCategory,type ConversationMaterial} from '@/entities/message';
 import {MessageAttachment} from '@/entities/message';
 import {handleMessageLinkClick} from '@/entities/message';

@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {Smile,Sticker as StickerIcon,X} from 'lucide-react';
 import emojiData from '@emoji-mart/data/sets/15/native.json';
-import type {ChatState,Group} from '@/shared/api/backend';
+import type {ChatState,Group} from '@/shared/types';
 import {ComposerIconButton} from '@/shared/ui/elements-composer';
 import {Select} from '@/shared/ui/select';
 import {canGroup} from '@/entities/group';

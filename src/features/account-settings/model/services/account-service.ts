@@ -8,7 +8,7 @@ import type {
  ProfileEffectScope,
  ProfileEffectTarget,
  User
-} from '@/shared/api/backend';
+} from '@/shared/types';
 
 /** Аккаунт: почта, пароль, уведомления и украшения профиля. */
 export const accountService = {

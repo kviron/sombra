@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {ConversationMaterialRows,type ProfileConversationMaterials} from '@/features/conversation-details';
 import { Check, Clock3, MessageCircle, Sparkles, UserMinus, UserPlus, X } from 'lucide-react';
-import type { Group, ProfileEffectTarget, User } from '@/shared/api/backend';
+import type { Group, ProfileEffectTarget, User } from '@/shared/types';
 import { UserAvatar } from '@/shared/ui/user-avatar';
 import { ProfileCover } from '@/shared/ui/profile-cover';
 import { useUserActions } from '@/shared/lib/user-actions';

@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {Dialog} from 'radix-ui';
 import {Forward,Hash,MessageCircle,Reply,Search,Volume2,X} from 'lucide-react';
-import type {ChatMessage,MessageReply} from '@/shared/api/backend';
+import type {ChatMessage,MessageReply} from '@/shared/types';
 import './message-references.css';
 
 export type ForwardDestination={id:string;name:string;group?:{id:string;name:string};voice?:boolean;keywords?:string};

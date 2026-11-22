@@ -1,6 +1,6 @@
 import {useState, type FormEvent, type RefObject} from 'react';
 import {AlertDialog, Dialog} from 'radix-ui';
-import {type ChatMessage} from '@/shared/api/backend';
+import {type ChatMessage} from '@/shared/types';
 import {messageService} from '@/entities/message';
 import {Button} from '@/shared/ui/button';
 

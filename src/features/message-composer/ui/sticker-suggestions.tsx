@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import type {Sticker} from '@/shared/api/backend';
+import type {Sticker} from '@/shared/types';
 import {findStickerSuggestions} from '@/entities/sticker';
 import {StickerImage} from '@/entities/sticker';
 import '@/shared/ui/menu-material.css';
