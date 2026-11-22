@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createUpdater} from './src/app/update-controller.ts';
+import {createUpdater} from './src/features/updates/model/update-controller.ts';
 
 function fixture(check) {
  let installed=0, restarted=0;

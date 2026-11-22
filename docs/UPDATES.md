@@ -81,5 +81,5 @@ gh release upload v0.1.26 target/release/bundle/nsis/*.exe target/release/bundle
 ## Код клиента
 
 - `src-tauri/src/updates.rs` — команды `check_update`, `download_update`, `install_update`, `restart_app`; проверка раз в 4 часа, тайм-ауты 15 с на проверку и 10 мин на загрузку.
-- `src/app/update-controller.ts` — фазы `checking → available → downloading → ready → installing`; скачивание и установка — только по явному действию пользователя.
+- `src/features/updates/model/update-controller.ts` — фазы `checking → available → downloading → ready → installing`; скачивание и установка — только по явному действию пользователя.
 - `npm run test:updater` — тесты состояний.

@@ -106,6 +106,15 @@ src/
 
 Удалены при рефакторинге: `src/app/chat-page.tsx` (демо-страница с битой кодировкой, дублировала `LiveChat`) и `src/components/button.tsx` (дубль `shared/ui/button`). История сохранена в git.
 
+## Связи с Rust-оболочкой
+
+Перенос файлов во фронтенде затрагивает ещё два места, которые не проверяются `tsc`:
+
+- **`include_bytes!` в Rust.** `src-tauri/src/notifications.rs` встраивает `src/features/notifications/assets/message-tone.wav` — путь жёстко прописан в коде. После переноса ассета его правят там же и проверяют `cargo check -p sombra --no-default-features`.
+- **Ассеты через `new URL('./x.wav', import.meta.url)`.** Vite разрешает такой путь относительно файла-модуля, а не `import`. Поэтому при переносе модуля в подпапку путь правят на `../assets/x.wav`; искать такие места — `grep "new URL(" src`.
+
+После переноса стоит убедиться, что `npm run build` кладёт `dist/assets/*.wav` — иначе звук молча не загрузится.
+
 ## Проверка
 
 ```bash

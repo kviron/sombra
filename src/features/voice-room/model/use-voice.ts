@@ -12,8 +12,8 @@ type MicrophoneGain={context:AudioContext;source:MediaStreamAudioSourceNode;gain
 type Call={room:string;client:string;stream:MediaStream;pcs:Map<string,RTCPeerConnection>;stop:boolean;microphone:MediaStreamTrack;micGain?:MicrophoneGain;members?:Set<string>};
 type TrackKind='audio'|'video';
 const voiceCues={
- joined:new URL('./voice-peer-joined.wav',import.meta.url).href,
- left:new URL('./voice-left.wav',import.meta.url).href,
+ joined:new URL('../assets/voice-peer-joined.wav',import.meta.url).href,
+ left:new URL('../assets/voice-left.wav',import.meta.url).href,
 };
 
 async function playVoiceCue(cue:keyof typeof voiceCues,speaker:string){

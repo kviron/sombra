@@ -1,6 +1,6 @@
 import {useEffect} from 'react';
 
-const ringtone=new URL('./call-ringtone.wav',import.meta.url).href;
+const ringtone=new URL('../assets/call-ringtone.wav',import.meta.url).href;
 
 /** One loop per current invitation; stop on answer, decline, expiry or unmount. */
 export function useIncomingRingtone(callId:string|undefined,muted:boolean,speaker:string,volume:number){

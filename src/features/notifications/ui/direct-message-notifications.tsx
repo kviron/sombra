@@ -19,7 +19,7 @@ export function useDirectMessageNotifications(state:ChatState|null,options?:{act
   const incoming=newChatMessages(state,cursor.current);
   if(!incoming.length)return;
   const account=state.me.id,native=isTauri();
-  function playSound(){sound.current??=new Audio(new URL('./message-tone.wav',import.meta.url).href);sound.current.currentTime=0;void sound.current.play().catch(()=>{});}
+  function playSound(){sound.current??=new Audio(new URL('../assets/message-tone.wav',import.meta.url).href);sound.current.currentTime=0;void sound.current.play().catch(()=>{});}
   async function eligibleNotifications(){
    let focused=document.hasFocus();
    if(native){try{focused=await getCurrentWindow().isFocused();}catch{/* Browser focus is the conservative fallback. */}}

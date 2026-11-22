@@ -222,7 +222,7 @@ pub async fn notify_direct_message(
 
 #[cfg(windows)]
 fn play_message_sound() {
-    static WAV: &[u8] = include_bytes!("../../src/app/message-tone.wav");
+    static WAV: &[u8] = include_bytes!("../../src/features/notifications/assets/message-tone.wav");
     // SND_MEMORY reads the embedded WAV buffer, which stays valid during async playback.
     let _ = unsafe { PlaySoundW(PCWSTR(WAV.as_ptr().cast()), None, SND_MEMORY | SND_ASYNC | SND_NODEFAULT) };
 }
