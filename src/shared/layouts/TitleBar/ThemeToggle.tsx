@@ -1,9 +1,12 @@
 import {MoonIcon, SunIcon} from 'lucide-react';
-import {useTheme} from '@/app/providers/ThemeProvider';
 import {Button} from '@/shared/ui';
 
-export function ThemeToggle() {
- const {theme, toggleTheme} = useTheme();
+type ThemeToggleProps = {
+ theme: 'light' | 'dark';
+ onToggle: () => void;
+};
+
+export function ThemeToggle({theme, onToggle}: ThemeToggleProps) {
  const isDark = theme === 'dark';
  const label = isDark ? 'Включить светлую тему' : 'Включить тёмную тему';
 
@@ -14,7 +17,7 @@ export function ThemeToggle() {
    className="text-muted-foreground hover:text-foreground"
    aria-label={label}
    title={label}
-   onClick={toggleTheme}
+   onClick={onToggle}
   >
    {isDark ? <SunIcon /> : <MoonIcon />}
   </Button>

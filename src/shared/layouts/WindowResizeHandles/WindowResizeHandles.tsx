@@ -1,4 +1,4 @@
-import {startWindowResize, type WindowResizeDirection} from '@/app/lib/window-actions';
+import {tauri, type WindowResizeDirection} from '@/shared/api';
 import {cn} from '@/shared/lib';
 
 /**
@@ -47,7 +47,7 @@ export function WindowResizeHandles({inTauri, isMaximized}: WindowResizeHandlesP
      className={cn('pointer-events-auto absolute', className)}
      onMouseDown={event => {
       event.preventDefault();
-      void startWindowResize(direction);
+      void tauri.window.startResize(direction);
      }}
     />
    ))}

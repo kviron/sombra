@@ -1,14 +1,14 @@
+// App: раскладка из shared/layouts, данные и провайдеры остаются здесь.
 import {useEffect, useState} from 'react';
 import {UpdateNotice, UpdateSettings} from '@/features/updates';
 import {userService} from '@/entities/user';
 import {isTauri} from '@/shared/api';
 import {Toaster} from '@/shared/ui';
 import {AuthAmbient} from '@/shared/ui/auth-ambient';
+import {MainLayout, TitleBar, WindowResizeHandles} from '@/shared/layouts';
 import {AppRouter, type AuthState} from '@/app/providers/router';
 import {useTheme, withTheme} from '@/app/providers/ThemeProvider';
 import {useWindowMaximized} from '@/app/lib/use-window-maximized';
-import {TitleBar} from '@/app/layout/title-bar';
-import {WindowResizeHandles} from '@/app/layout/window-resize-handles';
 
 import './styles/glass.css';
 import './styles/settings.css';
@@ -41,7 +41,7 @@ function AppContent() {
     })
     .catch(error => {
      if (active)
-      setAuth(String(error).includes('Сессия') || String(error).includes('AUTH_REQUIRED') ? 'guest' : 'error');
+      setAuth(String(error).includes('РЎРµСЃСЃРёСЏ') || String(error).includes('AUTH_REQUIRED') ? 'guest' : 'error');
     });
   };
   const changed = () => {
@@ -54,31 +54,32 @@ function AppContent() {
    window.removeEventListener('authchange', changed);
   };
  }, [route, attempt]);
- const {theme} = useTheme();
+ const {theme, toggleTheme} = useTheme();
  const inTauri = isTauri();
  const isMaximized = useWindowMaximized(inTauri);
 
  return (
-  <div
-   className={`app-surface bg-background text-foreground relative flex h-svh flex-col overflow-hidden ${auth === 'ready' ? 'chat-window' : 'auth-window mira-auth'}`}
-  >
-   {auth !== 'ready' && <AuthAmbient />}
-   <TitleBar inTauri={inTauri} isMaximized={isMaximized} />
-   <AppRouter auth={auth} route={route} onRetry={() => setAttempt(n => n + 1)} />
-   <WindowResizeHandles inTauri={inTauri} isMaximized={isMaximized} />
+  <>
+   <MainLayout
+    className={`${auth === 'ready' ? 'chat-window' : 'auth-window mira-auth'}`}
+    ambient={auth !== 'ready' ? <AuthAmbient /> : undefined}
+    titleBar={<TitleBar inTauri={inTauri} isMaximized={isMaximized} theme={theme} onToggleTheme={toggleTheme} />}
+    content={<AppRouter auth={auth} route={route} onRetry={() => setAttempt(n => n + 1)} />}
+    resizeHandles={<WindowResizeHandles inTauri={inTauri} isMaximized={isMaximized} />}
+   />
    <UpdateNotice />
    {showUpdates && auth !== 'ready' && (
     <div className="update-guest-overlay">
-     <section className="update-guest-dialog" role="dialog" aria-modal="true" aria-label="Обновления Sombra">
-      <button type="button" onClick={() => setShowUpdates(false)} aria-label="Закрыть обновления">
-       Закрыть
+     <section className="update-guest-dialog" role="dialog" aria-modal="true" aria-label="РћР±РЅРѕРІР»РµРЅРёСЏ Sombra">
+      <button type="button" onClick={() => setShowUpdates(false)} aria-label="Р—Р°РєСЂС‹С‚СЊ РѕР±РЅРѕРІР»РµРЅРёСЏ">
+       Р—Р°РєСЂС‹С‚СЊ
       </button>
       <UpdateSettings inCall={false} />
      </section>
     </div>
    )}
    <Toaster position="bottom-right" theme={theme} offset={{bottom: 60, right: 20}} />
-  </div>
+  </>
  );
 }
 

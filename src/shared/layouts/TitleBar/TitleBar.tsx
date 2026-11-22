@@ -1,16 +1,17 @@
 import {useEffect, useState, type MouseEvent} from 'react';
-import {getAppVersion} from '@/shared/api';
+import {getAppVersion, tauri} from '@/shared/api';
 import {Badge, SombraLogo} from '@/shared/ui';
-import {startWindowDrag, toggleMaximizeWindow} from '@/app/lib/window-actions';
-import {ThemeToggle} from './theme-toggle';
-import {WindowControls} from './window-controls';
+import {ThemeToggle} from './ThemeToggle';
+import {WindowControls} from './WindowControls';
 
 type TitleBarProps = {
  inTauri: boolean;
  isMaximized: boolean;
+ theme: 'light' | 'dark';
+ onToggleTheme: () => void;
 };
 
-export function TitleBar({inTauri, isMaximized}: TitleBarProps) {
+export function TitleBar({inTauri, isMaximized, theme, onToggleTheme}: TitleBarProps) {
  const [version, setVersion] = useState('0.1.0');
 
  useEffect(() => {
@@ -38,11 +39,11 @@ export function TitleBar({inTauri, isMaximized}: TitleBarProps) {
   }
 
   if (event.detail === 2) {
-   void toggleMaximizeWindow();
+   void tauri.window.toggleMaximize();
    return;
   }
 
-  void startWindowDrag();
+  void tauri.window.startDrag();
  }
 
  return (
@@ -61,7 +62,7 @@ export function TitleBar({inTauri, isMaximized}: TitleBarProps) {
    </div>
 
    <div className="flex h-full items-center gap-1 pr-1" data-no-drag>
-    <ThemeToggle />
+    <ThemeToggle theme={theme} onToggle={onToggleTheme} />
     <WindowControls inTauri={inTauri} isMaximized={isMaximized} />
    </div>
   </header>

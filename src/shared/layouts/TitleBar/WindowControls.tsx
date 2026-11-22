@@ -1,5 +1,5 @@
 import type {ReactNode} from 'react';
-import {closeWindow, minimizeWindow, toggleMaximizeWindow} from '@/app/lib/window-actions';
+import {tauri} from '@/shared/api';
 import {cn} from '@/shared/lib';
 
 type WindowControlsProps = {
@@ -12,15 +12,18 @@ export function WindowControls({inTauri, isMaximized}: WindowControlsProps) {
 
  return (
   <div className="flex h-full items-stretch" data-no-drag>
-   <ControlButton label="Свернуть" onClick={() => void minimizeWindow()}>
+   <ControlButton label="Свернуть" onClick={() => void tauri.window.minimize()}>
     <MinimizeIcon />
    </ControlButton>
 
-   <ControlButton label={isMaximized ? 'Восстановить' : 'Развернуть'} onClick={() => void toggleMaximizeWindow()}>
+   <ControlButton
+    label={isMaximized ? 'Восстановить' : 'Развернуть'}
+    onClick={() => void tauri.window.toggleMaximize()}
+   >
     {isMaximized ? <RestoreIcon /> : <MaximizeIcon />}
    </ControlButton>
 
-   <ControlButton label="Закрыть" close onClick={() => void closeWindow()}>
+   <ControlButton label="Закрыть" close onClick={() => void tauri.window.close()}>
     <CloseIcon />
    </ControlButton>
   </div>
