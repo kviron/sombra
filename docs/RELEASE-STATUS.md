@@ -1,5 +1,15 @@
 # Выпуски Sombra
 
+## Sombra 0.1.32 — 22 ноября 2026
+
+Типы в `shared/types`, транспорт переименован в `transport.ts`.
+
+Опубликованы [GitHub v0.1.32](https://github.com/kviron/sombra/releases/tag/v0.1.32) и зеркало на VPS. Установщик `Sombra_0.1.32_x64-setup.exe`, 11 596 856 байт, SHA-256 `04bf1ba2bfa604a1430fa3509c58a6a55297188b62c5f5040fde0656d730d3f3`; копии на GitHub и VPS совпадают, подпись сходится с ключом `594FDFFC0E4DE222`. Предыдущий манифест — `/root/sombra-backups/release-manifest-20261122T201420Z/`.
+
+Что сделано: транспортные типы разложены по темам в `shared/types` (`user`, `chat`, `group`, `profile`, `bot`, `voice`) с баррелем, 58 файлов переведены на новый импорт; `shared/api/backend.ts` переименован в `transport.ts`, потому что внутри был транспорт, а не «backend». Объявления типов не менялись — это перекладывание.
+
+Проверки: `tsc`, `npm run lint` (0 ошибок), `check:fsd`, 92 теста, сборка. Вне `shared/api` не осталось ни одного импорта транспорта — только типы из `shared/types`.
+
 ## Sombra 0.1.31 — 22 ноября 2026
 
 Архитектура данных: единый объект `api`, сервисы сущностей и фич, константы в `shared/const`.
