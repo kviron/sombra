@@ -1,24 +1,28 @@
 // Own stylesheet first: `profile-media-dialogs.css` (ниже, через импорт компонента и
 // последнюю строку) намеренно переопределяет старую раскладку карточки профиля.
 import './account-approved.css';
-import {useEffect, useRef, useState, type FormEvent, type KeyboardEvent} from 'react';
-import {type ChatState, type SessionDto, type User, type ProfileDecorationDoc} from '@/shared/types';
-import {sessionService} from '@/shared/api';
-import {userService} from '@/entities/user';
-import {accountService} from '../model/services/account-service';
+import {useEffect, useRef, type FormEvent, type KeyboardEvent} from 'react';
+import {type ChatState, type User} from '@/shared/types';
 import {Button} from '@/shared/ui/button';
 import {Input} from '@/shared/ui/input';
-import {ImageCropDialog, type PreparedProfileImage} from '@/shared/ui/image-crop-dialog';
+import {ImageCropDialog} from '@/shared/ui/image-crop-dialog';
 import {ProfileCover} from '@/shared/ui/profile-cover';
-import {ProfileDecorationPicker, type MediaTarget} from './profile-decoration-picker';
+import {ProfileDecorationPicker} from './profile-decoration-picker';
 import {ProfileMediaDialog} from './profile-media-dialogs';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {Monitor, Pencil, Trash2} from 'lucide-react';
 import {Label} from '@/shared/ui/label';
 import type {AccountSection} from './account-sidebar';
+import {useAccountSecurity} from '../model/use-account-security';
+import {deviceLabel, emailUnchanged, lastSeenLabel, sessionTitle} from '../model/account-security-rules';
+import type {MediaTarget} from '../model/profile-decoration';
 
 import './profile-media-dialogs.css';
 
+/**
+ * Компонент только показывает: сеансы, профиль, картинки, пароль и почта приходят
+ * из модели среза, поэтому здесь остались разметка, ref-ы и обработчики форм.
+ */
 export function AccountSecurity({
  state,
  refresh,
@@ -30,16 +34,14 @@ export function AccountSecurity({
  section: AccountSection;
  onMediaSaved: (user: User, field: MediaTarget | `decoration:${MediaTarget}`) => void;
 }) {
- const [sessions, setSessions] = useState<SessionDto[]>([]),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState(''),
-  [busy, setBusy] = useState(false);
- const [email, setEmail] = useState(state?.email || '');
- const [name, setName] = useState(state?.me.name || ''),
-  [bio, setBio] = useState(state?.me.bio || '');
-
- const [crop, setCrop] = useState<{file: File; kind: 'avatar' | 'cover'}>();
+ const {sessions, error, notice, busy, email, name, bio, crop, media, effects, coverSupported, actions} =
+  useAccountSecurity({state, refresh, section, onMediaSaved});
  const cropOrigin = useRef<HTMLButtonElement | null>(null);
+ const effectOrigin = useRef<HTMLButtonElement>(null),
+  avatarPicker = useRef<HTMLInputElement>(null),
+  coverPicker = useRef<HTMLInputElement>(null);
+
+ // Возврат фокуса после кадрирования — забота интерфейса.
  useEffect(() => {
   if (crop || !cropOrigin.current) return;
   const target = cropOrigin.current;
@@ -49,185 +51,32 @@ export function AccountSecurity({
   });
   return () => cancelAnimationFrame(frame);
  }, [crop]);
- const [media, setMedia] = useState<MediaTarget>();
- const [effects, setEffects] = useState<MediaTarget>();
- const effectOrigin = useRef<HTMLButtonElement>(null),
-  avatarPicker = useRef<HTMLInputElement>(null),
-  coverPicker = useRef<HTMLInputElement>(null);
- const mounted = useRef(true),
-  epoch = useRef(0),
-  lock = useRef(false),
-  identity = useRef(state?.me.id);
- identity.current = state?.me.id;
- const coverSupported = !!state?.me.coverSupported;
- useEffect(() => {
-  mounted.current = true;
-  return () => {
-   mounted.current = false;
-   epoch.current++;
-  };
- }, []);
- useEffect(() => {
-  epoch.current++;
-  setCrop(undefined);
-  setMedia(undefined);
-  setEffects(undefined);
-  setBusy(false);
-  lock.current = false;
-  setError('');
-  setNotice('');
-  setName(state?.me.name || '');
-  setBio(state?.me.bio || '');
-  setEmail(state?.email || '');
- }, [state?.me.id]);
- useEffect(() => {
-  if (section !== 'profile') {
-   setCrop(undefined);
-   setMedia(undefined);
-   setEffects(undefined);
-  }
- }, [section]);
- async function load() {
-  setSessions(await userService.sessions<SessionDto[]>());
- }
- useEffect(() => {
-  void load().catch(e => setError(e.message));
- }, []);
- useEffect(() => {
-  setError('');
-  setNotice('');
- }, [section]);
- async function run(action: () => Promise<void>) {
-  if (lock.current) return;
-  const request = ++epoch.current;
-  lock.current = true;
-  setBusy(true);
-  setError('');
-  setNotice('');
-  try {
-   await action();
-  } catch (e) {
-   if (mounted.current && request === epoch.current) setError((e as Error).message);
-  } finally {
-   if (mounted.current && request === epoch.current) {
-    lock.current = false;
-    setBusy(false);
-   }
-  }
- }
- async function saveImage(kind: 'avatar' | 'cover', result?: PreparedProfileImage) {
-  if (lock.current) throw new Error('Дождитесь сохранения');
-  if (kind === 'cover' && !coverSupported) throw new Error('Для обложек требуется обновление сервера');
-  const request = ++epoch.current,
-   account = identity.current,
-   token = sessionService.token();
-  const current = () =>
-   mounted.current && request === epoch.current && identity.current === account && sessionService.token() === token;
-  lock.current = true;
-  setBusy(true);
-  setError('');
-  setNotice('');
-  try {
-   let saved: User;
-   if (kind === 'cover')
-    ({user: saved} = await userService.setCover<{user: User}>({
-     cover: result ? {dataUrl: result.dataUrl, crop: result.crop} : null
-    }));
-   else {
-    const {user} = await userService.me<{user: User}>();
-    if (!current() || user.id !== account) throw new Error('Учётная запись изменилась');
-    await userService.updateProfile({profile: {name: user.name, bio: user.bio, avatar: result?.dataUrl ?? ''}});
-    saved = {...user, avatar: result?.dataUrl ?? ''};
-   }
-   if (!current() || saved.id !== account) return;
-   onMediaSaved(saved, kind);
-   setCrop(undefined);
-   setNotice(
-    kind === 'cover'
-     ? result
-       ? 'Обложка сохранена'
-       : 'Обложка удалена'
-     : result
-       ? 'Аватарка сохранена'
-       : 'Аватарка удалена'
-   );
-  } catch (e) {
-   if (current()) setError((e as Error).message);
-   throw e;
-  } finally {
-   if (current()) {
-    lock.current = false;
-    setBusy(false);
-   }
-  }
- }
- async function saveEffect(target: MediaTarget, decoration: ProfileDecorationDoc | null, id?: string) {
-  const account = identity.current,
-   token = sessionService.token();
-  const {user} = await (id
-   ? accountService.applyProfileEffect(id)
-   : userService.setDecoration<{user: User}>({target, decoration}));
-  if (!mounted.current || user.id !== account || identity.current !== account || sessionService.token() !== token)
-   return;
-  onMediaSaved(user, `decoration:${target}`);
-  setError('');
-  setNotice(id || decoration ? 'Украшение сохранено' : 'Украшение убрано');
- }
- /**
-  * The dialog keeps its own status line, so this variant returns the outcome
-  * instead of writing the section-wide notice behind the modal.
-  */
- async function applyMediaDecoration(target: MediaTarget, decoration: ProfileDecorationDoc | null) {
-  const account = identity.current,
-   token = sessionService.token();
-  const {user} = await userService.setDecoration<{user: User}>({target, decoration});
-  if (!mounted.current || user.id !== account || identity.current !== account || sessionService.token() !== token)
-   throw new Error('Учётная запись изменилась');
-  onMediaSaved(user, `decoration:${target}`);
- }
- async function saveIdentity() {
-  const trimmed = name.trim();
-  if (trimmed.length < 2 || trimmed.length > 32) {
-   setError('Имя: 2–32 символа');
-   return;
-  }
-  if (trimmed === state?.me.name && bio === state?.me.bio) return;
-  await run(async () => {
-   await userService.updateProfile({profile: {name: trimmed, bio}});
-   await refresh();
-   setNotice('Профиль сохранён');
-  });
- }
+
  function identityKey(event: KeyboardEvent<HTMLInputElement>) {
   if (event.key === 'Enter') {
    event.preventDefault();
-   void saveIdentity();
+   actions.saveIdentity();
   } else if (event.key === 'Escape') {
    event.preventDefault();
-   setName(state?.me.name || '');
-   setBio(state?.me.bio || '');
+   actions.resetFields();
    event.currentTarget.blur();
   }
  }
  function pickImage(target: MediaTarget) {
-  setMedia(undefined);
+  actions.closeMedia();
   (target === 'avatar' ? avatarPicker : coverPicker).current?.click();
  }
  function openCatalog(target: MediaTarget) {
-  setMedia(undefined);
+  actions.closeMedia();
   effectOrigin.current = document.querySelector<HTMLButtonElement>(
    `.profile-media [data-target="${target}"] [aria-haspopup="dialog"]`
   );
-  setEffects(target);
+  actions.openCatalog(target);
  }
  function password(e: FormEvent<HTMLFormElement>) {
   e.preventDefault();
   const data = new FormData(e.currentTarget);
-  void run(async () => {
-   if (data.get('password') !== data.get('confirm')) throw new Error('Пароли не совпадают');
-   await accountService.changePassword({current_password: data.get('current'), password: data.get('password')});
-   sessionService.clear();
-  });
+  actions.changePassword({current: data.get('current'), password: data.get('password'), confirm: data.get('confirm')});
  }
  return (
   <>
@@ -235,13 +84,8 @@ export function AccountSecurity({
     <ImageCropDialog
      file={crop.file}
      kind={crop.kind}
-     onConfirm={result => saveImage(crop.kind, result)}
-     onClose={() => {
-      epoch.current++;
-      lock.current = false;
-      setBusy(false);
-      setCrop(undefined);
-     }}
+     onConfirm={result => actions.saveImage(crop.kind, result)}
+     onClose={actions.cancelCrop}
     />
    )}
    <section hidden={section !== 'profile'} aria-labelledby="profile-heading">
@@ -260,7 +104,7 @@ export function AccountSecurity({
           size="sm"
           aria-haspopup="dialog"
           disabled={busy || state.me.bot || !coverSupported}
-          onClick={() => setMedia('cover')}
+          onClick={() => actions.openMedia('cover')}
          >
           <Pencil aria-hidden="true" />
           Изменить обложку
@@ -273,7 +117,7 @@ export function AccountSecurity({
            aria-label="Удалить обложку"
            title="Удалить обложку"
            disabled={busy}
-           onClick={() => void saveImage('cover').catch(() => {})}
+           onClick={() => void actions.saveImage('cover').catch(() => {})}
           >
            <Trash2 aria-hidden="true" />
           </Button>
@@ -289,7 +133,7 @@ export function AccountSecurity({
           size="sm"
           aria-haspopup="dialog"
           disabled={busy || state.me.bot}
-          onClick={() => setMedia('avatar')}
+          onClick={() => actions.openMedia('avatar')}
          >
           <Pencil aria-hidden="true" />
           Изменить аватар
@@ -302,7 +146,7 @@ export function AccountSecurity({
            aria-label="Удалить аватар"
            title="Удалить аватар"
            disabled={busy}
-           onClick={() => void saveImage('avatar').catch(() => {})}
+           onClick={() => void actions.saveImage('avatar').catch(() => {})}
           >
            <Trash2 aria-hidden="true" />
           </Button>
@@ -317,7 +161,7 @@ export function AccountSecurity({
           autoComplete="nickname"
           aria-label="Имя пользователя"
           value={name}
-          onChange={event => setName(event.target.value)}
+          onChange={event => actions.setName(event.target.value)}
           onKeyDown={identityKey}
           minLength={2}
           maxLength={32}
@@ -341,7 +185,7 @@ export function AccountSecurity({
           aria-label="О себе"
           placeholder="Описание пока не добавлено."
           value={bio}
-          onChange={event => setBio(event.target.value)}
+          onChange={event => actions.setBio(event.target.value)}
           onKeyDown={identityKey}
           maxLength={190}
          />
@@ -372,7 +216,7 @@ export function AccountSecurity({
          event.target.value = '';
          if (file) {
           cropOrigin.current = null;
-          setCrop({file, kind: 'avatar'});
+          actions.setCrop({file, kind: 'avatar'});
          }
         }}
        />
@@ -389,7 +233,7 @@ export function AccountSecurity({
          event.target.value = '';
          if (file) {
           cropOrigin.current = null;
-          setCrop({file, kind: 'cover'});
+          actions.setCrop({file, kind: 'cover'});
          }
         }}
        />
@@ -413,10 +257,10 @@ export function AccountSecurity({
         : 'PNG, JPEG, WebP или GIF · 1200 × 400 покажет лучше всего'
       }
       onPickImage={() => pickImage(media)}
-      onRemove={() => saveImage(media)}
-      onApply={doc => applyMediaDecoration(media, doc)}
+      onRemove={() => actions.saveImage(media)}
+      onApply={doc => actions.applyDecoration(media, doc)}
       onCatalog={() => openCatalog(media)}
-      onClose={() => setMedia(undefined)}
+      onClose={actions.closeMedia}
      />
     )}
     {state && effects && section === 'profile' && (
@@ -427,8 +271,8 @@ export function AccountSecurity({
       catalogSupported={!!state.effectCatalogSupported}
       draftsSupported={!!state.profileEffectDraftsSupported}
       uploadsSupported={!!state.profileEffectUploadsSupported}
-      onSave={(doc, id) => saveEffect(effects, doc, id)}
-      onClose={() => setEffects(undefined)}
+      onSave={(doc, id) => actions.saveEffect(effects, doc, id)}
+      onClose={actions.closeCatalog}
       onRestoreFocus={() => requestAnimationFrame(() => effectOrigin.current?.focus())}
      />
     )}
@@ -438,11 +282,8 @@ export function AccountSecurity({
       e.preventDefault();
       const form = e.currentTarget;
       const data = new FormData(form);
-      void run(async () => {
-       await accountService.changeEmail({email, current_password: data.get('current_password')});
-       await refresh();
-       form.reset();
-       setNotice('Почта изменена. Используйте её при следующем входе.');
+      void actions.changeEmail(data.get('current_password')).then(changed => {
+       if (changed) form.reset();
       });
      }}
     >
@@ -454,7 +295,7 @@ export function AccountSecurity({
        type="email"
        autoComplete="email"
        value={email}
-       onChange={e => setEmail(e.target.value)}
+       onChange={e => actions.setEmail(e.target.value)}
        required
        maxLength={254}
       />
@@ -471,7 +312,7 @@ export function AccountSecurity({
       />
      </div>
      <div className="settings-actions">
-      <Button variant="secondary" size="sm" disabled={busy || email.trim().toLowerCase() === state?.email}>
+      <Button variant="secondary" size="sm" disabled={busy || emailUnchanged(email, state?.email)}>
        {busy ? 'Сохраняем…' : 'Изменить почту'}
       </Button>
      </div>
@@ -549,47 +390,18 @@ export function AccountSecurity({
       <li key={session.id} className="approved-session-card" data-current={session.current}>
        <Monitor size={24} aria-hidden="true" />
        <div>
-        <strong>
-         {session.current
-          ? 'Это устройство'
-          : session.device.includes('Windows')
-            ? 'Windows'
-            : session.device.includes('Mac')
-              ? 'Mac'
-              : 'Браузер / приложение'}
-        </strong>
-        <p title={session.device}>{session.device.slice(0, 70)}</p>
-        <small>Последняя активность: {new Date(session.last_seen * 1000).toLocaleString('ru')}</small>
+        <strong>{sessionTitle(session)}</strong>
+        <p title={session.device}>{deviceLabel(session.device)}</p>
+        <small>Последняя активность: {lastSeenLabel(session.last_seen)}</small>
        </div>
-       <Button
-        variant="outline"
-        size="sm"
-        disabled={busy}
-        onClick={() =>
-         void run(async () => {
-          await userService.revokeSession(session.id);
-          if (session.current) sessionService.clear();
-          else await load();
-         })
-        }
-       >
+       <Button variant="outline" size="sm" disabled={busy} onClick={() => actions.revokeSession(session)}>
         Завершить
        </Button>
       </li>
      ))}
     </ul>
     <div className="approved-session-actions">
-     <Button
-      variant="outline"
-      size="sm"
-      disabled={busy}
-      onClick={() =>
-       void run(async () => {
-        await userService.logoutAll();
-        sessionService.clear();
-       })
-      }
-     >
+     <Button variant="outline" size="sm" disabled={busy} onClick={actions.logoutAll}>
       Выйти на всех устройствах
      </Button>
     </div>

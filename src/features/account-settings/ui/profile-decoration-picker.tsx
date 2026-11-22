@@ -1,56 +1,19 @@
-import {useEffect, useRef, useState, type FormEvent} from 'react';
+import {useRef} from 'react';
 import {Dialog, ScrollArea} from 'radix-ui';
 import {Check, Plus, Upload, X} from 'lucide-react';
-import {
- type ProfileDecorationDoc,
- type ProfileEffect,
- type ProfileEffectAsset,
- type ProfileEffectDraft,
- type ProfileEffectTarget,
- type User
-} from '@/shared/types';
-import {sessionService} from '@/shared/api';
-import {accountService} from '../model/services/account-service';
-import {DECORATION_PRESETS, normalizeDecoration} from '@/shared/ui/avatar-fx';
+import {type ProfileDecorationDoc, type ProfileEffect, type ProfileEffectAsset, type User} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
-import {ProfileEffectImage, PROFILE_EFFECT_MAX_BYTES} from '@/shared/ui/profile-effect-image';
+import {ProfileEffectImage} from '@/shared/ui/profile-effect-image';
 import {ProfileCover} from '@/shared/ui/profile-cover';
 import {Button} from '@/shared/ui/button';
+import {useProfileDecorationPicker} from '../model/use-profile-decoration-picker';
+import type {DecorationChoice, MediaTarget} from '../model/profile-decoration';
 import '@/shared/ui/menu-material.css';
 import './profile-decoration-picker.css';
 
-export type MediaTarget = ProfileEffectTarget;
-const OPTIONS = {
- avatar: [
-  ['ember-crown', 'Огненная рамка'],
-  ['slime-pet', 'Слайм в углу']
- ],
- cover: [
-  ['runner-cover', 'Бегущий герой'],
-  ['aurora-cover', 'Звёздное сияние']
- ]
-} as const;
-type Choice = {
- key: string;
- title: string;
- decoration: ProfileDecorationDoc | null;
- id?: string;
- asset?: ProfileEffectAsset;
-};
-type Page = {items: ProfileEffect[]; nextOffset: number | null};
-type View = 'personal' | 'catalog' | 'create' | 'upload';
+export type {MediaTarget};
 const MAX_EFFECT_TITLE = 64;
 
-const asChoice = (item: ProfileEffect): Choice => ({
- key: `effect:${item.id}`,
- id: item.id,
- title: item.title,
- decoration: item.decoration,
- asset: item.asset
-});
-function message(reason: unknown, fallback: string) {
- return reason instanceof Error ? reason.message : fallback;
-}
 function EffectSample({
  user,
  target,
@@ -74,6 +37,10 @@ function EffectSample({
  );
 }
 
+/**
+ * Компонент только показывает: каталог, черновики генерации, загрузка GIF и публикация
+ * приходят из модели среза, поэтому здесь остались разметка и фокус заголовка.
+ */
 export function ProfileDecorationPicker({
  user,
  target,
@@ -93,263 +60,43 @@ export function ProfileDecorationPicker({
  onClose: () => void;
  onRestoreFocus: () => void;
 }) {
- const [view, setView] = useState<View>('personal');
- const [file, setFile] = useState<File>(),
-  [title, setTitle] = useState(''),
-  [preview, setPreview] = useState('');
- const [fileError, setFileError] = useState('');
- const [page, setPage] = useState<Page>({items: [], nextOffset: null});
- const [recentUploads, setRecentUploads] = useState<ProfileEffect[]>([]);
- const displayedItems =
-  view === 'personal'
-   ? [
-      ...recentUploads.filter(item => item.target === target),
-      ...page.items.filter(item => !recentUploads.some(upload => upload.id === item.id))
-     ]
-   : page.items;
- const [pageLoading, setPageLoading] = useState(catalogSupported),
-  [pageError, setPageError] = useState('');
- const [reload, setReload] = useState(0),
-  [choice, setChoice] = useState<Choice>();
- const [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState('');
- const [prompt, setPrompt] = useState(''),
-  [draft, setDraft] = useState<ProfileEffectDraft>();
- const [pollError, setPollError] = useState('');
- const lock = useRef(false),
-  heading = useRef<HTMLHeadingElement>(null),
-  mounted = useRef(false);
- const pending = draft?.status === 'queued' || draft?.status === 'running';
- const draftReady =
-  draft?.status === 'ready' && draft.result && normalizeDecoration(draft.result.decoration, {target}).value
-   ? draft.result
-   : undefined;
- const currentDoc = user.decorations?.[target] ?? null;
- const currentRef = user.decorationRefs?.[target];
- const sameDocument = (left: ProfileDecorationDoc | null, right: ProfileDecorationDoc | null) =>
-  JSON.stringify(normalizeDecoration(left, {target}).value) ===
-  JSON.stringify(normalizeDecoration(right, {target}).value);
- const current = (item: Choice) =>
-  item.id ? item.id === currentRef : !currentRef && sameDocument(item.decoration, currentDoc);
- const none = {key: 'none', title: target === 'avatar' ? 'Без рамки' : 'Без эффекта', decoration: null};
- const presets: Choice[] = OPTIONS[target].map(([key, title]) => ({
-  key,
+ const model = useProfileDecorationPicker({
+  user,
+  target,
+  catalogSupported,
+  draftsSupported,
+  uploadsSupported,
+  onSave,
+  onClose
+ });
+ const {
+  view,
+  file,
   title,
-  decoration: DECORATION_PRESETS[key].decoration as ProfileDecorationDoc
- }));
- const localOptions: Choice[] = view === 'catalog' ? [] : target === 'avatar' ? [none, ...presets] : [...presets, none];
- if (view === 'personal' && currentDoc && !currentRef && !presets.some(current))
-  localOptions.splice(1, 0, {key: 'current', title: 'Текущий эффект', decoration: currentDoc});
+  preview,
+  fileError,
+  page,
+  pageLoading,
+  pageError,
+  choice,
+  busy,
+  error,
+  notice,
+  prompt,
+  draft,
+  pollError,
+  pending,
+  draftReady,
+  items,
+  effectsCount,
+  canApply,
+  isCurrent,
+  actions
+ } = model;
+ const heading = useRef<HTMLHeadingElement>(null);
 
- useEffect(() => {
-  mounted.current = true;
-  return () => {
-   mounted.current = false;
-  };
- }, []);
- useEffect(() => {
-  if (view !== 'upload' || !file) return;
-  let active = true,
-   url = '';
-  void file
-   .slice(0, 6)
-   .text()
-   .then(signature => {
-    if (!active) return;
-    if (!/^GIF8[79]a$/.test(signature)) {
-     setFileError('Выберите файл GIF.');
-     setFile(undefined);
-     return;
-    }
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    url = URL.createObjectURL(file);
-    setPreview(url);
-   })
-   .catch(() => {
-    if (active) {
-     setFileError('Не удалось прочитать GIF.');
-     setFile(undefined);
-    }
-   });
-  return () => {
-   active = false;
-   if (url) URL.revokeObjectURL(url);
-  };
- }, [file, view]);
- useEffect(() => {
-  if (!catalogSupported || view === 'create' || view === 'upload') return;
-  let active = true;
-  const token = sessionService.token();
-  setPage({items: [], nextOffset: null});
-  setPageLoading(true);
-  setPageError('');
-  void accountService
-   .listProfileEffects(view, target)
-   .then(result => {
-    if (active && sessionService.token() === token) setPage(result);
-   })
-   .catch(reason => {
-    if (active && sessionService.token() === token) setPageError(message(reason, 'Не удалось загрузить эффекты'));
-   })
-   .finally(() => {
-    if (active && sessionService.token() === token) setPageLoading(false);
-   });
-  return () => {
-   active = false;
-  };
- }, [catalogSupported, view, target, reload]);
-
- useEffect(() => {
-  if (!pending || !draft || pollError) return;
-  let active = true;
-  const token = sessionService.token();
-  const timeout = window.setTimeout(() => {
-   void accountService
-    .getProfileEffectDraft(draft.id)
-    .then(next => {
-     if (active && sessionService.token() === token) setDraft(next);
-    })
-    .catch(reason => {
-     if (active && sessionService.token() === token)
-      setPollError(message(reason, 'Не удалось проверить состояние черновика'));
-    });
-  }, 1800);
-  return () => {
-   active = false;
-   window.clearTimeout(timeout);
-  };
- }, [draft, pending, pollError]);
-
- async function run(action: (current: () => boolean) => Promise<void>) {
-  if (lock.current) return;
-  const token = sessionService.token(),
-   valid = () => mounted.current && sessionService.token() === token;
-  lock.current = true;
-  setBusy(true);
-  setError('');
-  setNotice('');
-  try {
-   await action(valid);
-  } catch (reason) {
-   if (valid()) setError(message(reason, 'Не удалось выполнить действие'));
-  } finally {
-   lock.current = false;
-   if (valid()) setBusy(false);
-  }
- }
- function switchView(next: View) {
-  if (next === view || lock.current) return;
-  if (view === 'upload') {
-   setFile(undefined);
-   setPreview('');
-   setTitle('');
-   setFileError('');
-  }
-  setChoice(undefined);
-  setError('');
-  setNotice('');
-  setPage({items: [], nextOffset: null});
-  setPageLoading(Boolean(catalogSupported && (next === 'personal' || next === 'catalog')));
-  setPageError('');
-  setView(next);
- }
- function loadMore() {
-  if (!catalogSupported || view === 'create' || view === 'upload' || page.nextOffset === null) return;
-  const offset = page.nextOffset;
-  void run(async valid => {
-   const result = await accountService.listProfileEffects(view, target, offset);
-   if (valid())
-    setPage(previous => ({
-     nextOffset: result.nextOffset,
-     items: [...previous.items, ...result.items.filter(item => !previous.items.some(old => old.id === item.id))]
-    }));
-  });
- }
- function changeVisibility(item: ProfileEffect) {
-  void run(async valid => {
-   const {item: updated} = await accountService.setProfileEffectVisibility(item.id, !item.public);
-   if (!valid()) return;
-   setRecentUploads(previous => previous.map(row => (row.id === updated.id ? updated : row)));
-   if (view === 'catalog' && !updated.public) {
-    setChoice(undefined);
-    setReload(value => value + 1);
-   } else
-    setPage(previous => ({...previous, items: previous.items.map(row => (row.id === updated.id ? updated : row))}));
-   setNotice(updated.public ? 'Эффект опубликован в каталоге' : 'Эффект убран из каталога');
-  });
- }
- function chooseFile(candidate?: File) {
-  setFile(undefined);
-  setPreview('');
-  setFileError('');
-  setError('');
-  if (!candidate) return;
-  if (candidate.size > PROFILE_EFFECT_MAX_BYTES) {
-   setFileError('GIF должен быть не больше 2 МиБ.');
-   return;
-  }
-  if (candidate.size < 6 || (candidate.type && candidate.type !== 'image/gif')) {
-   setFileError('Выберите файл GIF.');
-   return;
-  }
-  setFile(candidate);
- }
- function upload(event: FormEvent) {
-  event.preventDefault();
-  if (!uploadsSupported || !file || !title.trim()) return;
-  void run(async valid => {
-   if (!/^GIF8[79]a$/.test(await file.slice(0, 6).text())) throw new Error('Выберите файл GIF.');
-   const data = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
-    reader.onerror = reader.onabort = () => reject(new Error('Не удалось прочитать GIF.'));
-    reader.readAsDataURL(file);
-   });
-   if (!valid()) return;
-   const {item} = await accountService.uploadProfileEffect(target, title.trim(), data);
-   if (!valid()) return;
-   setFile(undefined);
-   setPreview('');
-   setTitle('');
-   setFileError('');
-   setRecentUploads(previous => [item, ...previous]);
-   setChoice(asChoice(item));
-   setView('personal');
-   setNotice('GIF добавлена в личную коллекцию. Чтобы использовать её, нажмите «Применить».');
-  });
- }
- function generate(event: FormEvent) {
-  event.preventDefault();
-  if (pending || !prompt.trim()) return;
-  void run(async valid => {
-   const next = await accountService.createProfileEffectDraft(target, prompt.trim());
-   if (valid()) {
-    setPollError('');
-    setDraft(next);
-   }
-  });
- }
- function saveDraft() {
-  if (!draftReady) return;
-  void run(async valid => {
-   await accountService.createProfileEffect(target, draftReady.title, draftReady.decoration);
-   if (!valid()) return;
-   setDraft(undefined);
-   setPrompt('');
-   setView('personal');
-   setNotice('Черновик сохранён в «Мои эффекты». Он не опубликован и не применён.');
-  });
- }
- function apply() {
-  if (!choice || current(choice)) return;
-  void run(async valid => {
-   await onSave(choice.decoration, choice.id);
-   if (valid()) onClose();
-  });
- }
- function renderCard(item: Choice, record?: ProfileEffect) {
-  const selected = choice?.key === item.key || (!choice && current(item));
+ function renderCard(item: DecorationChoice, kind: string, record?: ProfileEffect) {
+  const selected = choice?.key === item.key || (!choice && isCurrent(item));
   const card = (
    <button
     key={item.key}
@@ -357,16 +104,13 @@ export function ProfileDecorationPicker({
     className="profile-effect-card"
     aria-pressed={selected}
     disabled={busy}
-    onClick={() => {
-     setChoice(item);
-     setError('');
-    }}
+    onClick={() => actions.select(item)}
    >
     <EffectSample user={user} target={target} decoration={item.decoration} asset={item.asset} />
     <span className="profile-effect-title">
      <span>
       <strong>{item.title}</strong>
-      <small>{item.asset ? 'GIF-анимация' : item.decoration ? 'Анимированный эффект' : 'Стандартный вид'}</small>
+      <small>{kind}</small>
      </span>
      {selected && <Check size={16} aria-hidden="true" />}
     </span>
@@ -382,7 +126,7 @@ export function ProfileDecorationPicker({
       type="button"
       disabled={busy}
       aria-label={`${record.public ? 'Скрыть из каталога' : 'Опубликовать в каталоге'}: ${item.title}`}
-      onClick={() => changeVisibility(record)}
+      onClick={() => actions.changeVisibility(record)}
      >
       {record.public ? 'Скрыть' : 'Опубликовать'}
      </button>
@@ -390,11 +134,12 @@ export function ProfileDecorationPicker({
    </div>
   );
  }
+
  return (
   <Dialog.Root
    open
    onOpenChange={open => {
-    if (!open && !lock.current) onClose();
+    if (!open && !busy) onClose();
    }}
   >
    <Dialog.Portal>
@@ -412,11 +157,11 @@ export function ProfileDecorationPicker({
       onRestoreFocus();
      }}
      onEscapeKeyDown={event => {
-      if (lock.current) event.preventDefault();
+      if (busy) event.preventDefault();
       event.stopPropagation();
      }}
      onInteractOutside={event => {
-      if (lock.current) event.preventDefault();
+      if (busy) event.preventDefault();
      }}
     >
      <ScrollArea.Root className="profile-effects-scroll" type="hover">
@@ -445,11 +190,16 @@ export function ProfileDecorationPicker({
            type="button"
            aria-pressed={view === 'personal'}
            disabled={busy}
-           onClick={() => switchView('personal')}
+           onClick={() => actions.switchView('personal')}
           >
            Личное
           </button>
-          <button type="button" aria-pressed={view === 'catalog'} disabled={busy} onClick={() => switchView('catalog')}>
+          <button
+           type="button"
+           aria-pressed={view === 'catalog'}
+           disabled={busy}
+           onClick={() => actions.switchView('catalog')}
+          >
            Общее
           </button>
          </div>
@@ -460,7 +210,7 @@ export function ProfileDecorationPicker({
             variant="ghost"
             aria-pressed={view === 'create'}
             disabled={busy}
-            onClick={() => switchView('create')}
+            onClick={() => actions.switchView('create')}
            >
             Создать эффект
            </Button>
@@ -470,7 +220,7 @@ export function ProfileDecorationPicker({
            variant="outline"
            aria-pressed={view === 'upload'}
            disabled={busy}
-           onClick={() => switchView('upload')}
+           onClick={() => actions.switchView('upload')}
           >
            <Plus aria-hidden="true" />
            Добавить свою GIF
@@ -478,7 +228,13 @@ export function ProfileDecorationPicker({
          </div>
         </div>
         {view === 'upload' ? (
-         <form className="profile-effect-form" onSubmit={upload}>
+         <form
+          className="profile-effect-form"
+          onSubmit={event => {
+           event.preventDefault();
+           actions.upload();
+          }}
+         >
           {uploadsSupported ? (
            <div className="profile-effect-upload">
             <Upload size={22} aria-hidden="true" />
@@ -489,7 +245,7 @@ export function ProfileDecorationPicker({
              accept="image/gif,.gif"
              required
              disabled={busy}
-             onChange={event => chooseFile(event.currentTarget.files?.[0])}
+             onChange={event => actions.chooseFile(event.currentTarget.files?.[0])}
             />
             <p>GIF · до 2 МиБ. При сохранении эффект останется личным.</p>
             {fileError && <p role="alert">{fileError}</p>}
@@ -506,10 +262,7 @@ export function ProfileDecorationPicker({
              maxLength={MAX_EFFECT_TITLE}
              value={title}
              disabled={busy}
-             onChange={event => {
-              setTitle(event.target.value);
-              setError('');
-             }}
+             onChange={event => actions.setTitle(event.target.value)}
              placeholder="Название эффекта"
             />
            </div>
@@ -519,7 +272,7 @@ export function ProfileDecorationPicker({
            </p>
           )}
           <footer>
-           <Button type="button" variant="ghost" disabled={busy} onClick={() => switchView('personal')}>
+           <Button type="button" variant="ghost" disabled={busy} onClick={() => actions.switchView('personal')}>
             Назад
            </Button>
            {uploadsSupported && (
@@ -530,7 +283,13 @@ export function ProfileDecorationPicker({
           </footer>
          </form>
         ) : view === 'create' ? (
-         <form className="profile-effect-form" onSubmit={generate}>
+         <form
+          className="profile-effect-form"
+          onSubmit={event => {
+           event.preventDefault();
+           actions.generate();
+          }}
+         >
           <label htmlFor="profile-effect-prompt">Как должен выглядеть эффект?</label>
           <textarea
            id="profile-effect-prompt"
@@ -539,21 +298,17 @@ export function ProfileDecorationPicker({
            maxLength={400}
            value={prompt}
            disabled={busy || pending}
-           onChange={event => {
-            setPrompt(event.target.value);
-            setDraft(undefined);
-            setError('');
-           }}
+           onChange={event => actions.setPrompt(event.target.value)}
            placeholder={
             target === 'avatar' ? 'Например, тёплые искры по краю аватара' : 'Например, звёзды над ночным городом'
            }
           />
           <p>Сначала появится превью. Сохранённый черновик будет личным, пока вы не опубликуете его сами.</p>
-          {pending && <p role="status">{draft.status === 'queued' ? 'Черновик в очереди…' : 'Создаём эффект…'}</p>}
+          {pending && <p role="status">{draft?.status === 'queued' ? 'Черновик в очереди…' : 'Создаём эффект…'}</p>}
           {pollError && (
            <p role="alert">
             {pollError}{' '}
-            <Button type="button" variant="outline" onClick={() => setPollError('')}>
+            <Button type="button" variant="outline" onClick={actions.clearPollError}>
              Проверить ещё раз
             </Button>
            </p>
@@ -579,7 +334,7 @@ export function ProfileDecorationPicker({
             {draft ? 'Создать заново' : 'Создать превью'}
            </Button>
            {draftReady && (
-            <Button type="button" disabled={busy} onClick={saveDraft}>
+            <Button type="button" disabled={busy} onClick={actions.saveDraft}>
              Сохранить черновик
             </Button>
            )}
@@ -592,8 +347,7 @@ export function ProfileDecorationPicker({
            role="group"
            aria-label={target === 'avatar' ? 'Рамки аватара' : 'Эффекты обложки'}
           >
-           {localOptions.map(item => renderCard(item))}
-           {displayedItems.map(item => renderCard(asChoice(item), item))}
+           {items.map(({choice: item, kind, record}) => renderCard(item, kind, record))}
           </div>
           {!catalogSupported && view === 'catalog' && (
            <p className="profile-effect-state" role="status">
@@ -608,12 +362,12 @@ export function ProfileDecorationPicker({
           {pageError && (
            <div className="profile-effect-state" role="alert">
             {pageError}{' '}
-            <Button type="button" variant="outline" disabled={busy} onClick={() => setReload(value => value + 1)}>
+            <Button type="button" variant="outline" disabled={busy} onClick={actions.retry}>
              Повторить
             </Button>
            </div>
           )}
-          {catalogSupported && !pageLoading && !pageError && !displayedItems.length && (
+          {catalogSupported && !pageLoading && !pageError && !effectsCount && (
            <p className="profile-effect-state">
             {view === 'catalog'
              ? 'В каталоге пока нет эффектов для этого раздела.'
@@ -621,7 +375,7 @@ export function ProfileDecorationPicker({
            </p>
           )}
           {page.nextOffset !== null && (
-           <Button type="button" variant="outline" disabled={busy || pageLoading} onClick={loadMore}>
+           <Button type="button" variant="outline" disabled={busy || pageLoading} onClick={actions.loadMore}>
             Показать ещё
            </Button>
           )}
@@ -631,7 +385,7 @@ export function ProfileDecorationPicker({
              Отмена
             </Button>
            </Dialog.Close>
-           <Button type="button" disabled={busy || !choice || current(choice)} onClick={apply}>
+           <Button type="button" disabled={busy || !canApply} onClick={actions.apply}>
             Применить
            </Button>
           </footer>
