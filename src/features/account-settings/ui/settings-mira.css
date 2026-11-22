@@ -12,11 +12,23 @@
   width:min(1080px,100%);
   height:min(660px,100%);
   color:var(--foreground);
-  background:#1b1621;
-  border:1px solid var(--border);
+  /* Матовое стекло: тёмная полупрозрачная панель над размытым чатом. */
+  background:color-mix(in srgb, #1b1621 74%, transparent);
+  background-image:linear-gradient(180deg, #ffffff12, #ffffff00 38%), radial-gradient(130% 90% at 100% 0%, #5d0ec02e, transparent 58%);
+  border:1px solid #ffffff26;
   border-radius:14px;
-  box-shadow:none;
-  backdrop-filter:none;
+  -webkit-backdrop-filter:blur(34px) saturate(150%);
+  backdrop-filter:blur(34px) saturate(150%);
+  box-shadow:0 32px 90px #000000a6, inset 0 1px 0 #ffffff26;
+}
+/* Прозрачность — украшение: при системной настройке «уменьшить прозрачность» панель непрозрачна. */
+@media (prefers-reduced-transparency: reduce) {
+  .app-surface .account-modal.settings-mira {
+    background:#1b1621;
+    -webkit-backdrop-filter:none;
+    backdrop-filter:none;
+    box-shadow:none;
+  }
 }
 .app-surface .account-modal.settings-mira[data-section="journal"]{height:min(752px,100%);position:relative}
 .settings-mira[data-section=journal]>article>header{position:absolute;inset:14px 14px auto auto;min-height:0;padding:0;border:0;z-index:1}
