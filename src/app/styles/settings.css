@@ -62,7 +62,7 @@
 .account-modal [data-slot="input"] { height: 36px; background: var(--background); color: var(--foreground); border-color: var(--input); }
 .account-modal [data-slot="input"][readonly] { color: var(--muted-foreground); background: transparent; }
 .account-modal .settings-actions { display: flex; padding-left: 176px; margin-top: 4px; }
-.account-modal [data-slot="button"] { min-height: 32px; font-size: 13px; }
+.account-modal [data-slot="button"]:not([data-size="icon-xs"]) { min-height: 32px; font-size: 13px; }
 .account-modal [data-slot="button"][data-variant="secondary"] { background: var(--secondary); color: var(--secondary-foreground); }
 .account-modal [data-slot="button"][data-variant="secondary"]:hover { background: var(--accent); }
 .account-modal p.settings-hint { font-size: 12px; line-height: 18px; margin: 0 0 8px; color: var(--muted-foreground); }
@@ -176,7 +176,7 @@
 .account-modal #account-panel [data-slot="select-trigger"] { width: 100%; min-width: 0; height: 36px; min-height: 36px; padding: 0 12px; font-size: 14px; }
 .account-modal #account-panel [data-slot="input"][type="file"] { padding: 6px 8px; height: auto; min-height: 36px; }
 .account-modal #account-panel .settings-actions { min-height: 44px; align-items: center; margin: 0; padding-left: 176px; }
-.account-modal #account-panel [data-slot="button"] { min-height: 36px; font-size: 14px; }
+.account-modal #account-panel [data-slot="button"]:not([data-size^="icon"]) { min-height: 36px; font-size: 14px; }
 .account-modal #account-panel .email-form { margin-top: 24px; padding-top: 24px; }
 .account-modal #account-panel .settings-hint { font-size: 12px; line-height: 18px; margin: 4px 0 8px; }
 .account-modal #account-panel .session-row { padding: 12px; margin-bottom: 8px; gap: 16px; }

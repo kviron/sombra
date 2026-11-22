@@ -89,25 +89,25 @@ export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:Chat
     <div className="profile-media-item" data-target="cover">
      <ProfileCover user={state.me} accountId={state.me.id} className="settings-cover-preview"/>
      <div className="profile-media-chips">
-      <button type="button" className="profile-media-chip" aria-haspopup="dialog" disabled={busy||state.me.bot||!coverSupported} onClick={()=>setMedia('cover')}><Pencil size={14} aria-hidden="true"/>Изменить обложку</button>
-      {state.me.cover&&<button type="button" className="profile-media-chip" data-icon aria-label="Удалить обложку" title="Удалить обложку" disabled={busy} onClick={()=>void saveImage('cover').catch(()=>{})}><Trash2 size={14} aria-hidden="true"/></button>}
+      <Button type="button" variant="secondary" size="sm" aria-haspopup="dialog" disabled={busy||state.me.bot||!coverSupported} onClick={()=>setMedia('cover')}><Pencil aria-hidden="true"/>Изменить обложку</Button>
+      {state.me.cover&&<Button type="button" variant="secondary" size="icon-lg" aria-label="Удалить обложку" title="Удалить обложку" disabled={busy} onClick={()=>void saveImage('cover').catch(()=>{})}><Trash2 aria-hidden="true"/></Button>}
      </div>
     </div>
     <div className="profile-media-item" data-target="avatar">
      <UserAvatar user={state.me} size="xl" presence={false} decorative decoration={state.me.decorations?.avatar}/>
      <div className="profile-media-chips">
-      <button type="button" className="profile-media-chip" aria-haspopup="dialog" disabled={busy||state.me.bot} onClick={()=>setMedia('avatar')}><Pencil size={14} aria-hidden="true"/>Изменить аватар</button>
-      {state.me.avatar&&<button type="button" className="profile-media-chip" data-icon aria-label="Удалить аватар" title="Удалить аватар" disabled={busy} onClick={()=>void saveImage('avatar').catch(()=>{})}><Trash2 size={14} aria-hidden="true"/></button>}
+      <Button type="button" variant="secondary" size="sm" aria-haspopup="dialog" disabled={busy||state.me.bot} onClick={()=>setMedia('avatar')}><Pencil aria-hidden="true"/>Изменить аватар</Button>
+      {state.me.avatar&&<Button type="button" variant="secondary" size="icon-lg" aria-label="Удалить аватар" title="Удалить аватар" disabled={busy} onClick={()=>void saveImage('avatar').catch(()=>{})}><Trash2 aria-hidden="true"/></Button>}
      </div>
     </div>
     <div className="approved-profile-identity">
      <div className="profile-identity-field">
       <input id="account-name" className="profile-identity-input" autoComplete="nickname" aria-label="Имя пользователя" value={name} onChange={event=>setName(event.target.value)} onKeyDown={identityKey} minLength={2} maxLength={32}/>
-      <button type="button" className="profile-identity-edit" title="Изменить имя" aria-label="Изменить имя пользователя" onClick={()=>document.querySelector<HTMLInputElement>('#account-name')?.focus()}><Pencil size={14} aria-hidden="true"/></button>
+      <Button type="button" variant="ghost" size="icon-xs" className="profile-identity-edit" title="Изменить имя" aria-label="Изменить имя пользователя" onClick={()=>document.querySelector<HTMLInputElement>('#account-name')?.focus()}><Pencil aria-hidden="true"/></Button>
      </div>
      <div className="profile-identity-field">
       <input id="account-bio" className="profile-identity-input" aria-label="О себе" placeholder="Описание пока не добавлено." value={bio} onChange={event=>setBio(event.target.value)} onKeyDown={identityKey} maxLength={190}/>
-      <button type="button" className="profile-identity-edit" title="Изменить описание" aria-label="Изменить описание" onClick={()=>document.querySelector<HTMLInputElement>('#account-bio')?.focus()}><Pencil size={13} aria-hidden="true"/></button>
+      <Button type="button" variant="ghost" size="icon-xs" className="profile-identity-edit" title="Изменить описание" aria-label="Изменить описание" onClick={()=>document.querySelector<HTMLInputElement>('#account-bio')?.focus()}><Pencil aria-hidden="true"/></Button>
      </div>
      <small>Так профиль выглядит для собеседников — имя и описание сохраняются по Enter</small>
     </div>
