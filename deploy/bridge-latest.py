@@ -37,7 +37,11 @@ def main():
     platform = manifest['platforms']['windows-x86_64']
     assert version == tag.lstrip('v'), f'манифест {version} не совпадает с тегом {tag}'
     assert platform['url'].startswith(f'https://github.com/{REPO}/releases/download/{tag}/'), platform['url']
-    assert platform['signature'].startswith('untrusted comment:'), 'подпись не minisign'
+    # Tauri пишет .sig как base64 от minisign-подписи; в манифесте должна лежать ровно эта строка.
+    import base64
+    signature = platform['signature']
+    decoded = signature if signature.startswith('untrusted comment:') else base64.b64decode(signature).decode('utf-8')
+    assert decoded.startswith('untrusted comment:'), 'подпись не minisign'
 
     config = settings()
     client = paramiko.SSHClient()

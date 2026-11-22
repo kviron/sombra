@@ -29,8 +29,12 @@ const platforms = {};
 for (const name of readdirSync(sigsDir)) {
   const bundle = name.slice(0, -'.sig'.length);
   if (!name.endsWith('.sig') || !/_x64-setup\.exe$/.test(bundle)) continue;
+  // Tauri пишет .sig как base64 от minisign-подписи, и манифест должен отдать ровно эту строку.
   const signature = readFileSync(join(sigsDir, name), 'utf8').trim();
-  if (!signature.startsWith('untrusted comment:')) {
+  const decoded = signature.startsWith('untrusted comment:')
+    ? signature
+    : Buffer.from(signature, 'base64').toString('utf8');
+  if (!decoded.startsWith('untrusted comment:')) {
     throw Error(`подпись ${name} не в формате minisign (${signature.slice(0, 40)})`);
   }
   const url = `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(bundle)}`;
