@@ -3,6 +3,7 @@ import {api,ApiConnectionError} from '@/shared/api/backend';
 import {desktopDiagnosticsAvailable,recordDesktopDiagnostic} from '@/shared/api/diagnostics';
 import {createVoiceTransportMonitor,iceIsConnected} from './voice-diagnostics';
 import {captureVoiceStream,readMedia,setCapturedTrackEnabled,stopCapturedTrack,type MediaPreferences} from './voice-input';
+import {iceTransportPolicy,type IceServer} from './ice-policy';
 export function mediaError(e:unknown){const name=(e as DOMException).name;return name==='NotAllowedError'?'Разрешите доступ к микрофону или камере в настройках приложения и Windows.':name==='NotFoundError'?'Устройство не найдено. Подключите микрофон или камеру.':name==='NotReadableError'?'Устройство занято другим приложением. Освободите его и повторите.':(e as Error).message||'Не удалось подключить устройство.'}
 function videoConstraints(p:MediaPreferences){return {deviceId:p.camera?{exact:p.camera}:undefined,width:{ideal:1280},height:{ideal:720}}}
 type VoiceAvailability={muted:boolean;deaf:boolean};
@@ -131,8 +132,12 @@ export function useVoice(){
   const samplers=new Map<string,(peer:Peer,time:number)=>void>();
   let nextSample=0, sampleOffset=0;
   let diagnosticPeers=new Map<string,Peer>();
+  // Discord never sends media peer to peer: the voice server relays it. With TURN handed out by
+  // voice_join we can do the same, which removes one-way audio on blocked direct paths.
+  // The preference is read per connection, so a changed setting applies to the next peer.
+  const mediaPolicy=()=>iceTransportPolicy(first.iceServers as IceServer[]|undefined,preferred.current.relay);
   const make=(id:string,initiator=false)=>{
-   const pc=new RTCPeerConnection({iceServers:first.iceServers});c.pcs.set(id,pc);
+   const pc=new RTCPeerConnection({iceServers:first.iceServers,...(mediaPolicy()==='relay'?{iceTransportPolicy:'relay' as RTCIceTransportPolicy}:{})});c.pcs.set(id,pc);
    if(initiator){pc.addTransceiver(c.stream.getAudioTracks()[0],{direction:'sendrecv'});
    pc.addTransceiver(c.stream.getVideoTracks()[0]||'video',{direction:'sendrecv'});}
    const remote=new MediaStream();

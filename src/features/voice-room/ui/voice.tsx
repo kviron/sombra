@@ -202,6 +202,12 @@ export function VoiceSettings({voice:v}:{voice:Voice}){
       onValueChange={value=>{const option=noiseOptions.find(option=>option.value===value);if(option){stop();v.savePreferences('noise',option.value)}}}/>
     </div>
    </div></section>
+   <section className="media-settings-panel"><h2>Соединение</h2><div className="voice-processing">
+    <div className="voice-switch"><Label htmlFor="voice-relay">Всегда через сервер</Label>
+     <Switch id="voice-relay" disabled={v.busy} checked={p.relay} onCheckedChange={checked=>v.savePreferences('relay',checked)}/>
+    </div>
+    <p className="settings-hint">Звук идёт через сервер Sombra, как в Discord. Так звонок работает, даже если прямое соединение между вами и собеседником блокируется: «слышу его, а он меня нет» исключено. Задержка немного выше. Новые участники подключаются с этой настройкой сразу.</p>
+   </div></section>
    <section className="media-settings-panel"><h2>Камера</h2><div className="voice-device-fields">{renderDevice('videoinput',2)}<Button variant="secondary" disabled={busy||!!v.room} onClick={()=>void test(true)}>Проверить камеру</Button></div>
     {preview?.getVideoTracks().length? <Media stream={preview} muted volume={0}/>:null}
    </section>

@@ -185,6 +185,9 @@
 .account-modal #account-panel .voice-device-fields { gap: 16px; margin-top: 16px; }
 .account-modal #account-panel .voice-audio-fields { gap: 24px; margin: 24px 0; }
 .account-modal #account-panel .voice-processing { gap: 8px; }
+/* Переключатель соединения занимает всю ширину: подсказка должна идти под ним, а не в соседней колонке. */
+.account-modal #account-panel .voice-processing .voice-switch,
+.account-modal #account-panel .voice-processing .settings-hint { grid-column: 1 / -1; }
 .account-modal #account-panel .voice-switch { min-height: 44px; }
 .account-modal #account-panel .voice-divider { margin: 24px 0; }
 .account-modal #account-panel .voice-test-actions { gap: 8px; margin-bottom: 8px; }

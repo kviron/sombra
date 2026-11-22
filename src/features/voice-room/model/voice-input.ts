@@ -5,15 +5,15 @@ import {recordDesktopDiagnostic} from '@/shared/api/diagnostics';
 
 export type NoiseSuppression = 'off' | 'standard' | 'enhanced';
 export type MediaPreferences = {
- mic:string; camera:string; speaker:string; volume:number; echo:boolean; noise:NoiseSuppression;
+ mic:string; camera:string; speaker:string; volume:number; echo:boolean; noise:NoiseSuppression; relay:boolean;
 };
-export const defaultMedia:MediaPreferences = {mic:'',camera:'',speaker:'',volume:100,echo:true,noise:'standard'};
+export const defaultMedia:MediaPreferences = {mic:'',camera:'',speaker:'',volume:100,echo:true,noise:'standard',relay:true};
 
 export function readMedia():MediaPreferences {
  try {
   const stored = JSON.parse(localStorage.getItem('mines-media') || '{}') as Partial<Omit<MediaPreferences,'noise'>> & {noise?:unknown};
   const noise = stored.noise;
-  return {...defaultMedia,...stored,noise:noise===false||noise==='off'?'off':noise==='enhanced'?'enhanced':'standard'};
+  return {...defaultMedia,...stored,noise:noise===false||noise==='off'?'off':noise==='enhanced'?'enhanced':'standard',relay:stored.relay!==false};
  } catch {
   return defaultMedia;
  }
