@@ -1,3 +1,6 @@
+// Own stylesheet first: `profile-media-dialogs.css` (ниже, через импорт компонента и
+// последнюю строку) намеренно переопределяет старую раскладку карточки профиля.
+import './account-approved.css';
 import {useEffect,useRef,useState,type FormEvent,type KeyboardEvent} from 'react';
 import {api,applyProfileEffect,clearSession,session,type ChatState,type SessionDto,type User,type ProfileDecorationDoc} from '@/shared/api/backend';
 import {Button} from '@/shared/ui/button';
@@ -11,7 +14,6 @@ import {Monitor,Pencil,Sparkles,Trash2} from 'lucide-react';
 import {Label} from '@/shared/ui/label';
 import type {AccountSection} from './account-sidebar';
 
-import './account-approved.css';
 import './profile-media-dialogs.css';
 
 export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:ChatState|null;refresh:()=>Promise<ChatState>;section:AccountSection;onMediaSaved:(user:User,field:MediaTarget|`decoration:${MediaTarget}`)=>void}) {
