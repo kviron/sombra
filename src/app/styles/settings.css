@@ -119,14 +119,8 @@
   .account-modal > aside.settings-sidebar { width: 100%; }
 }
 
-/* Override legacy modal label spacing for the device settings form. */
-.account-modal .voice-settings h2 { margin-bottom: 12px; }
-.account-modal .voice-settings p { margin: 0 0 16px; }
-.account-modal .voice-settings label { gap: 8px; margin: 16px 0; }
-.account-modal .voice-settings select { min-height: 40px; padding: 8px 12px; }
-.account-modal .voice-settings .voice-switch { align-items: center; }
-.account-modal .voice-settings h2:not(:first-child) { margin-top: 24px; }
-.account-modal .voice-test-actions { margin-bottom: 12px; }
+/* Голос: раскладка целиком задаётся блоком «Голос и уведомления» в конце файла. */
+.account-modal .voice-test-actions { gap: 8px; margin-bottom: 12px; }
 @media (max-width: 480px) {
   .account-modal [data-sidebar="content"] [data-sidebar="menu"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .account-modal [data-sidebar="content"] [data-sidebar="menu-item"] { min-width: 0; }
@@ -137,24 +131,20 @@
 .account-modal .email-form h2 { margin-bottom:0; }
 /* Responsive layout around the shared shadcn controls. */
 .voice-settings { container-type: inline-size; }
-.account-modal .voice-device-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 24px; }
-.account-modal .voice-field { display: flex; flex-direction: column; min-width: 0; gap: 10px; }
 .account-modal .voice-settings [data-slot="label"] { margin: 0; font-size: 13px; line-height: 20px; }
 .account-modal .voice-settings [data-slot="select-trigger"] { justify-content: space-between; }
-.account-modal .voice-audio-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; margin: 28px 0; }
-.account-modal .voice-processing { display: grid; gap: 16px; }
-.account-modal .voice-switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .account-modal .voice-settings [data-slot="switch"] { min-height: 0; }
-.account-modal .voice-divider { margin: 28px 0 24px; }
 .account-modal .voice-settings [data-slot="progress"] { --primary: #7278ed; }
-@container (max-width: 680px) {
- .account-modal .voice-device-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container (max-width: 440px) {
- .account-modal .voice-device-fields, .account-modal .voice-audio-fields { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-}
 
 .account-modal .voice-settings [data-slot="switch"] { justify-content: flex-start; padding: 0; --primary: #7278ed; --input: #34343b; --background: #eee; --ring: #7278ed; }
+
+/* Одна шкала: расстояния и радиусы берутся отсюда, а не подбираются на глаз по файлам. */
+.account-modal {
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --r-section: 14px; --r-control: 10px; --r-pill: 999px;
+  --row: 44px; --label-col: 220px;
+}
+.media-settings-panel, .settings-form, .session-row, .email-form { --panel-gap: var(--s3); }
 
 /* Compact settings geometry. Explicit scopes isolate forms from legacy chat labels. */
 .app-surface .account-modal {
@@ -180,17 +170,7 @@
 .account-modal #account-panel .email-form { margin-top: 24px; padding-top: 24px; }
 .account-modal #account-panel .settings-hint { font-size: 12px; line-height: 18px; margin: 4px 0 8px; }
 .account-modal #account-panel .session-row { padding: 12px; margin-bottom: 8px; gap: 16px; }
-.account-modal #account-panel .voice-field { gap: 8px; }
-.account-modal #account-panel .voice-field > label { display: block; }
-.account-modal #account-panel .voice-device-fields { gap: 16px; margin-top: 16px; }
-.account-modal #account-panel .voice-audio-fields { gap: 24px; margin: 24px 0; }
-.account-modal #account-panel .voice-processing { gap: 8px; }
-/* Переключатель соединения занимает всю ширину: подсказка должна идти под ним, а не в соседней колонке. */
-.account-modal #account-panel .voice-processing .voice-switch,
-.account-modal #account-panel .voice-processing .settings-hint { grid-column: 1 / -1; }
-.account-modal #account-panel .voice-switch { min-height: 44px; }
-.account-modal #account-panel .voice-divider { margin: 24px 0; }
-.account-modal #account-panel .voice-test-actions { gap: 8px; margin-bottom: 8px; }
+.account-modal #account-panel .sticker-library > label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 16px 0; }
 .account-modal #account-panel [data-slot="switch"] { display: inline-flex; flex: 0 0 auto; width: 44px; min-width: 44px; height: 24px; min-height: 24px; padding: 0; gap: 0; justify-content: flex-start; }
 .account-modal #account-panel [data-slot="switch-thumb"] { flex: 0 0 auto; width: 20px; height: 20px; }
 .account-modal #account-panel .sticker-library > label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 16px 0; }
@@ -208,4 +188,61 @@
 }
 @media (max-width: 480px) {
  .app-surface .account-modal > aside.settings-sidebar { width: 100%; }
+}
+
+/* ── Голос и уведомления: разделы на общей поверхности, подпись слева, управление справа.
+   Правила собраны здесь, потому что app/styles подключается последним; дубли выше удалены. ── */
+.account-modal #account-panel .account-media-voice,
+.account-modal #account-panel .notification-settings.account-media-notifications { display: grid; gap: 0; align-content: start; }
+
+.account-modal #account-panel .account-media-voice > .media-settings-panel {
+  display: grid; gap: var(--s3); min-width: 0;
+  padding: var(--s5) 0; border: 0; border-radius: 0; background: none;
+}
+.account-modal #account-panel .account-media-voice > .media-settings-panel:first-of-type { padding-top: var(--s1); }
+.account-modal #account-panel .account-media-voice > .media-settings-panel + .media-settings-panel { border-top: 1px solid var(--border); }
+.account-modal #account-panel .account-media-voice .media-settings-panel h2 { font-size: 15px; line-height: 22px; font-weight: 600; letter-spacing: .01em; margin: 0; }
+
+.account-modal #account-panel .account-media-voice .voice-field {
+  display: grid; grid-template-columns: minmax(0, var(--label-col)) minmax(0, 1fr);
+  align-items: center; gap: var(--s4); min-height: var(--row); margin: 0;
+}
+.account-modal #account-panel .account-media-voice .voice-field > label {
+  display: block; margin: 0; font-size: 13px; line-height: 20px; color: var(--muted-foreground);
+}
+.account-modal #account-panel .account-media-voice .voice-field > .audio-device-missing { grid-column: 1 / -1; margin: 0 0 var(--s2); }
+.account-modal #account-panel .account-media-voice .voice-volume { grid-column: 1 / -1; align-items: start; }
+.account-modal #account-panel .account-media-voice .voice-volume > label { color: var(--foreground); margin-bottom: var(--s2); }
+
+.account-modal #account-panel .account-media-voice .voice-processing { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
+.account-modal #account-panel .account-media-voice .voice-switch {
+  display: grid; grid-template-columns: minmax(0, var(--label-col)) minmax(0, 1fr);
+  align-items: center; gap: var(--s4); min-height: var(--row); margin: 0;
+}
+.account-modal #account-panel .account-media-voice .voice-switch > [data-slot="switch"] { justify-self: start; }
+.account-modal #account-panel .account-media-voice .voice-switch > label { font-size: 13px; line-height: 20px; color: var(--foreground); }
+.account-modal #account-panel .account-media-voice .voice-processing .settings-hint { grid-column: 1 / -1; margin: 0 0 var(--s1); }
+
+.account-modal #account-panel .account-media-voice .voice-device-fields {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); align-items: stretch; margin-top: var(--s1);
+}
+.account-modal #account-panel .account-media-voice .voice-test-actions { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.account-modal #account-panel .account-media-voice .voice-test-actions [role=progressbar] { flex: 1 1 160px; min-width: 0; }
+
+.account-modal #account-panel .account-media-voice > .audio-device-access { margin: 0 0 var(--s3); padding: var(--s3); border: 1px solid var(--border); border-radius: var(--r-control); background: color-mix(in srgb, var(--foreground) 3%, transparent); }
+.account-modal #account-panel .account-media-voice > .audio-device-access p { margin: 0 0 var(--s2); }
+
+.account-modal #account-panel .account-media-notifications .notification-option {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s4);
+  min-height: var(--row); padding: var(--s3) 0; border: 0; border-bottom: 1px solid var(--border);
+  border-radius: 0; background: transparent;
+}
+.account-modal #account-panel .account-media-notifications .notification-option label { display: grid; gap: var(--s1); min-width: 0; cursor: pointer; }
+.account-modal #account-panel .account-media-notifications .notification-option label span,
+.account-modal #account-panel .account-media-notifications .notification-help p { color: var(--muted-foreground); }
+.account-modal #account-panel .account-media-notifications .notification-help { display: grid; gap: var(--s2); padding: 0; border: 0; background: transparent; }
+
+@container (max-width: 560px) {
+  .account-modal #account-panel .account-media-voice .voice-field,
+  .account-modal #account-panel .account-media-voice .voice-switch { grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
 }

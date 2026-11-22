@@ -96,3 +96,20 @@ test('packets that stop advancing are a send stall, not silence', () => {
   }
   assert.ok(events.includes('audio_send_stalled'), `expected audio_send_stalled, got ${events.join(',')}`);
 });
+
+test('receive silence is reported when packets arrive without energy', () => {
+  const events = [];
+  const monitor = createVoiceTransportMonitor((category) => events.push(category));
+  const stats = (packetsReceived, energy) =>
+    new Map([
+      ['t', {id: 't', type: 'transport', selectedCandidatePairId: 'pair'}],
+      ['pair', {id: 'pair', type: 'candidate-pair', state: 'succeeded', localCandidateId: 'l', remoteCandidateId: 'r'}],
+      ['l', {id: 'l', type: 'local-candidate', candidateType: 'host'}],
+      ['r', {id: 'r', type: 'remote-candidate', candidateType: 'host'}],
+      ['in', {id: 'in', type: 'inbound-rtp', kind: 'audio', transportId: 't', packetsReceived, totalAudioEnergy: energy}],
+    ]);
+  for (let i = 0; i < 4; i++) {
+    monitor.sample(stats(10 * (i + 1), 5), {send: false, receive: true}, 1000 * (i + 1));
+  }
+  assert.ok(events.includes('audio_receive_silent'), 'expected audio_receive_silent, got ' + events.join(','));
+});

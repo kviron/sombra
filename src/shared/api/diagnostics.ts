@@ -2,7 +2,8 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 
 export type VoiceTransportCategory = 'ice_checking' | 'ice_connected' | 'ice_disconnected' | 'ice_failed' | 'path_direct' | 'path_relay'
   | 'audio_receive_stalled' | 'audio_receive_recovered' | 'audio_send_stalled' | 'audio_send_recovered'
-  | 'audio_send_silent' | 'audio_send_silent_recovered';
+  | 'audio_send_silent' | 'audio_send_silent_recovered'
+  | 'audio_receive_silent' | 'audio_receive_silent_recovered';
 type Categories = {
   webview: 'js_error' | 'unhandled_rejection';
   voice_microphone: 'device_error' | 'device_permission';

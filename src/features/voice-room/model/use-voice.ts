@@ -10,7 +10,7 @@ type VoiceAvailability={muted:boolean;deaf:boolean};
 type Peer={client:string;user:string}&Partial<VoiceAvailability>;
 type Poll={peers:Peer[];signals:{id:number;from:string;payload:{description?:RTCSessionDescriptionInit;candidate?:RTCIceCandidateInit}}[];cursor:number;iceServers:RTCIceServer[]};
 type MicrophoneGain={context:AudioContext;source:MediaStreamAudioSourceNode;gain:GainNode;track:MediaStreamTrack};
-type Call={room:string;client:string;stream:MediaStream;pcs:Map<string,RTCPeerConnection>;stop:boolean;microphone:MediaStreamTrack;micGain?:MicrophoneGain;members?:Set<string>};
+type Call={room:string;client:string;stream:MediaStream;pcs:Map<string,RTCPeerConnection>;stop:boolean;microphone:MediaStreamTrack;micGain?:MicrophoneGain;members?:Set<string>;retries:Map<string,number>};
 type TrackKind='audio'|'video';
 const voiceCues={
  joined:new URL('../assets/voice-peer-joined.wav',import.meta.url).href,
@@ -116,7 +116,7 @@ export function useVoice(){
   acquired=new MediaStream([await capture('audio')]);
   if(withVideo)acquired.addTrack(await capture('video'));
   if(epoch!==generation.current){acquired.getTracks().forEach(stopCapturedTrack);return false}
-  const c:Call={room:destination,client:crypto.randomUUID(),stream:acquired,pcs:new Map(),stop:false,microphone:acquired.getAudioTracks()[0]};current.current=c;
+  const c:Call={room:destination,client:crypto.randomUUID(),stream:acquired,pcs:new Map(),stop:false,microphone:acquired.getAudioTracks()[0],retries:new Map()};current.current=c;
   setCapturedTrackEnabled(c.microphone,!latestAvailability.current.muted&&!latestAvailability.current.deaf);
   const request=(op:string,data={})=>api<Poll>(op,{room:c.room,client:c.client,...data});
   const first=await request('voice_join',latestAvailability.current);if(c.stop){
@@ -149,7 +149,25 @@ export function useVoice(){
     remote.addTrack(e.track);setStreams(old=>({...old,[id]:remote}));
    };
    pc.onicecandidate=e=>{if(e.candidate&&!c.stop)void signal(id,{candidate:e.candidate.toJSON()}).catch(e=>setError(e.message))};
-   pc.onconnectionstatechange=()=>{if(!c.stop)setConnections(old=>({...old,[id]:pc.connectionState}))};
+   pc.onconnectionstatechange=()=>{
+    if(c.stop)return;
+    setConnections(old=>({...old,[id]:pc.connectionState}));
+    const state=pc.connectionState;
+    if(state==='connected'){c.retries.delete(id);return}
+    // Discord rebuilds the transport instead of asking the user to rejoin. Dropping the
+    // connection is enough: the next poll offers again to this peer.
+    if(state!=='failed'&&state!=='disconnected')return;
+    const attempts=c.retries.get(id)??0;
+    if(attempts>=6)return;
+    c.retries.set(id,attempts+1);
+    window.setTimeout(()=>{
+     if(c.stop||c.pcs.get(id)!==pc)return;
+     samplers.delete(id);
+     pc.close();
+     c.pcs.delete(id);
+     setStreams(old=>{const next={...old};delete next[id];return next});
+    },state==='failed'?600:3000);
+   };
    if(diagnostics){
     const monitor=createVoiceTransportMonitor(category=>recordDesktopDiagnostic('voice_transport',category));
     const active=()=>!c.stop&&c.pcs.get(id)===pc&&pc.signalingState!=='closed';

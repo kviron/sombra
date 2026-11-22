@@ -5,6 +5,7 @@ import {Slider} from '@/shared/ui/slider';
 import {Select} from '@/shared/ui/select';
 import {useAudioDevices,isDeviceSelectionMissing} from '../model/use-audio-devices';
 import {AudioDeviceAccess} from './audio-device-access';
+import {useLevelRail} from '../model/use-level-rail';
 import {Label} from '@/shared/ui/label';
 import {Progress} from '@/shared/ui/progress';
 import {useEffect,useMemo,useRef,useState} from 'react';
@@ -139,8 +140,9 @@ export function VoicePlayback({voice,volumeForUser}:{voice:Voice;volumeForUser:(
 export function hasVisibleVideo(stream?:MediaStream):boolean{
  return !!stream?.getVideoTracks().some(track=>track.readyState==='live'&&track.enabled&&!track.muted);
 }
-export function VoicePeerVisual({stream,user,onOpen}:{stream?:MediaStream;user:User;onOpen:()=>void}){
+export function VoicePeerVisual({stream,user,onOpen,deaf=false}:{stream?:MediaStream;user:User;onOpen:()=>void;deaf?:boolean}){
  const [,refresh]=useState(0);
+ const rail=useLevelRail(stream,!deaf);
  useEffect(()=>{
   if(!stream)return;
   let watched:MediaStreamTrack[]=[];
@@ -154,18 +156,22 @@ export function VoicePeerVisual({stream,user,onOpen}:{stream?:MediaStream;user:U
   stream.addEventListener('addtrack',sync);stream.addEventListener('removetrack',sync);sync();
   return()=>{stream.removeEventListener('addtrack',sync);stream.removeEventListener('removetrack',sync);for(const track of watched)for(const event of ['mute','unmute','ended'])track.removeEventListener(event,changed)};
  },[stream]);
- return hasVisibleVideo(stream)?<Media stream={stream!} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title={`Профиль ${user.name}`} onClick={onOpen}><UserAvatar user={user} size="xl" decoration={user.decorations?.avatar}/></button>;
+ return <>
+  <div className="voice-tile-rail" ref={rail} aria-hidden="true"><i/></div>
+  {hasVisibleVideo(stream)?<Media stream={stream!} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title={`Профиль ${user.name}`} onClick={onOpen}><UserAvatar user={user} size="xl" decoration={user.decorations?.avatar}/></button>}
+ </>;
 }
 export function VoiceStage({voice:v,id,title,userName,me,meUser,users,onSettings,music}:{voice:Voice;id:string;title:string;userName:(id:string)=>string;me:string;meUser?:User;users?:User[];onSettings:()=>void;music?:ReturnType<typeof useRoomMusic>}){
  const joined=v.room===id;
  const actions=useUserActions();
  const microphoneOff=v.muted||v.deaf;
+ const selfRail=useLevelRail(v.local,!microphoneOff);
  const selfIdentity:User=meUser??{id:'',name:me,bio:'',created_at:0,online:true};
- const selfTile=<div className="voice-tile">{v.camera&&v.local?<Media stream={v.local} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title="Открыть профиль" onClick={()=>meUser&&actions?.openProfile(meUser.id)}><UserAvatar user={selfIdentity} size="xl" decoration={selfIdentity.decorations?.avatar}/></button>}<span>{me} · Вы {v.muted||v.deaf?'· микрофон выключен':''}</span></div>;
+ const selfTile=<div className="voice-tile"><div className="voice-tile-rail" ref={selfRail} aria-hidden="true"><i/></div>{v.camera&&v.local?<Media stream={v.local} muted volume={0}/>:<button type="button" className="voice-tile-avatar" title="Открыть профиль" onClick={()=>meUser&&actions?.openProfile(meUser.id)}><UserAvatar user={selfIdentity} size="xl" decoration={selfIdentity.decorations?.avatar}/></button>}<span>{me} · Вы {microphoneOff?'· микрофон выключен':''}</span></div>;
  return <div className="voice-stage"><h1>{title}</h1><p>{joined?(v.peers.length?'Вы в голосовой комнате':'Вы в комнате. Пригласите друзей, чтобы начать общение.'):'Присоединитесь, чтобы общаться голосом и видео'}</p>
  {joined&&<div className="voice-grid">{meUser?<UserContextMenu user={meUser}>{selfTile}</UserContextMenu>:selfTile}{v.peers.map(p=>{
   const identity:User=users?.find(user=>user.id===p.user)??{id:p.user,name:userName(p.user),bio:'',created_at:0,online:true};
-  const tile=<div className="voice-tile">{<VoicePeerVisual stream={v.streams[p.client]} user={identity} onOpen={()=>actions?.openProfile(identity.id)}/>}<span>{identity.name} · {v.connections[p.client]==='connected'?'На связи':v.connections[p.client]==='failed'?'Нет соединения — перезайдите':'Подключение…'}</span></div>;
+  const tile=<div className="voice-tile">{<VoicePeerVisual stream={v.streams[p.client]} user={identity} deaf={v.deaf} onOpen={()=>actions?.openProfile(identity.id)}/>}<span>{identity.name} · {v.connections[p.client]==='connected'?'На связи':v.connections[p.client]==='failed'?'Переподключаюсь…':'Подключение…'}</span></div>;
   return <UserContextMenu key={p.client} user={identity}>{tile}</UserContextMenu>;
  })}</div>}
  {v.error&&<p className="voice-error" role="alert">{v.error}</p>}

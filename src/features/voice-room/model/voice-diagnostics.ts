@@ -51,20 +51,22 @@ export function createVoiceTransportMonitor(emit: Emit) {
    before.stalled=true;
    emit(direction==='receive'?'audio_receive_stalled':'audio_send_stalled');
   }
-  if(direction!=='send')return;
-  // Silence fills the gap the packet heuristic leaves: packets flow while the
-  // microphone contributes nothing. It is not proof of what a peer hears.
+  if(direction!=='send'&&direction!=='receive')return;
+  // Silence fills the gap the packet heuristic leaves: packets flow while the microphone
+  // (or the peer's) contributes nothing. It is not proof of what a peer hears.
   // audioLevel is preferred; cumulative energy is the fallback when the engine omits it.
   let quiet: boolean | undefined;
   if(level!==undefined)quiet=level<SPEECH;
   else if(previousEnergy!==undefined&&energy!==undefined)quiet=energy-previousEnergy<ENERGY_EPSILON;
   before.energy=energy;
   if(quiet===undefined)return;
+  const silent=direction==='send'?'audio_send_silent':'audio_receive_silent';
+  const recovered=direction==='send'?'audio_send_silent_recovered':'audio_receive_silent_recovered';
   if(quiet){
-   if(advancing&&++before.silent>=3&&!before.quiet){before.quiet=true;emit('audio_send_silent');}
+   if(advancing&&++before.silent>=3&&!before.quiet){before.quiet=true;emit(silent);}
   }else{
    before.silent=0;
-   if(before.quiet){before.quiet=false;emit('audio_send_silent_recovered');}
+   if(before.quiet){before.quiet=false;emit(recovered);}
   }
  }
 
@@ -81,6 +83,7 @@ export function createVoiceTransportMonitor(emit: Emit) {
    const audioTransports=new Set<string>(), anyTransports=new Set<string>();
    let sendLevel:number|undefined;
    let sendEnergy:number|undefined;
+   let receiveEnergy:number|undefined;
    stats.forEach(stat=>{
     if(stat.type==='transport')anyTransports.add(stat.id);
     if((stat.type!=='inbound-rtp'&&stat.type!=='outbound-rtp')||(stat.kind??stat.mediaType)!=='audio')return;
@@ -92,8 +95,10 @@ export function createVoiceTransportMonitor(emit: Emit) {
     if(direction==='send'&&typeof stat.audioLevel==='number'&&Number.isFinite(stat.audioLevel))
      sendLevel=Math.max(sendLevel??0,stat.audioLevel);
     // Cumulative energy is present even when audioLevel is not; the monitor compares samples.
-    if(direction==='send'&&typeof stat.totalAudioEnergy==='number'&&Number.isFinite(stat.totalAudioEnergy))
-     sendEnergy=Math.max(sendEnergy??0,stat.totalAudioEnergy);
+    if(typeof stat.totalAudioEnergy==='number'&&Number.isFinite(stat.totalAudioEnergy)){
+     if(direction==='send')sendEnergy=Math.max(sendEnergy??0,stat.totalAudioEnergy);
+     else receiveEnergy=Math.max(receiveEnergy??0,stat.totalAudioEnergy);
+    }
    });
    // Use only the selected pair for the audio transport (or a single bundled transport).
    const transports=audioTransports.size?audioTransports:anyTransports;
@@ -109,7 +114,7 @@ export function createVoiceTransportMonitor(emit: Emit) {
     }
    }
    for(const direction of ['receive','send'] as const){
-    if(expected[direction])flow(direction,packets[direction],time,direction==='send'?sendLevel:undefined,direction==='send'?sendEnergy:undefined);
+    if(expected[direction])flow(direction,packets[direction],time,direction==='send'?sendLevel:undefined,direction==='send'?sendEnergy:receiveEnergy);
     else reset(direction);
    }
   },

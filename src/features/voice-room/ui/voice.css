@@ -13,3 +13,33 @@
 
 /* Reference picture-2: keep voice actions easy to click. */
 .voice-stage > .voice-controls > button { min-height:40px; }
+
+/* Индикатор речи: узкий канал вдоль левой кромки карточки. Заполняется как жидкость —
+   гребень светится и слегка качается, в тишине остаётся тонкая линия основания. */
+.voice-tile-rail{
+ position:absolute;left:6px;top:12px;bottom:12px;width:4px;border-radius:999px;
+ background:color-mix(in srgb,var(--foreground) 7%,transparent);
+ overflow:hidden;pointer-events:none;z-index:2;
+}
+.voice-tile-rail>i{
+ position:absolute;left:0;right:0;bottom:0;display:block;
+ height:calc(var(--level,0) * 100%);
+ min-height:calc(2px + var(--level,0) * 2px);
+ border-radius:999px;
+ background:linear-gradient(0deg,color-mix(in srgb,var(--primary) 45%,transparent),var(--primary));
+ transition:height 90ms linear;
+}
+.voice-tile-rail>i::after{
+ content:'';position:absolute;left:-3px;right:-3px;top:-4px;height:8px;border-radius:999px;
+ background:var(--primary);filter:blur(3px);
+ opacity:calc(var(--crest,0) * .9);
+ animation:voice-crest 2.4s ease-in-out infinite;
+}
+@keyframes voice-crest{
+ 0%,100%{transform:translateX(-1px) scaleX(.92)}
+ 50%{transform:translateX(1px) scaleX(1.05)}
+}
+@media (prefers-reduced-motion: reduce){
+ .voice-tile-rail>i::after{animation:none}
+ .voice-tile-rail>i{transition:none}
+}
