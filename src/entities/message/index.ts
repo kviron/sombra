@@ -5,5 +5,6 @@ export * from './model/draft-mentions';
 export * from './model/message-markdown-links';
 export * from './model/message-mentions';
 export * from './model/message-read-state';
+export * from './model/services/message-service';
 export * from './ui/message-attachments';
 export * from './ui/message-text';

@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
-import {api,ApiConnectionError} from '@/shared/api/backend';
+import {ApiConnectionError} from '@/shared/api/backend';
+import {voiceService} from './services/voice-service';
 import {desktopDiagnosticsAvailable,recordDesktopDiagnostic} from '@/shared/api/diagnostics';
 import {createVoiceTransportMonitor,iceIsConnected} from './voice-diagnostics';
 import {captureVoiceStream,readMedia,setCapturedTrackEnabled,stopCapturedTrack,type MediaPreferences} from './voice-input';
@@ -86,7 +87,7 @@ export function useVoice(){
    stopCapturedTrack(c.microphone);
    if(c.micGain)stopMicrophoneGain(c.micGain);
    c.pcs.forEach(pc=>pc.close());
-   void api('voice_leave',{room:c.room,client:c.client}).catch(()=>{});
+   void voiceService.leave({room:c.room,client:c.client}).catch(()=>{});
    if(c.members)void playVoiceCue('left',preferred.current.speaker);
   }
   setRoom('');setLocal(null);setPeers([]);setStreams({});setConnections({});setCamera(false);setMicVolumeValue(preferredMicVolume.current);
@@ -118,16 +119,15 @@ export function useVoice(){
   if(epoch!==generation.current){acquired.getTracks().forEach(stopCapturedTrack);return false}
   const c:Call={room:destination,client:crypto.randomUUID(),stream:acquired,pcs:new Map(),stop:false,microphone:acquired.getAudioTracks()[0],retries:new Map()};current.current=c;
   setCapturedTrackEnabled(c.microphone,!latestAvailability.current.muted&&!latestAvailability.current.deaf);
-  const request=(op:string,data={})=>api<Poll>(op,{room:c.room,client:c.client,...data});
-  const first=await request('voice_join',latestAvailability.current);if(c.stop){
+  const first=await voiceService.join<Poll>({room:c.room,client:c.client,...latestAvailability.current});if(c.stop){
    // Cancellation can race server admission; retire only this abandoned client.
-   void api('voice_leave',{room:c.room,client:c.client}).catch(()=>{});
+   void voiceService.leave({room:c.room,client:c.client}).catch(()=>{});
    return false;
   }
   c.members=otherMembers(first.peers,c.client);
   setRoom(destination);setLocal(acquired);setCamera(withVideo);let cursor=0;
   let lastPoll=performance.now();
-  const signal=(target:string,payload:unknown)=>request('voice_signal',{target,payload});
+  const signal=(target:string,payload:unknown)=>voiceService.signal({room:c.room,client:c.client,target,payload});
   const diagnostics=desktopDiagnosticsAvailable();
   const samplers=new Map<string,(peer:Peer,time:number)=>void>();
   let nextSample=0, sampleOffset=0;
@@ -212,7 +212,7 @@ export function useVoice(){
   async function poll(){if(c.stop)return;try{
    let data:Poll;
    try {
-    data=await request('voice_poll',{after:cursor,...latestAvailability.current});
+    data=await voiceService.poll<Poll>({room:c.room,client:c.client,after:cursor,...latestAvailability.current});
    } catch (error) {
     if(error instanceof ApiConnectionError&&performance.now()-lastPoll<14000)return;
     throw error;

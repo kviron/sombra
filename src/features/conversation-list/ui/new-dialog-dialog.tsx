@@ -1,7 +1,8 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { Checkbox, Dialog as RadixDialog } from 'radix-ui';
 import { Check, LoaderCircle, Search, X } from 'lucide-react';
-import { api, type ChatState, type Dialog, type User } from '@/shared/api/backend';
+import { type ChatState, type Dialog, type User } from '@/shared/api/backend';
+import {conversationService} from '@/entities/conversation';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { UserAvatar } from '@/shared/ui/user-avatar';
@@ -66,7 +67,7 @@ export function NewDialogDialog({ state, onClose, onCreated, refresh }: NewDialo
     setError('');
     try {
       // Keep a successful creation across refresh retries; never create a second group.
-      const result = created ?? await api<Dialog>('create_dialog', {
+      const result = created ?? await conversationService.createDialog<Dialog>({
         members: selected,
         ...(selected.length > 1 ? { name: name.trim() || selectedUsers.map(user=>user.name).join(', ').slice(0,60) } : {}),
       });

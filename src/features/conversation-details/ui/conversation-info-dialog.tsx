@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog as DialogPrimitive} from 'radix-ui';
 import {Camera,ChevronRight,File,Headphones,Image,Link2,Pencil,Settings,Video,X} from 'lucide-react';
-import {api,type ChatMessage,type ChatState,type Dialog,type User} from '@/shared/api/backend';
+import {type ChatMessage,type ChatState,type Dialog,type User} from '@/shared/api/backend';
+import {conversationService} from '@/entities/conversation';
 import {conversationMaterials,type MaterialCategory} from '@/entities/message';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {Button} from '@/shared/ui/button';
@@ -26,7 +27,7 @@ export function ConversationInfoDialog({state,title,channel,memberIds,avatar,cha
  useEffect(()=>{
   const epoch=++memberSearchEpoch.current;
   if(!emailQuery||!state.conversationMemberSearchSupported)return;
-  const timer=setTimeout(()=>{void api<{users:User[]}>('search_conversation_members',{channel,query:normalizedQuery}).then(result=>{
+  const timer=setTimeout(()=>{void conversationService.searchMembers<{users:User[]}>({channel,query:normalizedQuery}).then(result=>{
    if(memberSearchEpoch.current===epoch&&alive.current)setMemberResult({key:searchKey,users:result.users.filter(user=>memberIds.includes(user.id))});
   }).catch(reason=>{if(memberSearchEpoch.current===epoch&&alive.current)setMemberResult({key:searchKey,users:[],error:reason instanceof Error?reason.message:'Не удалось найти участников.'})})},250);
   return()=>{clearTimeout(timer);if(memberSearchEpoch.current===epoch)memberSearchEpoch.current++};
@@ -51,7 +52,7 @@ export function ConversationInfoDialog({state,title,channel,memberIds,avatar,cha
   const owner=state.me.id,destination=current.id,requestScope=scope;lock.current=true;setBusy(true);setError('');
   const valid=()=>alive.current&&scopeRef.current===requestScope&&live.current.editable&&live.current.dialog?.id===destination;
   try{
-   const result=await api<Dialog>('update_dialog',{dialog:destination,revision,name:name.trim(),avatar:image});
+   const result=await conversationService.update<Dialog>({dialog:destination,revision,name:name.trim(),avatar:image});
    if(!valid())return;
    if(result.id!==destination||result.owner!==owner||!Number.isSafeInteger(result.revision))throw new Error('Не удалось подтвердить сохранение чата.');
    await onSaved(owner,result);

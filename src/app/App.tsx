@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {UpdateNotice, UpdateSettings} from '@/features/updates';
-import {api} from '@/shared/api/backend';
+import {userService} from '@/entities/user';
 import {isTauri} from '@/shared/api';
 import {Toaster} from '@/shared/ui';
 import {AuthAmbient} from '@/shared/ui/auth-ambient';
@@ -28,7 +28,7 @@ function AppContent() {
  const [attempt, setAttempt] = useState(0);
  useEffect(() => {
   let active = true;
-  const check = () => { setAuth('checking'); void api('me').then(() => { if(active) setAuth('ready'); }).catch(error => { if(active) setAuth(String(error).includes('Сессия') || String(error).includes('AUTH_REQUIRED') ? 'guest' : 'error'); }); };
+  const check = () => { setAuth('checking'); void userService.me().then(() => { if(active) setAuth('ready'); }).catch(error => { if(active) setAuth(String(error).includes('Сессия') || String(error).includes('AUTH_REQUIRED') ? 'guest' : 'error'); }); };
   const changed = () => { setAuth('guest'); };
   check();
   window.addEventListener('authchange', changed);

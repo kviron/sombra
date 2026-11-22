@@ -1,5 +1,6 @@
 import {useEffect,useId,useRef,useState} from 'react';
-import {api,type Bot,type ChatState} from '@/shared/api/backend';
+import {type Bot,type ChatState} from '@/shared/api/backend';
+import {botService} from '../model/services/bot-service';
 import './bot-tool-access.css';
 
 type Policy={revision:number;owner:string;users:string[]};
@@ -38,7 +39,7 @@ function ToolPolicy({bot,state,rootBusy,panelId}:{bot:Bot;state:ChatState;rootBu
  async function load(keepDraft=false){
   const request=++epoch.current;setPending(true);setError('');
   try{
-   const next=policyResponse(await api('get_bot_tool_users',{bot:bot.id}));
+   const next=policyResponse(await botService.toolUsers({bot:bot.id}));
    if(!valid(request))return;
    if(next.owner!==live.current.owner){setBlocked(true);setPolicy(undefined);setError('Владелец бота изменился. Закройте настройки и обновите список ботов.');return}
    setPolicy(next);if(!keepDraft)setDraft(next.users);
@@ -70,7 +71,7 @@ function ToolPolicy({bot,state,rootBusy,panelId}:{bot:Bot;state:ChatState;rootBu
   if(disabled||!policy||!dirty||draft.length>50||invalidSelection||live.current.rootBusy)return;
   const request=++epoch.current;setPending(true);setError('');setNotice('');
   try{
-   const next=policyResponse(await api('set_bot_tool_users',{bot:bot.id,users:normalized(draft),revision:policy.revision}));
+   const next=policyResponse(await botService.setToolUsers({bot:bot.id,users:normalized(draft),revision:policy.revision}));
    if(!valid(request))return;
    if(next.owner!==live.current.owner){setBlocked(true);setPolicy(undefined);setError('Владелец бота изменился. Обновите список ботов.');return}
    setPolicy(next);setDraft(next.users);setNotice('Доступ сохранён. Сам по себе этот список не включает инструменты.');

@@ -3,7 +3,8 @@ import {Download,FileWarning,RotateCw,X} from 'lucide-react';
 import {Dialog} from 'radix-ui';
 import {invoke,isTauri} from '@tauri-apps/api/core';
 import {toast} from 'sonner';
-import {api,clearSession,type AttachmentFile,type MessageAttachmentMetadata} from '@/shared/api/backend';
+import {clearSession,type AttachmentFile,type MessageAttachmentMetadata} from '@/shared/api/backend';
+import {messageService} from '../model/services/message-service';
 import {session} from '@/shared/api/backend';
 import {attachmentCacheGeneration,attachmentCacheWriteEpoch} from '@/shared/api/attachment-cache';
 import {attachmentDownloadFailure} from '@/shared/lib/attachment-errors';
@@ -43,7 +44,7 @@ function cacheNote(attachment:MessageAttachmentMetadata){return attachment.expir
 /** The only attachment save path: Tauri native save dialog or the authorised browser request. */
 async function saveAttachment(messageId:string,alive:()=>boolean):Promise<string|undefined>{
  if(isTauri())return invoke<string>('save_message_attachment',{message:messageId});
- const file=await limited(()=>api<AttachmentFile>('attachment_file',{message:messageId}));
+ const file=await limited(()=>messageService.attachment<AttachmentFile>({message:messageId}));
  if(!alive())return;
  const url=URL.createObjectURL(fileBlob(file));
  const anchor=document.createElement('a');anchor.href=url;anchor.download=safeName(file.name);anchor.rel='noopener';
@@ -90,7 +91,7 @@ function AttachmentView({messageId,attachment}:MessageAttachmentProps){
    setPreview(url);
    if(reason)setError(reason instanceof Error?reason.message:'Не удалось загрузить вложение.');
   }};
-  const handle=previews.acquire(identity,owner,()=>api<AttachmentFile>('attachment_file',{message:messageId}),value=>{
+  const handle=previews.acquire(identity,owner,()=>messageService.attachment<AttachmentFile>({message:messageId}),value=>{
    const file=value as AttachmentFile;
    // Preserve the fetched raster MIME gate; never cache SVG, HTML or external URLs.
    if(!imageMimes.has(file.mime))throw new Error('Предпросмотр этого файла недоступен.');
@@ -197,7 +198,7 @@ function AttachmentAudio({messageId,attachment}:MessageAttachmentProps){
    setUrl(next);
    if(reason)setError(attachmentDownloadFailure(reason,'Не удалось загрузить аудио.').message);
   }};
-  const handle=previews.acquire(identity,owner,()=>api<AttachmentFile>('attachment_file',{message:messageId}),value=>{
+  const handle=previews.acquire(identity,owner,()=>messageService.attachment<AttachmentFile>({message:messageId}),value=>{
    const blob=verifiedMediaBlob(value as AttachmentFile,attachment,'audio');
    if(!document.createElement('audio').canPlayType(blob.type))throw new Error('Этот формат не поддерживается браузером. Скачайте файл.');
    return blob;

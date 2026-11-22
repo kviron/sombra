@@ -1,4 +1,5 @@
 // Public API of the `features/account-settings` slice.
+export * from './model/services/account-service';
 export * from './ui/account-security';
 export * from './ui/account-settings-modal';
 export * from './ui/account-sidebar';

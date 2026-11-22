@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog} from 'radix-ui';
 import {X} from 'lucide-react';
-import {api,type Bot,type BotModelSettings,type BotReasoning,type User,type ChatState} from '@/shared/api/backend';
+import {type Bot,type BotModelSettings,type BotReasoning,type User,type ChatState} from '@/shared/api/backend';
+import {botService} from '../model/services/bot-service';
 import {SettingsPanel} from '@/shared/ui/elements-settings';
 import {ImageCropDialog} from '@/shared/ui/image-crop-dialog';
 import {UserAvatar} from '@/shared/ui/user-avatar';
@@ -25,7 +26,7 @@ function SettingsContent({bot,state,refresh,onClose}:Props){
  const valid=(request:number)=>alive.current&&epoch.current===request&&live.current.id===bot.id&&live.current.owner===bot.owner&&live.current.actor===state.me.id&&live.current.owner===live.current.actor;
  async function load(keep=false){
   const request=++epoch.current;setBusy(true);setError('');
-  try{const value=await api<Settings>('get_bot_settings',{bot:bot.id});if(!valid(request))return;
+  try{const value=await botService.settings<Settings>({bot:bot.id});if(!valid(request))return;
    if(value.bot.id!==bot.id||value.bot.owner!==state.me.id||!Number.isSafeInteger(value.revision)||!value.profile||!value.conversation)throw new Error('invalid');
    setLoaded(value);if(!keep){setName(value.profile.name);setBio(value.profile.bio);setAvatar(undefined);setConversation(value.conversation);setAliases(value.conversation.aliases.join(', '));}
    else setNotice('Настройки изменились. Свежая версия загружена, ваш черновик сохранён. Проверьте его и сохраните снова.');
@@ -40,7 +41,7 @@ function SettingsContent({bot,state,refresh,onClose}:Props){
  const invalid=!name.trim()||name.length>32||bio.length>512||invalidAliases||!conversation||!Number.isInteger(conversation.followupSeconds)||conversation.followupSeconds<0||conversation.followupSeconds>600||!Number.isInteger(conversation.followupMessages)||conversation.followupMessages<0||conversation.followupMessages>20;
  async function save(){
   if(disabled||invalid||!dirty||saving.current||!loaded)return;saving.current=true;const request=++epoch.current;setBusy(true);setError('');setNotice('');
-  try{await api<Settings>('update_bot_settings',{bot:bot.id,revision:loaded.revision,profile:{name:name.trim(),bio,...(avatar!==undefined?{avatar}:{})},conversation:draftConversation});if(!valid(request))return;await refresh();if(valid(request))onClose();}
+  try{await botService.updateSettings<Settings>({bot:bot.id,revision:loaded.revision,profile:{name:name.trim(),bio,...(avatar!==undefined?{avatar}:{})},conversation:draftConversation});if(!valid(request))return;await refresh();if(valid(request))onClose();}
   catch(reason){if(!valid(request))return;if(String(reason).includes('BOT_SETTINGS_CONFLICT'))await load(true);else setError('Не удалось сохранить настройки бота. Проверьте данные и повторите попытку.');}
   finally{saving.current=false;if(valid(request))setBusy(false)}
  }
@@ -90,7 +91,7 @@ function ModelSettings({bot,state,refresh,rootBusy}:{bot:Bot;state:ChatState;ref
  function edit(next:{model?:string;reasoning?:BotReasoning}){if(next.model!==undefined)setModel(next.model);if(next.reasoning!==undefined)setReasoning(next.reasoning);setNotice('');setError('')}
  async function load(keepDraft=false){
   const request=++epoch.current;setPending(true);setError('');
-  try{const next=modelSettingsResponse(await api('bot_get_model_settings',{bot:bot.id}));if(!valid(request))return;
+  try{const next=modelSettingsResponse(await botService.modelSettings({bot:bot.id}));if(!valid(request))return;
    setLoaded(next);
    if(!keepDraft){setModel(next.model);setReasoning(next.reasoning);}
    else setNotice('Настройки изменились на сервере. Свежая версия загружена, ваш черновик сохранён. Проверьте его и сохраните снова.');
@@ -105,7 +106,7 @@ function ModelSettings({bot,state,refresh,rootBusy}:{bot:Bot;state:ChatState;ref
   if(disabled||!loaded||!dirty||invalidModel)return;
   const request=++epoch.current;setPending(true);setError('');setNotice('');
   try{
-   const next=modelSettingsResponse(await api('bot_update_settings',{bot:bot.id,model:trimmed,reasoning,revision:loaded.revision}));
+   const next=modelSettingsResponse(await botService.updateModelSettings({bot:bot.id,model:trimmed,reasoning,revision:loaded.revision}));
    if(!valid(request))return;
    setLoaded(next);setModel(next.model);setReasoning(next.reasoning);setNotice('Модель и уровень размышления сохранены. Значения применяет Hermes.');
    void refresh().catch(()=>{});

@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {Dialog,ScrollArea} from 'radix-ui';
 import {Check,Plus,Upload,X} from 'lucide-react';
-import {createProfileEffect,createProfileEffectDraft,getProfileEffectDraft,listProfileEffects,session,setProfileEffectVisibility,uploadProfileEffect,type ProfileDecorationDoc,type ProfileEffect,type ProfileEffectAsset,type ProfileEffectDraft,type ProfileEffectTarget,type User} from '@/shared/api/backend';
+import {session,type ProfileDecorationDoc,type ProfileEffect,type ProfileEffectAsset,type ProfileEffectDraft,type ProfileEffectTarget,type User} from '@/shared/api/backend';
+import {accountService} from '../model/services/account-service';
 import {DECORATION_PRESETS,normalizeDecoration} from '@/shared/ui/avatar-fx';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {ProfileEffectImage,PROFILE_EFFECT_MAX_BYTES} from '@/shared/ui/profile-effect-image';
@@ -73,7 +74,7 @@ export function ProfileDecorationPicker({user,target,catalogSupported,draftsSupp
   let active=true;
   const token=session();
   setPage({items:[],nextOffset:null});setPageLoading(true);setPageError('');
-  void listProfileEffects(view,target).then(result=>{if(active&&session()===token)setPage(result)})
+  void accountService.listProfileEffects(view,target).then(result=>{if(active&&session()===token)setPage(result)})
    .catch(reason=>{if(active&&session()===token)setPageError(message(reason,'Не удалось загрузить эффекты'))})
    .finally(()=>{if(active&&session()===token)setPageLoading(false)});
   return()=>{active=false};
@@ -84,7 +85,7 @@ export function ProfileDecorationPicker({user,target,catalogSupported,draftsSupp
   let active=true;
   const token=session();
   const timeout=window.setTimeout(()=>{
-   void getProfileEffectDraft(draft.id).then(next=>{if(active&&session()===token)setDraft(next)})
+   void accountService.getProfileEffectDraft(draft.id).then(next=>{if(active&&session()===token)setDraft(next)})
     .catch(reason=>{if(active&&session()===token)setPollError(message(reason,'Не удалось проверить состояние черновика'))});
   },1800);
   return()=>{active=false;window.clearTimeout(timeout)};
@@ -106,13 +107,13 @@ export function ProfileDecorationPicker({user,target,catalogSupported,draftsSupp
   if(!catalogSupported||view==='create'||view==='upload'||page.nextOffset===null)return;
   const offset=page.nextOffset;
   void run(async valid=>{
-   const result=await listProfileEffects(view,target,offset);
+   const result=await accountService.listProfileEffects(view,target,offset);
    if(valid())setPage(previous=>({nextOffset:result.nextOffset,items:[...previous.items,...result.items.filter(item=>!previous.items.some(old=>old.id===item.id))]}));
   });
  }
  function changeVisibility(item:ProfileEffect){
   void run(async valid=>{
-   const {item:updated}=await setProfileEffectVisibility(item.id,!item.public);
+   const {item:updated}=await accountService.setProfileEffectVisibility(item.id,!item.public);
    if(!valid())return;
    setRecentUploads(previous=>previous.map(row=>row.id===updated.id?updated:row));
    if(view==='catalog'&&!updated.public){setChoice(undefined);setReload(value=>value+1)}
@@ -139,7 +140,7 @@ export function ProfileDecorationPicker({user,target,catalogSupported,draftsSupp
     reader.readAsDataURL(file);
    });
    if(!valid())return;
-   const {item}=await uploadProfileEffect(target,title.trim(),data);
+   const {item}=await accountService.uploadProfileEffect(target,title.trim(),data);
    if(!valid())return;
    setFile(undefined);setPreview('');setTitle('');setFileError('');
    setRecentUploads(previous=>[item,...previous]);setChoice(asChoice(item));setView('personal');
@@ -150,14 +151,14 @@ export function ProfileDecorationPicker({user,target,catalogSupported,draftsSupp
   event.preventDefault();
   if(pending||!prompt.trim())return;
   void run(async valid=>{
-   const next=await createProfileEffectDraft(target,prompt.trim());
+   const next=await accountService.createProfileEffectDraft(target,prompt.trim());
    if(valid()){setPollError('');setDraft(next)}
   });
  }
  function saveDraft(){
   if(!draftReady)return;
   void run(async valid=>{
-   await createProfileEffect(target,draftReady.title,draftReady.decoration);
+   await accountService.createProfileEffect(target,draftReady.title,draftReady.decoration);
    if(!valid())return;
    setDraft(undefined);setPrompt('');setView('personal');setNotice('Черновик сохранён в «Мои эффекты». Он не опубликован и не применён.');
   });

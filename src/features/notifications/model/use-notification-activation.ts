@@ -2,7 +2,8 @@ import {useEffect,useRef,useState} from 'react';
 import {invoke,isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
 import {toast} from 'sonner';
-import {api,type ChatState} from '@/shared/api/backend';
+import {stateService} from '@/shared/api';
+import type {ChatState} from '@/shared/api/backend';
 import {notificationRoute,validNotificationTarget,type NotificationTarget,type NotificationRoute} from './notification-target';
 
 export function useNotificationActivation(state:ChatState|null,onOpen:(next:ChatState,route:NotificationRoute)=>void){
@@ -25,7 +26,7 @@ export function useNotificationActivation(state:ChatState|null,onOpen:(next:Chat
   let cancelled=false;const version=authVersion.current;
   void (async()=>{
    try{
-    const next=await api<ChatState>('state',{sticker_assets:true});
+    const next=await stateService.load<ChatState>({sticker_assets:true});
     if(cancelled||version!==authVersion.current||current.current.state?.me.id!==pending.account)return;
     const route=notificationRoute(next,pending);
     if(route)current.current.onOpen(next,route);

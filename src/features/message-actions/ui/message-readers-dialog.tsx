@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState,type RefObject} from 'react';
 import {Dialog} from 'radix-ui';
 import {X} from 'lucide-react';
-import {api,type ChatState,type ChatMessage} from '@/shared/api/backend';
+import {type ChatState,type ChatMessage} from '@/shared/api/backend';
+import {messageService} from '@/entities/message';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import './message-readers-dialog.css';
 type Reader={user:string;seenAt:number};
@@ -11,7 +12,7 @@ export function MessageReadersDialog({state,message,trigger,onClose}:{state:Chat
  const [readers,setReaders]=useState<Reader[]|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);
  useEffect(()=>{let current=true;setReaders(null);setError('');if(!state.readReceiptsSupported||message.user!==owner){close.current();return}
  const auth=()=>{current=false;setReaders(null);close.current()};window.addEventListener('authchange',auth);
- void api<{readers:Reader[]}>('message_readers',{message:id}).then(result=>{if(current)setReaders(result.readers.filter(reader=>reader.user!==owner))}).catch(reason=>{if(current)setError(reason instanceof Error?reason.message:'Не удалось загрузить просмотры')});
+ void messageService.readers<{readers:Reader[]}>({message:id}).then(result=>{if(current)setReaders(result.readers.filter(reader=>reader.user!==owner))}).catch(reason=>{if(current)setError(reason instanceof Error?reason.message:'Не удалось загрузить просмотры')});
  return()=>{current=false;window.removeEventListener('authchange',auth)};
  },[owner,channel,id,attempt,state.readReceiptsSupported,message.user]);
  return <Dialog.Root open onOpenChange={open=>{if(!open)close.current()}}><Dialog.Portal><Dialog.Overlay className="readers-overlay"/><Dialog.Content className="readers-dialog" aria-describedby={undefined} onCloseAutoFocus={event=>{event.preventDefault();trigger.current?.focus({preventScroll:true})}}><header><Dialog.Title>Кто посмотрел</Dialog.Title><Dialog.Close aria-label="Закрыть"><X size={20}/></Dialog.Close></header>

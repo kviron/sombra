@@ -2,5 +2,6 @@
 export * from './model/dm-header-status';
 export * from './model/new-chat-messages';
 export * from './model/new-direct-messages';
+export * from './model/services/conversation-service';
 export * from './ui/dm-header-identity';
 export * from './ui/unread-mention-badge';

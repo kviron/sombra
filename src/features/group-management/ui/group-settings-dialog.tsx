@@ -1,8 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog} from 'radix-ui';
 import {Settings,ShieldCheck,X} from 'lucide-react';
-import {api,type ChatState,type Group} from '@/shared/api/backend';
-import {canGroup} from '@/entities/group';
+import {type ChatState,type Group} from '@/shared/api/backend';
+import {canGroup,groupService} from '@/entities/group';
 import {ImageCropDialog,type PreparedProfileImage} from '@/shared/ui/image-crop-dialog';
 import {GroupRolesPanel} from './group-roles-dialog';
 import './group-settings-dialog.css';
@@ -31,7 +31,7 @@ export function GroupSettingsDialog({group,state,initialSection='general',onClos
  const latest=useRef({current,member,rename,avatarAllowed});latest.current={current,member,rename,avatarAllowed};
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[]);
  async function run(action:()=>Promise<unknown>,after?:()=>void){if(lock.current)return;lock.current=true;setBusy(true);setError('');try{await action();await refresh();if(mounted.current)after?.()}catch(cause){const message=cause instanceof Error?cause.message:String(cause);if(mounted.current)setError(message);onError?.(message);try{await refresh()}catch{/* Preserve original error and draft. */}}finally{lock.current=false;if(mounted.current)setBusy(false)}}
- function save(){const fresh=latest.current;const changedName=name.trim()!==fresh.current.name,changedAvatar=avatar!==(fresh.current.avatar??'');if(!fresh.member||(changedName&&!fresh.rename)||(changedAvatar&&!fresh.avatarAllowed)){setError('Права изменились. Проверьте доступные действия.');return}if(!name.trim()||name.trim().length>60||(!changedName&&!changedAvatar))return;void run(()=>api('update_group',{group:fresh.current.id,...(changedName?{name:name.trim()}:{}),...(changedAvatar?{avatar}:{})}),()=>{setNameDraft(undefined);setAvatarDraft(undefined)})}
+ function save(){const fresh=latest.current;const changedName=name.trim()!==fresh.current.name,changedAvatar=avatar!==(fresh.current.avatar??'');if(!fresh.member||(changedName&&!fresh.rename)||(changedAvatar&&!fresh.avatarAllowed)){setError('Права изменились. Проверьте доступные действия.');return}if(!name.trim()||name.trim().length>60||(!changedName&&!changedAvatar))return;void run(()=>groupService.update({group:fresh.current.id,...(changedName?{name:name.trim()}:{}),...(changedAvatar?{avatar}:{})}),()=>{setNameDraft(undefined);setAvatarDraft(undefined)})}
  function upload(file:File){if(lock.current||!latest.current.avatarAllowed)return;setError('');setCropFile(file)}
  function applyAvatar(result:PreparedProfileImage){if(!mounted.current||scopeRef.current!==scope||!latest.current.member||!latest.current.avatarAllowed)throw new Error('Права изменились. Изменение аватара недоступно.');setAvatarDraft(result.dataUrl);setCropFile(undefined)}
  return <Dialog.Root open onOpenChange={open=>{if(!open&&!lock.current&&!rolesBusy.current)onClose()}}><Dialog.Portal><Dialog.Overlay className="group-roles-overlay"/><Dialog.Content className="group-roles-dialog group-settings-dialog" onEscapeKeyDown={event=>{if(lock.current||rolesBusy.current)event.preventDefault()}}>

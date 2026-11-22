@@ -2,7 +2,7 @@ import {useRef,useState} from 'react';
 import {Check,CheckCheck,Eye,Forward,Pencil,Copy,Trash2,Reply} from 'lucide-react';
 import {ContextMenu} from 'radix-ui';
 import {toast} from 'sonner';
-import {api,type ChatState,type ChatMessage} from '@/shared/api/backend';
+import {type ChatState,type ChatMessage} from '@/shared/api/backend';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {Message,MessageAvatar,MessageContent,MessageHeader,MessageFooter,Bubble,BubbleContent} from '@/shared/ui/message';
 import {UserAvatar} from '@/shared/ui/user-avatar';
@@ -11,8 +11,7 @@ import {MessageActionDialog} from '@/features/message-actions';
 import {MessageReadersDialog} from '@/features/message-actions';
 import {MessageQuote} from '@/features/message-actions';
 import {SentSticker} from '@/entities/sticker';
-import {MessageAttachment} from '@/entities/message';
-import {MessageText} from '@/entities/message';
+import {MessageAttachment,MessageText,messageService} from '@/entities/message';
 import {useUserActions} from '@/shared/lib/user-actions';
 import './messages.css';
 
@@ -39,7 +38,7 @@ export function MessageItem({message:m,previous,state,refresh,onError,userName,o
  async function react(emoji:string){
   if(busy)return;
   setBusy(true);
-  try{await api('reaction',{message:m.id,emoji});await refresh()}
+  try{await messageService.react({message:m.id,emoji});await refresh()}
   catch(e){onError((e as Error).message)}
   finally{setBusy(false)}
  }

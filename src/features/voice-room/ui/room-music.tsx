@@ -1,6 +1,6 @@
 import {useEffect,useId,useRef,useState} from 'react';
 import {ListMusic,Music2,Pause,Play,Plus,SkipForward,Square,Volume2} from 'lucide-react';
-import {api} from '@/shared/api/backend';
+import {musicService} from '../model/services/music-service';
 import {parseMusicLimit} from '@/shared/lib/music-command';
 import {defaultGenerativeUILibrary,renderGenerativeUI} from '@assistant-ui/generative-ui/react';
 import './room-music-elements.css';
@@ -38,7 +38,7 @@ export function useRoomMusic(room:string|undefined,deaf:boolean,speaker:string){
    catch{setPrivateFailure('Этот клиент не поддерживает потоковое воспроизведение MP3.');return}
   }
   let disposed=false,objectUrl:string|undefined;
-  void api<{mime:string;base64:string}>('music_file',{room,id:assetId}).then(file=>{
+  void musicService.file<{mime:string;base64:string}>({room,id:assetId}).then(file=>{
    if(disposed)return;
    if(file.mime!=='audio/mpeg'||typeof file.base64!=='string'||!file.base64||file.base64.length>4*Math.ceil(MAX_PRIVATE_AUDIO/3))throw new Error('Invalid media');
    const raw=atob(file.base64);if(raw.length>MAX_PRIVATE_AUDIO)throw new Error('Media too large');
@@ -62,7 +62,7 @@ export function useRoomMusic(room:string|undefined,deaf:boolean,speaker:string){
   async function poll(){
    if(pending||epoch.current!==generation)return;
    pending=true;const started=performance.now();let delay=4000;
-   try{const state=await api<Snapshot>('music_state',{room});if(epoch.current===generation){accept(state,started);setUnavailable(false);if(state.track||state.status!=='idle')delay=2000}}
+   try{const state=await musicService.state<Snapshot>({room});if(epoch.current===generation){accept(state,started);setUnavailable(false);if(state.track||state.status!=='idle')delay=2000}}
    catch{if(epoch.current===generation){setUnavailable(true);setReading(null)}}
    finally{pending=false;if(epoch.current===generation)schedule(delay)}
   }
@@ -75,7 +75,7 @@ export function useRoomMusic(room:string|undefined,deaf:boolean,speaker:string){
   if(action==='add'&&!url)throw new Error('Укажите ссылку после /play.');
   if(action!=='add'&&url)throw new Error('Эта команда не принимает ссылку.');
   const generation=epoch.current,started=performance.now();
-  try{const state=await api<Snapshot>('music_command',{room,action,...(url?{url}:{}),...(limit!==undefined?{limit}:{})});if(epoch.current===generation)accept(state,started)}
+  try{const state=await musicService.command<Snapshot>({room,action,...(url?{url}:{}),...(limit!==undefined?{limit}:{})});if(epoch.current===generation)accept(state,started)}
   catch(error){throw new Error(message(error),{cause:error})}
  }
  useEffect(()=>{const el=engine.current;if(el){el.volume=volume/100;el.muted=deaf}},[volume,deaf]);

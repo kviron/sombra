@@ -1,4 +1,4 @@
-import {api} from '@/shared/api/backend';
+import {musicService} from './services/music-service';
 
 const MIME='audio/mpeg', CHUNK=262144, MAX=10*1024*1024;
 type Packet={mime:string;offset:number;nextOffset:number;totalBytes:number;data:string;eof:boolean};
@@ -16,7 +16,7 @@ export function openRoomMusicStream(room:string,id:string,durationMs:number,audi
    if(finished){source.endOfStream();return}
    if(last-audio.currentTime>24){schedule(500);return}
    fetching=true;
-   const p=await api<Packet>('music_stream_chunk',{room,id,offset});
+   const p=await musicService.streamChunk<Packet>({room,id,offset});
    if(closed||source.readyState!=='open')return;
    if(!p||p.mime!==MIME||p.offset!==offset||!Number.isSafeInteger(p.totalBytes)||p.totalBytes<=0||p.totalBytes>MAX||(total!==undefined&&p.totalBytes!==total)||typeof p.data!=='string'||p.data.length>4*Math.ceil(CHUNK/3))throw new Error('Invalid audio chunk');
    const raw=atob(p.data);

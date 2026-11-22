@@ -13,11 +13,11 @@ const attachmentRequests=new Map<string,Promise<unknown>>();
 const readOperations=new Set(['state','music_state','music_file','sessions','get_bot_settings','bot_get_model_settings','message_readers','list_public_sticker_packs','search_conversation_members','sticker_image']);
 const readRequests=new Map<string,Promise<unknown>>();
 /** Pictures are fetched once per version: see avatars.ts. */
-const avatars=createAvatarCache(async ref=>api<{kind:string;id:string;sha:string;data:string}>('avatar_file',{kind:ref.kind,id:ref.id,sha:ref.sha}));
+const avatars=createAvatarCache(async ref=>request<{kind:string;id:string;sha:string;data:string}>('avatar_file',{kind:ref.kind,id:ref.id,sha:ref.sha}));
 export const session = () => localStorage.getItem('mines-session') || '';
 export function clearSession() { resetAttachmentCacheAccess(); attachmentRequests.clear(); readRequests.clear(); avatars.clear(); localStorage.removeItem('mines-session'); sessionStorage.removeItem('mines-jwt'); window.dispatchEvent(new Event('authchange')); if(window.location.hash !== '#register') window.location.hash = '#login'; }
 export class ApiConnectionError extends Error {}
-export async function api<T = any>(op:string,data:Record<string,unknown>={}):Promise<T>{
+export async function request<T = any>(op:string,data:Record<string,unknown>={}):Promise<T>{
  // Ask polling snapshots for avatar hashes instead of inline pictures.
  const payload=op==='state'?{avatar_assets:true,...data}:data;
  if(!readOperations.has(op))return perform<T>(op,payload);
@@ -94,7 +94,7 @@ let response: Response;
    if(op==='state'){if(sequence<acceptedRawStateRequest)throw new Error('История уже обновлена.');acceptedRawStateRequest=sequence;}return result.data as T;
 }
 export async function authenticate(op: 'login' | 'register', data: Record<string, unknown>) {
- const result = await api<{token?: string; user: User}>(op, {...data, device: isTauri() ? 'Sombra · '+navigator.platform : navigator.userAgent});
+ const result = await request<{token?: string; user: User}>(op, {...data, device: isTauri() ? 'Sombra · '+navigator.platform : navigator.userAgent});
  if (!result?.user?.id) throw new Error('Сервер не подтвердил вход. Попробуйте снова.');
  avatars.clear();
  if (isTauri() && result.token) localStorage.setItem('mines-session', result.token);
@@ -102,7 +102,7 @@ export async function authenticate(op: 'login' | 'register', data: Record<string
  window.location.hash = '#chat';
 }
 export async function logout() {
- await api('logout'); clearSession();
+ await request('logout'); clearSession();
 }
 export type SessionDto = {id:string;device:string;created_at:number;last_seen:number;expires_at:number;current:boolean};
 export type ProfileDto = {name:string;bio:string};
@@ -119,15 +119,7 @@ export type ProfileEffectScope = 'personal'|'catalog';
 export type ProfileEffectRefs = Partial<Record<ProfileEffectTarget,string>>;
 export type ProfileEffectAsset={id:string;mime:'image/gif';width:number;height:number;frames:number;size:number};
 export type ProfileEffect = {id:string;target:ProfileEffectTarget;title:string;decoration:ProfileDecorationDoc|null;asset?:ProfileEffectAsset;ownerId:string;public:boolean};
-export const uploadProfileEffect=(target:ProfileEffectTarget,title:string,data:string)=>api<{item:ProfileEffect}>('upload_profile_effect',{target,title,data});
-export const profileEffectFile=(id:string)=>api<{asset:ProfileEffectAsset;data:string}>('profile_effect_file',{id});
 export type ProfileEffectDraft = {id:string;status:'queued'|'running'|'ready'|'failed';result?:{title:string;decoration:ProfileDecorationDoc};error?:string};
-export const listProfileEffects=(scope:ProfileEffectScope,target:ProfileEffectTarget,offset=0)=>api<{items:ProfileEffect[];nextOffset:number|null}>('list_profile_effects',{scope,target,offset,limit:12});
-export const createProfileEffect=(target:ProfileEffectTarget,title:string,decoration:ProfileDecorationDoc)=>api<{item:ProfileEffect}>('create_profile_effect',{target,title,decoration});
-export const setProfileEffectVisibility=(id:string,isPublic:boolean)=>api<{item:ProfileEffect}>(isPublic?'publish_profile_effect':'unpublish_profile_effect',{id});
-export const applyProfileEffect=(id:string)=>api<{item:ProfileEffect;user:User}>('apply_profile_effect',{id});
-export const createProfileEffectDraft=(target:ProfileEffectTarget,prompt:string)=>api<ProfileEffectDraft>('create_profile_effect_draft',{target,prompt});
-export const getProfileEffectDraft=(id:string)=>api<ProfileEffectDraft>('get_profile_effect_draft',{id});
 export type User = {id:string;name:string;bio:string;avatar?:string;/** Content hash of the avatar when the server withholds the inline picture. */avatarHash?:string;coverSupported?:boolean;decorationSupported?:boolean;cover?:ProfileCoverMetadata;decorations?:ProfileDecorations;decorationRefs?:ProfileEffectRefs;profileEffectAssets?:Partial<Record<ProfileEffectTarget,ProfileEffectAsset>>;created_at:number;online?:boolean;last_seen?:number;bot?:boolean;username?:string;commands?:BotCommand[]};
 export type Channel = {id:string;name:string;kind:string;unreadCount?:number;unreadMentionCount?:number};
 export type GroupPermission = 'group.rename' | 'group.avatar' | 'channels.create_text' | 'channels.create_voice' | 'channels.rename' | 'channels.delete' | 'members.invite' | 'invite.rotate' | 'members.kick' | 'messages.delete_any' | 'stickers.manage' | 'bots.manage';

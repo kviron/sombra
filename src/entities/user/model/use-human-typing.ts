@@ -1,5 +1,6 @@
 import {useEffect,useRef} from 'react';
-import {api,type ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/api/backend';
+import {userService} from './services/user-service';
 type Context={account:string;channel:string;epoch:number;live:boolean;wanted:boolean;lastInput:number;lastPulse:number;timer?:ReturnType<typeof setTimeout>};
 /** Only a boolean activity signal leaves this hook; restored drafts never trigger it. */
 export function useHumanTyping(state:ChatState|null,channel:string,enabled:boolean){
@@ -9,7 +10,7 @@ export function useHumanTyping(state:ChatState|null,channel:string,enabled:boole
   chain.current=chain.current.then(async()=>{
    if(ctx.epoch!==epoch.current||current.current?.me.id!==ctx.account)return;
    if(active&&(!ctx.live||!ctx.wanted||Date.now()-ctx.lastInput>3500))return;
-   try{await api('set_typing',{channel:ctx.channel,active})}catch{/* Ephemeral: server TTL is the final cleanup. */}
+   try{await userService.setTyping({channel:ctx.channel,active})}catch{/* Ephemeral: server TTL is the final cleanup. */}
   });
  }
  function stop(){const ctx=context.current;if(!ctx)return;if(ctx.timer)clearTimeout(ctx.timer);ctx.wanted=false;ctx.lastPulse=0;queue(ctx,false)}

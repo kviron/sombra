@@ -1,5 +1,6 @@
 import {useEffect,useRef} from 'react';
-import {api,type ChatState} from '@/shared/api/backend';
+import type {ChatState} from '@/shared/api/backend';
+import {messageService} from './services/message-service';
 
 /** Long messages use the viewport as denominator, not their entire height. */
 export function sufficientlyVisible(height:number,visible:number,viewport:number){return visible>=Math.min(40,height)&&visible>=Math.min(height,viewport)*0.5}
@@ -30,6 +31,6 @@ export function useMessageReadState(state:ChatState|null,channel:string,blocked:
  const ids=state?.messages.filter(m=>m.channel===channel&&m.user!==actor).map(m=>m.id).join('\n')||'';
  useEffect(()=>{if(!state?.readReceiptsSupported||state.me.bot||!actor||!channel||blocked||typeof IntersectionObserver==='undefined')return;
  const root=document.querySelector<HTMLElement>('.voice-messages')||document.querySelector<HTMLElement>('.message-scroll');if(!root)return;
- return observeMessageReads({root,actor,channel,eligible:new Set(ids.split('\n')),send:messages=>api('mark_messages_read',{channel,messages}),onRead:ids=>accepted.current?.(ids)});
+ return observeMessageReads({root,actor,channel,eligible:new Set(ids.split('\n')),send:messages=>messageService.markRead({channel,messages}),onRead:ids=>accepted.current?.(ids)});
  },[actor,channel,blocked,state?.readReceiptsSupported,ids]);
 }

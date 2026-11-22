@@ -12,16 +12,17 @@ import {ForwardPicker,ReferenceDraft,type ForwardDestination} from '@/features/m
 import type {ChatMessage} from '@/shared/api/backend';
 import {AssistantComposer} from '@/features/message-composer';
 import {BotTyping,BotImageActivity,hasLiveImageActivity} from '@/features/bots';
-import {useHumanTyping} from '@/entities/user';
-import {DmHeaderIdentity} from '@/entities/conversation';
+import {useHumanTyping,friendService} from '@/entities/user';
+import {DmHeaderIdentity,conversationService} from '@/entities/conversation';
 import {BotSettingsDialog} from '@/features/bots';
-import {NotificationSettings} from '@/features/account-settings';
+import {NotificationSettings,accountService} from '@/features/account-settings';
 import {AttachmentCacheSettings} from '@/features/account-settings';
 import {ConversationMaterials} from '@/features/conversation-details';
 import {ConversationInfoDialog,participantCount} from '@/features/conversation-details';
 import type {MaterialCategory} from '@/entities/message';
+import {messageService} from '@/entities/message';
 import {GroupSettingsDialog,type GroupSettingsSection} from '@/features/group-management';
-import {canGroup} from '@/entities/group';
+import {canGroup,groupService} from '@/entities/group';
 import {DialogListRow} from '@/features/conversation-list';
 import {StickerLibrary} from '@/entities/sticker';
 import {StickerSuggestions} from '@/features/message-composer';
@@ -57,7 +58,8 @@ import {toast} from 'sonner';
 
 import {useEffect,useLayoutEffect,useRef,useState,type FormEvent} from 'react';
 import {ShieldCheck,PanelRight,Home,Phone,Video,Bot,ChevronDown,Volume2,Plus,MessageCircle,Users,Settings,LogOut,Send,X,Search,Mic,MicOff,Headphones,HeadphoneOff} from 'lucide-react';
-import {api,applyProfileEffect,logout,session,type ProfileEffectTarget,type ChatState,type ChatPreferences,type DialogPreferences,type Group,type GroupPermission,type Channel,type Dialog,type User} from '@/shared/api/backend';
+import {stateService} from '@/shared/api';
+import {logout,session,type ProfileEffectTarget,type ChatState,type ChatPreferences,type DialogPreferences,type Group,type GroupPermission,type Channel,type Dialog,type User} from '@/shared/api/backend';
 import './chat.css';
 import {useChatDraft} from '@/features/message-composer';
 import {useMessageLink} from '@/features/message-composer';
@@ -129,7 +131,7 @@ export function LiveChat(){
   if(!canRequestFriend(id)||pendingFriendRequests.current.has(id))return;
   pendingFriendRequests.current.add(id);
   try{
-   await api('friend_request',{user:id});
+   await friendService.request({user:id});
    await refresh();
    toast.success('Заявка в друзья отправлена');
   }catch(e){toast.error((e as Error).message)}
@@ -147,14 +149,14 @@ export function LiveChat(){
  async function acceptFriend(id:string){
   const friend=state?.friends.find(item=>item.from===id&&item.to===state.me.id);
   if(!friend)return;
-  try{await api('friend_accept',{id:friend.id});await refresh();toast.success('Заявка принята')}
+  try{await friendService.accept(friend.id);await refresh();toast.success('Заявка принята')}
   catch(e){toast.error((e as Error).message)}
  }
  async function removeFriend(id:string){
   const friend=state?.friends.find(item=>
    (item.from===id&&item.to===state.me.id)||(item.to===id&&item.from===state.me.id));
   if(!friend)return;
-  try{await api('friend_remove',{id:friend.id});await refresh()}
+  try{await friendService.remove(friend.id);await refresh()}
   catch(e){toast.error((e as Error).message)}
  }
  async function messageUser(id:string){
@@ -163,7 +165,7 @@ export function LiveChat(){
    dialog.members.length===2&&dialog.members.includes(id)&&dialog.members.includes(state.me.id));
   if(existing){setHome(true);setChannelId(existing.id);return}
   try{
-   const dialog=await api<Dialog>('create_dialog',{members:[id],name:''});
+   const dialog=await conversationService.createDialog<Dialog>({members:[id],name:''});
    await refresh();
    setHome(true);
    setChannelId(dialog.id);
@@ -187,7 +189,7 @@ export function LiveChat(){
  async function equipProfileEffect(id:string,target:ProfileEffectTarget){
   const account=state?.me.id,token=session();
   if(!account)throw new Error('Учётная запись недоступна');
-  const {user,item}=await applyProfileEffect(id);
+  const {user,item}=await accountService.applyProfileEffect(id);
   if(session()!==token||user.id!==account||item.target!==target)throw new Error('Не удалось обновить украшение профиля');
   mediaSaved(user,`decoration:${target}`);
  }
@@ -202,7 +204,7 @@ export function LiveChat(){
   const merge=(dialogs:Dialog[])=>dialogs.map(item=>item.id===dialog.id&&(item.revision||0)<=(dialog.revision||0)?{...item,name:dialog.name,avatar:dialog.avatar,owner:dialog.owner,revision:dialog.revision}:item);
   setState(previous=>previous?.me.id===owner?{...previous,dialogs:merge(previous.dialogs)}:previous);
   try{
-   const next=await api<ChatState>('state',{sticker_assets:true});
+   const next=await stateService.load<ChatState>({sticker_assets:true});
    if(next.me.id!==owner)return;
    setState(previous=>previous?.me.id===owner?{...previous,dialogs:next.dialogs.map(item=>{const old=previous.dialogs.find(row=>row.id===item.id);return old&&(old.revision||0)>(item.revision||0)?{...item,name:old.name,avatar:old.avatar,revision:old.revision}:item})}:previous);
   }catch{/* Saved DTO is authoritative; the regular poll retries refresh without discarding the successful save. */}
@@ -214,18 +216,18 @@ export function LiveChat(){
  async function changeDialogPreferences(dialog:string,patch:Partial<DialogPreferences>){
   if(!state||pendingDialogPreferences.current.has(dialog))return;
   const owner=state.me.id;pendingDialogPreferences.current.add(dialog);setDialogPreferencesBusy(previous=>({...previous,[dialog]:true}));
-  try{applyChatPreferences(owner,await api<ChatPreferences>('set_dialog_preferences',{dialog,...patch}))}
+  try{applyChatPreferences(owner,await conversationService.setPreferences<ChatPreferences>({dialog,...patch}))}
   catch(reason){toast.error(reason instanceof Error?reason.message:'Не удалось сохранить настройки чата.')}
   finally{pendingDialogPreferences.current.delete(dialog);setDialogPreferencesBusy(previous=>({...previous,[dialog]:false}))}
  }
- async function refresh(){const generation=mediaGeneration.current;const next=await api<ChatState>('state',{sticker_assets:true});if(generation===mediaGeneration.current)applyState(next);return next}
+ async function refresh(){const generation=mediaGeneration.current;const next=await stateService.load<ChatState>({sticker_assets:true});if(generation===mediaGeneration.current)applyState(next);return next}
  useEffect(()=>{let active=true,inFlight=false;
   async function load(){
    // A hung request (30 s timeout) must not stack up behind the two-second tick.
    if(inFlight||document.visibilityState==='hidden')return;
    inFlight=true;
    const generation=mediaGeneration.current;
-   try{const next=await api<ChatState>('state',{sticker_assets:true});if(active&&generation===mediaGeneration.current)applyState(next)}
+   try{const next=await stateService.load<ChatState>({sticker_assets:true});if(active&&generation===mediaGeneration.current)applyState(next)}
    catch(e){if(active)setError((e as Error).message)}
    finally{inFlight=false}
   }
@@ -353,7 +355,7 @@ export function LiveChat(){
   const sent=forwardDraft,key=referenceKey,destination=channel.id,comment=sent.comment.trim();
   setBusy(true);setError('');
   try{
-   await api<{messages:ChatMessage[]}>('forward_message',{message:sent.message.id,channel:destination,...(comment?{comment}:{})});
+   await messageService.forward<{messages:ChatMessage[]}>({message:sent.message.id,channel:destination,...(comment?{comment}:{})});
    setForwardDrafts(previous=>previous[key]!==sent?previous:{...previous,[key]:undefined});
    scroll.followOnNextUpdate();
    void refresh().catch(reason=>setError((reason as Error).message));
@@ -375,7 +377,7 @@ export function LiveChat(){
    }
    // Server trims the stored text; send that same trimmed text so verified UTF-16 offsets match exactly.
    const payload=mentionSendPayload(mentionDrafts.current[destination]||{text:sent,mentions:[]},sent,mentionAliases(destination));
-   await api('message',{channel:destination,text:payload.text,mentions:payload.mentions,...(sentAttachment?{attachment:sentAttachment}:{}),...(replyDraft?{replyTo:replyDraft.id}:{})});
+   await messageService.send({channel:destination,text:payload.text,mentions:payload.mentions,...(sentAttachment?{attachment:sentAttachment}:{}),...(replyDraft?{replyTo:replyDraft.id}:{})});
     if(replyDraft)cancelReply(referenceKey,replyDraft);
    if(mentionDrafts.current[destination]?.text===sent)delete mentionDrafts.current[destination];
    clearSent(destination,sent);
@@ -389,7 +391,7 @@ export function LiveChat(){
   const destination=channel.id,sent=draft;humanTyping.stop();
   setBusy(true);setError('');
   try{
-   await api('message',{channel:destination,sticker,...(replyDraft?{replyTo:replyDraft.id}:{})});
+   await messageService.send({channel:destination,sticker,...(replyDraft?{replyTo:replyDraft.id}:{})});
     if(replyDraft)cancelReply(referenceKey,replyDraft);
    if(replaceDraft)clearSent(destination,sent);
    if(replaceDraft&&mentionDrafts.current[destination]?.text===sent)delete mentionDrafts.current[destination];
@@ -401,34 +403,34 @@ export function LiveChat(){
  }
  async function leaveGroup(target:Group){
   if(!state||target.owner===state.me.id||busy||!window.confirm(`Покинуть группу «${target.name}»?`))return;
-  setBusy(true);try{await api('leave_group',{group:target.id});if(target.channels.some(channel=>channel.id===call.room))call.leave();if(groupId===target.id){setHome(true);setGroupId('');setChannelId('')}await refresh()}catch(reason){toast.error((reason as Error).message)}finally{setBusy(false)}
+  setBusy(true);try{await groupService.leave({group:target.id});if(target.channels.some(channel=>channel.id===call.room))call.leave();if(groupId===target.id){setHome(true);setGroupId('');setChannelId('')}await refresh()}catch(reason){toast.error((reason as Error).message)}finally{setBusy(false)}
  }
  async function rotateInvite(){
   if(!group||!permits(group,'invite.rotate')||busy||!window.confirm('Заменить код приглашения? Старый код перестанет работать.'))return;
-  setBusy(true);setError('');try{await api('rotate_group_invite',{group:group.id});await refresh();toast.success('Код приглашения обновлён')}catch(reason){setError((reason as Error).message)}finally{setBusy(false)}
+  setBusy(true);setError('');try{await groupService.rotateInvite({group:group.id});await refresh();toast.success('Код приглашения обновлён')}catch(reason){setError((reason as Error).message)}finally{setBusy(false)}
  }
  async function create(e:FormEvent){e.preventDefault();if(busy||modal==='group-stickers')return;setBusy(true);setError('');try{
  if(modal==='invite'){
   if(!group||!permits(group,'members.invite'))return;
-  await api('invite_group_member',{group:group.id,email:name.trim()});
+  await groupService.invite({group:group.id,email:name.trim()});
   setModal('');
   toast.success('Участник добавлен в группу');
   return;
  }
- if(modal==='edit-channel'&&editingChannel){if(!permits(editingChannelGroup,'channels.rename'))throw new Error('Нет права переименовывать каналы');await api('update_channel',{group:editingChannel.group,channel:editingChannel.channel.id,name})}
+ if(modal==='edit-channel'&&editingChannel){if(!permits(editingChannelGroup,'channels.rename'))throw new Error('Нет права переименовывать каналы');await groupService.updateChannel({group:editingChannel.group,channel:editingChannel.channel.id,name})}
  else if(modal==='delete-channel'&&editingChannel){
    if(!permits(editingChannelGroup,'channels.delete'))throw new Error('Нет права удалять каналы');
   const target=editingChannel.channel.id;
-  await api('delete_channel',{group:editingChannel.group,channel:target});
+  await groupService.deleteChannel({group:editingChannel.group,channel:target});
   if(call.room===target)call.leave();
   setChannelId(selected=>selected===target?'':selected);
   setModal('');
   toast.success('Канал удалён');
  }
- else if(modal==='dialog'){const d=await api<Dialog>('create_dialog',{name,members:selected});setHome(true);setChannelId(d.id)}
- else if(modal==='group'){const created=await api<Group>('create_group',{name});setGroupId(created.id);setChannelId('');setHome(false)}
- else if(modal==='join'){const joined=await api<Group>('join_group',{invite:name.trim()});setGroupId(joined.id);setChannelId('');setHome(false)}
- else if(modal==='channel'){if(!permits(group,channelKind==='voice'?'channels.create_voice':'channels.create_text'))throw new Error('Нет права создавать этот тип канала');const created=await api<Channel>('create_channel',{group:group?.id,name,kind:channelKind});setChannelId(created.id)}
+ else if(modal==='dialog'){const d=await conversationService.createDialog<Dialog>({name,members:selected});setHome(true);setChannelId(d.id)}
+ else if(modal==='group'){const created=await groupService.create<Group>({name});setGroupId(created.id);setChannelId('');setHome(false)}
+ else if(modal==='join'){const joined=await groupService.join<Group>({invite:name.trim()});setGroupId(joined.id);setChannelId('');setHome(false)}
+ else if(modal==='channel'){if(!permits(group,channelKind==='voice'?'channels.create_voice':'channels.create_text'))throw new Error('Нет права создавать этот тип канала');const created=await groupService.createChannel<Channel>({group:group?.id,name,kind:channelKind});setChannelId(created.id)}
  await refresh();setModal('');
  }catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  useEffect(()=>{setSearch('');setError('');setJumpTarget(notificationJump.current&&notificationJump.current.channel===channel?.id?notificationJump.current.message:'');notificationJump.current=null;setInfoOpen(false);setHeaderProfile(false);setMaterialsCategory('all')},[channel?.id]);

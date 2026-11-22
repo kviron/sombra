@@ -1,8 +1,8 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Checkbox, Switch, Dialog as RadixDialog } from 'radix-ui';
 import { Check, X } from 'lucide-react';
-import { api, type ChatState, type Group, type GroupPermission } from '@/shared/api/backend';
-import { canGroup, DEFAULT_MEMBER_ROLE, getGroupRoles, GROUP_PERMISSION_CATALOG } from '@/entities/group';
+import { type ChatState, type Group, type GroupPermission } from '@/shared/api/backend';
+import { canGroup, DEFAULT_MEMBER_ROLE, getGroupRoles, GROUP_PERMISSION_CATALOG, groupService } from '@/entities/group';
 import { Select } from '@/shared/ui/select';
 import './group-roles-dialog.css';
 
@@ -42,6 +42,13 @@ export function GroupRolesPanel({group,state,onClose,refresh,onError,onBusyChang
  function choose(value:string){if(dirty&&!window.confirm('Отменить несохранённые изменения роли?'))return;setSelected(value);setDirty(false);setConfirmDelete(false);setError('');}
  function create(){if(dirty&&!window.confirm('Отменить несохранённые изменения роли?'))return;setSelected('__new');setName('');setPermissions([]);setDirty(true);setError('');}
  async function run(op:string,data:Record<string,unknown>,after?:()=>void,ownerOnly=true){
+  const actions={
+   set_group_member_invites:groupService.setMemberInvites,
+   set_group_member_role:groupService.setMemberRole,
+   kick_group_member:groupService.kickMember,
+   delete_group_role:groupService.deleteRole,
+   save_group_role:groupService.saveRole
+  };
   const snapshot=latest.current;
   if(locks.current.size || !snapshot.live || !snapshot.supported || (ownerOnly&&!snapshot.owner))return;
   if(op==='set_group_member_invites'&&typeof snapshot.current.membersCanInvite!=='boolean')return;
@@ -53,7 +60,7 @@ export function GroupRolesPanel({group,state,onClose,refresh,onError,onBusyChang
   const groupId=snapshot.current.id;
   locks.current.add(op);setBusy(true);onBusyChange?.(true);setError('');
   try{
-   await api<Group>(op,{...data,group:groupId,...(op==='kick_group_member'?{}:{revision:snapshot.current.rolesRevision||0})});
+   await actions[op as keyof typeof actions]({...data,group:groupId,...(op==='kick_group_member'?{}:{revision:snapshot.current.rolesRevision||0})});
    await refresh();
    if(mounted.current&&latest.current.current.id===groupId)after?.();
   }catch(cause){

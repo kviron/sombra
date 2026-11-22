@@ -1,6 +1,7 @@
 import {useRef,useState} from 'react';
 import {LoaderCircle} from 'lucide-react';
-import {api,type ChatPreferences} from '@/shared/api/backend';
+import {type ChatPreferences} from '@/shared/api/backend';
+import {accountService} from '../model/services/account-service';
 import {Switch} from '@/shared/ui/switch';
 import './notification-settings.css';
 import '@/shared/ui/account-media-settings.css';
@@ -11,7 +12,7 @@ export function NotificationSettings({preferences,ready,onSaved}:{preferences?:C
  async function change(key:'direct'|'groups',enabled:boolean){
   if(pending.current||!ready)return;
   pending.current=true;setBusy(true);setError('');
-  try{onSaved(await api<ChatPreferences>('set_notification_preferences',{[key]:enabled}))}
+  try{onSaved(await accountService.setNotificationPreferences<ChatPreferences>({[key]:enabled}))}
   catch(reason){setError(reason instanceof Error?reason.message:'Не удалось сохранить настройки уведомлений.')}
   finally{pending.current=false;setBusy(false)}
  }

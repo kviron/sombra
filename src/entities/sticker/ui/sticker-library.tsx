@@ -4,7 +4,8 @@ import {Dialog,ScrollArea,Tabs} from 'radix-ui';
 import {ArrowLeft,Plus,Sticker as StickerIcon,Upload,X} from 'lucide-react';
 import './sticker-catalog.css';
 import {Button} from '@/shared/ui/button';
-import {api,type Sticker} from '@/shared/api/backend';
+import type {Sticker} from '@/shared/api/backend';
+import {stickerService} from '../model/services/sticker-service';
 
 const imageExtension=/\.(png|webp)$/i;
 const maxImageSize=8*1024*1024;
@@ -14,7 +15,7 @@ window.addEventListener('authchange',()=>images.clear());
 function loadImage(id:string){
  const cached=images.get(id);
  if(cached)return cached;
- const loaded=api<{image:string}>('sticker_image',{sticker:id}).then(result=>result.image).catch(error=>{images.delete(id);throw error});
+ const loaded=stickerService.image<{image:string}>({sticker:id}).then(result=>result.image).catch(error=>{images.delete(id);throw error});
  if(images.size>=256)images.delete(images.keys().next().value!);
  images.set(id,loaded);
  return loaded;
@@ -104,7 +105,7 @@ async function encodeSticker(file:Blob){
 }
 
 type PublicPack={id:string;name:string;owner:string;count:number;installed:boolean;stickers:Sticker[]};
-const listPacks=(options:{packId?:string;offset?:number}={})=>api<{packs:PublicPack[];nextOffset:number|null}>('list_public_sticker_packs',options);
+const listPacks=(options:{packId?:string;offset?:number}={})=>stickerService.listPublicPacks<{packs:PublicPack[];nextOffset:number|null}>(options);
 export const personalSticker=(sticker:Sticker,user:string)=>!sticker.group&&(sticker.owner===user||sticker.packInstalled===true);
 export const stickerPackKey=(sticker:Sticker)=>sticker.packId||sticker.pack||'';
 
@@ -117,7 +118,7 @@ function StickerPackPreview({id,user,refresh,onClose,trigger}:{id:string;user:st
  },[id]);
  async function install(){
   setBusy(true);setError('');
-  try{await api('install_public_sticker_pack',{packId:id});await refresh();onClose()}
+  try{await stickerService.installPublicPack({packId:id});await refresh();onClose()}
   catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }
  return <Dialog.Root open onOpenChange={open=>{if(!open)onClose()}}><Dialog.Portal>
@@ -195,7 +196,7 @@ export function StickerLibrary({stickers,user,group,catalog,refresh}:LibraryProp
    let batch:typeof prepared=[],bytes=0,uploaded=0;
    async function send(){
     if(!batch.length)return;
-    await api('import_sticker_pack',{group,pack,stickers:batch});
+    await stickerService.importPack({group,pack,stickers:batch});
     uploaded+=batch.length;
     setProgress(`Загружено ${uploaded} из ${prepared.length}`);
     batch=[];bytes=0;
@@ -217,7 +218,7 @@ export function StickerLibrary({stickers,user,group,catalog,refresh}:LibraryProp
  async function remove(pack:string,sticker?:Sticker){
   setBusy(true);setError('');setProgress('');
   try{
-   await api(sticker?'remove_sticker':'remove_sticker_pack',{group,pack,sticker:sticker?.id});
+   await stickerService.remove({group,pack,sticker:sticker?.id});
    await refresh();
    setConfirm(undefined);
   }catch(e){setError((e as Error).message)}
@@ -227,8 +228,8 @@ export function StickerLibrary({stickers,user,group,catalog,refresh}:LibraryProp
  async function changePack(sticker:Sticker){
   setBusy(true);setError('');setProgress('');
   try{
-   if(sticker.packInstalled)await api('remove_installed_sticker_pack',{packId:sticker.packId});
-   else await api('set_sticker_pack_public',{packId:sticker.packId,pack:sticker.pack,public:!sticker.packPublic});
+   if(sticker.packInstalled)await stickerService.removeInstalledPack({packId:sticker.packId});
+   else await stickerService.setPackPublic({packId:sticker.packId,pack:sticker.pack,public:!sticker.packPublic});
    await refresh();
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}
  }

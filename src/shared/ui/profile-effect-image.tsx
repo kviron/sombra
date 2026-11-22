@@ -1,12 +1,14 @@
 import {useEffect,useState} from 'react';
-import {profileEffectFile,session,type ProfileEffectAsset} from '@/shared/api/backend';
+import {session,type ProfileEffectAsset} from '@/shared/api/backend';
+import {fileService} from '@/shared/api';
 
 export const PROFILE_EFFECT_MAX_BYTES=2*1024*1024;
-const pending=new Map<string,ReturnType<typeof profileEffectFile>>();
-function load(id:string,token:string){
+type EffectFile={asset:ProfileEffectAsset;data:string};
+const pending=new Map<string,Promise<EffectFile>>();
+function load(id:string,token:string):Promise<EffectFile>{
  const key=JSON.stringify([token,id]);
  const existing=pending.get(key);if(existing)return existing;
- const request=profileEffectFile(id).finally(()=>pending.delete(key));
+ const request=fileService.profileEffect<EffectFile>(id).finally(()=>pending.delete(key));
  pending.set(key,request);return request;
 }
 export function ProfileEffectImage({asset,className}:{asset?:ProfileEffectAsset;className?:string}){

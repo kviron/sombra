@@ -1,6 +1,7 @@
 import {useState, type FormEvent, type RefObject} from 'react';
 import {AlertDialog, Dialog} from 'radix-ui';
-import {api, type ChatMessage} from '@/shared/api/backend';
+import {type ChatMessage} from '@/shared/api/backend';
+import {messageService} from '@/entities/message';
 import {Button} from '@/shared/ui/button';
 
 type Props={
@@ -40,8 +41,8 @@ export function MessageActionDialog({mode,message,author,canDeleteEveryone=false
   setBusy(true);
   setError('');
   try{
-   if(mode==='edit')await api('update_message',{message:message.id,text:trimmed});
-   else await api('delete_message',{message:message.id,for_everyone:removeForEveryone});
+   if(mode==='edit')await messageService.update({message:message.id,text:trimmed});
+   else await messageService.remove({message:message.id,for_everyone:removeForEveryone});
    await refresh();
    onClose();
   }catch(err){setError((err as Error).message)}

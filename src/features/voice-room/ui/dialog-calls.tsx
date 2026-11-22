@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {Dialog as DialogPrimitive} from 'radix-ui';
 import {Phone,PhoneOff,Video,Users} from 'lucide-react';
-import {api,type ChatState,type DialogCall} from '@/shared/api/backend';
+import {type ChatState,type DialogCall} from '@/shared/api/backend';
+import {callService} from '../model/services/call-service';
 import {Button} from '@/shared/ui/button';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import type {Voice} from '../model/use-voice';
@@ -60,9 +61,9 @@ export function useDialogCalls({state,voice,refresh,onOpenDialog}:{state:ChatSta
   const op=begin(dialog,'start');if(!op)return;
   let created:DialogCall|undefined;
   try{
-   created=await api<DialogCall>('dialog_call_start',{dialog,video});if(!current(op))return;
+   created=await callService.start<DialogCall>({dialog,video});if(!current(op))return;
    const joined=await voice.join(created.id,video);if(!current(op))return;
-   if(!joined){await api('dialog_call_cancel',{call:created.id}).catch(()=>{});if(current(op))setError('Не удалось начать звонок. Проверьте доступ к микрофону и камере.')}
+   if(!joined){await callService.cancel({call:created.id}).catch(()=>{});if(current(op))setError('Не удалось начать звонок. Проверьте доступ к микрофону и камере.')}
    else{scope.current.handled.add(created.id);onOpenDialog(dialog)}
    update();
   }catch(reason){if(current(op))setError((reason as Error).message)}
@@ -80,7 +81,7 @@ export function useDialogCalls({state,voice,refresh,onOpenDialog}:{state:ChatSta
   if(!call||declinePending.current?.id===call.id)return;
   const op={id:call.id,epoch:scope.current.epoch};declinePending.current=op;setDeclining(op);setError('');
   const valid=()=>scope.current.epoch===op.epoch&&declinePending.current===op&&latest.current.state?.me.id===account;
-  try{await api('dialog_call_decline',{call:call.id});if(!valid())return;scope.current.handled.add(call.id);update()}
+  try{await callService.decline({call:call.id});if(!valid())return;scope.current.handled.add(call.id);update()}
   catch{if(valid())setError('Приглашение закрыто на этом устройстве. Сервер не подтвердил отклонение звонка.')}
   finally{if(valid()){declinePending.current=null;setDeclining(null)}}
  }

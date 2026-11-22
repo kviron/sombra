@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
-import {api,session,type User,type ProfileCoverMetadata,type ProfileCoverFile} from '@/shared/api/backend';
+import {session,type User,type ProfileCoverMetadata,type ProfileCoverFile} from '@/shared/api/backend';
+import {fileService} from '@/shared/api';
 import {AvatarFrame,normalizeDecoration,type DecorationInput} from '@/shared/ui/avatar-fx';
 import {inspectImage} from '@/shared/lib/image-crop';
 import './profile-cover.css';
@@ -24,7 +25,7 @@ export function ProfileCover({user,accountId,className='',decoration,effectAsset
  useEffect(()=>{
   let active=true,url:string|undefined;const meta=latest.current,token=session();setImage(undefined);
   // The scene is opaque and covers the whole banner: the picture is neither needed nor fetched.
-  if(!scene&&meta&&valid(meta))void api<ProfileCoverFile>('profile_cover',{user:user.id,coverId:meta.id}).then(file=>{
+  if(!scene&&meta&&valid(meta))void fileService.cover<ProfileCoverFile>({user:user.id,coverId:meta.id}).then(file=>{
    if(!active||session()!==token)return;
    if(!file||!valid(file)||file.user!==user.id||file.id!==meta.id||file.mime!==meta.mime||file.bytes!==meta.bytes||file.width!==meta.width||file.height!==meta.height||file.animated!==meta.animated||JSON.stringify(file.crop)!==JSON.stringify(meta.crop)||typeof file.data!=='string'||file.data.length>4*Math.ceil(LIMIT/3)||! /^[A-Za-z0-9+/]*={0,2}$/.test(file.data))return;
    const raw=atob(file.data);if(raw.length!==meta.bytes)return;
