@@ -1,52 +1,148 @@
 /* Голос и уведомления: разделы на общей поверхности, подпись слева, управление справа.
    Никаких карточек в карточке — блоки разделены волосяной линией. */
-.account-media-voice,.notification-settings.account-media-notifications{display:grid;gap:0;align-content:start}
-
-.account-media-voice .media-settings-panel{
- min-width:0;display:grid;gap:var(--s3);
- padding:var(--s5) 0;border:0;border-radius:0;background:none;
+.account-media-voice,
+.notification-settings.account-media-notifications {
+ display: grid;
+ gap: 0;
+ align-content: start;
 }
-.account-media-voice .media-settings-panel:first-of-type{padding-top:var(--s1)}
-.account-media-voice .media-settings-panel+.media-settings-panel{border-top:1px solid var(--border)}
-.account-media-voice .media-settings-panel h2,.account-media-notifications .notification-help h2{
- font-size:15px;line-height:22px;font-weight:600;letter-spacing:.01em;margin:0;color:var(--foreground);
+
+.account-media-voice .media-settings-panel {
+ min-width: 0;
+ display: grid;
+ gap: var(--s3);
+ padding: var(--s5) 0;
+ border: 0;
+ border-radius: 0;
+ background: none;
+}
+.account-media-voice .media-settings-panel:first-of-type {
+ padding-top: var(--s1);
+}
+.account-media-voice .media-settings-panel + .media-settings-panel {
+ border-top: 1px solid var(--border);
+}
+.account-media-voice .media-settings-panel h2,
+.account-media-notifications .notification-help h2 {
+ font-size: 15px;
+ line-height: 22px;
+ font-weight: 600;
+ letter-spacing: 0.01em;
+ margin: 0;
+ color: var(--foreground);
 }
 
 /* Поле — строка: подпись и управление в общей сетке, одинаковой для всех полей. */
-.account-media-voice .voice-field{
- display:grid;grid-template-columns:minmax(0,var(--label-col)) minmax(0,1fr);
- align-items:center;gap:var(--s4);min-height:var(--row);
+.account-media-voice .voice-field {
+ display: grid;
+ grid-template-columns: minmax(0, var(--label-col)) minmax(0, 1fr);
+ align-items: center;
+ gap: var(--s4);
+ min-height: var(--row);
 }
-.account-media-voice .voice-field>label{display:block;margin:0;font-size:13px;line-height:20px;color:var(--muted-foreground)}
-.account-media-voice .voice-field>.audio-device-missing{grid-column:1/-1;margin:0 0 var(--s2)}
-.account-media-voice .voice-volume{grid-column:1/-1}
-.account-media-voice .voice-volume>label{color:var(--foreground)}
-
-.account-media-voice .voice-processing{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s2)}
-.account-media-voice .voice-switch{
- display:grid;grid-template-columns:minmax(0,var(--label-col)) minmax(0,1fr);
- align-items:center;gap:var(--s4);min-height:var(--row);margin:0;
+.account-media-voice .voice-field > label {
+ display: block;
+ margin: 0;
+ font-size: 13px;
+ line-height: 20px;
+ color: var(--muted-foreground);
 }
-.account-media-voice .voice-switch>[data-slot="switch"]{justify-self:start}
-.account-media-voice .voice-switch>label{font-size:13px;line-height:20px;color:var(--foreground)}
-.account-media-voice .voice-processing .settings-hint{grid-column:1/-1;margin:0 0 var(--s1)}
+.account-media-voice .voice-field > .audio-device-missing {
+ grid-column: 1/-1;
+ margin: 0 0 var(--s2);
+}
+.account-media-voice .voice-volume {
+ grid-column: 1/-1;
+}
+.account-media-voice .voice-volume > label {
+ color: var(--foreground);
+}
 
-.account-media-voice .voice-device-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s2);align-items:stretch;margin-top:var(--s1)}
-.account-media-voice .voice-test-actions{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
-.account-media-voice .voice-test-actions [role=progressbar]{flex:1 1 160px;min-width:0}
+.account-media-voice .voice-processing {
+ display: grid;
+ grid-template-columns: minmax(0, 1fr);
+ gap: var(--s2);
+}
+.account-media-voice .voice-switch {
+ display: grid;
+ grid-template-columns: minmax(0, var(--label-col)) minmax(0, 1fr);
+ align-items: center;
+ gap: var(--s4);
+ min-height: var(--row);
+ margin: 0;
+}
+.account-media-voice .voice-switch > [data-slot='switch'] {
+ justify-self: start;
+}
+.account-media-voice .voice-switch > label {
+ font-size: 13px;
+ line-height: 20px;
+ color: var(--foreground);
+}
+.account-media-voice .voice-processing .settings-hint {
+ grid-column: 1/-1;
+ margin: 0 0 var(--s1);
+}
 
-.account-media-voice>.audio-device-access,
-.account-media-voice>.settings-hint:first-of-type{margin:var(--s2) 0 var(--s3)}
+.account-media-voice .voice-device-fields {
+ display: grid;
+ grid-template-columns: minmax(0, 1fr);
+ gap: var(--s2);
+ align-items: stretch;
+ margin-top: var(--s1);
+}
+.account-media-voice .voice-test-actions {
+ display: flex;
+ flex-wrap: wrap;
+ gap: var(--s2);
+ align-items: center;
+}
+.account-media-voice .voice-test-actions [role='progressbar'] {
+ flex: 1 1 160px;
+ min-width: 0;
+}
 
-.account-media-notifications .notification-option{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);padding:var(--s3) 0;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;min-height:var(--row)}
-.account-media-notifications .notification-option label{display:grid;gap:var(--s1);min-width:0;cursor:pointer}
+.account-media-voice > .audio-device-access,
+.account-media-voice > .settings-hint:first-of-type {
+ margin: var(--s2) 0 var(--s3);
+}
+
+.account-media-notifications .notification-option {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: var(--s4);
+ padding: var(--s3) 0;
+ border: 0;
+ border-bottom: 1px solid var(--border);
+ border-radius: 0;
+ background: transparent;
+ min-height: var(--row);
+}
+.account-media-notifications .notification-option label {
+ display: grid;
+ gap: var(--s1);
+ min-width: 0;
+ cursor: pointer;
+}
 .account-media-notifications .notification-option label span,
-.account-media-notifications>p:not([role]),
-.account-media-notifications .notification-help p{color:var(--muted-foreground)}
-.account-media-notifications .notification-help{display:grid;gap:var(--s2);padding:0;border:0;background:transparent}
+.account-media-notifications > p:not([role]),
+.account-media-notifications .notification-help p {
+ color: var(--muted-foreground);
+}
+.account-media-notifications .notification-help {
+ display: grid;
+ gap: var(--s2);
+ padding: 0;
+ border: 0;
+ background: transparent;
+}
 
 /* Узкая панель: подпись уходит над управлением, сетка остаётся той же. */
-@media(max-width:640px){
+@media (max-width: 640px) {
  .account-media-voice .voice-field,
- .account-media-voice .voice-switch{grid-template-columns:minmax(0,1fr);gap:var(--s2)}
+ .account-media-voice .voice-switch {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s2);
+ }
 }

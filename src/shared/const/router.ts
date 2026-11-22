@@ -3,7 +3,7 @@ export const AppRoutes = {
  home: '',
  chat: '#chat',
  login: '#login',
- register: '#register',
+ register: '#register'
 } as const;
 
 export type AppRoute = (typeof AppRoutes)[keyof typeof AppRoutes];

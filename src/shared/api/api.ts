@@ -3,7 +3,10 @@ import {authenticate, logout, request} from './transport';
 type Payload = Record<string, unknown>;
 type Method = <T = unknown>(payload?: Payload) => Promise<T>;
 
-const method = (op: string): Method => <T = unknown>(payload: Payload = {}) => request<T>(op, payload);
+const method =
+ (op: string): Method =>
+ <T = unknown>(payload: Payload = {}) =>
+  request<T>(op, payload);
 
 /**
  * Все запросы приложения одним объектом: группы по владельцу данных, методы по операции.
@@ -18,7 +21,7 @@ export const api = {
   logout: () => logout(),
   logoutAll: method('logout_all'),
   changePassword: method('change_password'),
-  changeEmail: method('change_email'),
+  changeEmail: method('change_email')
  },
  user: {
   updateProfile: method('update_profile'),
@@ -26,7 +29,7 @@ export const api = {
   setDecoration: method('set_profile_decoration'),
   sessions: method('sessions'),
   revokeSession: method('revoke_session'),
-  setTyping: method('set_typing'),
+  setTyping: method('set_typing')
  },
  message: {
   send: method('message'),
@@ -36,13 +39,13 @@ export const api = {
   react: method('reaction'),
   readers: method('message_readers'),
   markRead: method('mark_messages_read'),
-  attachment: method('attachment_file'),
+  attachment: method('attachment_file')
  },
  conversation: {
   createDialog: method('create_dialog'),
   update: method('update_dialog'),
   setPreferences: method('set_dialog_preferences'),
-  searchMembers: method('search_conversation_members'),
+  searchMembers: method('search_conversation_members')
  },
  group: {
   create: method('create_group'),
@@ -58,12 +61,12 @@ export const api = {
   setMemberRole: method('set_group_member_role'),
   kickMember: method('kick_group_member'),
   saveRole: method('save_group_role'),
-  deleteRole: method('delete_group_role'),
+  deleteRole: method('delete_group_role')
  },
  friend: {
   request: method('friend_request'),
   accept: method('friend_accept'),
-  remove: method('friend_remove'),
+  remove: method('friend_remove')
  },
  sticker: {
   image: method('sticker_image'),
@@ -73,7 +76,7 @@ export const api = {
   removeInstalledPack: method('remove_installed_sticker_pack'),
   removeSticker: method('remove_sticker'),
   removePack: method('remove_sticker_pack'),
-  setPackPublic: method('set_sticker_pack_public'),
+  setPackPublic: method('set_sticker_pack_public')
  },
  bot: {
   settings: method('get_bot_settings'),
@@ -85,24 +88,24 @@ export const api = {
   create: method('create_bot'),
   remove: method('delete_bot'),
   removeFromGroup: method('remove_bot_from_group'),
-  rotateToken: method('bot_rotate_token'),
+  rotateToken: method('bot_rotate_token')
  },
  voice: {
   join: method('voice_join'),
   poll: method('voice_poll'),
   leave: method('voice_leave'),
-  signal: method('voice_signal'),
+  signal: method('voice_signal')
  },
  call: {
   start: method('dialog_call_start'),
   cancel: method('dialog_call_cancel'),
-  decline: method('dialog_call_decline'),
+  decline: method('dialog_call_decline')
  },
  music: {
   state: method('music_state'),
   file: method('music_file'),
   command: method('music_command'),
-  streamChunk: method('music_stream_chunk'),
+  streamChunk: method('music_stream_chunk')
  },
  profileEffect: {
   upload: method('upload_profile_effect'),
@@ -113,13 +116,13 @@ export const api = {
   createDraft: method('create_profile_effect_draft'),
   getDraft: method('get_profile_effect_draft'),
   publish: method('publish_profile_effect'),
-  unpublish: method('unpublish_profile_effect'),
+  unpublish: method('unpublish_profile_effect')
  },
  file: {
   avatar: method('avatar_file'),
-  cover: method('profile_cover'),
+  cover: method('profile_cover')
  },
- notifications: {setPreferences: method('set_notification_preferences')},
+ notifications: {setPreferences: method('set_notification_preferences')}
 };
 
 export type Api = typeof api;

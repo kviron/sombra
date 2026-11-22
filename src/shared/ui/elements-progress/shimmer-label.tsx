@@ -8,6 +8,12 @@
 import type {ComponentProps} from 'react';
 import {cn} from '@/shared/lib/utils';
 
-export function ShimmerLabel({active=true,className,...props}:ComponentProps<'span'>&{active?:boolean}){
- return <span data-slot="shimmer-label" className={cn(active&&'elements-shimmer motion-reduce:animate-none',className)} {...props}/>;
+export function ShimmerLabel({active = true, className, ...props}: ComponentProps<'span'> & {active?: boolean}) {
+ return (
+  <span
+   data-slot="shimmer-label"
+   className={cn(active && 'elements-shimmer motion-reduce:animate-none', className)}
+   {...props}
+  />
+ );
 }

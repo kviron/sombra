@@ -2,7 +2,7 @@ export type IceServer = {urls?: string | string[]};
 
 /** True when the backend handed out a TURN relay: only then can media avoid a direct path. */
 export function hasRelay(servers: IceServer[] | undefined): boolean {
- if(!Array.isArray(servers))return false;
+ if (!Array.isArray(servers)) return false;
  return servers.some(server => {
   const urls = Array.isArray(server?.urls) ? server.urls : [server?.urls];
   return urls.some(url => typeof url === 'string' && (url.startsWith('turn:') || url.startsWith('turns:')));

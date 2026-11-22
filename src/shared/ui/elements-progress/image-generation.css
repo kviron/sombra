@@ -2,32 +2,36 @@
    `.shimmer` label animation in its global theme; Sombra ships the same effect next to
    the one Elements component that uses it, with Sombra's muted-foreground colours. */
 @keyframes elements-shimmer-sweep {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
+ from {
+  background-position: 200% 0;
+ }
+ to {
+  background-position: -200% 0;
+ }
 }
 .elements-shimmer {
-  background-image: linear-gradient(100deg, #8f97aa 20%, #eef1f9 50%, #8f97aa 80%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: elements-shimmer-sweep 1.9s linear infinite;
+ background-image: linear-gradient(100deg, #8f97aa 20%, #eef1f9 50%, #8f97aa 80%);
+ background-size: 200% 100%;
+ -webkit-background-clip: text;
+ background-clip: text;
+ color: transparent;
+ -webkit-text-fill-color: transparent;
+ animation: elements-shimmer-sweep 1.9s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .elements-shimmer {
-    animation: none;
-    background-image: none;
-    color: #c3cad9;
-    -webkit-text-fill-color: currentColor;
-  }
+ .elements-shimmer {
+  animation: none;
+  background-image: none;
+  color: #c3cad9;
+  -webkit-text-fill-color: currentColor;
+ }
 }
 @media (forced-colors: active) {
-  .elements-shimmer {
-    background-image: none;
-    color: CanvasText;
-    -webkit-text-fill-color: currentColor;
-  }
+ .elements-shimmer {
+  background-image: none;
+  color: CanvasText;
+  -webkit-text-fill-color: currentColor;
+ }
 }
 
 /* Generating plate. Canonical Elements hides the gradient and keeps only the pulsing dot
@@ -35,50 +39,54 @@
    keeps the same dot field on top of a soft, slowly breathing gradient with a single
    sheen sweep: visible work in progress, still no percentage, prompt or resolution. */
 @keyframes elements-image-breathe {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 0.7; }
+ 0%,
+ 100% {
+  opacity: 0.45;
+ }
+ 50% {
+  opacity: 0.7;
+ }
 }
 @keyframes elements-image-sweep {
-  from { transform: translateX(-65%); }
-  to { transform: translateX(65%); }
+ from {
+  transform: translateX(-65%);
+ }
+ to {
+  transform: translateX(65%);
+ }
 }
 .elements-image-plate {
-  pointer-events: none;
+ pointer-events: none;
 }
 .elements-image-plate-generating {
-  animation: elements-image-breathe 3.4s ease-in-out infinite;
+ animation: elements-image-breathe 3.4s ease-in-out infinite;
 }
 /* A dark scrim keeps the pastel placeholder palette calm inside Sombra's dark chat. */
 .elements-image-plate-generating::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(9, 11, 18, 0.3), rgba(9, 11, 18, 0.5));
+ content: '';
+ position: absolute;
+ inset: 0;
+ background: linear-gradient(180deg, rgba(9, 11, 18, 0.3), rgba(9, 11, 18, 0.5));
 }
 .elements-image-plate-generating::after {
-  content: "";
-  position: absolute;
-  inset: -45%;
-  background: linear-gradient(
-    105deg,
-    transparent 38%,
-    rgba(163, 176, 255, 0.3) 50%,
-    transparent 62%
-  );
-  animation: elements-image-sweep 2.8s linear infinite;
+ content: '';
+ position: absolute;
+ inset: -45%;
+ background: linear-gradient(105deg, transparent 38%, rgba(163, 176, 255, 0.3) 50%, transparent 62%);
+ animation: elements-image-sweep 2.8s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .elements-image-plate-generating {
-    animation: none;
-    opacity: 0.6;
-  }
-  .elements-image-plate-generating::after {
-    animation: none;
-    opacity: 0;
-  }
+ .elements-image-plate-generating {
+  animation: none;
+  opacity: 0.6;
+ }
+ .elements-image-plate-generating::after {
+  animation: none;
+  opacity: 0;
+ }
 }
 @media (forced-colors: active) {
-  .elements-image-plate-generating::after {
-    display: none;
-  }
+ .elements-image-plate-generating::after {
+  display: none;
+ }
 }

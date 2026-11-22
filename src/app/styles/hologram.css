@@ -1,14 +1,58 @@
-.auth-window section>div:first-child{flex-direction:column;gap:14px}
-.auth-window section>div:first-child .sombra-mark{width:100px;height:100px}
-.sombra-logo{display:inline-flex;align-items:center;gap:10px;max-width:100%;color:#e5ceff;vertical-align:middle}
-.sombra-wordmark{display:block;font-family:inherit;font-size:24px;font-weight:600;line-height:1.1;letter-spacing:0}
-.sombra-logo--compact{gap:7px}
-.sombra-logo--compact .sombra-mark{width:26px;height:26px}
-.sombra-logo--compact .sombra-wordmark{font-size:18px}
-.sombra-logo--auth{flex-direction:column;gap:18px}
-.sombra-logo--auth .sombra-wordmark{font-size:36px}
-.sombra-logo--hero .sombra-mark{width:64px;height:64px}
-.sombra-logo--hero .sombra-wordmark{font-size:44px}
-.server-rail .server .sombra-mark{width:32px;height:32px}
-:root:not(.dark) .sombra-logo{color:#63339a}
-:root .chat-window .sombra-logo{color:#e5ceff}
+.auth-window section > div:first-child {
+ flex-direction: column;
+ gap: 14px;
+}
+.auth-window section > div:first-child .sombra-mark {
+ width: 100px;
+ height: 100px;
+}
+.sombra-logo {
+ display: inline-flex;
+ align-items: center;
+ gap: 10px;
+ max-width: 100%;
+ color: #e5ceff;
+ vertical-align: middle;
+}
+.sombra-wordmark {
+ display: block;
+ font-family: inherit;
+ font-size: 24px;
+ font-weight: 600;
+ line-height: 1.1;
+ letter-spacing: 0;
+}
+.sombra-logo--compact {
+ gap: 7px;
+}
+.sombra-logo--compact .sombra-mark {
+ width: 26px;
+ height: 26px;
+}
+.sombra-logo--compact .sombra-wordmark {
+ font-size: 18px;
+}
+.sombra-logo--auth {
+ flex-direction: column;
+ gap: 18px;
+}
+.sombra-logo--auth .sombra-wordmark {
+ font-size: 36px;
+}
+.sombra-logo--hero .sombra-mark {
+ width: 64px;
+ height: 64px;
+}
+.sombra-logo--hero .sombra-wordmark {
+ font-size: 44px;
+}
+.server-rail .server .sombra-mark {
+ width: 32px;
+ height: 32px;
+}
+:root:not(.dark) .sombra-logo {
+ color: #63339a;
+}
+:root .chat-window .sombra-logo {
+ color: #e5ceff;
+}

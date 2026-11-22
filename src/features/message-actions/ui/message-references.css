@@ -1,19 +1,145 @@
-.message-reference,.reference-draft{display:flex;align-items:center;gap:8px;min-width:0;color:var(--muted-foreground);font-size:.8125rem;text-align:left}
-.message-reference{max-width:100%;width:fit-content;margin-block:4px;padding:4px 8px;border-inline-start:2px solid var(--muted-foreground);border-radius:4px;background:var(--muted)}
-button.message-reference:hover,.reference-draft button:hover,.forward-picker button:hover{background:var(--accent);color:var(--accent-foreground)}
-.message-reference span,.reference-draft span,.forward-picker li span{min-width:0;display:grid}
-.message-reference strong,.message-reference small,.reference-draft strong,.reference-draft small,.forward-picker strong,.forward-picker small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.message-reference strong,.reference-draft strong,.forward-picker strong{color:var(--foreground);font-size:inherit}
-.message-reference svg,.reference-draft svg,.forward-picker svg{flex:none}
-.message-forwarded{display:flex;align-items:center;gap:6px;margin-block:4px;color:var(--muted-foreground);font-size:.75rem}
-.reference-draft{padding:4px 8px 4px 12px;background:var(--muted);border-radius:8px;margin-bottom:4px}
-.reference-draft button,.forward-picker header button{display:grid;place-items:center;flex:none;width:36px;height:36px;margin-inline-start:auto;border-radius:6px}
-.forward-composer{display:flex;gap:8px;align-items:end;padding:8px;background:var(--background);border:1px solid var(--border);border-radius:8px}
-.forward-composer textarea{flex:1;min-width:0;min-height:40px;max-height:140px;resize:vertical;padding:8px;background:transparent}
-.forward-picker.group-modal{position:fixed;z-index:101;inset:50% auto auto 50%;transform:translate(-50%,-50%);display:grid;gap:12px;width:min(430px,calc(100vw - 32px));max-height:85vh;padding:16px;overflow:auto}
-.forward-picker header{display:flex;align-items:center;gap:8px;color:var(--foreground)}
-.forward-picker h2{margin:0}
-.forward-picker ul{display:grid;gap:2px;max-height:min(45vh,340px);overflow:auto;padding:0;margin:0;list-style:none}
-.forward-picker li button{display:flex;align-items:center;text-align:left;gap:12px;width:100%;min-height:48px;padding:6px 10px;border-radius:6px;color:var(--muted-foreground)}
-.forward-picker label{width:100%}
-.forward-picker button:focus-visible,.reference-draft button:focus-visible,.message-reference:focus-visible,.forward-composer textarea:focus-visible{outline:2px solid var(--ring);outline-offset:-2px}
+.message-reference,
+.reference-draft {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ min-width: 0;
+ color: var(--muted-foreground);
+ font-size: 0.8125rem;
+ text-align: left;
+}
+.message-reference {
+ max-width: 100%;
+ width: fit-content;
+ margin-block: 4px;
+ padding: 4px 8px;
+ border-inline-start: 2px solid var(--muted-foreground);
+ border-radius: 4px;
+ background: var(--muted);
+}
+button.message-reference:hover,
+.reference-draft button:hover,
+.forward-picker button:hover {
+ background: var(--accent);
+ color: var(--accent-foreground);
+}
+.message-reference span,
+.reference-draft span,
+.forward-picker li span {
+ min-width: 0;
+ display: grid;
+}
+.message-reference strong,
+.message-reference small,
+.reference-draft strong,
+.reference-draft small,
+.forward-picker strong,
+.forward-picker small {
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap;
+}
+.message-reference strong,
+.reference-draft strong,
+.forward-picker strong {
+ color: var(--foreground);
+ font-size: inherit;
+}
+.message-reference svg,
+.reference-draft svg,
+.forward-picker svg {
+ flex: none;
+}
+.message-forwarded {
+ display: flex;
+ align-items: center;
+ gap: 6px;
+ margin-block: 4px;
+ color: var(--muted-foreground);
+ font-size: 0.75rem;
+}
+.reference-draft {
+ padding: 4px 8px 4px 12px;
+ background: var(--muted);
+ border-radius: 8px;
+ margin-bottom: 4px;
+}
+.reference-draft button,
+.forward-picker header button {
+ display: grid;
+ place-items: center;
+ flex: none;
+ width: 36px;
+ height: 36px;
+ margin-inline-start: auto;
+ border-radius: 6px;
+}
+.forward-composer {
+ display: flex;
+ gap: 8px;
+ align-items: end;
+ padding: 8px;
+ background: var(--background);
+ border: 1px solid var(--border);
+ border-radius: 8px;
+}
+.forward-composer textarea {
+ flex: 1;
+ min-width: 0;
+ min-height: 40px;
+ max-height: 140px;
+ resize: vertical;
+ padding: 8px;
+ background: transparent;
+}
+.forward-picker.group-modal {
+ position: fixed;
+ z-index: 101;
+ inset: 50% auto auto 50%;
+ transform: translate(-50%, -50%);
+ display: grid;
+ gap: 12px;
+ width: min(430px, calc(100vw - 32px));
+ max-height: 85vh;
+ padding: 16px;
+ overflow: auto;
+}
+.forward-picker header {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ color: var(--foreground);
+}
+.forward-picker h2 {
+ margin: 0;
+}
+.forward-picker ul {
+ display: grid;
+ gap: 2px;
+ max-height: min(45vh, 340px);
+ overflow: auto;
+ padding: 0;
+ margin: 0;
+ list-style: none;
+}
+.forward-picker li button {
+ display: flex;
+ align-items: center;
+ text-align: left;
+ gap: 12px;
+ width: 100%;
+ min-height: 48px;
+ padding: 6px 10px;
+ border-radius: 6px;
+ color: var(--muted-foreground);
+}
+.forward-picker label {
+ width: 100%;
+}
+.forward-picker button:focus-visible,
+.reference-draft button:focus-visible,
+.message-reference:focus-visible,
+.forward-composer textarea:focus-visible {
+ outline: 2px solid var(--ring);
+ outline-offset: -2px;
+}

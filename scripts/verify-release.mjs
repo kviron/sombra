@@ -9,20 +9,20 @@ import {createHash, createPublicKey, verify} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 
 const argv = process.argv.slice(2);
-const arg = (name) => {
-  const index = argv.indexOf(`--${name}`);
-  return index === -1 ? undefined : argv[index + 1];
+const arg = name => {
+ const index = argv.indexOf(`--${name}`);
+ return index === -1 ? undefined : argv[index + 1];
 };
 const repo = arg('repo') ?? 'kviron/sombra';
 const config = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'));
 const tag = arg('tag');
 const manifestUrl = tag
-  ? `https://github.com/${repo}/releases/download/${tag}/latest.json`
-  : `https://github.com/${repo}/releases/latest/download/latest.json`;
+ ? `https://github.com/${repo}/releases/download/${tag}/latest.json`
+ : `https://github.com/${repo}/releases/latest/download/latest.json`;
 
-const fail = (message) => {
-  console.error(`FAIL ${message}`);
-  process.exitCode = 1;
+const fail = message => {
+ console.error(`FAIL ${message}`);
+ process.exitCode = 1;
 };
 
 // Ключ из конфига: две строки, вторая — "Ed" + keyid(8) + key(32).
@@ -31,16 +31,18 @@ const keyBytes = Buffer.from(key, 'base64');
 if (keyBytes.length !== 42) fail('публичный ключ в tauri.conf.json не 42 байта');
 const keyId = keyBytes.subarray(2, 10);
 const publicKey = createPublicKey({
-  key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), keyBytes.subarray(10)]),
-  format: 'der',
-  type: 'spki',
+ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), keyBytes.subarray(10)]),
+ format: 'der',
+ type: 'spki'
 });
 
 const manifest = await (await fetch(manifestUrl)).json();
-if (manifest.version !== (tag ?? manifest.version).replace(/^v/, '') && tag) fail(`версия ${manifest.version} не совпадает с тегом ${tag}`);
+if (manifest.version !== (tag ?? manifest.version).replace(/^v/, '') && tag)
+ fail(`версия ${manifest.version} не совпадает с тегом ${tag}`);
 const platform = manifest.platforms['windows-x86_64'] ?? manifest.platforms['windows-x86_64-nsis'];
 if (!platform) fail('в манифесте нет windows-x86_64');
-if (!platform?.url?.startsWith(`https://github.com/${repo}/releases/download/`)) fail(`URL не ведёт на релиз GitHub: ${platform?.url}`);
+if (!platform?.url?.startsWith(`https://github.com/${repo}/releases/download/`))
+ fail(`URL не ведёт на релиз GitHub: ${platform?.url}`);
 
 const installer = Buffer.from(await (await fetch(platform.url)).arrayBuffer());
 if (installer.length < 1024 * 1024) fail(`установщик подозрительно мал: ${installer.length} байт`);

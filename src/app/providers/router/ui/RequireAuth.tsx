@@ -11,7 +11,11 @@ export function RequireAuth({auth, onRetry, children}: Props) {
  return (
   <main className="m-auto text-center">
    <p role="status">{auth === 'checking' ? 'Проверяем сессию…' : 'Не удалось проверить сессию.'}</p>
-   {auth === 'error' && <button type="button" onClick={onRetry}>Повторить</button>}
+   {auth === 'error' && (
+    <button type="button" onClick={onRetry}>
+     Повторить
+    </button>
+   )}
   </main>
  );
 }

@@ -8,6 +8,6 @@
 
 /** Constrains a value to `min…max`. */
 export function clamp(value: number, min: number, max: number) {
-  if (Number.isNaN(value)) return min;
-  return Math.min(max, Math.max(min, value));
+ if (Number.isNaN(value)) return min;
+ return Math.min(max, Math.max(min, value));
 }

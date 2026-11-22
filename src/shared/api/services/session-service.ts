@@ -6,5 +6,5 @@ import {clearSession, session} from '../transport';
  */
 export const sessionService = {
  token: () => session(),
- clear: () => clearSession(),
+ clear: () => clearSession()
 };

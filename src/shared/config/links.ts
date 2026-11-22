@@ -1,1 +1,1 @@
-export const DOCS_URL = "https://tauri.app";
+export const DOCS_URL = 'https://tauri.app';

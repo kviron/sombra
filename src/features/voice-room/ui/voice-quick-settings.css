@@ -1,6 +1,86 @@
 .chat-shell .profile .voice-device-control > button:enabled:is(:hover, :focus-visible),
-.chat-shell .profile .voice-device-control > .voice-quick-trigger[data-state="open"] {
-  background: var(--glass-line);
-  color: var(--accent-foreground);
+.chat-shell .profile .voice-device-control > .voice-quick-trigger[data-state='open'] {
+ background: var(--glass-line);
+ color: var(--accent-foreground);
 }
-.voice-device-control{display:flex;align-items:center;flex-shrink:0;border-radius:7px;gap:0}.profile .voice-device-control>button:first-child{width:26px;height:30px;padding:3px;border-radius:7px 0 0 7px}.profile .voice-device-control .voice-quick-trigger{width:15px;min-width:15px;height:30px;padding:0;border-radius:0 7px 7px 0}.voice-quick-trigger svg{width:12px;height:12px;transition:transform .15s}.voice-quick-trigger[data-state=open] svg{transform:rotate(180deg)}.voice-quick-panel{z-index:110;width:280px;max-width:calc(100vw - 24px);padding:16px;border:1px solid #ffffff24;border-radius:12px;background:#17191f;color:#e1e5ee;box-shadow:0 16px 44px #0009;font:13px Arial,sans-serif}.voice-quick-label{display:block;margin-bottom:9px;font-weight:600}.voice-quick-volume{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;font-weight:600}.voice-quick-volume output{font-variant-numeric:tabular-nums;color:#aeb7ca}.voice-quick-panel [data-slot=slider]{min-height:24px;--primary:#8589ff;--secondary:#363944;--background:#eee;--ring:#8589ff}.voice-quick-panel .voice-quick-settings-link{width:100%;justify-content:flex-start;padding:0 8px}.voice-quick-error{margin:9px 0;color:#d3b98b;font-size:12px;line-height:1.5}.voice-quick-panel button:focus-visible{outline:2px solid #9b9fff;outline-offset:2px}
+.voice-device-control {
+ display: flex;
+ align-items: center;
+ flex-shrink: 0;
+ border-radius: 7px;
+ gap: 0;
+}
+.profile .voice-device-control > button:first-child {
+ width: 26px;
+ height: 30px;
+ padding: 3px;
+ border-radius: 7px 0 0 7px;
+}
+.profile .voice-device-control .voice-quick-trigger {
+ width: 15px;
+ min-width: 15px;
+ height: 30px;
+ padding: 0;
+ border-radius: 0 7px 7px 0;
+}
+.voice-quick-trigger svg {
+ width: 12px;
+ height: 12px;
+ transition: transform 0.15s;
+}
+.voice-quick-trigger[data-state='open'] svg {
+ transform: rotate(180deg);
+}
+.voice-quick-panel {
+ z-index: 110;
+ width: 280px;
+ max-width: calc(100vw - 24px);
+ padding: 16px;
+ border: 1px solid #ffffff24;
+ border-radius: 12px;
+ background: #17191f;
+ color: #e1e5ee;
+ box-shadow: 0 16px 44px #0009;
+ font:
+  13px Arial,
+  sans-serif;
+}
+.voice-quick-label {
+ display: block;
+ margin-bottom: 9px;
+ font-weight: 600;
+}
+.voice-quick-volume {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: 12px;
+ margin-bottom: 9px;
+ font-weight: 600;
+}
+.voice-quick-volume output {
+ font-variant-numeric: tabular-nums;
+ color: #aeb7ca;
+}
+.voice-quick-panel [data-slot='slider'] {
+ min-height: 24px;
+ --primary: #8589ff;
+ --secondary: #363944;
+ --background: #eee;
+ --ring: #8589ff;
+}
+.voice-quick-panel .voice-quick-settings-link {
+ width: 100%;
+ justify-content: flex-start;
+ padding: 0 8px;
+}
+.voice-quick-error {
+ margin: 9px 0;
+ color: #d3b98b;
+ font-size: 12px;
+ line-height: 1.5;
+}
+.voice-quick-panel button:focus-visible {
+ outline: 2px solid #9b9fff;
+ outline-offset: 2px;
+}

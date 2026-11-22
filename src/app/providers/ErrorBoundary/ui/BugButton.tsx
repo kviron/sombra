@@ -9,7 +9,11 @@ export function BugButton() {
  if (!import.meta.env.DEV) return null;
  if (crash) throw new Error('Проверка границы ошибок: BugButton');
  return (
-  <button type="button" className="fixed right-3 bottom-3 z-[9999] rounded-[10px] border border-border bg-card px-3 py-2 text-xs text-muted-foreground" onClick={() => setCrash(true)}>
+  <button
+   type="button"
+   className="border-border bg-card text-muted-foreground fixed right-3 bottom-3 z-[9999] rounded-[10px] border px-3 py-2 text-xs"
+   onClick={() => setCrash(true)}
+  >
    Уронить интерфейс
   </button>
  );

@@ -1,31 +1,144 @@
 /* Geometry comes from the official Elements utility classes. Only textarea adaptation is native. */
 /* These popups may be portaled outside the dark composer. Keep their material
    and text local, opaque and readable even without Windows backdrop effects. */
-.sombra-composer-menu[data-slot]{--sombra-menu-surface:#1b1d27;--sombra-menu-solid:#1b1d27;--sombra-menu-text:#edf0f7;--sombra-menu-muted:#b8bfce;--sombra-menu-border:rgba(255,255,255,.1);--sombra-menu-highlight:rgba(255,255,255,.12);--sombra-menu-highlight-text:#fff;--sombra-menu-blur:none;--sombra-menu-shadow:0 12px 32px #0005;--muted-foreground:var(--sombra-menu-muted);--accent:var(--sombra-menu-highlight);--accent-foreground:var(--sombra-menu-highlight-text)}
-.sombra-composer-menu[data-slot] button[role=option]:is([data-highlighted],:hover,:focus-visible){background:var(--sombra-menu-highlight);color:var(--sombra-menu-highlight-text)}
-.sombra-assistant-composer textarea{min-width:0;resize:none;border:0;box-shadow:none;line-height:24px;padding-top:10px;padding-bottom:10px;color:var(--foreground)}
-.sombra-assistant-composer .sombra-composer-menu{position:absolute;bottom:calc(100% + 12px);left:0;right:auto;width:min(420px,100%);z-index:40;padding:8px;max-height:min(340px,50vh);overflow:auto;border-radius:16px;min-width:0}
-.sombra-composer-menu p{margin:4px 8px 8px;font-size:12px;color:var(--muted-foreground,#b0b1bd)}
-.sombra-composer-menu button[role=option]{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;min-height:54px;height:auto;padding:8px 12px;text-align:left;border-radius:10px;background:transparent;color:inherit}
-.sombra-composer-menu button[role=option][data-highlighted],.sombra-composer-menu button[role=option]:hover{background:var(--accent,rgba(255,255,255,.09))}
-.sombra-composer-menu button[role=option]>span:last-child{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
-.sombra-composer-menu strong,.sombra-composer-menu small{overflow-wrap:anywhere;white-space:normal}
-.sombra-composer-menu strong{font-size:14px;font-weight:600}.sombra-composer-menu small{font-size:12px;color:var(--muted-foreground,#b0b1bd)}
-.sombra-composer-menu .sombra-mention-avatar{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--accent,#41434e);font-size:16px}
-.sombra-mention-avatar img{width:100%;height:100%;object-fit:cover}.sombra-composer-menu-empty{padding:12px;font-size:14px;color:var(--muted-foreground,#b0b1bd)}
+.sombra-composer-menu[data-slot] {
+ --sombra-menu-surface: #1b1d27;
+ --sombra-menu-solid: #1b1d27;
+ --sombra-menu-text: #edf0f7;
+ --sombra-menu-muted: #b8bfce;
+ --sombra-menu-border: rgba(255, 255, 255, 0.1);
+ --sombra-menu-highlight: rgba(255, 255, 255, 0.12);
+ --sombra-menu-highlight-text: #fff;
+ --sombra-menu-blur: none;
+ --sombra-menu-shadow: 0 12px 32px #0005;
+ --muted-foreground: var(--sombra-menu-muted);
+ --accent: var(--sombra-menu-highlight);
+ --accent-foreground: var(--sombra-menu-highlight-text);
+}
+.sombra-composer-menu[data-slot] button[role='option']:is([data-highlighted], :hover, :focus-visible) {
+ background: var(--sombra-menu-highlight);
+ color: var(--sombra-menu-highlight-text);
+}
+.sombra-assistant-composer textarea {
+ min-width: 0;
+ resize: none;
+ border: 0;
+ box-shadow: none;
+ line-height: 24px;
+ padding-top: 10px;
+ padding-bottom: 10px;
+ color: var(--foreground);
+}
+.sombra-assistant-composer .sombra-composer-menu {
+ position: absolute;
+ bottom: calc(100% + 12px);
+ left: 0;
+ right: auto;
+ width: min(420px, 100%);
+ z-index: 40;
+ padding: 8px;
+ max-height: min(340px, 50vh);
+ overflow: auto;
+ border-radius: 16px;
+ min-width: 0;
+}
+.sombra-composer-menu p {
+ margin: 4px 8px 8px;
+ font-size: 12px;
+ color: var(--muted-foreground, #b0b1bd);
+}
+.sombra-composer-menu button[role='option'] {
+ display: flex;
+ align-items: center;
+ justify-content: flex-start;
+ gap: 12px;
+ width: 100%;
+ min-height: 54px;
+ height: auto;
+ padding: 8px 12px;
+ text-align: left;
+ border-radius: 10px;
+ background: transparent;
+ color: inherit;
+}
+.sombra-composer-menu button[role='option'][data-highlighted],
+.sombra-composer-menu button[role='option']:hover {
+ background: var(--accent, rgba(255, 255, 255, 0.09));
+}
+.sombra-composer-menu button[role='option'] > span:last-child {
+ min-width: 0;
+ display: flex;
+ flex-direction: column;
+ align-items: flex-start;
+ gap: 2px;
+}
+.sombra-composer-menu strong,
+.sombra-composer-menu small {
+ overflow-wrap: anywhere;
+ white-space: normal;
+}
+.sombra-composer-menu strong {
+ font-size: 14px;
+ font-weight: 600;
+}
+.sombra-composer-menu small {
+ font-size: 12px;
+ color: var(--muted-foreground, #b0b1bd);
+}
+.sombra-composer-menu .sombra-mention-avatar {
+ display: grid;
+ place-items: center;
+ width: 36px;
+ height: 36px;
+ border-radius: 50%;
+ overflow: hidden;
+ flex-shrink: 0;
+ background: var(--accent, #41434e);
+ font-size: 16px;
+}
+.sombra-mention-avatar img {
+ width: 100%;
+ height: 100%;
+ object-fit: cover;
+}
+.sombra-composer-menu-empty {
+ padding: 12px;
+ font-size: 14px;
+ color: var(--muted-foreground, #b0b1bd);
+}
 /* Sombra dock surface: a matte, translucent panel in the app palette (#1b1d27
    family) so the messages scrolled underneath stay readable through it, while the
    text keeps its contrast. Colours only; geometry stays with the Elements classes. */
-.composer-chrome .sombra-assistant-composer{background:rgba(20,22,30,.64);border-color:rgba(160,174,198,.16);-webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%);box-shadow:0 12px 34px rgba(0,0,0,.42)}
-.composer-chrome .sombra-assistant-composer textarea::placeholder{color:#8e94a4}
+.composer-chrome .sombra-assistant-composer {
+ background: rgba(20, 22, 30, 0.64);
+ border-color: rgba(160, 174, 198, 0.16);
+ -webkit-backdrop-filter: blur(20px) saturate(140%);
+ backdrop-filter: blur(20px) saturate(140%);
+ box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42);
+}
+.composer-chrome .sombra-assistant-composer textarea::placeholder {
+ color: #8e94a4;
+}
 /* Keep both halves of the send palette together: the shell's unlayered
    button:hover otherwise replaces only the Tailwind button background. */
-.sombra-assistant-composer [data-slot="composer-send"]{
- --sombra-send-bg:#dce6fa;--sombra-send-hover:#c6d6f6;--sombra-send-ink:#1b263a;
- background-color:var(--sombra-send-bg);color:var(--sombra-send-ink)
+.sombra-assistant-composer [data-slot='composer-send'] {
+ --sombra-send-bg: #dce6fa;
+ --sombra-send-hover: #c6d6f6;
+ --sombra-send-ink: #1b263a;
+ background-color: var(--sombra-send-bg);
+ color: var(--sombra-send-ink);
 }
-.sombra-assistant-composer [data-slot="composer-send"]:hover:not(:disabled){background-color:var(--sombra-send-hover)}
-.sombra-assistant-composer [data-slot="composer-send"]:disabled:hover{background-color:var(--sombra-send-bg)}
-@media(prefers-reduced-transparency:reduce){
- .composer-chrome .sombra-assistant-composer{background:#16181f;border-color:#2b2e3a;-webkit-backdrop-filter:none;backdrop-filter:none}
+.sombra-assistant-composer [data-slot='composer-send']:hover:not(:disabled) {
+ background-color: var(--sombra-send-hover);
+}
+.sombra-assistant-composer [data-slot='composer-send']:disabled:hover {
+ background-color: var(--sombra-send-bg);
+}
+@media (prefers-reduced-transparency: reduce) {
+ .composer-chrome .sombra-assistant-composer {
+  background: #16181f;
+  border-color: #2b2e3a;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+ }
 }

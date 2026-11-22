@@ -16,8 +16,12 @@ import './styles/chat-extras.css';
 import './styles/hologram.css';
 
 function AppContent() {
- const [showUpdates,setShowUpdates]=useState(false);
- useEffect(()=>{const open=()=>setShowUpdates(true);window.addEventListener('sombra:open-updates',open);return()=>window.removeEventListener('sombra:open-updates',open)},[]);
+ const [showUpdates, setShowUpdates] = useState(false);
+ useEffect(() => {
+  const open = () => setShowUpdates(true);
+  window.addEventListener('sombra:open-updates', open);
+  return () => window.removeEventListener('sombra:open-updates', open);
+ }, []);
  const [route, setRoute] = useState(window.location.hash);
  useEffect(() => {
   const navigate = () => setRoute(window.location.hash);
@@ -28,29 +32,52 @@ function AppContent() {
  const [attempt, setAttempt] = useState(0);
  useEffect(() => {
   let active = true;
-  const check = () => { setAuth('checking'); void userService.me().then(() => { if(active) setAuth('ready'); }).catch(error => { if(active) setAuth(String(error).includes('Сессия') || String(error).includes('AUTH_REQUIRED') ? 'guest' : 'error'); }); };
-  const changed = () => { setAuth('guest'); };
+  const check = () => {
+   setAuth('checking');
+   void userService
+    .me()
+    .then(() => {
+     if (active) setAuth('ready');
+    })
+    .catch(error => {
+     if (active)
+      setAuth(String(error).includes('Сессия') || String(error).includes('AUTH_REQUIRED') ? 'guest' : 'error');
+    });
+  };
+  const changed = () => {
+   setAuth('guest');
+  };
   check();
   window.addEventListener('authchange', changed);
-  return () => { active=false; window.removeEventListener('authchange', changed); };
+  return () => {
+   active = false;
+   window.removeEventListener('authchange', changed);
+  };
  }, [route, attempt]);
- const { theme } = useTheme();
+ const {theme} = useTheme();
  const inTauri = isTauri();
  const isMaximized = useWindowMaximized(inTauri);
 
  return (
-  <div className={`app-surface relative flex h-svh flex-col overflow-hidden bg-background text-foreground ${auth === 'ready' ? 'chat-window' : 'auth-window mira-auth'}`}>
+  <div
+   className={`app-surface bg-background text-foreground relative flex h-svh flex-col overflow-hidden ${auth === 'ready' ? 'chat-window' : 'auth-window mira-auth'}`}
+  >
    {auth !== 'ready' && <AuthAmbient />}
    <TitleBar inTauri={inTauri} isMaximized={isMaximized} />
-   <AppRouter auth={auth} route={route} onRetry={() => setAttempt(n => n+1)} />
+   <AppRouter auth={auth} route={route} onRetry={() => setAttempt(n => n + 1)} />
    <WindowResizeHandles inTauri={inTauri} isMaximized={isMaximized} />
    <UpdateNotice />
-   {showUpdates&&auth!=='ready'&&<div className="update-guest-overlay"><section className="update-guest-dialog" role="dialog" aria-modal="true" aria-label="Обновления Sombra"><button type="button" onClick={()=>setShowUpdates(false)} aria-label="Закрыть обновления">Закрыть</button><UpdateSettings inCall={false}/></section></div>}
-   <Toaster
-    position="bottom-right"
-    theme={theme}
-    offset={{ bottom: 60, right: 20 }}
-   />
+   {showUpdates && auth !== 'ready' && (
+    <div className="update-guest-overlay">
+     <section className="update-guest-dialog" role="dialog" aria-modal="true" aria-label="Обновления Sombra">
+      <button type="button" onClick={() => setShowUpdates(false)} aria-label="Закрыть обновления">
+       Закрыть
+      </button>
+      <UpdateSettings inCall={false} />
+     </section>
+    </div>
+   )}
+   <Toaster position="bottom-right" theme={theme} offset={{bottom: 60, right: 20}} />
   </div>
  );
 }

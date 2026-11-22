@@ -1,6 +1,6 @@
 export const Theme = {
  light: 'light',
- dark: 'dark',
+ dark: 'dark'
 } as const;
 
 export type Theme = (typeof Theme)[keyof typeof Theme];

@@ -4,5 +4,5 @@ import {api} from '@/shared/api';
 export const authService = {
  login: (payload: Record<string, unknown> = {}) => api.auth.login(payload),
  register: (payload: Record<string, unknown> = {}) => api.auth.register(payload),
- logout: () => api.auth.logout(),
+ logout: () => api.auth.logout()
 };

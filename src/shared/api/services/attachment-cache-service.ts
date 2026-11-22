@@ -4,7 +4,7 @@ import {clearAttachmentCache, getAttachmentCacheInfo, setAttachmentCacheLimit, t
 export const attachmentCacheService = {
  info: (): Promise<CacheInfo> => getAttachmentCacheInfo(),
  setLimit: (limitMiB: number): Promise<CacheInfo> => setAttachmentCacheLimit(limitMiB),
- clear: (): Promise<CacheInfo> => clearAttachmentCache(),
+ clear: (): Promise<CacheInfo> => clearAttachmentCache()
 };
 
 export type {CacheInfo};

@@ -1,11 +1,19 @@
-import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 
 if (process.platform === 'win32') {
-  const result = spawnSync('powershell.exe', [
-    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-    '-File', fileURLToPath(new URL('./src-tauri/prepare-build.ps1', import.meta.url)),
-  ], { stdio: 'inherit', windowsHide: true });
-  if (result.error) throw result.error;
-  process.exitCode = result.status ?? 1;
+ const result = spawnSync(
+  'powershell.exe',
+  [
+   '-NoProfile',
+   '-NonInteractive',
+   '-ExecutionPolicy',
+   'Bypass',
+   '-File',
+   fileURLToPath(new URL('./src-tauri/prepare-build.ps1', import.meta.url))
+  ],
+  {stdio: 'inherit', windowsHide: true}
+ );
+ if (result.error) throw result.error;
+ process.exitCode = result.status ?? 1;
 }

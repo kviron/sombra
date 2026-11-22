@@ -29,7 +29,8 @@ export default class ErrorBoundary extends Component<Props, State> {
  }
 
  componentDidMount() {
-  if (requestedCrash()) this.setState({failure: {error: new Error('Проверка границы ошибок: ?crash=1'), componentStack: null}});
+  if (requestedCrash())
+   this.setState({failure: {error: new Error('Проверка границы ошибок: ?crash=1'), componentStack: null}});
  }
 
  componentDidCatch(error: Error, info: ErrorInfo) {
@@ -47,7 +48,15 @@ export default class ErrorBoundary extends Component<Props, State> {
  render(): ReactNode {
   const {failure} = this.state;
   if (!failure) return this.props.children;
-  if (this.props.fallback) return this.props.fallback({error: failure.error, componentStack: failure.componentStack, reset: this.reset});
-  return <ErrorScreen error={failure.error} componentStack={failure.componentStack} onRetry={this.reset} onReload={() => window.location.reload()} />;
+  if (this.props.fallback)
+   return this.props.fallback({error: failure.error, componentStack: failure.componentStack, reset: this.reset});
+  return (
+   <ErrorScreen
+    error={failure.error}
+    componentStack={failure.componentStack}
+    onRetry={this.reset}
+    onReload={() => window.location.reload()}
+   />
+  );
  }
 }

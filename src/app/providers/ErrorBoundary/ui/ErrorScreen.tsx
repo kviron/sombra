@@ -34,26 +34,48 @@ export function ErrorScreen({error, componentStack, onRetry, onReload}: Props) {
  }
 
  return (
-  <main className="fixed inset-0 z-[9000] grid place-items-center overflow-auto bg-background p-6 text-foreground" role="alert" aria-live="assertive">
-   <section className="grid w-full max-w-[640px] gap-4 rounded-[14px] border border-border bg-card p-8 shadow-[0_24px_64px_rgb(0_0_0/0.35)]">
-    <p className="m-0 font-mono text-[11px] tracking-[0.16em] uppercase text-muted-foreground">Сбой экрана</p>
+  <main
+   className="bg-background text-foreground fixed inset-0 z-[9000] grid place-items-center overflow-auto p-6"
+   role="alert"
+   aria-live="assertive"
+  >
+   <section className="border-border bg-card grid w-full max-w-[640px] gap-4 rounded-[14px] border p-8 shadow-[0_24px_64px_rgb(0_0_0/0.35)]">
+    <p className="text-muted-foreground m-0 font-mono text-[11px] tracking-[0.16em] uppercase">Сбой экрана</p>
     <h1 className="m-0 text-[22px] leading-tight font-semibold tracking-[-0.01em]">{errorTitle(error)}</h1>
-    <p className="m-0 text-sm leading-relaxed text-muted-foreground">
-     Переписка, звонки и настройки не пострадали: данные остались на сервере и в локальном хранилище. Продолжить можно с этого же места.
+    <p className="text-muted-foreground m-0 text-sm leading-relaxed">
+     Переписка, звонки и настройки не пострадали: данные остались на сервере и в локальном хранилище. Продолжить можно с
+     этого же места.
     </p>
-    <pre className="m-0 max-h-[180px] overflow-auto rounded-[10px] border border-border bg-foreground/[0.04] p-3 font-mono text-[12.5px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
+    <pre className="border-border bg-foreground/[0.04] m-0 max-h-[180px] overflow-auto rounded-[10px] border p-3 font-mono text-[12.5px] leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
      {errorSummary(error)}
     </pre>
     <div className="flex flex-wrap gap-2">
-     <button type="button" ref={primary} className={`${BUTTON} ${PRIMARY} min-h-[38px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`} onClick={onRetry}>Вернуться в приложение</button>
-     <button type="button" className={`${BUTTON} ${SECONDARY} min-h-[38px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`} onClick={onReload}>Перезагрузить</button>
-     <button type="button" className={`${BUTTON} ${QUIET} min-h-[38px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`} onClick={() => void copy()}>
+     <button
+      type="button"
+      ref={primary}
+      className={`${BUTTON} ${PRIMARY} focus-visible:outline-ring min-h-[38px] focus-visible:outline-2 focus-visible:outline-offset-2`}
+      onClick={onRetry}
+     >
+      Вернуться в приложение
+     </button>
+     <button
+      type="button"
+      className={`${BUTTON} ${SECONDARY} focus-visible:outline-ring min-h-[38px] focus-visible:outline-2 focus-visible:outline-offset-2`}
+      onClick={onReload}
+     >
+      Перезагрузить
+     </button>
+     <button
+      type="button"
+      className={`${BUTTON} ${QUIET} focus-visible:outline-ring min-h-[38px] focus-visible:outline-2 focus-visible:outline-offset-2`}
+      onClick={() => void copy()}
+     >
       {copied === 'done' ? 'Скопировано' : copied === 'failed' ? 'Не удалось скопировать' : 'Скопировать текст ошибки'}
      </button>
     </div>
-    <details className="border-t border-border pt-3">
-     <summary className="cursor-pointer text-[13px] text-muted-foreground">Подробности для отчёта об ошибке</summary>
-     <pre className="mt-2 max-h-[220px] overflow-auto font-mono text-[12px] leading-relaxed whitespace-pre-wrap text-muted-foreground [overflow-wrap:anywhere]">
+    <details className="border-border border-t pt-3">
+     <summary className="text-muted-foreground cursor-pointer text-[13px]">Подробности для отчёта об ошибке</summary>
+     <pre className="text-muted-foreground mt-2 max-h-[220px] overflow-auto font-mono text-[12px] leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
       {errorDetails(error, componentStack)}
      </pre>
     </details>

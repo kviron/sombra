@@ -13,10 +13,10 @@ export type AppRouteProps = {
 export const AppRoutes = {
  home: '#',
  login: '#login',
- register: '#register',
+ register: '#register'
 } as const;
 
 export const routeConfig: Record<string, AppRouteProps> = {
  [AppRoutes.login]: {path: AppRoutes.login, authOnly: false, element: <LoginPage />},
- [AppRoutes.register]: {path: AppRoutes.register, authOnly: false, element: <RegisterPage />},
+ [AppRoutes.register]: {path: AppRoutes.register, authOnly: false, element: <RegisterPage />}
 };

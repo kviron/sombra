@@ -1,1 +1,57 @@
-.audio-device-missing{min-width:0;margin-top:6px}.audio-device-missing p{font-size:12px;line-height:1.5;color:#b1b8c6;margin:6px 0}.audio-device-missing .audio-device-reset{max-width:100%;height:auto;min-height:32px;white-space:normal;text-align:left}.audio-device-access .audio-device-remote-info{color:#c4d7f5}.voice-quick-panel .audio-device-reset{width:100%;justify-content:flex-start}.audio-device-access{margin:12px 0 16px;min-width:0}.audio-device-access p{font-size:12px;line-height:1.5;color:#b1b8c6;margin:8px 0;overflow-wrap:anywhere}.audio-device-access button{min-height:36px;max-width:100%;white-space:normal}.audio-device-access svg{flex-shrink:0}.audio-device-access .audio-device-error{color:#f2acb4}.voice-quick-panel .audio-device-access button{width:100%;justify-content:flex-start}.voice-settings>.audio-device-access{margin:12px 0 16px;padding:12px;border:1px solid var(--glass-line,#e1ebff21);border-radius:10px;background:#dce6fa08}
+.audio-device-missing {
+ min-width: 0;
+ margin-top: 6px;
+}
+.audio-device-missing p {
+ font-size: 12px;
+ line-height: 1.5;
+ color: #b1b8c6;
+ margin: 6px 0;
+}
+.audio-device-missing .audio-device-reset {
+ max-width: 100%;
+ height: auto;
+ min-height: 32px;
+ white-space: normal;
+ text-align: left;
+}
+.audio-device-access .audio-device-remote-info {
+ color: #c4d7f5;
+}
+.voice-quick-panel .audio-device-reset {
+ width: 100%;
+ justify-content: flex-start;
+}
+.audio-device-access {
+ margin: 12px 0 16px;
+ min-width: 0;
+}
+.audio-device-access p {
+ font-size: 12px;
+ line-height: 1.5;
+ color: #b1b8c6;
+ margin: 8px 0;
+ overflow-wrap: anywhere;
+}
+.audio-device-access button {
+ min-height: 36px;
+ max-width: 100%;
+ white-space: normal;
+}
+.audio-device-access svg {
+ flex-shrink: 0;
+}
+.audio-device-access .audio-device-error {
+ color: #f2acb4;
+}
+.voice-quick-panel .audio-device-access button {
+ width: 100%;
+ justify-content: flex-start;
+}
+.voice-settings > .audio-device-access {
+ margin: 12px 0 16px;
+ padding: 12px;
+ border: 1px solid var(--glass-line, #e1ebff21);
+ border-radius: 10px;
+ background: #dce6fa08;
+}

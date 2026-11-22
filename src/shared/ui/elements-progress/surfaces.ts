@@ -3,6 +3,6 @@
 // The shared tokens are already vendored once for Sombra, so this module only
 // re-exports the ones the progress elements use and keeps `mono` verbatim.
 // `ShimmerLabel` sits in its own `.tsx` module because this file has no JSX.
-export { paper, ghostButton } from '../elements-composer/surfaces';
+export {paper, ghostButton} from '../elements-composer/surfaces';
 
-export const mono = "font-mono text-[11px] tracking-tight";
+export const mono = 'font-mono text-[11px] tracking-tight';

@@ -1,37 +1,126 @@
 /* One pinned activity block above the composer: the compact Elements JobProgress
    line and the official Elements TypingIndicator with the bot avatar. Sombra changes
    colours and sizes only; geometry stays with the vendored Elements utilities. */
-.bot-typing{display:flex;flex-direction:column;align-items:flex-start;gap:6px;flex:none;min-width:0;max-width:100%;padding:0 2px}
-.bot-typing-announce{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
-.bot-typing-indicator{display:flex;align-items:flex-end;gap:8px;min-width:0;max-width:100%}
-.bot-typing-indicator .user-avatar{--avatar-size:28px;flex-shrink:0;margin-bottom:1px}
+.bot-typing {
+ display: flex;
+ flex-direction: column;
+ align-items: flex-start;
+ gap: 6px;
+ flex: none;
+ min-width: 0;
+ max-width: 100%;
+ padding: 0 2px;
+}
+.bot-typing-announce {
+ position: absolute;
+ width: 1px;
+ height: 1px;
+ margin: -1px;
+ padding: 0;
+ overflow: hidden;
+ clip: rect(0 0 0 0);
+ clip-path: inset(50%);
+ white-space: nowrap;
+ border: 0;
+}
+.bot-typing-indicator {
+ display: flex;
+ align-items: flex-end;
+ gap: 8px;
+ min-width: 0;
+ max-width: 100%;
+}
+.bot-typing-indicator .user-avatar {
+ --avatar-size: 28px;
+ flex-shrink: 0;
+ margin-bottom: 1px;
+}
 /* Both rows share the indicator column so the block reads as one stack. */
-.bot-typing [data-slot="job-progress"]{margin-inline-start:36px;max-width:calc(100% - 36px)}
-.bot-typing [data-slot="job-progress"]:has(button[aria-expanded="true"]){border-radius:14px}
-.bot-typing [data-slot="typing-indicator"]{padding:9px 13px;border-radius:16px 16px 16px 5px;background:rgba(20,22,30,.68);border-color:rgba(160,174,198,.16);-webkit-backdrop-filter:blur(18px) saturate(135%);backdrop-filter:blur(18px) saturate(135%);box-shadow:0 8px 22px rgba(0,0,0,.35)}
-.bot-typing [data-slot="typing-indicator"] span{background:#a9ccff}
-.bot-typing [data-slot="job-progress"]{background:rgba(20,22,30,.68);border-color:rgba(160,174,198,.16);-webkit-backdrop-filter:blur(18px) saturate(135%);backdrop-filter:blur(18px) saturate(135%);box-shadow:0 8px 22px rgba(0,0,0,.28)}
-.bot-typing [data-slot="job-progress"] time{color:#a9b0c2;font-size:11px;font-variant-numeric:tabular-nums}
-.bot-typing [data-slot="job-progress"] button:focus-visible{outline:2px solid #8c92ff;outline-offset:1px}
-.bot-typing [data-slot="job-progress"] p{color:#a9b0c2;font-size:11.5px;line-height:1.4;overflow-wrap:anywhere}
-@media(prefers-reduced-transparency:reduce){
- .bot-typing [data-slot="typing-indicator"],.bot-typing [data-slot="job-progress"]{background:#1b1d27;border-color:#2c2f3a;-webkit-backdrop-filter:none;backdrop-filter:none}
+.bot-typing [data-slot='job-progress'] {
+ margin-inline-start: 36px;
+ max-width: calc(100% - 36px);
 }
-@media(prefers-reduced-motion:reduce){
- .bot-typing [data-slot="typing-indicator"] span,.bot-typing [data-slot="job-progress"] svg{animation:none}
+.bot-typing [data-slot='job-progress']:has(button[aria-expanded='true']) {
+ border-radius: 14px;
 }
-@media(max-width:760px){
- .bot-typing{gap:4px}
- .bot-typing [data-slot="job-progress"] p{max-width:min(60vw,240px)}
+.bot-typing [data-slot='typing-indicator'] {
+ padding: 9px 13px;
+ border-radius: 16px 16px 16px 5px;
+ background: rgba(20, 22, 30, 0.68);
+ border-color: rgba(160, 174, 198, 0.16);
+ -webkit-backdrop-filter: blur(18px) saturate(135%);
+ backdrop-filter: blur(18px) saturate(135%);
+ box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+.bot-typing [data-slot='typing-indicator'] span {
+ background: #a9ccff;
+}
+.bot-typing [data-slot='job-progress'] {
+ background: rgba(20, 22, 30, 0.68);
+ border-color: rgba(160, 174, 198, 0.16);
+ -webkit-backdrop-filter: blur(18px) saturate(135%);
+ backdrop-filter: blur(18px) saturate(135%);
+ box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+.bot-typing [data-slot='job-progress'] time {
+ color: #a9b0c2;
+ font-size: 11px;
+ font-variant-numeric: tabular-nums;
+}
+.bot-typing [data-slot='job-progress'] button:focus-visible {
+ outline: 2px solid #8c92ff;
+ outline-offset: 1px;
+}
+.bot-typing [data-slot='job-progress'] p {
+ color: #a9b0c2;
+ font-size: 11.5px;
+ line-height: 1.4;
+ overflow-wrap: anywhere;
+}
+@media (prefers-reduced-transparency: reduce) {
+ .bot-typing [data-slot='typing-indicator'],
+ .bot-typing [data-slot='job-progress'] {
+  background: #1b1d27;
+  border-color: #2c2f3a;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+ }
+}
+@media (prefers-reduced-motion: reduce) {
+ .bot-typing [data-slot='typing-indicator'] span,
+ .bot-typing [data-slot='job-progress'] svg {
+  animation: none;
+ }
+}
+@media (max-width: 760px) {
+ .bot-typing {
+  gap: 4px;
+ }
+ .bot-typing [data-slot='job-progress'] p {
+  max-width: min(60vw, 240px);
+ }
 }
 
 /* The "not yet arrived" image message at the end of the transcript. It reuses the normal
    message composition (avatar column, header, transparent image bubble), so the card
    lines up with the picture that replaces it; only colours and spacing are Sombra's. */
-.bot-image-activity{display:flex;flex-direction:column;min-width:0;max-width:100%}
-.bot-image-activity .bot-image-message{margin:6px 0 0}
-.bot-image-activity .bot-image-message .message-meta{padding-right:0}
-.bot-image-activity [data-slot="image-generation"]{max-width:100%}
-@media(max-width:760px){
- .bot-image-activity [data-slot="image-generation"]{width:min(52vw,208px)}
+.bot-image-activity {
+ display: flex;
+ flex-direction: column;
+ min-width: 0;
+ max-width: 100%;
+}
+.bot-image-activity .bot-image-message {
+ margin: 6px 0 0;
+}
+.bot-image-activity .bot-image-message .message-meta {
+ padding-right: 0;
+}
+.bot-image-activity [data-slot='image-generation'] {
+ max-width: 100%;
+}
+@media (max-width: 760px) {
+ .bot-image-activity [data-slot='image-generation'] {
+  width: min(52vw, 208px);
+ }
 }
