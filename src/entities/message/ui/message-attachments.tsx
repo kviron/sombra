@@ -37,6 +37,7 @@ function fileBlob(file:AttachmentFile):Blob{
  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
  return new Blob([bytes],{type:imageMimes.has(file.mime)?file.mime:'application/octet-stream'});
 }
+// eslint-disable-next-line no-control-regex -- управляющие символы недопустимы в имени файла
 function safeName(name:string){return name.replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').slice(0,240)||'Вложение'}
 function cacheNote(attachment:MessageAttachmentMetadata){return attachment.expired?'Локальная копия · файл очищен на сервере':'Сохранено на этом устройстве'}
 /** The only attachment save path: Tauri native save dialog or the authorised browser request. */

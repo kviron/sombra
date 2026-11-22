@@ -100,7 +100,6 @@ export class SceneRenderer {
   }
 
   render(out: Uint8ClampedArray): void {
-    const palette = this.palette;
     this.sky(out);
     for (const effect of this.effects) this.blendEffect(out, effect);
     this.hills(out);

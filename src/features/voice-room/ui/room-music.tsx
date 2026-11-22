@@ -1,7 +1,7 @@
 import {useEffect,useId,useRef,useState} from 'react';
 import {ListMusic,Music2,Pause,Play,Plus,SkipForward,Square,Volume2} from 'lucide-react';
 import {api} from '@/shared/api/backend';
-import {parseMusicCommand,parseMusicLimit} from '@/shared/lib/music-command';
+import {parseMusicLimit} from '@/shared/lib/music-command';
 import {defaultGenerativeUILibrary,renderGenerativeUI} from '@assistant-ui/generative-ui/react';
 import './room-music-elements.css';
 import './room-music.css';
@@ -76,7 +76,7 @@ export function useRoomMusic(room:string|undefined,deaf:boolean,speaker:string){
   if(action!=='add'&&url)throw new Error('Эта команда не принимает ссылку.');
   const generation=epoch.current,started=performance.now();
   try{const state=await api<Snapshot>('music_command',{room,action,...(url?{url}:{}),...(limit!==undefined?{limit}:{})});if(epoch.current===generation)accept(state,started)}
-  catch(error){throw new Error(message(error))}
+  catch(error){throw new Error(message(error),{cause:error})}
  }
  useEffect(()=>{const el=engine.current;if(el){el.volume=volume/100;el.muted=deaf}},[volume,deaf]);
  useEffect(()=>{const el=engine.current;if(el?.setSinkId)void el.setSinkId(speaker).catch(()=>{})},[speaker]);

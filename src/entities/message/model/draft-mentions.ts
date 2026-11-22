@@ -6,6 +6,7 @@ export type MentionAlias={id:string;name:string;username?:string};
 const EDGE=/^[\s\u0085]+|[\s\u0085]+$/gu;
 /** The server's own boundary rules; JS \s would wrongly accept U+FEFF before an alias.
  *  Letters, marks and numbers are a superset of Rust's is_alphanumeric, so nothing invalid is sent. */
+// eslint-disable-next-line no-control-regex -- граница слова включает управляющие разделители
 const BOUNDARY=/[\t\n\u000B\f\r \u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000([{>'",;:!?]/u,WORD=/[\p{L}\p{M}\p{N}_@-]/u;
 export const MENTION_LIMIT=100;
 export function trimmedDraftText(text:string){return text.replace(EDGE,'')}

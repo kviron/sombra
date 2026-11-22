@@ -55,8 +55,8 @@ import {AccountSecurity} from '@/features/account-settings';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {toast} from 'sonner';
 
-﻿import {useEffect,useLayoutEffect,useRef,useState,type FormEvent} from 'react';
-import {ShieldCheck,PanelRight,Home,Phone,Video,Bot,ChevronUp,ChevronDown,Volume2,Plus,MessageCircle,Users,Settings,LogOut,Send,X,Search,Mic,MicOff,Headphones,HeadphoneOff} from 'lucide-react';
+import {useEffect,useLayoutEffect,useRef,useState,type FormEvent} from 'react';
+import {ShieldCheck,PanelRight,Home,Phone,Video,Bot,ChevronDown,Volume2,Plus,MessageCircle,Users,Settings,LogOut,Send,X,Search,Mic,MicOff,Headphones,HeadphoneOff} from 'lucide-react';
 import {api,applyProfileEffect,logout,session,type ProfileEffectTarget,type ChatState,type ChatPreferences,type DialogPreferences,type Group,type GroupPermission,type Channel,type Dialog,type User} from '@/shared/api/backend';
 import './chat.css';
 import {useChatDraft} from '@/features/message-composer';
@@ -69,7 +69,6 @@ export function LiveChat(){
  const [accountSection,setAccountSection]=useState<AccountSection>('profile');
  const [botSettingsId,setBotSettingsId]=useState('');
  useEffect(()=>{const open=()=>{setAccountSection('updates');setSettings(true)};window.addEventListener('sombra:open-updates',open);return()=>window.removeEventListener('sombra:open-updates',open)},[]);
- const [stickerCollectionOpen,setStickerCollectionOpen]=useState(false);
  const [state,setState]=useState<ChatState|null>(null),[groupId,setGroupId]=useState(''),[channelId,setChannelId]=useState(''),[home,setHome]=useState(true),[error,setError]=useState(''),[search,setSearch]=useState(''),[settings,setSettings]=useState(false),[modal,setModal]=useState(''),[name,setName]=useState(''),[selected,setSelected]=useState<string[]>([]),[busy,setBusy]=useState(false),[members,setMembers]=useState(false),[profileId,setProfileId]=useState('');
  const [replyDrafts,setReplyDrafts]=useState<Record<string,ChatMessage|undefined>>({});
  const [forwardPicker,setForwardPicker]=useState<{owner:string;message:ChatMessage}>();
@@ -494,7 +493,7 @@ export function LiveChat(){
  <div className="category">Голосовые каналы{permits(group,'channels.create_voice')&&<button type="button" title="Добавить голосовой канал" aria-label="Добавить голосовой канал" onClick={()=>{open('channel');setChannelKind('voice')}}><Plus size={15}/></button>}</div>{group?.channels.filter(c=>c.kind==='voice').map(c=><div className="voice-channel" key={c.id}><div className={'channel-row '+(c.id===channel?.id?'selected':'')}><button className={'channel '+(c.id===channel?.id?'selected':'')} key={c.id} onClick={()=>setChannelId(c.id)} onDoubleClick={()=>{setChannelId(c.id);if(call.room!==c.id&&!call.busy)void call.join(c.id)}}><Volume2/><span>{c.name}</span><UnreadMentionBadge count={c.unreadMentionCount}/></button>{channelSettings(c)}</div>
  <VoiceParticipants voice={call} room={c.id} title={c.name} me={state?.me} users={state?.users||[]} presence={state?.voicePresence?.[c.id]}
   volumeForUser={volumeForUser} setUserVolume={setUserVolume}
-  canRequestFriend={canRequestFriend} requestFriend={id=>void requestFriend(id)}/>
+ />
  </div>)}{!group&&<p>Создайте группу или вступите по приглашению.</p>}</>}</div>{call.room&&<div className="voice-status">Голосовая связь · {state?.groups.flatMap(g=>g.channels).find(c=>c.id===call.room)?.name||state?.dialogs.find(dialog=>dialog.id===dialogCalls.calls.find(item=>item.id===call.room)?.dialog)?.name||'Личный звонок'}<button onClick={call.leave}>Отключиться</button></div>}
  <footer className="profile"><button type="button" className="profile-self" title="Открыть свой профиль" onClick={()=>state&&setProfileId(state.me.id)}>{state?<UserAvatar user={state.me} size="md" decoration={state.me.decorations?.avatar}/>:<span className="avatar"/>}<span className="profile-name"><strong>{state?.me.name||'Загрузка…'}</strong><small>{state?.me.online?'В сети':'Не в сети'}</small></span></button>
   <div className="voice-device-control"><Button type="button" variant="ghost" size="icon-sm" title={microphoneOff?'Включить микрофон':'Выключить микрофон'} aria-label="Микрофон" aria-pressed={microphoneOff} onClick={call.toggleMic}>{microphoneOff?<MotionIcon icon={MicOff} kind="device" size={18} className="text-red-400"/>:<MotionIcon icon={Mic} kind="device" size={18}/>}</Button><VoiceQuickSettings voice={call} kind="input" onSettings={()=>{setAccountSection('voice');setSettings(true)}}/></div>

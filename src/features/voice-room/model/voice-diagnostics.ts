@@ -5,7 +5,6 @@ type Direction = 'receive' | 'send';
 type Expected = Record<Direction, boolean>;
 type Reading = {packets: Map<string, number>; time: number; moving: boolean; flat: number; stalled: boolean; silent: number; quiet: boolean; energy?: number};
 // Outbound audio below this level for three samples is treated as capture silence, not loss.
-const SILENCE = 0.004;
 const SPEECH = 0.01;
 // Chromium may omit audioLevel but still reports cumulative energy; its flatness means the
 // microphone contributed nothing between samples.

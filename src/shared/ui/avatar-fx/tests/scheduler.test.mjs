@@ -1,3 +1,4 @@
+/* global document -- тест подставляет минимальную заглушку DOM */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fxSchedulerState, MAX_ANIMATED_FX, registerFxJob } from '../scheduler.ts';

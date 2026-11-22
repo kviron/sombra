@@ -2,6 +2,7 @@ export type MessageTextPart = {type:'text'; text:string} | {type:'link'; text:st
 
 /** The only URL policy used by both parsing and native opening. No URL repair. */
 export function safeMessageUrl(value:string, bare=false):string|null {
+ // eslint-disable-next-line no-control-regex -- ссылка не должна содержать управляющих символов
  if (!value || /[\s\u0000-\u001f\u007f\\<>"']/.test(value)) return null;
  if (!bare && (!/^https?:\/\//i.test(value) || /^https?:\/\/[^/?#]*@/i.test(value))) return null;
  if (bare && !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}(?::\d+)?(?:[/?#]|$)/i.test(value)) return null;
@@ -52,7 +53,7 @@ export function parseMessageLinks(text:string):MessageTextPart[] {
     const target=targetAt(text,i+label[0].length);
     if(target) {
      const href=safeMessageUrl(target.target);
-     if(href) parts.push({type:'link',text:label[1].replace(/\\([\\\[\]])/g,'$1'),href});else plain(text.slice(i,target.end));
+     if(href) parts.push({type:'link',text:label[1].replace(/\\([\\[\]])/g,'$1'),href});else plain(text.slice(i,target.end));
      i=target.end;continue;
     }
    }

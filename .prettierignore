@@ -1,0 +1,21 @@
+# Сборка, зависимости и сгенерированные файлы — не форматируем.
+node_modules/
+dist/
+target/
+release/
+src-tauri/target/
+src-tauri/gen/
+design/
+data/
+.agents/
+.claude/
+public/vendor/
+
+# Артефакты выпуска и блокировки.
+release-secrets/
+package-lock.json
+Cargo.lock
+latest.json
+*.min.js
+*.min.css
+*.wasm

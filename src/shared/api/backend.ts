@@ -54,7 +54,7 @@ async function hydrateState<T>(state: T): Promise<T> {
 async function perform<T>(op:string,payload:Record<string,unknown>):Promise<T>{
  if(isTauri()){
   let result:T;
-  try{result=await invoke<T>('remote_api',{request:{op,token:session(),...payload}})}catch(error){const message=String(error);if(message.includes('AUTH_REQUIRED'))clearSession();if(message.startsWith('REMOTE_UNAVAILABLE:'))throw new ApiConnectionError(message.slice(19));throw new Error(message)}
+  try{result=await invoke<T>('remote_api',{request:{op,token:session(),...payload}})}catch(error){const message=String(error);if(message.includes('AUTH_REQUIRED'))clearSession();if(message.startsWith('REMOTE_UNAVAILABLE:'))throw new ApiConnectionError(message.slice(19));throw new Error(message,{cause:error})}
   return op==='state'?await hydrateState(result) as T:result;
  }
  if(op==='login'||op==='register'||op==='logout'){resetAttachmentCacheAccess();attachmentRequests.clear()}

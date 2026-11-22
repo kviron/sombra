@@ -16,11 +16,9 @@ type Props={
  presence?:VoicePresence[];
  volumeForUser:(id:string)=>number;
  setUserVolume:(id:string,volume:number)=>void;
- canRequestFriend:(id:string)=>boolean;
- requestFriend:(id:string)=>void;
 };
 
-export function VoiceParticipants({voice,room,title,me,users,presence,volumeForUser,setUserVolume,canRequestFriend,requestFriend}:Props){
+export function VoiceParticipants({voice,room,title,me,users,presence,volumeForUser,setUserVolume}:Props){
  const actions=useUserActions();
  if(!me)return null;
  const joined=voice.room===room;

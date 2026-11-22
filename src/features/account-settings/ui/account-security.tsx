@@ -10,7 +10,7 @@ import {ProfileCover} from '@/shared/ui/profile-cover';
 import {ProfileDecorationPicker,type MediaTarget} from './profile-decoration-picker';
 import {ProfileMediaDialog} from './profile-media-dialogs';
 import {UserAvatar} from '@/shared/ui/user-avatar';
-import {Monitor,Pencil,Sparkles,Trash2} from 'lucide-react';
+import {Monitor,Pencil,Trash2} from 'lucide-react';
 import {Label} from '@/shared/ui/label';
 import type {AccountSection} from './account-sidebar';
 
