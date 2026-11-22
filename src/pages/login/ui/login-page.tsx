@@ -1,5 +1,5 @@
 import {Input} from '@/shared/ui/input';
-import { authenticate } from '@/shared/api/backend';
+import { authService } from '@/entities/user';
 import { useState, type FormEvent } from "react";
 import { CheckIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { Checkbox } from 'radix-ui';
@@ -14,7 +14,7 @@ export function LoginPage() {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     setBusy(true); setError("");
-    try { await authenticate('login', {email: data.get('email'), password: data.get('password'), remember_me: data.get('remember_me') === 'on'}); }
+    try { await authService.login({email: data.get('email'), password: data.get('password'), remember_me: data.get('remember_me') === 'on'}); }
     catch (error) { setError((error as Error).message); } finally { setBusy(false); }
   }
   return (

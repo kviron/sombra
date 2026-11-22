@@ -1,4 +1,5 @@
 // Public API of the `entities/user` slice.
+export * from './model/services/auth-service';
 export * from './model/services/friend-service';
 export * from './model/services/user-service';
 export * from './model/use-human-typing';

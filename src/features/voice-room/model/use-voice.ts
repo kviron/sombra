@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {ApiConnectionError} from '@/shared/api/backend';
+import {ApiConnectionError} from '@/shared/api';
 import {voiceService} from './services/voice-service';
 import {desktopDiagnosticsAvailable,recordDesktopDiagnostic} from '@/shared/api/diagnostics';
 import {createVoiceTransportMonitor,iceIsConnected} from './voice-diagnostics';

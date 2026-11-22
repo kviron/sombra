@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
-import {session,type ProfileEffectAsset} from '@/shared/api/backend';
+import {type ProfileEffectAsset} from '@/shared/api/backend';
+import {sessionService} from '@/shared/api';
 import {fileService} from '@/shared/api';
 
 export const PROFILE_EFFECT_MAX_BYTES=2*1024*1024;
@@ -16,9 +17,9 @@ export function ProfileEffectImage({asset,className}:{asset?:ProfileEffectAsset;
  const id=asset?.id,size=asset?.size;
  useEffect(()=>{
   if(!id||!size||size>PROFILE_EFFECT_MAX_BYTES||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  let active=true,url='';const token=session();
+  let active=true,url='';const token=sessionService.token();
   void load(id,token).then(result=>{
-   if(!active||session()!==token||result.asset.id!==id||result.asset.mime!=='image/gif'||result.data.length>4*Math.ceil(size/3))return;
+   if(!active||sessionService.token()!==token||result.asset.id!==id||result.asset.mime!=='image/gif'||result.data.length>4*Math.ceil(size/3))return;
    const raw=atob(result.data);if(raw.length!==size||!/^GIF8[79]a/.test(raw))return;
    url=URL.createObjectURL(new Blob([Uint8Array.from(raw,c=>c.charCodeAt(0))],{type:'image/gif'}));setImage({id,url});
   }).catch(()=>{});

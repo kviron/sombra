@@ -3,9 +3,9 @@ import {Download,FileWarning,RotateCw,X} from 'lucide-react';
 import {Dialog} from 'radix-ui';
 import {invoke,isTauri} from '@tauri-apps/api/core';
 import {toast} from 'sonner';
-import {clearSession,type AttachmentFile,type MessageAttachmentMetadata} from '@/shared/api/backend';
+import {type AttachmentFile,type MessageAttachmentMetadata} from '@/shared/api/backend';
 import {messageService} from '../model/services/message-service';
-import {session} from '@/shared/api/backend';
+import {sessionService} from '@/shared/api';
 import {attachmentCacheGeneration,attachmentCacheWriteEpoch} from '@/shared/api/attachment-cache';
 import {attachmentDownloadFailure} from '@/shared/lib/attachment-errors';
 import {attachmentCategory} from '../model/conversation-materials';
@@ -15,7 +15,7 @@ import {AttachmentPreviewCache} from '../model/attachment-preview-cache';
 import './message-attachments.css';
 
 const previews=new AttachmentPreviewCache();
-const previewScope=()=>JSON.stringify([session(),attachmentCacheGeneration(),attachmentCacheWriteEpoch()]);
+const previewScope=()=>JSON.stringify([sessionService.token(),attachmentCacheGeneration(),attachmentCacheWriteEpoch()]);
 let acceptedPreviewScope='';
 function syncPreviewScope(){const next=previewScope();if(next!==acceptedPreviewScope){acceptedPreviewScope=next;previews.clear()}return next}
 window.addEventListener('authchange',()=>{acceptedPreviewScope='';previews.clear()});
@@ -112,7 +112,7 @@ function AttachmentView({messageId,attachment}:MessageAttachmentProps){
    if(mounted.current&&path)toast.success('Файл сохранён в Загрузки',{description:path});
   }catch(reason){
    const failure=attachmentDownloadFailure(reason,'Не удалось скачать файл.');
-   if(failure.authRequired&&mounted.current)clearSession();
+   if(failure.authRequired&&mounted.current)sessionService.clear();
    if(mounted.current)setError(failure.message);
   }
   finally{if(mounted.current)setBusy(false)}
@@ -217,7 +217,7 @@ function AttachmentAudio({messageId,attachment}:MessageAttachmentProps){
    if(mounted.current&&path)toast.success('Файл сохранён в Загрузки',{description:path});
   }catch(reason){
    const failure=attachmentDownloadFailure(reason,'Не удалось скачать файл.');
-   if(failure.authRequired&&mounted.current)clearSession();
+   if(failure.authRequired&&mounted.current)sessionService.clear();
    if(mounted.current)setError(failure.message);
   }
   finally{if(mounted.current)setBusy(false)}

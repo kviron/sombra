@@ -2,7 +2,8 @@
 // последнюю строку) намеренно переопределяет старую раскладку карточки профиля.
 import './account-approved.css';
 import {useEffect,useRef,useState,type FormEvent,type KeyboardEvent} from 'react';
-import {clearSession,session,type ChatState,type SessionDto,type User,type ProfileDecorationDoc} from '@/shared/api/backend';
+import {type ChatState,type SessionDto,type User,type ProfileDecorationDoc} from '@/shared/api/backend';
+import {sessionService} from '@/shared/api';
 import {userService} from '@/entities/user';
 import {accountService} from '../model/services/account-service';
 import {Button} from '@/shared/ui/button';
@@ -41,8 +42,8 @@ export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:Chat
  async function saveImage(kind:'avatar'|'cover',result?:PreparedProfileImage){
   if(lock.current)throw new Error('Дождитесь сохранения');
   if(kind==='cover'&&!coverSupported)throw new Error('Для обложек требуется обновление сервера');
-  const request=++epoch.current,account=identity.current,token=session();
-  const current=()=>mounted.current&&request===epoch.current&&identity.current===account&&session()===token;
+  const request=++epoch.current,account=identity.current,token=sessionService.token();
+  const current=()=>mounted.current&&request===epoch.current&&identity.current===account&&sessionService.token()===token;
   lock.current=true;setBusy(true);setError('');setNotice('');
   try{
    let saved:User;
@@ -54,9 +55,9 @@ export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:Chat
   }catch(e){if(current())setError((e as Error).message);throw e}finally{if(current()){lock.current=false;setBusy(false)}}
  }
  async function saveEffect(target:MediaTarget,decoration:ProfileDecorationDoc|null,id?:string){
-  const account=identity.current,token=session();
+  const account=identity.current,token=sessionService.token();
   const {user}=await (id?accountService.applyProfileEffect(id):userService.setDecoration<{user:User}>({target,decoration}));
-  if(!mounted.current||user.id!==account||identity.current!==account||session()!==token)return;
+  if(!mounted.current||user.id!==account||identity.current!==account||sessionService.token()!==token)return;
   onMediaSaved(user,`decoration:${target}`);
   setError('');setNotice(id||decoration?'Украшение сохранено':'Украшение убрано');
  }
@@ -65,9 +66,9 @@ export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:Chat
   * instead of writing the section-wide notice behind the modal.
   */
  async function applyMediaDecoration(target:MediaTarget,decoration:ProfileDecorationDoc|null){
-  const account=identity.current,token=session();
+  const account=identity.current,token=sessionService.token();
   const {user}=await userService.setDecoration<{user:User}>({target,decoration});
-  if(!mounted.current||user.id!==account||identity.current!==account||session()!==token)throw new Error('Учётная запись изменилась');
+  if(!mounted.current||user.id!==account||identity.current!==account||sessionService.token()!==token)throw new Error('Учётная запись изменилась');
   onMediaSaved(user,`decoration:${target}`);
  }
  async function saveIdentity(){
@@ -82,7 +83,7 @@ export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:Chat
  }
  function pickImage(target:MediaTarget){setMedia(undefined);(target==='avatar'?avatarPicker:coverPicker).current?.click()}
  function openCatalog(target:MediaTarget){setMedia(undefined);effectOrigin.current=document.querySelector<HTMLButtonElement>(`.profile-media [data-target="${target}"] [aria-haspopup="dialog"]`);setEffects(target)}
- function password(e:FormEvent<HTMLFormElement>){e.preventDefault();const data=new FormData(e.currentTarget);void run(async()=>{if(data.get('password')!==data.get('confirm'))throw new Error('Пароли не совпадают');await accountService.changePassword({current_password:data.get('current'),password:data.get('password')});clearSession()})}
+ function password(e:FormEvent<HTMLFormElement>){e.preventDefault();const data=new FormData(e.currentTarget);void run(async()=>{if(data.get('password')!==data.get('confirm'))throw new Error('Пароли не совпадают');await accountService.changePassword({current_password:data.get('current'),password:data.get('password')});sessionService.clear()})}
  return <>
    {crop&&<ImageCropDialog file={crop.file} kind={crop.kind} onConfirm={result=>saveImage(crop.kind,result)} onClose={()=>{epoch.current++;lock.current=false;setBusy(false);setCrop(undefined)}}/>}
   <section hidden={section!=='profile'} aria-labelledby="profile-heading">
@@ -145,8 +146,8 @@ export function AccountSecurity({state,refresh,section,onMediaSaved}:{state:Chat
   <section hidden={section!=='sessions'} aria-labelledby="sessions-heading">
    <h2 id="sessions-heading" className="sr-only">Активные сеансы</h2>
    <p className="settings-hint">С опцией «Оставаться в системе» вход сохраняется на год. Без неё — до 30 дней или 7 дней бездействия.</p>
-   <h3 className="approved-session-count">Устройства <span>{sessions.length}</span></h3><ul className="approved-sessions">{sessions.map(session=><li key={session.id} className="approved-session-card" data-current={session.current}><Monitor size={24} aria-hidden="true"/><div><strong>{session.current?'Это устройство':session.device.includes('Windows')?'Windows':session.device.includes('Mac')?'Mac':'Браузер / приложение'}</strong><p title={session.device}>{session.device.slice(0,70)}</p><small>Последняя активность: {new Date(session.last_seen*1000).toLocaleString('ru')}</small></div><Button variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await userService.revokeSession(session.id);if(session.current)clearSession();else await load()})}>Завершить</Button></li>)}</ul><div className="approved-session-actions">
-   <Button variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await userService.logoutAll();clearSession()})}>Выйти на всех устройствах</Button></div>
+   <h3 className="approved-session-count">Устройства <span>{sessions.length}</span></h3><ul className="approved-sessions">{sessions.map(session=><li key={session.id} className="approved-session-card" data-current={session.current}><Monitor size={24} aria-hidden="true"/><div><strong>{session.current?'Это устройство':session.device.includes('Windows')?'Windows':session.device.includes('Mac')?'Mac':'Браузер / приложение'}</strong><p title={session.device}>{session.device.slice(0,70)}</p><small>Последняя активность: {new Date(session.last_seen*1000).toLocaleString('ru')}</small></div><Button variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await userService.revokeSession(session.id);if(session.current)sessionService.clear();else await load()})}>Завершить</Button></li>)}</ul><div className="approved-session-actions">
+   <Button variant="outline" size="sm" disabled={busy} onClick={()=>void run(async()=>{await userService.logoutAll();sessionService.clear()})}>Выйти на всех устройствах</Button></div>
   </section>
   {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
  </>;

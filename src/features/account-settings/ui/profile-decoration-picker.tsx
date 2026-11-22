@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {Dialog,ScrollArea} from 'radix-ui';
 import {Check,Plus,Upload,X} from 'lucide-react';
-import {session,type ProfileDecorationDoc,type ProfileEffect,type ProfileEffectAsset,type ProfileEffectDraft,type ProfileEffectTarget,type User} from '@/shared/api/backend';
+import {type ProfileDecorationDoc,type ProfileEffect,type ProfileEffectAsset,type ProfileEffectDraft,type ProfileEffectTarget,type User} from '@/shared/api/backend';
+import {sessionService} from '@/shared/api';
 import {accountService} from '../model/services/account-service';
 import {DECORATION_PRESETS,normalizeDecoration} from '@/shared/ui/avatar-fx';
 import {UserAvatar} from '@/shared/ui/user-avatar';
@@ -72,28 +73,28 @@ export function ProfileDecorationPicker({user,target,catalogSupported,draftsSupp
  useEffect(()=>{
   if(!catalogSupported||view==='create'||view==='upload')return;
   let active=true;
-  const token=session();
+  const token=sessionService.token();
   setPage({items:[],nextOffset:null});setPageLoading(true);setPageError('');
-  void accountService.listProfileEffects(view,target).then(result=>{if(active&&session()===token)setPage(result)})
-   .catch(reason=>{if(active&&session()===token)setPageError(message(reason,'Не удалось загрузить эффекты'))})
-   .finally(()=>{if(active&&session()===token)setPageLoading(false)});
+  void accountService.listProfileEffects(view,target).then(result=>{if(active&&sessionService.token()===token)setPage(result)})
+   .catch(reason=>{if(active&&sessionService.token()===token)setPageError(message(reason,'Не удалось загрузить эффекты'))})
+   .finally(()=>{if(active&&sessionService.token()===token)setPageLoading(false)});
   return()=>{active=false};
  },[catalogSupported,view,target,reload]);
 
  useEffect(()=>{
   if(!pending||!draft||pollError)return;
   let active=true;
-  const token=session();
+  const token=sessionService.token();
   const timeout=window.setTimeout(()=>{
-   void accountService.getProfileEffectDraft(draft.id).then(next=>{if(active&&session()===token)setDraft(next)})
-    .catch(reason=>{if(active&&session()===token)setPollError(message(reason,'Не удалось проверить состояние черновика'))});
+   void accountService.getProfileEffectDraft(draft.id).then(next=>{if(active&&sessionService.token()===token)setDraft(next)})
+    .catch(reason=>{if(active&&sessionService.token()===token)setPollError(message(reason,'Не удалось проверить состояние черновика'))});
   },1800);
   return()=>{active=false;window.clearTimeout(timeout)};
  },[draft,pending,pollError]);
 
  async function run(action:(current:()=>boolean)=>Promise<void>){
   if(lock.current)return;
-  const token=session(),valid=()=>mounted.current&&session()===token;
+  const token=sessionService.token(),valid=()=>mounted.current&&sessionService.token()===token;
   lock.current=true;setBusy(true);setError('');setNotice('');
   try{await action(valid)}catch(reason){if(valid())setError(message(reason,'Не удалось выполнить действие'))}
   finally{lock.current=false;if(valid())setBusy(false)}

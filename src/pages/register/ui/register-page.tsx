@@ -1,5 +1,5 @@
 import {Input} from '@/shared/ui/input';
-import { authenticate } from '@/shared/api/backend';
+import { authService } from '@/entities/user';
 import { useState, type FormEvent } from "react";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { Button } from "@/shared/ui";
@@ -17,7 +17,7 @@ export function RegisterPage() {
       return;
     }
     setBusy(true); setError("");
-    try { await authenticate('register', {email: data.get('email'), password: data.get('password'), name: data.get('username')}); }
+    try { await authService.register({email: data.get('email'), password: data.get('password'), name: data.get('username')}); }
     catch (error) { setError((error as Error).message); } finally { setBusy(false); }
   }
   return (
