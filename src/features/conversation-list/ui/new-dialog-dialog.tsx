@@ -1,12 +1,12 @@
-import {useId, useRef, useState, type FormEvent} from 'react';
+import {useId} from 'react';
 import {Checkbox, Dialog as RadixDialog} from 'radix-ui';
 import {Check, LoaderCircle, Search, X} from 'lucide-react';
 import {type ChatState, type Dialog, type User} from '@/shared/types';
-import {conversationService} from '@/entities/conversation';
 import {Button} from '@/shared/ui/button';
 import {Input} from '@/shared/ui/input';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {UserRow} from '@/entities/user';
+import {useNewDialog} from '../model/use-new-dialog';
 import './new-dialog-dialog.css';
 
 export type NewDialogDialogProps = {
@@ -64,91 +64,30 @@ function SelectionRow({
 
 export function NewDialogDialog({state, onClose, onCreated, refresh}: NewDialogDialogProps) {
  const id = useId();
- const [query, setQuery] = useState('');
- const [selected, setSelected] = useState<string[]>([]);
- const [name, setName] = useState('');
- const [busy, setBusy] = useState(false);
- const [error, setError] = useState('');
- const [created, setCreated] = useState<Dialog | null>(null);
- const submitting = useRef(false);
- const friendIds = new Set(
-  state.friends
-   .filter(friend => friend.accepted && (friend.from === state.me.id || friend.to === state.me.id))
-   .map(friend => (friend.from === state.me.id ? friend.to : friend.from))
- );
- const commonIds = new Set(
-  state.groups.filter(group => group.members.includes(state.me.id)).flatMap(group => group.members)
- );
- const people = state.users.filter(
-  (user, index, all) =>
-   user.id !== state.me.id &&
-   (friendIds.has(user.id) || commonIds.has(user.id)) &&
-   all.findIndex(other => other.id === user.id) === index
- );
- const selectedUsers = selected
-  .map(userId => people.find(user => user.id === userId))
-  .filter((user): user is User => !!user);
- const search = query.trim().toLocaleLowerCase('ru');
- const visible = people
-  .filter(user => user.name.toLocaleLowerCase('ru').includes(search))
-  .sort((a, b) => Number(friendIds.has(b.id)) - Number(friendIds.has(a.id)) || a.name.localeCompare(b.name, 'ru'));
- const locked = busy || !!created;
- const selectedBot = selectedUsers.some(user => user.bot);
- const unavailable = (user: User) =>
-  locked ||
-  (!selected.includes(user.id) && (selected.length >= 9 || selectedBot || (!!user.bot && selected.length > 0)));
-
- function toggle(userId: string) {
-  if (locked) return;
-  setSelected(current =>
-   current.includes(userId)
-    ? current.filter(value => value !== userId)
-    : current.length < 9
-      ? [...current, userId]
-      : current
-  );
-  setError('');
- }
-
- async function submit(event: FormEvent<HTMLFormElement>) {
-  event.preventDefault();
-  if (submitting.current || selected.length < 1 || selected.length > 9) return;
-  submitting.current = true;
-  setBusy(true);
-  setError('');
-  try {
-   // Keep a successful creation across refresh retries; never create a second group.
-   const result =
-    created ??
-    (await conversationService.createDialog<Dialog>({
-     members: selected,
-     ...(selected.length > 1
-      ? {
-         name:
-          name.trim() ||
-          selectedUsers
-           .map(user => user.name)
-           .join(', ')
-           .slice(0, 60)
-        }
-      : {})
-    }));
-   setCreated(result);
-   await refresh();
-   onCreated(result);
-  } catch (cause) {
-   setError(cause instanceof Error ? cause.message : 'Не удалось создать чат. Попробуйте ещё раз.');
-  } finally {
-   submitting.current = false;
-   setBusy(false);
-  }
- }
+ const {
+  query,
+  selected,
+  name,
+  busy,
+  error,
+  selectedUsers,
+  people,
+  locked,
+  limitNote,
+  emptyText,
+  errorText,
+  submitLabel,
+  isFriend,
+  unavailable,
+  isSubmitting,
+  actions
+ } = useNewDialog({state, refresh, onCreated});
 
  return (
   <RadixDialog.Root
    open
    onOpenChange={open => {
-    if (!open && !submitting.current) onClose();
+    if (!open && !isSubmitting()) onClose();
    }}
   >
    <RadixDialog.Portal>
@@ -165,7 +104,14 @@ export function NewDialogDialog({state, onClose, onCreated, refresh}: NewDialogD
        </Button>
       </RadixDialog.Close>
      </header>
-     <form className="new-dialog-form" onSubmit={submit} aria-busy={busy}>
+     <form
+      className="new-dialog-form"
+      onSubmit={event => {
+       event.preventDefault();
+       actions.submit();
+      }}
+      aria-busy={busy}
+     >
       <div className="new-dialog-body">
        <div className="new-dialog-search">
         <Search size={18} aria-hidden="true" />
@@ -174,7 +120,7 @@ export function NewDialogDialog({state, onClose, onCreated, refresh}: NewDialogD
          aria-label="Поиск по имени"
          placeholder="Поиск по имени"
          value={query}
-         onChange={event => setQuery(event.target.value)}
+         onChange={event => actions.setQuery(event.target.value)}
          disabled={locked}
         />
        </div>
@@ -187,7 +133,7 @@ export function NewDialogDialog({state, onClose, onCreated, refresh}: NewDialogD
             variant="secondary"
             className="new-dialog-chip"
             disabled={locked}
-            onClick={() => toggle(user.id)}
+            onClick={() => actions.toggle(user.id)}
             aria-label={`Убрать: ${user.name}`}
            >
             <UserAvatar user={user} size="xs" presence={false} decorative decoration={user.decorations?.avatar} />
@@ -199,8 +145,7 @@ export function NewDialogDialog({state, onClose, onCreated, refresh}: NewDialogD
         </ul>
        )}
        <p className="new-dialog-count" id={`${id}-limit`} aria-live="polite">
-        Выбрано: {selected.length} из 9
-        {selected.length === 9 ? ' · Достигнут лимит участников' : ' · До 10 участников вместе с вами'}
+        Выбрано: {selected.length} из 9{limitNote}
        </p>
        {selected.length > 1 && (
         <div className="new-dialog-name">
@@ -212,7 +157,7 @@ export function NewDialogDialog({state, onClose, onCreated, refresh}: NewDialogD
           maxLength={60}
           placeholder="Как назовём группу?"
           value={name}
-          onChange={event => setName(event.target.value)}
+          onChange={event => actions.setName(event.target.value)}
           disabled={locked}
          />
         </div>
@@ -223,28 +168,23 @@ export function NewDialogDialog({state, onClose, onCreated, refresh}: NewDialogD
         aria-label="Друзья и участники общих групп"
         aria-describedby={`${id}-limit`}
        >
-        {visible.map(user => (
+        {people.map(user => (
          <SelectionRow
           key={user.id}
           user={user}
           checked={selected.includes(user.id)}
           disabled={unavailable(user)}
-          friend={friendIds.has(user.id)}
-          onChange={() => toggle(user.id)}
+          friend={isFriend(user.id)}
+          onChange={() => actions.toggle(user.id)}
          />
         ))}
-        {!visible.length && (
-         <p className="new-dialog-empty">
-          {search ? 'Никого не нашли. Попробуйте другое имя.' : 'Здесь появятся ваши друзья и участники общих групп.'}
-         </p>
-        )}
+        {!people.length && <p className="new-dialog-empty">{emptyText}</p>}
        </div>
       </div>
       <footer className="new-dialog-footer">
        {error && (
         <p className="new-dialog-error" role="alert">
-         {created ? 'Чат создан, но не удалось обновить список. Повторите обновление. ' : ''}
-         {error}
+         {errorText}
         </p>
        )}
        <div className="new-dialog-actions">
@@ -255,15 +195,7 @@ export function NewDialogDialog({state, onClose, onCreated, refresh}: NewDialogD
         </RadixDialog.Close>
         <Button type="submit" disabled={busy || selected.length === 0}>
          {busy && <LoaderCircle className="new-dialog-spinner" size={16} aria-hidden="true" />}
-         {busy
-          ? 'Создаём…'
-          : created
-            ? 'Повторить обновление'
-            : error
-              ? 'Попробовать снова'
-              : selected.length > 1
-                ? 'Создать группу'
-                : 'Создать чат'}
+         {submitLabel}
         </Button>
        </div>
       </footer>

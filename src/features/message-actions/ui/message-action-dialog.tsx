@@ -1,8 +1,8 @@
-import {useState, type FormEvent, type RefObject} from 'react';
+import type {RefObject} from 'react';
 import {AlertDialog, Dialog} from 'radix-ui';
 import {type ChatMessage} from '@/shared/types';
-import {messageService} from '@/entities/message';
 import {Button} from '@/shared/ui/button';
+import {useMessageAction} from '../model/use-message-action';
 
 type Props = {
  mode: 'edit' | 'delete';
@@ -29,64 +29,41 @@ export function MessageActionDialog({
  refresh,
  onClose
 }: Props) {
- const [text, setText] = useState(message.text || '');
- const [forEveryone, setForEveryone] = useState(false);
- const mayDeleteEveryone = author || canDeleteEveryone;
- const removeForEveryone = mayDeleteEveryone && forEveryone;
- const [busy, setBusy] = useState(false);
- const [error, setError] = useState('');
- const trimmed = text.trim();
- const tooLong = [...trimmed].length > 2000;
- const canSave = !!trimmed && !tooLong && trimmed !== message.text;
-
- function close(open: boolean) {
-  if (!open && !busy) onClose();
- }
+ const model = useMessageAction({mode, message, author, canDeleteEveryone, refresh, onClose});
  function restoreFocus(event: Event) {
   event.preventDefault();
   trigger.current?.focus({preventScroll: true});
  }
- async function submit(event: FormEvent<HTMLFormElement>) {
-  event.preventDefault();
-  if (busy || (mode === 'edit' && !canSave)) return;
-  setBusy(true);
-  setError('');
-  try {
-   if (mode === 'edit') await messageService.update({message: message.id, text: trimmed});
-   else await messageService.remove({message: message.id, for_everyone: removeForEveryone});
-   await refresh();
-   onClose();
-  } catch (err) {
-   setError((err as Error).message);
-  } finally {
-   setBusy(false);
-  }
- }
- const submitError = error && (
+ const submitError = model.error && (
   <p className="text-destructive mt-3 text-sm" role="alert">
-   {error}
+   {model.error}
   </p>
  );
 
  if (mode === 'delete')
   return (
-   <AlertDialog.Root open onOpenChange={close}>
+   <AlertDialog.Root open onOpenChange={model.actions.close}>
     <AlertDialog.Portal>
      <AlertDialog.Overlay className={overlayClass} />
      <AlertDialog.Content className={contentClass} onCloseAutoFocus={restoreFocus}>
       <AlertDialog.Title className={titleClass}>Удалить сообщение?</AlertDialog.Title>
       <AlertDialog.Description className="text-muted-foreground mt-2 text-sm">
-       {removeForEveryone ? 'Сообщение исчезнет у всех участников чата.' : 'Сообщение исчезнет только у вас.'}
+       {model.deleteDescription}
       </AlertDialog.Description>
-      <form onSubmit={submit}>
-       {mayDeleteEveryone && (
+      <form
+       onSubmit={event => {
+        event.preventDefault();
+        model.actions.submit();
+       }}
+      >
+       {model.mayDeleteEveryone && (
         <label className="mt-4 flex w-fit cursor-pointer items-center gap-2 text-sm">
          <input
           type="checkbox"
           className="accent-primary size-4"
-          checked={removeForEveryone}
-          onChange={event => setForEveryone(event.target.checked)}
-          disabled={busy}
+          checked={model.removeForEveryone}
+          onChange={event => model.actions.setForEveryone(event.target.checked)}
+          disabled={model.busy}
          />
          Удалить для всех
         </label>
@@ -94,11 +71,11 @@ export function MessageActionDialog({
        {submitError}
        <div className={actionsClass}>
         <AlertDialog.Cancel asChild>
-         <Button variant="outline" type="button" disabled={busy}>
+         <Button variant="outline" type="button" disabled={model.busy}>
           Отмена
          </Button>
         </AlertDialog.Cancel>
-        <Button variant="destructive" type="submit" disabled={busy}>
+        <Button variant="destructive" type="submit" disabled={model.busy}>
          Удалить
         </Button>
        </div>
@@ -109,30 +86,35 @@ export function MessageActionDialog({
   );
 
  return (
-  <Dialog.Root open onOpenChange={close}>
+  <Dialog.Root open onOpenChange={model.actions.close}>
    <Dialog.Portal>
     <Dialog.Overlay className={overlayClass} />
     <Dialog.Content className={contentClass} onCloseAutoFocus={restoreFocus} aria-describedby={undefined}>
      <Dialog.Title className={titleClass}>Редактировать сообщение</Dialog.Title>
-     <form onSubmit={submit}>
+     <form
+      onSubmit={event => {
+       event.preventDefault();
+       model.actions.submit();
+      }}
+     >
       <textarea
        aria-label="Текст сообщения"
-       aria-invalid={tooLong}
+       aria-invalid={model.tooLong}
        className="border-input bg-background focus-visible:ring-ring mt-3 block max-h-60 min-h-24 w-full resize-y rounded-md border p-2 text-sm outline-none focus-visible:ring-2"
        rows={4}
-       value={text}
-       disabled={busy}
-       onChange={event => setText(event.target.value)}
+       value={model.text}
+       disabled={model.busy}
+       onChange={event => model.actions.setText(event.target.value)}
       />
-      {tooLong && <p className="text-destructive mt-2 text-sm">Максимум 2000 символов.</p>}
+      {model.tooLong && <p className="text-destructive mt-2 text-sm">Максимум 2000 символов.</p>}
       {submitError}
       <div className={actionsClass}>
        <Dialog.Close asChild>
-        <Button variant="outline" type="button" disabled={busy}>
+        <Button variant="outline" type="button" disabled={model.busy}>
          Отмена
         </Button>
        </Dialog.Close>
-       <Button type="submit" disabled={busy || !canSave}>
+       <Button type="submit" disabled={model.busy || !model.canSave}>
         Сохранить
        </Button>
       </div>

@@ -1,21 +1,12 @@
-import {useState} from 'react';
 import {Dialog} from 'radix-ui';
 import {Forward, Hash, MessageCircle, Reply, Search, Volume2, X} from 'lucide-react';
 import type {ChatMessage, MessageReply} from '@/shared/types';
+import {messagePreview, type ForwardDestination} from '../model/message-references-rules';
+import {useForwardPicker} from '../model/use-forward-picker';
 import './message-references.css';
 
-export type ForwardDestination = {
- id: string;
- name: string;
- group?: {id: string; name: string};
- voice?: boolean;
- keywords?: string;
-};
-export function messagePreview(message: ChatMessage) {
- return (
-  message.text?.trim() || message.attachment?.name || (message.sticker ? 'Стикер' : message.gif ? 'GIF' : 'Сообщение')
- );
-}
+export type {ForwardDestination} from '../model/message-references-rules';
+
 export function MessageQuote({
  reply,
  userName,
@@ -97,12 +88,7 @@ export function ForwardPicker({
  source: ChatMessage;
  author: string;
 }) {
- const [query, setQuery] = useState('');
- const matches = destinations.filter(item =>
-  `${item.name} ${item.group?.name || ''} ${item.keywords || ''}`
-   .toLocaleLowerCase()
-   .includes(query.trim().toLocaleLowerCase())
- );
+ const model = useForwardPicker(destinations);
  return (
   <Dialog.Root
    open
@@ -136,12 +122,12 @@ export function ForwardPicker({
        autoFocus
        placeholder="Поиск чата или канала"
        aria-label="Поиск чата или канала"
-       value={query}
-       onChange={event => setQuery(event.target.value)}
+       value={model.query}
+       onChange={event => model.actions.setQuery(event.target.value)}
       />
      </label>
      <ul aria-label="Куда переслать">
-      {matches.map(item => {
+      {model.matches.map(item => {
        const Icon = item.voice ? Volume2 : item.group ? Hash : MessageCircle;
        return (
         <li key={item.id}>
@@ -156,9 +142,7 @@ export function ForwardPicker({
        );
       })}
      </ul>
-     {!matches.length && (
-      <p role="status">{query.trim() ? 'Чаты и каналы не найдены.' : 'Нет доступных чатов и каналов.'}</p>
-     )}
+     {!model.matches.length && <p role="status">{model.emptyText}</p>}
     </Dialog.Content>
    </Dialog.Portal>
   </Dialog.Root>
