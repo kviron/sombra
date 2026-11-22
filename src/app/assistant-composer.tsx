@@ -5,7 +5,7 @@ import {composerTrigger,mentionCandidates,commandCandidates,localCommandCandidat
 import '@/shared/ui/menu-material.css';
 import {ComposerToolbar,ComposerActions,paper,composerInputClass} from '@/shared/ui/elements-composer';
 import './assistant-composer.css';
-import {parseMusicCommand} from './room-music';
+import {parseMusicCommand} from '@/shared/lib/music-command';
 
 const musicCommands=[['play','Добавить трек · вставьте ссылку после команды'],['pause','Поставить музыку на паузу'],['resume','Продолжить воспроизведение'],['skip','Пропустить трек'],['stop','Остановить и очистить очередь']].map(([name,description])=>({id:`music:${name}`,type:'command',label:`/${name}`,description,metadata:{insert:`/${name}`,avatar:'',search:name}}));
 

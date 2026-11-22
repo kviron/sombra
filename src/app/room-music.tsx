@@ -1,6 +1,7 @@
 import {useEffect,useId,useRef,useState} from 'react';
 import {ListMusic,Music2,Pause,Play,Plus,SkipForward,Square,Volume2} from 'lucide-react';
 import {api} from '@/shared/api/backend';
+import {parseMusicCommand,parseMusicLimit} from '@/shared/lib/music-command';
 import {defaultGenerativeUILibrary,renderGenerativeUI} from '@assistant-ui/generative-ui/react';
 import './room-music-elements.css';
 import './room-music.css';
@@ -12,19 +13,6 @@ const MAX_PRIVATE_AUDIO=10*1024*1024;
 type Snapshot={room:string;revision:number;serverTimeMs:number;positionMs:number;status:'idle'|'playing'|'paused';track:Track|null;queue:Track[]};
 type Action='add'|'pause'|'resume'|'skip'|'stop';
 type Reading={state:Snapshot;received:number};
-const commandActions={play:'add',pause:'pause',resume:'resume',skip:'skip',stop:'stop'} as const;
-export function parseMusicCommand(text:string){
- const match=/^\/(play|pause|resume|skip|stop)(?:\s+(.*))?$/i.exec(text.trim());
- if(!match)return undefined;
- const action=commandActions[match[1].toLowerCase() as keyof typeof commandActions];
- const args=match[2]?.trim();
- const parts=action==='add'&&args?/^(\S+)\s+(\S+)$/.exec(args):null;
- return {action,url:parts?.[1]??args,limit:parts?parseMusicLimit(parts[2]):undefined};
-}
-function parseMusicLimit(raw:string){
- const n=Number(raw);
- return /^\d{1,4}$/.test(raw)&&n>=1&&n<=1000?n:NaN;
-}
 const position=({state,received}:Reading)=>Math.max(0,Math.min(state.track?.durationMs??0,state.positionMs+(state.status==='playing'?performance.now()-received:0)));
 function message(error:unknown){
  const raw=String(error);
