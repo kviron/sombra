@@ -227,7 +227,11 @@ export function useVoice(){
     if(payload.candidate){if(pc.remoteDescription)await pc.addIceCandidate(payload.candidate);else candidates.set(id,[...(candidates.get(id)||[]),payload.candidate])}
    }
    cursor=data.cursor;
-  }catch(e){if(!c.stop){leave();setError(mediaError(e))}}finally{if(!c.stop)setTimeout(()=>void poll(),700)}}
+  }catch(e){if(!c.stop){leave();setError(mediaError(e))}}finally{
+   // With no media peer yet the poll only discovers joins, so a slower tick is invisible
+   // to the user; once a peer connection exists it carries signaling and stays at 700 ms.
+   if(!c.stop)setTimeout(()=>void poll(),c.pcs.size?700:1000)
+  }}
   void poll();
   return true;
  }catch(e){acquired?.getTracks().forEach(stopCapturedTrack);if(epoch===generation.current){leave();setError(mediaError(e))}return false}finally{if(pending.current===operation){pending.current=null;setBusy(false)}}}

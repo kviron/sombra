@@ -55,16 +55,19 @@ export function useRoomMusic(room:string|undefined,deaf:boolean,speaker:string){
   const generation=++epoch.current;
   setReading(null);setUnavailable(false);setBlocked(false);
   if(!room)return;
-  let pending=false;
+  let pending=false,timer=0;
+  // Nothing playing: poll slower. A new track is noticed within a few seconds and the
+  // room stops paying for an idle snapshot every two seconds.
+  function schedule(delay:number){window.clearTimeout(timer);timer=window.setTimeout(()=>{if(epoch.current===generation)void poll()},delay)}
   async function poll(){
-   if(pending)return;
-   pending=true;const started=performance.now();
-   try{const state=await api<Snapshot>('music_state',{room});if(epoch.current===generation){accept(state,started);setUnavailable(false)}}
+   if(pending||epoch.current!==generation)return;
+   pending=true;const started=performance.now();let delay=4000;
+   try{const state=await api<Snapshot>('music_state',{room});if(epoch.current===generation){accept(state,started);setUnavailable(false);if(state.track||state.status!=='idle')delay=2000}}
    catch{if(epoch.current===generation){setUnavailable(true);setReading(null)}}
-   finally{pending=false}
+   finally{pending=false;if(epoch.current===generation)schedule(delay)}
   }
-  void poll();const timer=window.setInterval(poll,2000);
-  return()=>{epoch.current++;clearInterval(timer)};
+  void poll();
+  return()=>{epoch.current++;window.clearTimeout(timer)};
  },[room]);
  async function command(action:Action,url?:string,limit?:number){
    if(limit!==undefined&&(!Number.isInteger(limit)||limit<1||limit>1000))throw new Error('Укажите число треков от 1 до 1000.');

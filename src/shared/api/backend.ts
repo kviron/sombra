@@ -8,14 +8,28 @@ export async function setAttachmentCacheLimit(limitMiB:number):Promise<CacheInfo
 export async function clearAttachmentCache():Promise<CacheInfo>{const result=await (isTauri()?invoke<CacheInfo>('clear_attachment_cache'):clearBrowserAttachmentCache());attachmentRequests.clear();notifyAttachmentCacheChange();return result}
 let stateRequest=0,acceptedStateRequest=0,rawStateRequest=0,acceptedRawStateRequest=0;
 const attachmentRequests=new Map<string,Promise<unknown>>();
+// Several places read the same snapshot at nearly the same moment (a poll tick and a
+// notification activation, say). One request answers them all; mutating ops are never merged.
+const readOperations=new Set(['state','music_state','music_file','sessions','get_bot_settings','bot_get_model_settings','message_readers','list_public_sticker_packs','search_conversation_members','sticker_image']);
+const readRequests=new Map<string,Promise<unknown>>();
 /** Pictures are fetched once per version: see avatars.ts. */
 const avatars=createAvatarCache(async ref=>api<{kind:string;id:string;sha:string;data:string}>('avatar_file',{kind:ref.kind,id:ref.id,sha:ref.sha}));
 export const session = () => localStorage.getItem('mines-session') || '';
-export function clearSession() { resetAttachmentCacheAccess(); attachmentRequests.clear(); avatars.clear(); localStorage.removeItem('mines-session'); sessionStorage.removeItem('mines-jwt'); window.dispatchEvent(new Event('authchange')); if(window.location.hash !== '#register') window.location.hash = '#login'; }
+export function clearSession() { resetAttachmentCacheAccess(); attachmentRequests.clear(); readRequests.clear(); avatars.clear(); localStorage.removeItem('mines-session'); sessionStorage.removeItem('mines-jwt'); window.dispatchEvent(new Event('authchange')); if(window.location.hash !== '#register') window.location.hash = '#login'; }
 export class ApiConnectionError extends Error {}
 export async function api<T = any>(op:string,data:Record<string,unknown>={}):Promise<T>{
  // Ask polling snapshots for avatar hashes instead of inline pictures.
  const payload=op==='state'?{avatar_assets:true,...data}:data;
+ if(!readOperations.has(op))return perform<T>(op,payload);
+ const key=op+'\n'+JSON.stringify(payload);
+ const shared=readRequests.get(key);
+ if(shared)return shared as Promise<T>;
+ const request=perform<T>(op,payload);
+ readRequests.set(key,request);
+ try{return await request}
+ finally{if(readRequests.get(key)===request)readRequests.delete(key)}
+}
+async function perform<T>(op:string,payload:Record<string,unknown>):Promise<T>{
  if(isTauri()){
   let result:T;
   try{result=await invoke<T>('remote_api',{request:{op,token:session(),...payload}})}catch(error){const message=String(error);if(message.includes('AUTH_REQUIRED'))clearSession();if(message.startsWith('REMOTE_UNAVAILABLE:'))throw new ApiConnectionError(message.slice(19));throw new Error(message)}
@@ -24,14 +38,14 @@ export async function api<T = any>(op:string,data:Record<string,unknown>={}):Pro
  if(op==='login'||op==='register'||op==='logout'){resetAttachmentCacheAccess();attachmentRequests.clear()}
  const scope=attachmentCacheGeneration();const stateSequence=op==='state'?++stateRequest:0;
  if(op==='attachment_file'){
-  const writeEpoch=attachmentCacheWriteEpoch();const key=JSON.stringify([scope,writeEpoch,data]);const existing=attachmentRequests.get(key);if(existing)return existing as Promise<T>;
+  const writeEpoch=attachmentCacheWriteEpoch();const key=JSON.stringify([scope,writeEpoch,payload]);const existing=attachmentRequests.get(key);if(existing)return existing as Promise<T>;
   const request=(async()=>{
    if(attachmentCacheNeedsState())await browserRaw<ChatState>('state').then(state=>acceptAttachmentCacheState(state,scope));
    if(scope!==attachmentCacheGeneration())throw new Error('Сессия изменилась. Повторите загрузку.');
-   const cached=await readAttachmentCache(String(data.message));if(scope!==attachmentCacheGeneration())throw new Error('Сессия изменилась.');if(cached)return cached as T;
-   const file=await browserRaw<AttachmentFile>(op,data);file.cached=false;
+   const cached=await readAttachmentCache(String(payload.message));if(scope!==attachmentCacheGeneration())throw new Error('Сессия изменилась.');if(cached)return cached as T;
+   const file=await browserRaw<AttachmentFile>(op,payload);file.cached=false;
    if(scope!==attachmentCacheGeneration())throw new Error('Сессия изменилась. Повторите загрузку.');
-   await writeAttachmentCache(String(data.message),file,scope,writeEpoch);if(scope!==attachmentCacheGeneration())throw new Error('Сессия изменилась.');return file as T;
+   await writeAttachmentCache(String(payload.message),file,scope,writeEpoch);if(scope!==attachmentCacheGeneration())throw new Error('Сессия изменилась.');return file as T;
   })();attachmentRequests.set(key,request);try{return await request}finally{if(attachmentRequests.get(key)===request)attachmentRequests.delete(key)}
  }
  const result=await browserRaw<T>(op,payload);if(op==='state'){if(stateSequence<acceptedStateRequest)throw new Error('История уже обновлена.');acceptedStateRequest=stateSequence;const accepted=await acceptAttachmentCacheState(result as unknown as ChatState,scope);return await avatars.hydrate(accepted) as T}return result;

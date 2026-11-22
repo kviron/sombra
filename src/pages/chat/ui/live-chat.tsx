@@ -220,7 +220,19 @@ export function LiveChat(){
   finally{pendingDialogPreferences.current.delete(dialog);setDialogPreferencesBusy(previous=>({...previous,[dialog]:false}))}
  }
  async function refresh(){const generation=mediaGeneration.current;const next=await api<ChatState>('state',{sticker_assets:true});if(generation===mediaGeneration.current)applyState(next);return next}
- useEffect(()=>{let active=true;async function load(){const generation=mediaGeneration.current;try{const next=await api<ChatState>('state',{sticker_assets:true});if(active&&generation===mediaGeneration.current)applyState(next)}catch(e){if(active)setError((e as Error).message)}}void load();const timer=setInterval(load,2000);return()=>{active=false;clearInterval(timer)}},[]);
+ useEffect(()=>{let active=true,inFlight=false;
+  async function load(){
+   // A hung request (30 s timeout) must not stack up behind the two-second tick.
+   if(inFlight||document.visibilityState==='hidden')return;
+   inFlight=true;
+   const generation=mediaGeneration.current;
+   try{const next=await api<ChatState>('state',{sticker_assets:true});if(active&&generation===mediaGeneration.current)applyState(next)}
+   catch(e){if(active)setError((e as Error).message)}
+   finally{inFlight=false}
+  }
+  const shown=()=>{if(document.visibilityState==='visible')void load()};
+  void load();const timer=setInterval(load,2000);document.addEventListener('visibilitychange',shown);
+  return()=>{active=false;clearInterval(timer);document.removeEventListener('visibilitychange',shown)}},[]);
  const dialogCalls=useDialogCalls({state,voice:call,refresh,onOpenDialog:id=>{setHome(true);setChannelId(id);setModal('')}});
  const currentDialogCall=home?dialogCalls.calls.find(item=>item.dialog===channelId):undefined;
  const voiceRoom=home&&currentDialogCall?currentDialogCall.id:undefined;
