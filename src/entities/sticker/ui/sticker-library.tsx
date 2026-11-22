@@ -1,174 +1,20 @@
-import {useEffect, useRef, useState, type ChangeEvent} from 'react';
-import {unzipSync} from 'fflate';
+import {useRef, useState} from 'react';
 import {Dialog, ScrollArea, Tabs} from 'radix-ui';
 import {ArrowLeft, Plus, Sticker as StickerIcon, Upload, X} from 'lucide-react';
 import './sticker-catalog.css';
 import {Button} from '@/shared/ui/button';
 import type {Sticker} from '@/shared/types';
-import {stickerService} from '../model/services/sticker-service';
-
-const imageExtension = /\.(png|webp)$/i;
-const maxImageSize = 8 * 1024 * 1024;
-const images = new Map<string, Promise<string>>();
-window.addEventListener('authchange', () => images.clear());
-
-function loadImage(id: string) {
- const cached = images.get(id);
- if (cached) return cached;
- const loaded = stickerService
-  .image<{image: string}>({sticker: id})
-  .then(result => result.image)
-  .catch(error => {
-   images.delete(id);
-   throw error;
-  });
- if (images.size >= 256) images.delete(images.keys().next().value!);
- images.set(id, loaded);
- return loaded;
-}
+import {useStickerImage} from '../model/use-sticker-image';
+import {useStickerLibrary} from '../model/use-sticker-library';
+import {useStickerCatalog} from '../model/use-sticker-catalog';
+import {useStickerPackPreview} from '../model/use-sticker-pack-preview';
+import {catalogPackNote, libraryPackNote, shouldPreviewSentSticker} from '../model/sticker-library-rules';
 
 export function StickerImage({sticker, className}: {sticker: Sticker; className?: string}) {
  const ref = useRef<HTMLImageElement>(null);
- const [image, setImage] = useState(sticker.image);
- useEffect(() => {
-  if (sticker.image) return;
-  let active = true;
-  const observer = new IntersectionObserver(entries => {
-   if (!entries.some(entry => entry.isIntersecting)) return;
-   observer.disconnect();
-   void loadImage(sticker.id)
-    .then(image => {
-     if (active) setImage(image);
-    })
-    .catch(() => {});
-  });
-  observer.observe(ref.current!);
-  return () => {
-   active = false;
-   observer.disconnect();
-  };
- }, [sticker.id, sticker.image]);
- return <img ref={ref} className={className} src={sticker.image || image} alt={sticker.name} draggable={false} />;
+ const image = useStickerImage({sticker, target: ref});
+ return <img ref={ref} className={className} src={image} alt={sticker.name} draggable={false} />;
 }
-
-type StickerFile = {name: string; file: Blob; keywords?: string[]};
-type ManifestItem = {
- name?: string;
- file?: string;
- filename?: string;
- files?: {webp?: string; png?: string};
- keywords?: unknown;
-};
-function baseName(path: string) {
- return path.split(/[\\/]/).pop() || path;
-}
-function titleFor(path: string) {
- return (
-  baseName(path)
-   .replace(/\.[^.]+$/, '')
-   .trim() || 'Стикер'
- );
-}
-
-async function stickerFiles(files: File[]): Promise<{items: StickerFile[]; title?: string}> {
- if (files.length !== 1 || !/\.zip$/i.test(files[0].name))
-  return {items: files.map(file => ({name: titleFor(file.name), file}))};
- const archive = files[0];
- if (archive.size > 80 * 1024 * 1024) throw new Error('ZIP должен быть не больше 80 МБ.');
- let count = 0,
-  total = 0;
- const unpacked = unzipSync(new Uint8Array(await archive.arrayBuffer()), {
-  filter: entry => {
-   if (
-    !imageExtension.test(entry.name) &&
-    baseName(entry.name) !== 'manifest.json' &&
-    baseName(entry.name) !== 'pack.json'
-   )
-    return false;
-   total += entry.originalSize;
-   if (++count > 410 || entry.originalSize > maxImageSize || total > 100 * 1024 * 1024)
-    throw new Error('В архиве слишком много данных.');
-   return true;
-  }
- });
- const manifestPath = Object.keys(unpacked).find(path => ['manifest.json', 'pack.json'].includes(baseName(path)));
- if (manifestPath) {
-  const manifest = JSON.parse(new TextDecoder().decode(unpacked[manifestPath]));
-  const items: ManifestItem[] | undefined = Array.isArray(manifest) ? manifest : manifest?.stickers;
-  if (Array.isArray(items)) {
-   const directory = manifestPath.slice(0, manifestPath.lastIndexOf('/') + 1);
-   const selected = items.flatMap(entry => {
-    const file = entry?.files?.webp ?? entry?.files?.png ?? entry?.file ?? entry?.filename;
-    if (typeof file !== 'string') return [];
-    const path = [directory + file, directory + 'png/' + file, file].find(
-     path => unpacked[path] && imageExtension.test(path)
-    );
-    if (!path) return [];
-    const keywords = Array.isArray(entry.keywords)
-     ? [
-        ...new Set(
-         entry.keywords
-          .filter((value): value is string => typeof value === 'string')
-          .map(value => [...value.trim()].slice(0, 48).join(''))
-          .filter(Boolean)
-        )
-       ].slice(0, 24)
-     : undefined;
-    return [
-     {
-      name: typeof entry.name === 'string' && entry.name.trim() ? entry.name : titleFor(path),
-      file: asStickerBlob(path, unpacked[path]),
-      keywords
-     }
-    ];
-   });
-   if (selected.length)
-    return {items: selected, title: typeof manifest.name === 'string' ? manifest.name.trim() : undefined};
-  }
- }
- const items = Object.entries(unpacked)
-  .filter(([path]) => imageExtension.test(path) && !path.startsWith('__MACOSX/'))
-  .sort(([a], [b]) => a.localeCompare(b, undefined, {numeric: true}))
-  .map(([path, bytes]) => ({name: titleFor(path), file: asStickerBlob(path, bytes)}));
- return {items};
-}
-
-function asStickerBlob(path: string, bytes: Uint8Array) {
- return new Blob([Uint8Array.from(bytes)], {type: /\.webp$/i.test(path) ? 'image/webp' : 'image/png'});
-}
-
-async function encodeSticker(file: Blob) {
- if (!['image/png', 'image/webp'].includes(file.type) || file.size > maxImageSize)
-  throw new Error('Выберите PNG или WebP до 8 МБ.');
- const bitmap = await createImageBitmap(file);
- try {
-  if (file.type === 'image/webp' && file.size <= 256 * 1024 && Math.max(bitmap.width, bitmap.height) === 512) {
-   return await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Не удалось прочитать стикер.'));
-    reader.readAsDataURL(file);
-   });
-  }
-  const scale = 512 / Math.max(bitmap.width, bitmap.height);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('Не удалось обработать стикер.');
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/webp', 0.86);
- } finally {
-  bitmap.close();
- }
-}
-
-type PublicPack = {id: string; name: string; owner: string; count: number; installed: boolean; stickers: Sticker[]};
-const listPacks = (options: {packId?: string; offset?: number} = {}) =>
- stickerService.listPublicPacks<{packs: PublicPack[]; nextOffset: number | null}>(options);
-export const personalSticker = (sticker: Sticker, user: string) =>
- !sticker.group && (sticker.owner === user || sticker.packInstalled === true);
-export const stickerPackKey = (sticker: Sticker) => sticker.packId || sticker.pack || '';
 
 function StickerPackPreview({
  id,
@@ -183,38 +29,7 @@ function StickerPackPreview({
  onClose: () => void;
  trigger: React.RefObject<HTMLButtonElement | null>;
 }) {
- const [pack, setPack] = useState<PublicPack>(),
-  [error, setError] = useState(''),
-  [busy, setBusy] = useState(false);
- useEffect(() => {
-  let current = true;
-  void listPacks({packId: id})
-   .then(({packs}) => {
-    if (current) {
-     setPack(packs[0]);
-     if (!packs.length) setError('Этот набор больше не опубликован.');
-    }
-   })
-   .catch(e => {
-    if (current) setError(e.message);
-   });
-  return () => {
-   current = false;
-  };
- }, [id]);
- async function install() {
-  setBusy(true);
-  setError('');
-  try {
-   await stickerService.installPublicPack({packId: id});
-   await refresh();
-   onClose();
-  } catch (e) {
-   setError((e as Error).message);
-  } finally {
-   setBusy(false);
-  }
- }
+ const {pack, error, busy, install} = useStickerPackPreview({id, refresh, onClose});
  return (
   <Dialog.Root
    open
@@ -277,10 +92,11 @@ export function SentSticker({
  catalog?: boolean;
  refresh: () => Promise<unknown>;
 }) {
+ // Открыт ли предпросмотр набора — состояние одного стикера, поэтому остаётся в интерфейсе.
  const [open, setOpen] = useState(false),
   trigger = useRef<HTMLButtonElement>(null);
  const id = sticker.packId;
- if (!catalog || !id || !sticker.packPublic || sticker.packAdded || personalSticker(sticker, user) || sticker.group)
+ if (!id || !shouldPreviewSentSticker(sticker, user, catalog))
   return <StickerImage className="sent-sticker" sticker={sticker} />;
  return (
   <>
@@ -320,37 +136,8 @@ function PackArt({stickers}: {stickers: Sticker[]}) {
 }
 
 function PublicStickerCatalog({user, refresh}: {user: string; refresh: () => Promise<unknown>}) {
- const [packs, setPacks] = useState<PublicPack[]>([]),
-  [next, setNext] = useState<number | null>(null),
-  [busy, setBusy] = useState(true),
-  [error, setError] = useState('');
- const [preview, setPreview] = useState<string>(),
-  trigger = useRef<HTMLButtonElement | null>(null);
- const [generation, setGeneration] = useState(0),
-  [offset, setOffset] = useState(0);
- useEffect(() => {
-  let current = true;
-  setBusy(true);
-  setError('');
-  void listPacks({offset})
-   .then(({packs, nextOffset}) => {
-    if (current) {
-     setPacks(previous =>
-      offset ? [...new Map([...previous, ...packs].map(pack => [pack.id, pack])).values()] : packs
-     );
-     setNext(nextOffset);
-    }
-   })
-   .catch(e => {
-    if (current) setError(e.message);
-   })
-   .finally(() => {
-    if (current) setBusy(false);
-   });
-  return () => {
-   current = false;
-  };
- }, [offset, generation, user]);
+ const {packs, next, busy, error, preview, actions} = useStickerCatalog({user, refresh});
+ const trigger = useRef<HTMLButtonElement | null>(null);
  return (
   <section aria-label="Публичные наборы" className="public-sticker-catalog">
    {error && <p role="alert">{error}</p>}
@@ -364,26 +151,24 @@ function PublicStickerCatalog({user, refresh}: {user: string; refresh: () => Pro
       className="sticker-collection-tile"
       onClick={event => {
        trigger.current = event.currentTarget;
-       setPreview(pack.id);
+       actions.openPreview(pack.id);
       }}
      >
       <PackArt stickers={pack.stickers} />
       <span className="sticker-collection-label">
        <strong>{pack.name}</strong>
-       <small>
-        {pack.count} шт.{pack.owner === user ? ' · Ваш набор' : pack.installed ? ' · Добавлен' : ''}
-       </small>
+       <small>{catalogPackNote(pack, user)}</small>
       </span>
      </button>
     ))}
    </div>
    {error ? (
-    <Button size="sm" variant="outline" onClick={() => setGeneration(n => n + 1)}>
+    <Button size="sm" variant="outline" onClick={actions.retry}>
      Повторить
     </Button>
    ) : (
     next !== null && (
-     <Button size="sm" variant="outline" disabled={busy} onClick={() => setOffset(next)}>
+     <Button size="sm" variant="outline" disabled={busy} onClick={actions.nextPage}>
       Ещё наборы
      </Button>
     )
@@ -393,11 +178,8 @@ function PublicStickerCatalog({user, refresh}: {user: string; refresh: () => Pro
      user={user}
      id={preview}
      trigger={trigger}
-     onClose={() => setPreview(undefined)}
-     refresh={async () => {
-      await refresh();
-      setPacks(rows => rows.map(pack => (pack.id === preview ? {...pack, installed: true} : pack)));
-     }}
+     onClose={actions.closePreview}
+     refresh={actions.refreshInstalled}
     />
    )}
   </section>
@@ -411,106 +193,16 @@ type LibraryProps = {
  catalog?: boolean;
  refresh: () => Promise<unknown>;
 };
+
+/** Компонент только показывает: наборы, прогресс и удаление приходят из модели среза. */
 export function StickerLibrary({stickers, user, group, catalog, refresh}: LibraryProps) {
- const [name, setName] = useState(''),
-  [progress, setProgress] = useState(''),
-  [error, setError] = useState('');
- const [busy, setBusy] = useState(false),
-  [confirm, setConfirm] = useState<string>();
- const [tab, setTab] = useState('library'),
-  [adding, setAdding] = useState(false);
+ const {name, progress, error, busy, confirm, tab, adding, packs, actions} = useStickerLibrary({
+  stickers,
+  user,
+  group,
+  refresh
+ });
  const addTrigger = useRef<HTMLButtonElement>(null);
- const library = stickers.filter(
-  sticker => !sticker.archived && (group ? sticker.group === group : personalSticker(sticker, user))
- );
- const packs = new Map<string, Sticker[]>();
- for (const sticker of library) {
-  const pack = stickerPackKey(sticker);
-  const items = packs.get(pack);
-  if (items) items.push(sticker);
-  else packs.set(pack, [sticker]);
- }
-
- async function upload(event: ChangeEvent<HTMLInputElement>) {
-  const files = Array.from(event.target.files || []);
-  event.target.value = '';
-  if (!files.length || busy) return;
-  setBusy(true);
-  setError('');
-  setProgress('Подготавливаем набор…');
-  try {
-   const {items, title} = await stickerFiles(files);
-   const pack = [...(name.trim() || title || (files.length === 1 ? titleFor(files[0].name) : 'Мои стикеры'))]
-    .slice(0, 60)
-    .join('');
-   if (!items.length || items.length > 200) throw new Error('Добавьте от 1 до 200 изображений PNG или WebP.');
-   const prepared: {name: string; image: string; keywords?: string[]}[] = [];
-   for (const item of items)
-    prepared.push({
-     name: [...item.name.trim()].slice(0, 40).join('') || 'Стикер',
-     image: await encodeSticker(item.file),
-     keywords: item.keywords
-    });
-   let batch: typeof prepared = [],
-    bytes = 0,
-    uploaded = 0;
-   async function send() {
-    if (!batch.length) return;
-    await stickerService.importPack({group, pack, stickers: batch});
-    uploaded += batch.length;
-    setProgress(`Загружено ${uploaded} из ${prepared.length}`);
-    batch = [];
-    bytes = 0;
-   }
-   const encoder = new TextEncoder();
-   for (const item of prepared) {
-    const size = encoder.encode(JSON.stringify(item)).length + 1;
-    if (batch.length === 48 || bytes + size > 650_000) await send();
-    batch.push(item);
-    bytes += size;
-   }
-   await send();
-   await refresh();
-   setName('');
-   setProgress(`Набор «${pack}» загружен · ${items.length} стикеров`);
-  } catch (e) {
-   setProgress('');
-   setError((e as Error).message);
-   await refresh().catch(() => {});
-  } finally {
-   setBusy(false);
-  }
- }
-
- async function remove(pack: string, sticker?: Sticker) {
-  setBusy(true);
-  setError('');
-  setProgress('');
-  try {
-   await stickerService.remove({group, pack, sticker: sticker?.id});
-   await refresh();
-   setConfirm(undefined);
-  } catch (e) {
-   setError((e as Error).message);
-  } finally {
-   setBusy(false);
-  }
- }
-
- async function changePack(sticker: Sticker) {
-  setBusy(true);
-  setError('');
-  setProgress('');
-  try {
-   if (sticker.packInstalled) await stickerService.removeInstalledPack({packId: sticker.packId});
-   else await stickerService.setPackPublic({packId: sticker.packId, pack: sticker.pack, public: !sticker.packPublic});
-   await refresh();
-  } catch (e) {
-   setError((e as Error).message);
-  } finally {
-   setBusy(false);
-  }
- }
  const importForm = (
   <>
    <label className="sticker-pack-name">
@@ -519,7 +211,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
      value={name}
      maxLength={60}
      disabled={busy}
-     onChange={event => setName(event.target.value)}
+     onChange={event => actions.setName(event.target.value)}
      placeholder="Подставится из имени файла"
     />
    </label>
@@ -531,7 +223,11 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
      accept=".zip,image/png,image/webp"
      multiple
      disabled={busy}
-     onChange={event => void upload(event)}
+     onChange={event => {
+      const files = Array.from(event.target.files || []);
+      event.target.value = '';
+      actions.upload(files);
+     }}
     />
    </label>
   </>
@@ -544,10 +240,10 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
  );
  const packList = (
   <div className={group ? undefined : 'sticker-collection-tiles'}>
-   {[...packs].map(([key, items]) => {
+   {packs.map(([key, items]) => {
     const source = items[0],
      pack = source.pack || '',
-     added = !group && source.packInstalled;
+     added = !group && !!source.packInstalled;
     return (
      <details key={key} className="sticker-pack">
       {group ? (
@@ -559,9 +255,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
         <PackArt stickers={items} />
         <span className="sticker-collection-label">
          <strong>{pack || 'Без набора'}</strong>
-         <small>
-          {items.length} шт.{added ? ' · Добавлен' : source.packPublic ? ' · Опубликован' : ''}
-         </small>
+         <small>{libraryPackNote(items.length, source, added)}</small>
         </span>
        </summary>
       )}
@@ -576,7 +270,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
            variant="ghost"
            aria-label={`Удалить стикер «${sticker.name}»`}
            disabled={busy}
-           onClick={() => void remove(pack, sticker)}
+           onClick={() => actions.remove(pack, sticker)}
           >
            Удалить
           </Button>
@@ -585,7 +279,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
        ))}
       </div>
       {!group && catalog && source.packId && (
-       <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void changePack(source)}>
+       <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => actions.changePack(source)}>
         {added ? 'Убрать из моих стикеров' : source.packPublic ? 'Снять с публикации' : 'Опубликовать'}
        </Button>
       )}
@@ -593,15 +287,15 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
        pack &&
        (confirm === key ? (
         <div className="sticker-remove-actions">
-         <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setConfirm(undefined)}>
+         <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={actions.cancelRemove}>
           Отмена
          </Button>
-         <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => void remove(pack)}>
+         <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => actions.remove(pack)}>
           Подтвердить удаление
          </Button>
         </div>
        ) : (
-        <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => setConfirm(key)}>
+        <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => actions.askRemove(key)}>
          Удалить набор
         </Button>
        ))}
@@ -615,7 +309,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
    <section className="sticker-library">
     {importForm}
     {feedback}
-    {!packs.size && <p>Пока нет стикеров.</p>}
+    {!packs.length && <p>Пока нет стикеров.</p>}
     {packList}
    </section>
   );
@@ -630,7 +324,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
       variant="ghost"
       disabled={busy}
       onClick={() => {
-       setAdding(false);
+       actions.backToPacks();
        requestAnimationFrame(() => addTrigger.current?.focus());
       }}
      >
@@ -639,7 +333,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
      </Button>
     </div>
    ) : (
-    <Tabs.Root value={tab} onValueChange={setTab}>
+    <Tabs.Root value={tab} onValueChange={actions.setTab}>
      <div className="sticker-collection-toolbar settings-sticker-banner">
       <div className="settings-sticker-intro">
        <StickerIcon aria-hidden="true" />
@@ -649,18 +343,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
        </div>
       </div>
 
-      <Button
-       ref={addTrigger}
-       type="button"
-       variant="outline"
-       disabled={busy}
-       onClick={() => {
-        setTab('library');
-        setProgress('');
-        setError('');
-        setAdding(true);
-       }}
-      >
+      <Button ref={addTrigger} type="button" variant="outline" disabled={busy} onClick={actions.beginImport}>
        <Plus />
        Добавить свой набор
       </Button>
@@ -672,7 +355,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
      </Tabs.List>
      <Tabs.Content value="library" className="sticker-collection-panel">
       {feedback}
-      {!packs.size && (
+      {!packs.length && (
        <p className="sticker-collection-empty">
         Пока нет личных наборов. Импортируйте свой набор или найдите его в общем каталоге.
        </p>
