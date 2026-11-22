@@ -1,85 +1,17 @@
-import {useEffect, useRef, useState} from 'react';
 import {HardDrive, RefreshCw, Trash2, LoaderCircle} from 'lucide-react';
-import {attachmentCacheService, type CacheInfo} from '@/shared/api';
 import {Button} from '@/shared/ui/button';
 import {Select} from '@/shared/ui/select';
+import {useAttachmentCache} from '../model/use-attachment-cache';
 import './attachment-cache-settings.css';
 import './account-approved.css';
-const options = [
- {value: '0', label: 'Не сохранять кэш'},
- {value: '256', label: '256 МиБ'},
- {value: '512', label: '512 МиБ'},
- {value: '1024', label: '1 ГиБ'},
- {value: '2048', label: '2 ГиБ'},
- {value: '4096', label: '4 ГиБ'}
-];
-function size(bytes: number) {
- return bytes >= 1024 ** 3
-  ? `${(bytes / 1024 ** 3).toFixed(2)} ГиБ`
-  : bytes >= 1024 ** 2
-    ? `${(bytes / 1024 ** 2).toFixed(1)} МиБ`
-    : `${Math.ceil(bytes / 1024)} КиБ`;
-}
+
 export function AttachmentCacheSettings({ready, onChanged}: {ready: boolean; onChanged: () => Promise<unknown>}) {
- const [info, setInfo] = useState<CacheInfo | null>(null),
-  [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState(''),
-  [confirm, setConfirm] = useState(false);
- const mounted = useRef(true),
-  pending = useRef(false),
-  request = useRef(0);
- async function load() {
-  if (!ready || pending.current) return;
-  const sequence = ++request.current;
-  try {
-   const next = await attachmentCacheService.info();
-   if (mounted.current && sequence === request.current) {
-    setInfo(next);
-    setError('');
-   }
-  } catch (reason) {
-   if (mounted.current && sequence === request.current)
-    setError(reason instanceof Error ? reason.message : 'Не удалось прочитать кэш.');
-  }
- }
- useEffect(() => {
-  mounted.current = true;
-  void load();
-  const timer = setInterval(() => void load(), 5000);
-  return () => {
-   mounted.current = false;
-   request.current++;
-   clearInterval(timer);
-  };
- }, [ready]);
- async function change(action: () => Promise<CacheInfo>, message: string) {
-  if (pending.current || !ready) return;
-  pending.current = true;
-  request.current++;
-  setBusy(true);
-  setError('');
-  setNotice('');
-  try {
-   const next = await action();
-   if (mounted.current) {
-    setInfo(next);
-    setConfirm(false);
-    setNotice(message);
-   }
-   await onChanged().catch(() => {});
-  } catch (reason) {
-   if (mounted.current) setError(reason instanceof Error ? reason.message : 'Не удалось изменить кэш.');
-  } finally {
-   pending.current = false;
-   if (mounted.current) setBusy(false);
-  }
- }
+ const model = useAttachmentCache({ready, onChanged});
  return (
   <section
    className="attachment-cache-settings approved-cache"
    aria-labelledby="cache-settings-heading"
-   aria-busy={busy}
+   aria-busy={model.busy}
   >
    <h2 id="cache-settings-heading">
     <HardDrive size={22} />
@@ -91,21 +23,17 @@ export function AttachmentCacheSettings({ready, onChanged}: {ready: boolean; onC
     <div className="cache-usage">
      <div>
       <span>Кэш текущего аккаунта</span>
-      <small>
-       {info
-        ? `${info.files} файлов · ${info.enabled ? 'кэш включён' : 'кэш выключен'}`
-        : 'Получаем сведения о хранилище'}
-      </small>
+      <small>{model.summary}</small>
      </div>
      <div className="approved-cache-actions">
-      <strong>{info ? size(info.bytes) : 'Загружаем…'}</strong>
+      <strong>{model.size}</strong>
       <Button
        type="button"
        variant="outline"
        title="Обновить сведения о кэше"
        aria-label="Обновить сведения о кэше"
-       disabled={busy || !ready}
-       onClick={() => void load()}
+       disabled={model.disabled}
+       onClick={() => void model.refresh()}
       >
        <RefreshCw size={17} />
        Обновить сведения
@@ -125,15 +53,10 @@ export function AttachmentCacheSettings({ready, onChanged}: {ready: boolean; onC
       <Select
        id="attachment-cache-limit"
        label="Лимит кэша вложений"
-       value={String(info?.limitMiB ?? 1024)}
-       options={options}
-       disabled={busy || !ready || !info}
-       onValueChange={value =>
-        void change(
-         () => attachmentCacheService.setLimit(Number(value)),
-         Number(value) ? 'Лимит кэша сохранён.' : 'Кэш выключен и очищен.'
-        )
-       }
+       value={model.limit}
+       options={model.options}
+       disabled={model.disabled || !model.info}
+       onValueChange={value => void model.setLimit(value)}
       />
      </div>
     </div>
@@ -143,33 +66,23 @@ export function AttachmentCacheSettings({ready, onChanged}: {ready: boolean; onC
       <p>Сообщения и файлы в «Загрузках» останутся на месте.</p>
      </div>{' '}
      <div className="cache-clear">
-      {confirm ? (
+      {model.confirm ? (
        <>
         <p>
          Очистить локальные копии этого аккаунта? Файлы, уже очищенные на сервере, после этого не получится открыть из
          кэша.
         </p>
         <div>
-         <Button
-          type="button"
-          variant="destructive"
-          disabled={busy}
-          onClick={() => void change(attachmentCacheService.clear, 'Локальный кэш очищен.')}
-         >
+         <Button type="button" variant="destructive" disabled={model.busy} onClick={() => void model.clearCache()}>
           Да, очистить кэш
          </Button>
-         <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirm(false)}>
+         <Button type="button" variant="outline" disabled={model.busy} onClick={() => model.setConfirm(false)}>
           Отмена
          </Button>
         </div>
        </>
       ) : (
-       <Button
-        type="button"
-        variant="outline"
-        disabled={busy || !ready || !info || !info.files}
-        onClick={() => setConfirm(true)}
-       >
+       <Button type="button" variant="outline" disabled={model.clearDisabled} onClick={() => model.setConfirm(true)}>
         <Trash2 size={16} />
         Очистить кэш аккаунта
        </Button>
@@ -198,20 +111,20 @@ export function AttachmentCacheSettings({ready, onChanged}: {ready: boolean; onC
      </li>
     </ul>
    </div>
-   {busy && (
+   {model.busy && (
     <p className="cache-operation" role="status">
      <LoaderCircle size={15} className="animate-spin" />
      Обновляем хранилище…
     </p>
    )}
-   {notice && (
+   {model.notice && (
     <p className="cache-notice" role="status">
-     {notice}
+     {model.notice}
     </p>
    )}
-   {error && (
+   {model.error && (
     <p className="cache-error" role="alert">
-     {error}
+     {model.error}
     </p>
    )}
   </section>

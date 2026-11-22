@@ -1,8 +1,7 @@
-import {useState} from 'react';
-import {useAudioDevices, isDeviceSelectionMissing} from '../model/use-audio-devices';
-import {AudioDeviceAccess} from './audio-device-access';
 import {Popover} from 'radix-ui';
 import {ChevronUp, Settings} from 'lucide-react';
+import {AudioDeviceAccess} from './audio-device-access';
+import {useVoiceQuickSettings} from '../model/use-voice-quick-settings';
 import {Button} from '@/shared/ui/button';
 import {Select} from '@/shared/ui/select';
 import {Slider} from '@/shared/ui/slider';
@@ -19,47 +18,17 @@ export function VoiceQuickSettings({
  kind: 'input' | 'output';
  onSettings: () => void;
 }) {
- const [open, setOpen] = useState(false);
- const audioDevices = useAudioDevices(open);
- const {devices} = audioDevices;
- const input = kind === 'input';
- const key = input ? 'mic' : 'speaker';
- const label = input ? 'Устройство ввода' : 'Устройство вывода';
- const volumeLabel = input ? 'Громкость микрофона' : 'Громкость звука';
- const volume = input ? voice.micVolume : voice.preferences.volume;
- const matching = devices.filter(
-  device => device.kind === (input ? 'audioinput' : 'audiooutput') && device.deviceId && device.deviceId !== 'default'
- );
- const selected = voice.preferences[key];
- const options = [
-  {value: '', label: 'По умолчанию'},
-  ...matching.map((device, index) => ({
-   value: device.deviceId,
-   label: device.label || `${input ? 'Микрофон' : 'Динамики'} ${index + 1}`
-  }))
- ];
- const missing = isDeviceSelectionMissing(devices, audioDevices.loaded, input ? 'audioinput' : 'audiooutput', selected);
- if (selected && !options.some(option => option.value === selected))
-  options.push({
-   value: selected,
-   label: missing
-    ? 'Выбранное устройство (недоступно)'
-    : selected === 'default'
-      ? 'По умолчанию'
-      : selected === 'communications'
-        ? 'Устройство связи по умолчанию'
-        : 'Выбранное устройство'
-  });
+ const model = useVoiceQuickSettings({voice, kind, onSettings});
  return (
-  <Popover.Root open={open} onOpenChange={setOpen}>
+  <Popover.Root open={model.open} onOpenChange={model.setOpen}>
    <Popover.Trigger asChild>
     <Button
      type="button"
      variant="ghost"
      size="icon-xs"
      className="voice-quick-trigger"
-     aria-label={input ? 'Быстрые настройки микрофона' : 'Быстрые настройки наушников'}
-     title={input ? 'Настройки микрофона' : 'Настройки наушников'}
+     aria-label={model.labels.aria}
+     title={model.labels.title}
     >
      <ChevronUp size={12} />
     </Button>
@@ -72,20 +41,20 @@ export function VoiceQuickSettings({
      collisionPadding={12}
      className="voice-quick-panel sombra-menu-surface dark"
      data-slot="popover-content"
-     aria-label={input ? 'Быстрые настройки микрофона' : 'Быстрые настройки наушников'}
+     aria-label={model.labels.aria}
     >
      <label className="voice-quick-label" htmlFor={`quick-${kind}-device`}>
-      {label}
+      {model.labels.device}
      </label>
      <Select
       id={`quick-${kind}-device`}
-      label={label}
-      value={selected}
-      disabled={voice.busy || audioDevices.requesting}
-      options={options}
-      onValueChange={value => voice.savePreferences(key, value)}
+      label={model.labels.device}
+      value={model.selected}
+      disabled={model.disabled}
+      options={model.options}
+      onValueChange={model.setDevice}
      />
-     {missing && (
+     {model.missing && (
       <div className="audio-device-missing">
        <p role="status">Выбранное устройство недоступно. Настройка сохранена.</p>
        <Button
@@ -93,37 +62,29 @@ export function VoiceQuickSettings({
         variant="secondary"
         size="sm"
         className="audio-device-reset"
-        data-device-kind={input ? 'audioinput' : 'audiooutput'}
-        disabled={voice.busy || audioDevices.requesting}
-        onClick={() => voice.savePreferences(key, '')}
+        data-device-kind={kind === 'input' ? 'audioinput' : 'audiooutput'}
+        disabled={model.disabled}
+        onClick={() => model.resetDevice()}
        >
-        Использовать по умолчанию · {input ? 'микрофон' : 'динамики'}
+        {model.labels.reset}
        </Button>
       </div>
      )}
-     <AudioDeviceAccess devices={audioDevices} disabled={voice.busy} />
+     <AudioDeviceAccess devices={model.audioDevices} disabled={voice.busy} />
      <Separator className="my-4" />
      <div className="voice-quick-volume">
-      <label id={`quick-${kind}-volume`}>{volumeLabel}</label>
-      <output>{volume}%</output>
+      <label id={`quick-${kind}-volume`}>{model.labels.volume}</label>
+      <output>{model.volume}%</output>
      </div>
      <Slider
       aria-labelledby={`quick-${kind}-volume`}
       min={0}
-      max={input ? 200 : 100}
-      value={[volume]}
-      onValueChange={([value]) => (input ? voice.setMicVolume(value) : voice.savePreferences('volume', value))}
+      max={model.volumeMax}
+      value={[model.volume]}
+      onValueChange={([value]) => model.setVolume(value)}
      />
      <Separator className="my-4" />
-     <Button
-      type="button"
-      variant="ghost"
-      className="voice-quick-settings-link"
-      onClick={() => {
-       setOpen(false);
-       onSettings();
-      }}
-     >
+     <Button type="button" variant="ghost" className="voice-quick-settings-link" onClick={model.openSettings}>
       <Settings size={16} />
       Настройки голоса
      </Button>

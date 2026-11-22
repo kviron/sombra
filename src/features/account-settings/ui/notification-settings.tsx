@@ -1,7 +1,6 @@
-import {useRef, useState} from 'react';
 import {LoaderCircle} from 'lucide-react';
 import {type ChatPreferences} from '@/shared/types';
-import {accountService} from '../model/services/account-service';
+import {useNotificationSettings} from '../model/use-notification-settings';
 import {Switch} from '@/shared/ui/switch';
 import './notification-settings.css';
 import '@/shared/ui/account-media-settings.css';
@@ -15,28 +14,12 @@ export function NotificationSettings({
  ready: boolean;
  onSaved: (preferences: ChatPreferences) => void;
 }) {
- const [busy, setBusy] = useState(false),
-  [error, setError] = useState('');
- const pending = useRef(false);
- async function change(key: 'direct' | 'groups', enabled: boolean) {
-  if (pending.current || !ready) return;
-  pending.current = true;
-  setBusy(true);
-  setError('');
-  try {
-   onSaved(await accountService.setNotificationPreferences<ChatPreferences>({[key]: enabled}));
-  } catch (reason) {
-   setError(reason instanceof Error ? reason.message : 'Не удалось сохранить настройки уведомлений.');
-  } finally {
-   pending.current = false;
-   setBusy(false);
-  }
- }
+ const model = useNotificationSettings({preferences, ready, onSaved});
  return (
   <section
    className="notification-settings account-media-notifications"
    aria-label="Настройки уведомлений"
-   aria-busy={busy}
+   aria-busy={model.busy}
   >
    <p>Выберите, откуда получать новые сообщения. Настройки сохраняются в вашем аккаунте.</p>
    <div className="notification-option">
@@ -47,9 +30,9 @@ export function NotificationSettings({
     <Switch
      id="notify-direct"
      aria-label="Уведомления из личных сообщений"
-     checked={preferences?.notifications.direct !== false}
-     disabled={!ready || busy}
-     onCheckedChange={value => void change('direct', value)}
+     checked={model.checked('direct')}
+     disabled={model.disabled}
+     onCheckedChange={value => void model.change('direct', value)}
     />
    </div>
    <div className="notification-option">
@@ -60,9 +43,9 @@ export function NotificationSettings({
     <Switch
      id="notify-groups"
      aria-label="Уведомления из групп"
-     checked={preferences?.notifications.groups !== false}
-     disabled={!ready || busy}
-     onCheckedChange={value => void change('groups', value)}
+     checked={model.checked('groups')}
+     disabled={model.disabled}
+     onCheckedChange={value => void model.change('groups', value)}
     />
    </div>
    <div className="notification-help">
@@ -77,15 +60,15 @@ export function NotificationSettings({
     </p>
     <p>Уведомления работают, пока Sombra запущена. В браузере они показываются внутри приложения.</p>
    </div>
-   {busy && (
+   {model.busy && (
     <p className="notification-saving" role="status">
      <LoaderCircle size={15} className="animate-spin" />
      Сохраняем…
     </p>
    )}
-   {error && (
+   {model.error && (
     <p className="notification-settings-error" role="alert">
-     {error}
+     {model.error}
     </p>
    )}
   </section>
