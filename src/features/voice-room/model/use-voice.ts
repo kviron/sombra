@@ -3,7 +3,7 @@ import {ApiConnectionError} from '@/shared/api/backend';
 import {voiceService} from './services/voice-service';
 import {desktopDiagnosticsAvailable,recordDesktopDiagnostic} from '@/shared/api/diagnostics';
 import {createVoiceTransportMonitor,iceIsConnected} from './voice-diagnostics';
-import {captureVoiceStream,readMedia,setCapturedTrackEnabled,stopCapturedTrack,type MediaPreferences} from './voice-input';
+import {captureVoiceStream,readMedia,setCapturedTrackEnabled,stopCapturedTrack,watchMicrophoneSilence,type MediaPreferences} from './voice-input';
 import {iceTransportPolicy,type IceServer} from './ice-policy';
 export function mediaError(e:unknown){const name=(e as DOMException).name;return name==='NotAllowedError'?'Разрешите доступ к микрофону или камере в настройках приложения и Windows.':name==='NotFoundError'?'Устройство не найдено. Подключите микрофон или камеру.':name==='NotReadableError'?'Устройство занято другим приложением. Освободите его и повторите.':(e as Error).message||'Не удалось подключить устройство.'}
 function videoConstraints(p:MediaPreferences){return {deviceId:p.camera?{exact:p.camera}:undefined,width:{ideal:1280},height:{ideal:720}}}
@@ -11,7 +11,7 @@ type VoiceAvailability={muted:boolean;deaf:boolean};
 type Peer={client:string;user:string}&Partial<VoiceAvailability>;
 type Poll={peers:Peer[];signals:{id:number;from:string;payload:{description?:RTCSessionDescriptionInit;candidate?:RTCIceCandidateInit}}[];cursor:number;iceServers:RTCIceServer[]};
 type MicrophoneGain={context:AudioContext;source:MediaStreamAudioSourceNode;gain:GainNode;track:MediaStreamTrack};
-type Call={room:string;client:string;stream:MediaStream;pcs:Map<string,RTCPeerConnection>;stop:boolean;microphone:MediaStreamTrack;micGain?:MicrophoneGain;members?:Set<string>;retries:Map<string,number>};
+type Call={room:string;client:string;stream:MediaStream;pcs:Map<string,RTCPeerConnection>;stop:boolean;microphone:MediaStreamTrack;micGain?:MicrophoneGain;members?:Set<string>;retries:Map<string,number>;silenceWatch?:()=>void};
 type TrackKind='audio'|'video';
 const voiceCues={
  joined:new URL('../assets/voice-peer-joined.wav',import.meta.url).href,
@@ -83,6 +83,7 @@ export function useVoice(){
   current.current=null;
   if(c){
    c.stop=true;
+   c.silenceWatch?.();
    c.stream.getTracks().filter(track=>track!==c.microphone&&track!==c.micGain?.track).forEach(stopCapturedTrack);
    stopCapturedTrack(c.microphone);
    if(c.micGain)stopMicrophoneGain(c.micGain);
@@ -119,6 +120,9 @@ export function useVoice(){
   if(epoch!==generation.current){acquired.getTracks().forEach(stopCapturedTrack);return false}
   const c:Call={room:destination,client:crypto.randomUUID(),stream:acquired,pcs:new Map(),stop:false,microphone:acquired.getAudioTracks()[0],retries:new Map()};current.current=c;
   setCapturedTrackEnabled(c.microphone,!latestAvailability.current.muted&&!latestAvailability.current.deaf);
+  // Движок не сообщает энергию микрофона в статистике — измеряем её сами, чтобы журнал
+  // отличал «тихий микрофон» от «звук не дошёл до собеседника».
+  c.silenceWatch=watchMicrophoneSilence(c.microphone);
   const first=await voiceService.join<Poll>({room:c.room,client:c.client,...latestAvailability.current});if(c.stop){
    // Cancellation can race server admission; retire only this abandoned client.
    void voiceService.leave({room:c.room,client:c.client}).catch(()=>{});
@@ -154,19 +158,23 @@ export function useVoice(){
     setConnections(old=>({...old,[id]:pc.connectionState}));
     const state=pc.connectionState;
     if(state==='connected'){c.retries.delete(id);return}
-    // Discord rebuilds the transport instead of asking the user to rejoin. Dropping the
-    // connection is enough: the next poll offers again to this peer.
+    // Пересобирать связь нужно только после настоящего обрыва. «disconnected» проходит
+    // сам за пару секунд, и спешная пересборка раньше давала качели: соединение рвалось
+    // каждую минуту и звук пропадал на каждом переподключении.
     if(state!=='failed'&&state!=='disconnected')return;
     const attempts=c.retries.get(id)??0;
-    if(attempts>=6)return;
+    if(attempts>=3)return;
     c.retries.set(id,attempts+1);
+    const delay=state==='failed'?1500:8000;
     window.setTimeout(()=>{
      if(c.stop||c.pcs.get(id)!==pc)return;
+     // Если за это время связь восстановилась сама — ничего не трогаем.
+     if(pc.connectionState==='connected')return;
      samplers.delete(id);
      pc.close();
      c.pcs.delete(id);
      setStreams(old=>{const next={...old};delete next[id];return next});
-    },state==='failed'?600:3000);
+    },delay);
    };
    if(diagnostics){
     const monitor=createVoiceTransportMonitor(category=>recordDesktopDiagnostic('voice_transport',category));

@@ -12,7 +12,8 @@ type Categories = {
   voice_playback: 'autoplay_blocked' | 'playback_error';
   voice_transport: VoiceTransportCategory;
   voice_output: 'mic_muted' | 'mic_unmuted' | 'output_deafened' | 'output_undeafened'
-    | 'playback_failed' | 'output_device_failed' | 'input_device_failed';
+    | 'playback_failed' | 'output_device_failed' | 'input_device_failed'
+    | 'mic_silent' | 'mic_silent_recovered';
 };
 export const desktopDiagnosticsAvailable = isTauri;
 const lastReport = new Map<string, number>();

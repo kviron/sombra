@@ -7,13 +7,13 @@ export type NoiseSuppression = 'off' | 'standard' | 'enhanced';
 export type MediaPreferences = {
  mic:string; camera:string; speaker:string; volume:number; echo:boolean; noise:NoiseSuppression; relay:boolean;
 };
-export const defaultMedia:MediaPreferences = {mic:'',camera:'',speaker:'',volume:100,echo:true,noise:'standard',relay:true};
+export const defaultMedia:MediaPreferences = {mic:'',camera:'',speaker:'',volume:100,echo:true,noise:'standard',relay:false};
 
 export function readMedia():MediaPreferences {
  try {
   const stored = JSON.parse(localStorage.getItem('mines-media') || '{}') as Partial<Omit<MediaPreferences,'noise'>> & {noise?:unknown};
   const noise = stored.noise;
-  return {...defaultMedia,...stored,noise:noise===false||noise==='off'?'off':noise==='enhanced'?'enhanced':'standard',relay:stored.relay!==false};
+  return {...defaultMedia,...stored,noise:noise===false||noise==='off'?'off':noise==='enhanced'?'enhanced':'standard',relay:stored.relay===true};
  } catch {
   return defaultMedia;
  }
@@ -49,6 +49,48 @@ export function stopCapturedTrack(track:MediaStreamTrack) {
  *  system mute switch cuts the source. Calling stop() ourselves does not fire it. */
 function watchCaptureEnd(track:MediaStreamTrack) {
  track.addEventListener('ended',()=>recordDesktopDiagnostic('voice_microphone','device_error'),{once:true});
+}
+
+/**
+ * Движок окна не отдаёт энергию звука в статистике WebRTC (проверено: в outbound-rtp
+ * есть только пакеты и байты, а totalAudioEnergy и audioLevel отсутствуют). Поэтому
+ * уровень микрофона измеряем сами: включённый, но молчащий дольше пяти секунд микрофон
+ * иначе не виден ни в журнале, ни в интерфейсе.
+ */
+export function watchMicrophoneSilence(track:MediaStreamTrack,{threshold=0.002,quietMs=5000,stepMs=500}={}) {
+ let context:AudioContext|undefined,timer=0;
+ try {
+  context=new AudioContext();
+  const analyser=context.createAnalyser();
+  analyser.fftSize=512;
+  analyser.smoothingTimeConstant=0.4;
+  context.createMediaStreamSource(new MediaStream([track])).connect(analyser);
+  const samples=new Float32Array(analyser.fftSize);
+  let quiet=0,reported=false;
+  timer=window.setInterval(()=>{
+   if(track.readyState!=='live'){stop();return}
+   // Пользователь сам выключил микрофон — это не поломка, отсчёт сбрасываем.
+   if(!track.enabled){quiet=0;return}
+   analyser.getFloatTimeDomainData(samples);
+   let sum=0;
+   for(const value of samples)sum+=value*value;
+   if(Math.sqrt(sum/samples.length)>=threshold){
+    quiet=0;
+    if(reported){reported=false;recordDesktopDiagnostic('voice_output','mic_silent_recovered')}
+    return;
+   }
+   quiet+=stepMs;
+   if(quiet>=quietMs&&!reported){reported=true;recordDesktopDiagnostic('voice_output','mic_silent')}
+  },stepMs);
+ } catch {
+  return ()=>{};
+ }
+ function stop() {
+  if(timer)window.clearInterval(timer);
+  timer=0;
+  void context?.close().catch(()=>{});
+ }
+ return stop;
 }
 
 export async function captureVoiceStream(preferences:MediaPreferences,video:MediaTrackConstraints|false=false) {
