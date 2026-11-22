@@ -72,6 +72,9 @@ export type Sticker = {
  packAdded?: boolean;
 };
 export type Friend = {id: string; from: string; to: string; accepted: boolean};
+/** Страница истории канала: сервер отдаёт её от старых к новым. */
+export type MessagesPage = {messages: ChatMessage[]; hasMore: boolean; nextBefore: string | null};
+
 export type ChatState = {
  features?: {
   messageReferences?: boolean;
@@ -94,7 +97,10 @@ export type ChatState = {
  users: User[];
  groups: Group[];
  dialogs: Dialog[];
+ /** Только последние сообщения каждого канала: остальное — страницами. */
  messages: ChatMessage[];
+ /** Каналы, у которых история длиннее снапшота. */
+ historyTruncated?: string[];
  stickers: Sticker[];
  friends: Friend[];
  bots: Bot[];

@@ -1,9 +1,9 @@
-import {useEffect, useRef, useState} from 'react';
 import {Checkbox, Switch, Dialog as RadixDialog} from 'radix-ui';
 import {Check, X} from 'lucide-react';
-import {type ChatState, type Group, type GroupPermission} from '@/shared/types';
-import {canGroup, DEFAULT_MEMBER_ROLE, getGroupRoles, GROUP_PERMISSION_CATALOG, groupService} from '@/entities/group';
+import type {ChatState, Group, GroupPermission} from '@/shared/types';
+import {GROUP_PERMISSION_CATALOG} from '@/entities/group';
 import {Select} from '@/shared/ui/select';
+import {useGroupRoles} from '../model/use-group-roles';
 import './group-roles-dialog.css';
 
 export type GroupRolesDialogProps = {
@@ -14,136 +14,43 @@ export type GroupRolesDialogProps = {
  onError?: (message: string) => void;
  onBusyChange?: (busy: boolean) => void;
 };
+
 export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusyChange}: GroupRolesDialogProps) {
- const live = state.groups.find(item => item.id === group.id);
- const current = live ?? group;
- const supported = Array.isArray(current.roles) && typeof current.rolesRevision === 'number';
- const policySupported = supported && typeof current.membersCanInvite === 'boolean';
- const actualOwner = !!live && current.owner === state.me.id && current.members.includes(state.me.id);
- const owner = actualOwner && supported;
- const roles = getGroupRoles(current);
- const [tab, setTab] = useState<'roles' | 'members'>('roles');
- const [selected, setSelected] = useState('member');
- const [name, setName] = useState('Участник');
- const [permissions, setPermissions] = useState<GroupPermission[]>([]);
- const [dirty, setDirty] = useState(false);
- const [error, setError] = useState('');
- const [busy, setBusy] = useState(false);
- const [confirmDelete, setConfirmDelete] = useState(false);
- const [confirmOff, setConfirmOff] = useState(false);
- useEffect(() => {
-  if (!owner || !policySupported || !current.membersCanInvite) setConfirmOff(false);
- }, [owner, policySupported, current.membersCanInvite]);
- const [kick, setKick] = useState<{id: string; name: string} | null>(null);
- const locks = useRef(new Set<string>());
- const latest = useRef({current, owner, live, state, supported});
- latest.current = {current, owner, live, state, supported};
- const mounted = useRef(true);
- useEffect(() => {
-  mounted.current = true;
-  return () => {
-   mounted.current = false;
-  };
- }, []);
- const role = roles.find(item => item.id === selected);
- const signature = JSON.stringify(role);
- useEffect(() => {
-  if (dirty || selected === '__new') return;
-  setName(role?.name ?? DEFAULT_MEMBER_ROLE.name);
-  setPermissions(role?.permissions ?? []);
- }, [signature, selected, dirty]);
- useEffect(() => {
-  setSelected('member');
-  setDirty(false);
-  setConfirmDelete(false);
-  setKick(null);
-  setError('');
- }, [group.id]);
- const editable = owner && selected !== 'member' && selected !== 'owner' && (selected === '__new' || !!role);
- const members = state.users.filter(user => current.members.includes(user.id));
- function choose(value: string) {
-  if (dirty && !window.confirm('Отменить несохранённые изменения роли?')) return;
-  setSelected(value);
-  setDirty(false);
-  setConfirmDelete(false);
-  setError('');
- }
- function create() {
-  if (dirty && !window.confirm('Отменить несохранённые изменения роли?')) return;
-  setSelected('__new');
-  setName('');
-  setPermissions([]);
-  setDirty(true);
-  setError('');
- }
- async function run(op: string, data: Record<string, unknown>, after?: () => void, ownerOnly = true) {
-  const actions = {
-   set_group_member_invites: groupService.setMemberInvites,
-   set_group_member_role: groupService.setMemberRole,
-   kick_group_member: groupService.kickMember,
-   delete_group_role: groupService.deleteRole,
-   save_group_role: groupService.saveRole
-  };
-  const snapshot = latest.current;
-  if (locks.current.size || !snapshot.live || !snapshot.supported || (ownerOnly && !snapshot.owner)) return;
-  if (op === 'set_group_member_invites' && typeof snapshot.current.membersCanInvite !== 'boolean') return;
-  if (op === 'set_group_member_role') {
-   const target = snapshot.state.users.find(user => user.id === data.user);
-   if (
-    !target ||
-    target.bot ||
-    target.id === snapshot.current.owner ||
-    !snapshot.current.members.includes(target.id) ||
-    !getGroupRoles(snapshot.current).some(role => role.id === data.role)
-   )
-    return;
-  }
-  if (
-   (op === 'delete_group_role' || op === 'save_group_role') &&
-   data.role &&
-   !getGroupRoles(snapshot.current).some(role => role.id === data.role && role.id !== 'member' && role.id !== 'owner')
-  )
-   return;
-  const groupId = snapshot.current.id;
-  locks.current.add(op);
-  setBusy(true);
-  onBusyChange?.(true);
-  setError('');
-  try {
-   await actions[op as keyof typeof actions]({
-    ...data,
-    group: groupId,
-    ...(op === 'kick_group_member' ? {} : {revision: snapshot.current.rolesRevision || 0})
-   });
-   await refresh();
-   if (mounted.current && latest.current.current.id === groupId) after?.();
-  } catch (cause) {
-   if (!mounted.current || latest.current.current.id !== groupId) return;
-   const raw = cause instanceof Error ? cause.message : String(cause);
-   const conflict = /revision|conflict|верси|изменен|изменён/i.test(raw);
-   const message = conflict
-    ? 'Роли уже изменены другим запросом. Данные обновлены; ваши изменения сохранены в форме. Проверьте их и повторите сохранение.'
-    : raw;
-   setError(message);
-   onError?.(message);
-   if (conflict) {
-    try {
-     await refresh();
-    } catch {
-     /* Keep the actionable conflict and unsaved draft. */
-    }
-   }
-  } finally {
-   locks.current.delete(op);
-   onBusyChange?.(false);
-   if (mounted.current && latest.current.current.id === groupId) setBusy(false);
-  }
- }
- function policy(enabled: boolean) {
-  void run('set_group_member_invites', {enabled}, () => setConfirmOff(false));
- }
- const canKick = supported && !!live && canGroup(current, state.me.id, 'members.kick');
- const roleOptions = roles.map(item => ({value: item.id, label: item.name}));
+ const {
+  tab,
+  setTab,
+  selected,
+  choose,
+  create,
+  name,
+  setName,
+  permissions,
+  toggle,
+  dirty,
+  clearDirty,
+  error,
+  busy,
+  confirmDelete,
+  setConfirmDelete,
+  confirmOff,
+  setConfirmOff,
+  kick,
+  setKick,
+  run,
+  policy,
+  current,
+  live,
+  supported,
+  policySupported,
+  owner,
+  roles,
+  role,
+  roleOptions,
+  editable,
+  members,
+  canKick
+ } = useGroupRoles({group, state, refresh, onError, onBusyChange});
+
  return (
   <section className="group-roles-panel" aria-busy={busy}>
    <nav className="group-roles-tabs" aria-label="Разделы ролей">
@@ -235,10 +142,7 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
          value={name}
          maxLength={40}
          disabled={!editable || busy}
-         onChange={event => {
-          setName(event.target.value);
-          setDirty(true);
-         }}
+         onChange={event => setName(event.target.value)}
          placeholder="От 1 до 40 символов"
         />
        </label>
@@ -268,10 +172,7 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
            permissions={permissions}
            editable={editable && !busy}
            membersCanInvite={current.membersCanInvite === true}
-           onToggle={key => {
-            setPermissions(values => (values.includes(key) ? values.filter(value => value !== key) : [...values, key]));
-            setDirty(true);
-           }}
+           onToggle={toggle}
           />
          ))}
          <tr>
@@ -295,9 +196,8 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
            disabled={busy}
            onClick={() =>
             void run('delete_group_role', {role: selected}, () => {
-             setSelected('member');
-             setDirty(false);
-             setConfirmDelete(false);
+             clearDirty();
+             choose('member');
             })
            }
           >
@@ -360,18 +260,16 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
          className="gr-danger"
          disabled={busy}
          onClick={() => {
-          const fresh = latest.current;
-          const target = fresh.state.users.find(user => user.id === kick.id);
-          const assigned = fresh.current.memberRoles?.[kick.id] || 'member';
+          const target = state.users.find(user => user.id === kick.id);
+          const assigned = current.memberRoles?.[kick.id] || 'member';
           if (
            !target ||
            target.bot ||
-           kick.id === fresh.state.me.id ||
-           kick.id === fresh.current.owner ||
-           !fresh.current.members.includes(kick.id) ||
-           !canGroup(fresh.current, fresh.state.me.id, 'members.kick') ||
-           (!fresh.owner &&
-            getGroupRoles(fresh.current).some(role => role.id === assigned && role.permissions.length > 0))
+           kick.id === state.me.id ||
+           kick.id === current.owner ||
+           !current.members.includes(kick.id) ||
+           !canKick ||
+           (!owner && roles.some(item => item.id === assigned && item.permissions.length > 0))
           )
            return;
           void run('kick_group_member', {user: kick.id}, () => setKick(null), false);
@@ -411,13 +309,13 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
        className="gr-primary"
        disabled={busy || !dirty || !name.trim() || name.trim().length > 40}
        onClick={() => {
-        if (!latest.current.owner) return;
+        if (!owner) return;
         void run(
          'save_group_role',
          {...(selected === '__new' ? {} : {role: selected}), name: name.trim(), permissions},
          () => {
-          setDirty(false);
-          if (selected === '__new') setSelected('member');
+          if (selected === '__new') choose('member');
+          else clearDirty();
          }
         );
        }}

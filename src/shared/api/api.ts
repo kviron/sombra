@@ -39,6 +39,7 @@ export const api = {
   react: method('reaction'),
   readers: method('message_readers'),
   markRead: method('mark_messages_read'),
+  page: method('messages_page'),
   attachment: method('attachment_file')
  },
  conversation: {
