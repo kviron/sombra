@@ -1,13 +1,13 @@
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useRef} from 'react';
 import {Dialog as DialogPrimitive} from 'radix-ui';
 import {Camera, ChevronRight, File, Headphones, Image, Link2, Pencil, Settings, Video, X} from 'lucide-react';
 import {type ChatMessage, type ChatState, type Dialog, type User} from '@/shared/types';
-import {conversationService} from '@/entities/conversation';
 import {conversationMaterials, type MaterialCategory} from '@/entities/message';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {Button} from '@/shared/ui/button';
 import {peerStatus} from '@/entities/conversation';
 import {ImageCropDialog} from '@/shared/ui/image-crop-dialog';
+import {useConversationInfo} from '../model/use-conversation-info';
 import './conversation-info-dialog.css';
 
 export function participantCount(count: number) {
@@ -61,6 +61,11 @@ type Props = {
  onMaterials: (category: MaterialCategory) => void;
  onSettings?: () => void;
 };
+
+/**
+ * Компонент только показывает: черновик, поиск участников и сохранение приходят
+ * из модели среза, поэтому здесь нет ни запросов, ни правил доступа.
+ */
 export function ConversationInfoDialog({
  state,
  title,
@@ -75,169 +80,38 @@ export function ConversationInfoDialog({
  onMaterials,
  onSettings
 }: Props) {
- const [editing, setEditing] = useState(false),
-  [name, setName] = useState(''),
-  [image, setImage] = useState(''),
-  [revision, setRevision] = useState(0),
-  [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [crop, setCrop] = useState<File>();
- const [memberQuery, setMemberQuery] = useState(''),
-  [memberResult, setMemberResult] = useState<{key: string; users: User[]; error?: string}>();
- const normalizedQuery = memberQuery.trim().toLocaleLowerCase(),
-  emailQuery = /^[^\s@]+@[^\s@]+$/.test(normalizedQuery),
-  searchKey = `${state.me.id}:${channel}:${normalizedQuery}:${memberIds.join(',')}`;
- const memberSearchEpoch = useRef(0);
- useEffect(() => {
-  const epoch = ++memberSearchEpoch.current;
-  if (!emailQuery || !state.conversationMemberSearchSupported) return;
-  const timer = setTimeout(() => {
-   void conversationService
-    .searchMembers<{users: User[]}>({channel, query: normalizedQuery})
-    .then(result => {
-     if (memberSearchEpoch.current === epoch && alive.current)
-      setMemberResult({key: searchKey, users: result.users.filter(user => memberIds.includes(user.id))});
-    })
-    .catch(reason => {
-     if (memberSearchEpoch.current === epoch && alive.current)
-      setMemberResult({
-       key: searchKey,
-       users: [],
-       error: reason instanceof Error ? reason.message : 'Не удалось найти участников.'
-      });
-    });
-  }, 250);
-  return () => {
-   clearTimeout(timer);
-   if (memberSearchEpoch.current === epoch) memberSearchEpoch.current++;
-  };
- }, [searchKey, emailQuery, state.conversationMemberSearchSupported]);
- const remoteResult = memberResult?.key === searchKey ? memberResult : undefined;
- const localMemberIds = memberIds.filter(id => {
-  const user = id === state.me.id ? state.me : state.users.find(item => item.id === id);
-  return (
-   !normalizedQuery ||
-   (!!user &&
-    `${user.name} ${user.username || ''} @${user.username || ''}`.toLocaleLowerCase().includes(normalizedQuery))
-  );
- });
- const shownMemberIds = emailQuery
-  ? state.conversationMemberSearchSupported
-    ? remoteResult?.users.map(user => user.id) || []
-    : []
-  : localMemberIds;
- const searchPending = emailQuery && state.conversationMemberSearchSupported && !remoteResult;
+ const model = useConversationInfo({chat: state, channel, memberIds, dialog, onSaved});
+ const {editing, name, image, busy, error, crop, memberQuery, shown, remote, hint, actions} = model;
  const picker = useRef<HTMLInputElement>(null),
   camera = useRef<HTMLButtonElement>(null),
   editTrigger = useRef<HTMLButtonElement>(null),
   nameInput = useRef<HTMLInputElement>(null),
-  close = useRef<HTMLButtonElement>(null),
-  lock = useRef(false),
-  alive = useRef(true);
- const scope = `${state.me.id}:${channel}`,
-  scopeRef = useRef(scope);
- scopeRef.current = scope;
- const editable =
-  !!onSaved &&
-  state.dialogMetadataSupported === true &&
-  !!dialog &&
-  dialog.owner === state.me.id &&
-  !state.me.bot &&
-  dialog.members.length > 2 &&
-  dialog.members.length <= 10 &&
-  dialog.members.includes(state.me.id) &&
-  dialog.members.every(id => id === state.me.id || state.users.some(user => user.id === id && !user.bot));
- const live = useRef({editable, dialog});
- live.current = {editable, dialog};
+  close = useRef<HTMLButtonElement>(null);
+
+ const restoreEdit = () => requestAnimationFrame(() => editTrigger.current?.focus());
+
+ // Фокус — забота интерфейса, но момент перехода задаёт модель.
  useEffect(() => {
-  alive.current = true;
-  const invalidate = () => {
-   alive.current = false;
-  };
-  window.addEventListener('authchange', invalidate);
-  return () => {
-   alive.current = false;
-   window.removeEventListener('authchange', invalidate);
-  };
- }, []);
- useEffect(() => {
-  setEditing(false);
-  setCrop(undefined);
-  setError('');
-  setBusy(false);
-  setMemberQuery('');
-  setMemberResult(undefined);
-  lock.current = false;
- }, [scope]);
- useEffect(() => {
-  if (editing && /CONFLICT|Диалог изменён/i.test(error)) setRevision(dialog?.revision || 0);
- }, [dialog?.revision, editing, error]);
- function restoreEdit() {
-  requestAnimationFrame(() => editTrigger.current?.focus());
- }
- function cancel() {
-  if (lock.current) return;
-  setEditing(false);
-  setCrop(undefined);
-  setError('');
-  restoreEdit();
- }
+  if (editing) requestAnimationFrame(() => nameInput.current?.focus());
+  else restoreEdit();
+ }, [editing]);
+
  function begin() {
-  if (!editable || !dialog) return;
-  setName(dialog.name);
-  setImage(dialog.avatar || '');
-  setRevision(dialog.revision || 0);
-  setError('');
-  setEditing(true);
+  actions.begin();
   requestAnimationFrame(() => nameInput.current?.focus());
  }
+ function cancel() {
+  actions.cancel();
+  restoreEdit();
+ }
  function closeCrop() {
-  setCrop(undefined);
+  actions.setCrop(undefined);
   requestAnimationFrame(() => camera.current?.focus());
  }
- async function save() {
-  const current = live.current.dialog;
-  if (lock.current || !live.current.editable || !current || !onSaved || !name.trim() || name.trim().length > 60) return;
-  const owner = state.me.id,
-   destination = current.id,
-   requestScope = scope;
-  lock.current = true;
-  setBusy(true);
-  setError('');
-  const valid = () =>
-   alive.current &&
-   scopeRef.current === requestScope &&
-   live.current.editable &&
-   live.current.dialog?.id === destination;
-  try {
-   const result = await conversationService.update<Dialog>({
-    dialog: destination,
-    revision,
-    name: name.trim(),
-    avatar: image
-   });
-   if (!valid()) return;
-   if (result.id !== destination || result.owner !== owner || !Number.isSafeInteger(result.revision))
-    throw new Error('Не удалось подтвердить сохранение чата.');
-   await onSaved(owner, result);
-   if (valid()) {
-    setEditing(false);
-    restoreEdit();
-   }
-  } catch (reason) {
-   if (valid()) {
-    setError(reason instanceof Error ? reason.message : 'Не удалось сохранить чат. Черновик сохранён.');
-    if (live.current.dialog) setRevision(live.current.dialog.revision || 0);
-   }
-  } finally {
-   if (alive.current && scopeRef.current === requestScope) {
-    lock.current = false;
-    setBusy(false);
-   }
-  }
- }
+
  const previewName = editing ? name : title,
   previewAvatar = editing ? image : avatar;
+
  return (
   <DialogPrimitive.Root
    open
@@ -299,14 +173,14 @@ export function ConversationInfoDialog({
        {channelLabel && (
         <p className="conversation-info-channel">Канал: {channelLabel} · материалы только этого канала</p>
        )}
-       {editable && !editing && (
+       {model.editable && !editing && (
         <Button ref={editTrigger} variant="ghost" size="sm" type="button" data-edit-dialog onClick={begin}>
          <Pencil size={16} />
          Редактировать чат
         </Button>
        )}
       </div>
-      {editing && editable && (
+      {editing && model.editable && (
        <section className="conversation-info-editor" data-dialog-metadata-editor aria-label="Редактировать чат">
         <div className="conversation-info-edit-avatar">
          <Button
@@ -321,7 +195,7 @@ export function ConversationInfoDialog({
           Изменить аватар
          </Button>
          {image && (
-          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setImage('')}>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => actions.setImage('')}>
            Удалить аватар
           </Button>
          )}
@@ -334,10 +208,7 @@ export function ConversationInfoDialog({
           onChange={event => {
            const file = event.target.files?.[0];
            event.target.value = '';
-           if (file) {
-            setError('');
-            setCrop(file);
-           }
+           if (file) actions.setCrop(file);
           }}
          />
         </div>
@@ -352,7 +223,7 @@ export function ConversationInfoDialog({
           value={name}
           maxLength={60}
           disabled={busy}
-          onChange={event => setName(event.target.value)}
+          onChange={event => actions.setName(event.target.value)}
          />
         </label>
         {error && (
@@ -367,13 +238,8 @@ export function ConversationInfoDialog({
          <Button
           type="button"
           size="sm"
-          disabled={
-           busy ||
-           !name.trim() ||
-           name.trim().length > 60 ||
-           (name.trim() === dialog?.name && image === (dialog.avatar || ''))
-          }
-          onClick={() => void save()}
+          disabled={busy || !model.canSave}
+          onClick={() => void actions.save()}
           data-save-dialog
          >
           {busy ? 'Сохранение…' : 'Сохранить'}
@@ -401,30 +267,17 @@ export function ConversationInfoDialog({
          placeholder="Имя, логин или полный email"
          value={memberQuery}
          maxLength={128}
-         onChange={event => {
-          setMemberQuery(event.target.value);
-          setMemberResult(undefined);
-         }}
+         onChange={event => actions.setMemberQuery(event.target.value)}
         />
        </label>
        <p className="conversation-info-search-status" role="status" aria-live="polite">
-        {searchPending
-         ? 'Поиск участника…'
-         : emailQuery && !state.conversationMemberSearchSupported
-           ? 'Поиск по email недоступен на этой версии сервера. Используйте имя или логин.'
-           : remoteResult?.error
-             ? remoteResult.error
-             : normalizedQuery && !shownMemberIds.length
-               ? 'Участники не найдены'
-               : normalizedQuery
-                 ? `Найдено: ${shownMemberIds.length}`
-                 : 'Поиск только среди участников этого чата. Email не отображается.'}
+        {hint}
        </p>
-       {shownMemberIds.map(id => {
+       {shown.map(id => {
         const user =
          id === state.me.id
           ? state.me
-          : state.users.find(item => item.id === id) || remoteResult?.users.find(item => item.id === id);
+          : state.users.find(item => item.id === id) || remote?.users.find(item => item.id === id);
         return user ? (
          <button key={id} type="button" className="conversation-info-member" onClick={() => onProfile(id)}>
           <UserAvatar user={user} decorative decoration={user.decorations?.avatar} />
@@ -451,9 +304,7 @@ export function ConversationInfoDialog({
        kind="avatar"
        onClose={closeCrop}
        onConfirm={result => {
-        if (!alive.current || scopeRef.current !== scope || !live.current.editable)
-         throw new Error('Чат или права изменились.');
-        setImage(result.dataUrl);
+        actions.setImage(result.dataUrl);
         closeCrop();
        }}
       />
@@ -463,3 +314,5 @@ export function ConversationInfoDialog({
   </DialogPrimitive.Root>
  );
 }
+
+export type {User};
