@@ -1,5 +1,7 @@
 .journal-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.account-modal #account-panel .journal-heading h2{font-size:20px;line-height:28px;margin:0}
+.account-modal #account-panel .journal-heading h2{font-size:20px;line-height:28px;margin:0;font-weight:700}
+/* Заголовок и подзаголовок шапки набраны как в общих шапках разделов настроек. */
+.account-modal #account-panel .journal-heading p{margin:2px 0 0;color:var(--muted-foreground);font-size:13px;font-weight:500;line-height:1.5}
 .account-modal #account-panel .journal-actions [data-slot=button]{min-height:36px}
 .account-modal #account-panel .diagnostic-journal p{margin:0;color:var(--muted-foreground);line-height:1.5}
 .account-modal #account-panel .diagnostic-journal [role=alert]{color:var(--destructive)}

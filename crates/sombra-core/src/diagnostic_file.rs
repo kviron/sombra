@@ -164,6 +164,20 @@ pub fn read_recent(directory: &Path, time: u64) -> io::Result<Vec<Event>> {
     Ok(events)
 }
 
+/// Removes every stored diagnostic record. The writer recreates the current file on the
+/// next record, so clearing only drops what has been written so far and leaves the
+/// database and other application data untouched.
+pub fn clear(directory: &Path) -> io::Result<()> {
+    let _lock = lock_directory(directory)?;
+    for name in [SCRATCH, PREVIOUS, CURRENT] {
+        let path = directory.join(name);
+        if regular_metadata(&path)?.is_some() {
+            fs::remove_file(path)?;
+        }
+    }
+    Ok(())
+}
+
 fn cleanup(directory: &Path, time: u64) -> io::Result<()> {
     let _lock = lock_directory(directory)?;
     let scratch = directory.join(SCRATCH);
@@ -251,6 +265,26 @@ mod tests {
             old
         );
         drop(sink);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn clear_removes_stored_records_and_keeps_other_data() {
+        let directory =
+            std::env::temp_dir().join(format!("sombra-diagnostics-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let line = format!("{{\"time\":{}}}\n", now());
+        fs::write(directory.join(CURRENT), &line).unwrap();
+        fs::write(directory.join(PREVIOUS), &line).unwrap();
+        fs::write(directory.join("mines-db.json"), &line).unwrap();
+        clear(&directory).unwrap();
+        assert!(!directory.join(CURRENT).exists());
+        assert!(!directory.join(PREVIOUS).exists());
+        assert_eq!(
+            fs::read_to_string(directory.join("mines-db.json")).unwrap(),
+            line
+        );
+        assert!(read_recent(&directory, now()).unwrap().is_empty());
         fs::remove_dir_all(directory).unwrap();
     }
 

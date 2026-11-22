@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {ChevronDown,Copy,Download,RefreshCw} from 'lucide-react';
+import {ChevronDown,Copy,Download,RefreshCw,Trash2} from 'lucide-react';
 import {invoke,isTauri} from '@tauri-apps/api/core';
 import {Badge} from '@/shared/ui/badge';
 import {Button} from '@/shared/ui/button';
@@ -11,9 +11,10 @@ const titles:Record<string,string>={voice_poll:'Не удалось обнови
 const clock=new Intl.DateTimeFormat('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 const fullDate=new Intl.DateTimeFormat('ru',{dateStyle:'medium',timeStyle:'medium'});
 const readEntries=()=>invoke<DiagnosticEntry[]>('read_local_diagnostics');
+const clearEntries=()=>invoke<void>('clear_local_diagnostics');
 
 type JournalState={phase:'loading'|'ready'|'failed';entries:DiagnosticEntry[]|null};
-export function DiagnosticJournal({read=readEntries,available=isTauri()}:{read?:()=>Promise<DiagnosticEntry[]>;available?:boolean}) {
+export function DiagnosticJournal({read=readEntries,clear=clearEntries,available=isTauri()}:{read?:()=>Promise<DiagnosticEntry[]>;clear?:()=>Promise<void>;available?:boolean}) {
   const [request,setRequest]=useState(0);
   const [state,setState]=useState<JournalState>({phase:'loading',entries:null});
   useEffect(()=>{
@@ -38,13 +39,27 @@ export function DiagnosticJournal({read=readEntries,available=isTauri()}:{read?:
     const link=document.createElement('a');link.href=url;link.download='sombra-diagnostics.jsonl';
     document.body.append(link);link.click();link.remove();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
+  async function clearJournal(){
+    if(!available||!entries?.length)return;
+    if(!window.confirm('Очистить журнал? Записи диагностики будут удалены без возможности восстановления.'))return;
+    setState({phase:'loading',entries:null});
+    setFeedback('');
+    try{
+      await clear();
+      setFeedback('Журнал очищен.');
+      setRequest(previous=>previous+1);
+    }catch{
+      setState(previous=>({...previous,phase:'failed'}));
+      setFeedback('Не удалось очистить журнал. Попробуйте ещё раз.');
+    }
+  }
   const loading=available&&phase==='loading';
   const refresh=()=>{
     setState(previous=>({...previous,phase:'loading'}));
     setRequest(previous=>previous+1);
   };
   return <section className="diagnostic-journal" aria-label="Журнал диагностики">
-    <div className="journal-heading"><div><h2>Журнал</h2><p>Диагностика Sombra за последние 48 часов</p></div><div className="journal-actions"><Button type="button" disabled={!available||loading} onClick={refresh}><RefreshCw/>Обновить</Button><Button type="button" variant="ghost" size="icon" title="Скачать журнал" aria-label="Скачать журнал" disabled={!entries?.length} onClick={download}><Download/></Button><Button type="button" variant="ghost" size="icon" title="Копировать журнал" aria-label="Копировать журнал" disabled={!entries?.length} onClick={()=>void copy()}><Copy/></Button></div></div>
+    <div className="journal-heading"><div><h2>Журнал</h2><p>Диагностика Sombra за последние 48 часов</p></div><div className="journal-actions"><Button type="button" disabled={!available||loading} onClick={refresh}><RefreshCw/>Обновить</Button><Button type="button" variant="ghost" size="icon" title="Скачать журнал" aria-label="Скачать журнал" disabled={!entries?.length} onClick={download}><Download/></Button><Button type="button" variant="ghost" size="icon" title="Копировать журнал" aria-label="Копировать журнал" disabled={!entries?.length} onClick={()=>void copy()}><Copy/></Button><Button type="button" variant="ghost" size="icon" title="Очистить журнал" aria-label="Очистить журнал" disabled={!available||!entries?.length} onClick={()=>void clearJournal()}><Trash2/></Button></div></div>
     {feedback&&<p role="status">{feedback}</p>}
     <div className="journal-summary" role="status"><strong className="journal-total">{entries?.length??'—'}</strong><div><strong>Ошибки</strong><p>В сохранённых записях</p></div></div>
     <h3>Хронология ошибок</h3>
