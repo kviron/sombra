@@ -132,6 +132,7 @@ pub fn desktop_runtime_category(operation: &str, category: &str) -> Option<&'sta
     match (operation, category) {
         ("webview", "js_error") => Some("js_error"),
         ("webview", "unhandled_rejection") => Some("unhandled_rejection"),
+        ("webview", "render_error") => Some("render_error"),
         ("voice_microphone" | "voice_camera" | "voice_speaker", "device_error") => {
             Some("device_error")
         }
@@ -153,6 +154,8 @@ pub fn desktop_runtime_category(operation: &str, category: &str) -> Option<&'sta
             "audio_send_recovered",
             "audio_send_silent",
             "audio_send_silent_recovered",
+            "audio_receive_silent",
+            "audio_receive_silent_recovered",
         ]
         .into_iter()
         .find(|allowed| *allowed == category),
@@ -164,6 +167,8 @@ pub fn desktop_runtime_category(operation: &str, category: &str) -> Option<&'sta
             "playback_failed",
             "output_device_failed",
             "input_device_failed",
+            "mic_silent",
+            "mic_silent_recovered",
         ]
         .into_iter()
         .find(|allowed| *allowed == category),
@@ -437,5 +442,60 @@ mod file_tests {
         assert_ne!(records[4]["time"], 1);
         drop(diagnostics);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod client_contract {
+    use super::desktop_runtime_category;
+
+    /// Клиент отправляет эти пары; оболочка обязана их принимать, иначе запись
+    /// молча отбрасывается и журнал диагностики остаётся пустым.
+    const PAIRS: &[(&str, &str)] = &[
+        ("webview", "js_error"),
+        ("webview", "unhandled_rejection"),
+        ("webview", "render_error"),
+        ("voice_microphone", "device_error"),
+        ("voice_microphone", "device_permission"),
+        ("voice_camera", "device_error"),
+        ("voice_camera", "device_permission"),
+        ("voice_speaker", "device_error"),
+        ("voice_speaker", "device_permission"),
+        ("voice_playback", "autoplay_blocked"),
+        ("voice_playback", "playback_error"),
+        ("voice_transport", "ice_checking"),
+        ("voice_transport", "ice_connected"),
+        ("voice_transport", "ice_disconnected"),
+        ("voice_transport", "ice_failed"),
+        ("voice_transport", "path_direct"),
+        ("voice_transport", "path_relay"),
+        ("voice_transport", "audio_receive_stalled"),
+        ("voice_transport", "audio_receive_recovered"),
+        ("voice_transport", "audio_send_stalled"),
+        ("voice_transport", "audio_send_recovered"),
+        ("voice_transport", "audio_send_silent"),
+        ("voice_transport", "audio_send_silent_recovered"),
+        ("voice_transport", "audio_receive_silent"),
+        ("voice_transport", "audio_receive_silent_recovered"),
+        ("voice_output", "mic_muted"),
+        ("voice_output", "mic_unmuted"),
+        ("voice_output", "output_deafened"),
+        ("voice_output", "output_undeafened"),
+        ("voice_output", "playback_failed"),
+        ("voice_output", "output_device_failed"),
+        ("voice_output", "input_device_failed"),
+        ("voice_output", "mic_silent"),
+        ("voice_output", "mic_silent_recovered"),
+    ];
+
+    #[test]
+    fn every_client_category_is_accepted() {
+        for (operation, category) in PAIRS {
+            assert_eq!(
+                desktop_runtime_category(operation, category),
+                Some(*category),
+                "оболочка отклонит {operation}/{category}"
+            );
+        }
     }
 }
