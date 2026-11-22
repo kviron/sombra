@@ -29,11 +29,33 @@ export async function api<T = any>(op:string,data:Record<string,unknown>={}):Pro
  try{return await request}
  finally{if(readRequests.get(key)===request)readRequests.delete(key)}
 }
+import {uniqueIds,uniqueRows} from './unique-rows';
+export {uniqueRows} from './unique-rows';
+function normalizeState(state: ChatState): ChatState {
+  return {
+    ...state,
+    dialogs: uniqueRows(state.dialogs, 'переписках').map(dialog => ({ ...dialog, members: uniqueIds(dialog.members) })),
+    users: uniqueRows(state.users, 'участниках'),
+    groups: uniqueRows(state.groups, 'группах').map(group => ({
+      ...group,
+      members: uniqueIds(group.members),
+      channels: uniqueRows(group.channels, 'каналах группы'),
+    })),
+    messages: uniqueRows(state.messages, 'сообщениях'),
+    friends: uniqueRows(state.friends, 'заявках в друзья'),
+    dialogCalls: uniqueRows(state.dialogCalls, 'звонках'),
+  };
+}
+
+async function hydrateState<T>(state: T): Promise<T> {
+  return normalizeState(await avatars.hydrate(state as unknown as ChatState) as ChatState) as unknown as T;
+}
+
 async function perform<T>(op:string,payload:Record<string,unknown>):Promise<T>{
  if(isTauri()){
   let result:T;
   try{result=await invoke<T>('remote_api',{request:{op,token:session(),...payload}})}catch(error){const message=String(error);if(message.includes('AUTH_REQUIRED'))clearSession();if(message.startsWith('REMOTE_UNAVAILABLE:'))throw new ApiConnectionError(message.slice(19));throw new Error(message)}
-  return op==='state'?await avatars.hydrate(result) as T:result;
+  return op==='state'?await hydrateState(result) as T:result;
  }
  if(op==='login'||op==='register'||op==='logout'){resetAttachmentCacheAccess();attachmentRequests.clear()}
  const scope=attachmentCacheGeneration();const stateSequence=op==='state'?++stateRequest:0;
@@ -48,7 +70,7 @@ async function perform<T>(op:string,payload:Record<string,unknown>):Promise<T>{
    await writeAttachmentCache(String(payload.message),file,scope,writeEpoch);if(scope!==attachmentCacheGeneration())throw new Error('Сессия изменилась.');return file as T;
   })();attachmentRequests.set(key,request);try{return await request}finally{if(attachmentRequests.get(key)===request)attachmentRequests.delete(key)}
  }
- const result=await browserRaw<T>(op,payload);if(op==='state'){if(stateSequence<acceptedStateRequest)throw new Error('История уже обновлена.');acceptedStateRequest=stateSequence;const accepted=await acceptAttachmentCacheState(result as unknown as ChatState,scope);return await avatars.hydrate(accepted) as T}return result;
+ const result=await browserRaw<T>(op,payload);if(op==='state'){if(stateSequence<acceptedStateRequest)throw new Error('История уже обновлена.');acceptedStateRequest=stateSequence;const accepted=await acceptAttachmentCacheState(result as unknown as ChatState,scope);return await hydrateState(accepted) as T}return result;
 }
 async function browserRaw<T>(op:string,data:Record<string,unknown>={}):Promise<T>{
  const scope=attachmentCacheGeneration(),sequence=op==='state'?++rawStateRequest:0;
