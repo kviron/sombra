@@ -6,7 +6,7 @@ import {Button} from '@/shared/ui/button';
 import './diagnostic-journal.css';
 
 export type DiagnosticEntry={time:number;source:'desktop';operation:string;category:string;status:number|null};
-const categories:Record<string,string>={transport:'Ошибка соединения',timeout:'Время ожидания истекло',invalid_response:'Некорректный ответ',session_storage:'Ошибка хранения сеанса',http_error:'Ошибка HTTP',js_error:'Ошибка интерфейса',unhandled_rejection:'Ошибка интерфейса',device_error:'Ошибка устройства',device_permission:'Нет доступа к устройству',autoplay_blocked:'Автовоспроизведение заблокировано',playback_error:'Ошибка воспроизведения'};
+const categories:Record<string,string>={transport:'Ошибка соединения',timeout:'Время ожидания истекло',invalid_response:'Некорректный ответ',session_storage:'Ошибка хранения сеанса',http_error:'Ошибка HTTP',js_error:'Ошибка интерфейса',unhandled_rejection:'Ошибка интерфейса',render_error:'Экран остановился из-за ошибки',device_error:'Ошибка устройства',device_permission:'Нет доступа к устройству',autoplay_blocked:'Автовоспроизведение заблокировано',playback_error:'Ошибка воспроизведения'};
 const titles:Record<string,string>={voice_poll:'Не удалось обновить состояние голосовой комнаты',state:'Не удалось загрузить состояние приложения'};
 const clock=new Intl.DateTimeFormat('ru',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 const fullDate=new Intl.DateTimeFormat('ru',{dateStyle:'medium',timeStyle:'medium'});

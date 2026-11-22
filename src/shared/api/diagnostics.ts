@@ -5,7 +5,7 @@ export type VoiceTransportCategory = 'ice_checking' | 'ice_connected' | 'ice_dis
   | 'audio_send_silent' | 'audio_send_silent_recovered'
   | 'audio_receive_silent' | 'audio_receive_silent_recovered';
 type Categories = {
-  webview: 'js_error' | 'unhandled_rejection';
+  webview: 'js_error' | 'unhandled_rejection' | 'render_error';
   voice_microphone: 'device_error' | 'device_permission';
   voice_camera: 'device_error' | 'device_permission';
   voice_speaker: 'device_error' | 'device_permission';
