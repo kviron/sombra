@@ -3,7 +3,7 @@ import os, sys
 from pathlib import Path
 import paramiko
 
-root = Path(__file__).resolve().parents[2]
+root = Path(__file__).resolve().parents[1]
 settings = {}
 for line in (root / '.env').read_text(encoding='utf-8-sig').splitlines():
     if '=' in line and not line.lstrip().startswith('#'):
@@ -12,7 +12,7 @@ for line in (root / '.env').read_text(encoding='utf-8-sig').splitlines():
 client = paramiko.SSHClient()
 client.load_system_host_keys()
 # Persist first-use host key in an administrator-only local QA directory.
-known = root / 'app' / 'deploy-qa' / 'ssh-known-hosts'
+known = root / 'deploy' / 'ssh-known-hosts'
 known.parent.mkdir(exist_ok=True)
 if known.exists(): client.load_host_keys(str(known))
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())

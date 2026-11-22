@@ -133,60 +133,36 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
     steps:
-      - uses: actions/github-script@v7
-        env:
-          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
-          VERSION: ${{ needs.config.outputs.version }}
+      - uses: actions/checkout@v4
         with:
-          script: |
-            const { owner, repo } = context.repo;
-            const release_id = Number(process.env.RELEASE_ID);
-            const tag = process.env.TAG;
-            const assets = await github.paginate(github.rest.repos.listReleaseAssets, { owner, repo, release_id });
-            const signed = assets.filter((a) => a.name.endsWith(".sig"));
-            if (!signed.length) {
-              core.setFailed("в релизе нет .sig: установщик не подписан, обновление не проверить");
-              return;
-            }
-            // Имя --signature скачивается как байты: так подпись остаётся ровно тем текстом, что её создал.
-            const platforms = {};
-            for (const sig of signed) {
-              const bundle = sig.name.slice(0, -".sig".length);
-              if (!/_x64-setup\.exe$/.test(bundle)) continue;
-              const { data } = await github.rest.repos.getReleaseAsset({
-                owner, repo, asset_id: sig.id, headers: { accept: "application/octet-stream" },
-              });
-              const signature = Buffer.from(data).toString("utf8").trim();
-              if (!signature.startsWith("untrusted comment:")) {
-                core.setFailed(`подпись ${sig.name} не в формате minisign`);
-                return;
-              }
-              const url = `https://github.com/${owner}/${repo}/releases/download/${tag}/${encodeURIComponent(bundle)}`;
-              platforms["windows-x86_64"] = { signature, url };
-              platforms["windows-x86_64-nsis"] = { signature, url };
-            }
-            if (!platforms["windows-x86_64"]) {
-              core.setFailed("не найден NSIS-установщик (*_x64-setup.exe.sig)");
-              return;
-            }
-            const { data: release } = await github.rest.repos.getRelease({ owner, repo, release_id });
-            const body = String(release.body ?? "");
-            const notes = body.replace(/<!--[\s\S]*?-->/g, "").replace(/^#+\s*download[\s\S]*$/im, "").trim();
-            const manifest = {
-              version: process.env.VERSION,
-              notes,
-              pub_date: new Date().toISOString(),
-              platforms,
-            };
-            const old = assets.find((a) => a.name === "latest.json");
-            if (old) await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: old.id });
-            await github.rest.repos.uploadReleaseAsset({
-              owner, repo, release_id, name: "latest.json",
-              data: JSON.stringify(manifest, null, 2),
-              headers: { "content-type": "application/json" },
-            });
-            core.info(`latest.json ${manifest.version}: ${platforms["windows-x86_64"].url}`);
+          ref: "${{ env.TAG }}"
+      # Подписи скачиваются из черновика тем же API, что и у tauri-action: файл пишется байт в байт.
+      - name: Signatures from the draft
+        run: |
+          mkdir -p "$RUNNER_TEMP/sigs"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets" \
+            --jq '.[] | select(.name | endswith(".sig")) | "\(.id) \(.name)"' |
+            while read -r id name; do
+              gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$id" > "$RUNNER_TEMP/sigs/$name"
+            done
+          ls -l "$RUNNER_TEMP/sigs"
+      - name: Release notes
+        run: |
+          : > "$RUNNER_TEMP/notes.md"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$RUNNER_TEMP/notes.md" || true
+      - name: Build latest.json
+        run: |
+          node scripts/build-updater-manifest.mjs \
+            --repo "$GITHUB_REPOSITORY" --tag "$TAG" \
+            --version "${{ needs.config.outputs.version }}" \
+            --sigs "$RUNNER_TEMP/sigs" --notes "$RUNNER_TEMP/notes.md" --out latest.json
+          cat latest.json
+      - name: Upload to the draft
+        run: gh release upload "$TAG" latest.json --repo "$GITHUB_REPOSITORY" --clobber
 
   publish:
     name: Publish
