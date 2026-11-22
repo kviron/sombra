@@ -1,4 +1,4 @@
-import {invoke, isTauri} from '@tauri-apps/api/core';
+import {tauri} from './tauri';
 import {createAvatarCache} from './avatars';
 import {
  notifyAttachmentCacheChange,
@@ -17,17 +17,17 @@ import {
 export type {CacheInfo} from './attachment-cache';
 export {CacheUnavailable} from './attachment-cache';
 export const getAttachmentCacheInfo = (): Promise<CacheInfo> =>
- isTauri() ? invoke('attachment_cache_info') : getBrowserAttachmentCacheInfo();
+ tauri.isTauri() ? tauri.commands.cache.info<CacheInfo>() : getBrowserAttachmentCacheInfo();
 export async function setAttachmentCacheLimit(limitMiB: number): Promise<CacheInfo> {
- const result = await (isTauri()
-  ? invoke<CacheInfo>('set_attachment_cache_limit', {limitMiB})
+ const result = await (tauri.isTauri()
+  ? tauri.commands.cache.setLimit<CacheInfo>(limitMiB)
   : setBrowserAttachmentCacheLimit(limitMiB));
  attachmentRequests.clear();
  notifyAttachmentCacheChange();
  return result;
 }
 export async function clearAttachmentCache(): Promise<CacheInfo> {
- const result = await (isTauri() ? invoke<CacheInfo>('clear_attachment_cache') : clearBrowserAttachmentCache());
+ const result = await (tauri.isTauri() ? tauri.commands.cache.clear<CacheInfo>() : clearBrowserAttachmentCache());
  attachmentRequests.clear();
  notifyAttachmentCacheChange();
  return result;
@@ -111,10 +111,10 @@ async function hydrateState<T>(state: T): Promise<T> {
 }
 
 async function perform<T>(op: string, payload: Record<string, unknown>): Promise<T> {
- if (isTauri()) {
+ if (tauri.isTauri()) {
   let result: T;
   try {
-   result = await invoke<T>('remote_api', {request: {op, token: session(), ...payload}});
+   result = await tauri.commands.remote<T>({op, token: session(), ...payload});
   } catch (error) {
    const message = String(error);
    if (message.includes('AUTH_REQUIRED')) clearSession();
@@ -218,11 +218,11 @@ async function browserRaw<T>(op: string, data: Record<string, unknown> = {}): Pr
 export async function authenticate(op: 'login' | 'register', data: Record<string, unknown>) {
  const result = await request<{token?: string; user: User}>(op, {
   ...data,
-  device: isTauri() ? 'Sombra · ' + navigator.platform : navigator.userAgent
+  device: tauri.isTauri() ? 'Sombra · ' + navigator.platform : navigator.userAgent
  });
  if (!result?.user?.id) throw new Error('Сервер не подтвердил вход. Попробуйте снова.');
  avatars.clear();
- if (isTauri() && result.token) localStorage.setItem('mines-session', result.token);
+ if (tauri.isTauri() && result.token) localStorage.setItem('mines-session', result.token);
  window.dispatchEvent(new Event('authchange'));
  window.location.hash = '#chat';
 }

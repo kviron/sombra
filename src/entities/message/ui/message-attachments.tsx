@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {Download, FileWarning, RotateCw, X} from 'lucide-react';
 import {Dialog} from 'radix-ui';
-import {invoke, isTauri} from '@tauri-apps/api/core';
+import {tauri} from '@/shared/api';
 import {toast} from 'sonner';
 import {type AttachmentFile, type MessageAttachmentMetadata} from '@/shared/types';
 import {messageService} from '../model/services/message-service';
@@ -75,7 +75,7 @@ function cacheNote(attachment: MessageAttachmentMetadata) {
 }
 /** The only attachment save path: Tauri native save dialog or the authorised browser request. */
 async function saveAttachment(messageId: string, alive: () => boolean): Promise<string | undefined> {
- if (isTauri()) return invoke<string>('save_message_attachment', {message: messageId});
+ if (tauri.isTauri()) return tauri.commands.files.saveAttachment<string>({message: messageId});
  const file = await limited(() => messageService.attachment<AttachmentFile>({message: messageId}));
  if (!alive()) return;
  const url = URL.createObjectURL(fileBlob(file));

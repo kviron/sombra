@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {ChevronDown, Copy, Download, RefreshCw, Trash2} from 'lucide-react';
-import {invoke, isTauri} from '@tauri-apps/api/core';
+import {tauri} from '@/shared/api';
 import {Badge} from '@/shared/ui/badge';
 import {Button} from '@/shared/ui/button';
 import './diagnostic-journal.css';
@@ -34,14 +34,14 @@ const titles: Record<string, string> = {
 };
 const clock = new Intl.DateTimeFormat('ru', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
 const fullDate = new Intl.DateTimeFormat('ru', {dateStyle: 'medium', timeStyle: 'medium'});
-const readEntries = () => invoke<DiagnosticEntry[]>('read_local_diagnostics');
-const clearEntries = () => invoke<void>('clear_local_diagnostics');
+const readEntries = () => tauri.commands.diagnostics.read<DiagnosticEntry>();
+const clearEntries = () => tauri.commands.diagnostics.clear();
 
 type JournalState = {phase: 'loading' | 'ready' | 'failed'; entries: DiagnosticEntry[] | null};
 export function DiagnosticJournal({
  read = readEntries,
  clear = clearEntries,
- available = isTauri()
+ available = tauri.isTauri()
 }: {
  read?: () => Promise<DiagnosticEntry[]>;
  clear?: () => Promise<void>;

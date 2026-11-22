@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {invoke, isTauri} from '@tauri-apps/api/core';
+import {tauri} from '@/shared/api';
 
 export type AudioDeviceContext = {
  remoteSession: boolean;
@@ -35,9 +35,9 @@ export function useAudioDevices(enabled = true) {
  const current = (epoch: number) => available.current && lifecycle.current === epoch;
  async function readContext(epoch: number) {
   let context: AudioDeviceContext | null = null;
-  if (isTauri())
+  if (tauri.isTauri())
    try {
-    context = await invoke<AudioDeviceContext>('audio_device_context');
+    context = await tauri.commands.audio.deviceContext<AudioDeviceContext>();
    } catch {
     /* Older native versions and browser previews have no context command. */
    }

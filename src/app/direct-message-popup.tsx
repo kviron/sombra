@@ -1,5 +1,4 @@
-import {invoke} from '@tauri-apps/api/core';
-import {getCurrentWebviewWindow} from '@tauri-apps/api/webviewWindow';
+import {tauri} from '@/shared/api';
 import '@fontsource-variable/geist';
 import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
@@ -26,7 +25,7 @@ function render() {
            const target = message.target!;
            remove(id);
            render();
-           void invoke('activate_message_notification', {target}).catch(console.error);
+           void tauri.commands.notifications.activate(target).catch(console.error);
           }
         : undefined
       }
@@ -40,7 +39,7 @@ function render() {
   );
  });
  const height = messages.size ? Math.ceil(container.getBoundingClientRect().height) : 0;
- void invoke('resize_notification_popup', {height}).catch(console.error);
+ void tauri.commands.notifications.resizePopup(height).catch(console.error);
 }
 
 function remove(id: number) {
@@ -52,7 +51,7 @@ function remove(id: number) {
 
 document.addEventListener('contextmenu', event => event.preventDefault());
 
-await getCurrentWebviewWindow().listen<DirectMessage>('direct-message-popup', ({payload}) => {
+await tauri.events.listenCurrentWindow<DirectMessage>('direct-message-popup', payload => {
  if (messages.size >= 3) remove(messages.keys().next().value!);
  const id = nextId++;
  const timer = window.setTimeout(() => {
@@ -62,4 +61,4 @@ await getCurrentWebviewWindow().listen<DirectMessage>('direct-message-popup', ({
  messages.set(id, {message: payload, timer});
  render();
 });
-await invoke('notification_popup_ready');
+await tauri.commands.notifications.popupReady();

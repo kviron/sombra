@@ -1,6 +1,5 @@
 import {useEffect, useRef} from 'react';
-import {invoke, isTauri} from '@tauri-apps/api/core';
-import {getCurrentWindow} from '@tauri-apps/api/window';
+import {tauri} from '@/shared/api';
 import {toast} from 'sonner';
 import type {ChatState} from '@/shared/types';
 import {DirectMessageToast} from './direct-message-toast';
@@ -31,7 +30,7 @@ export function useDirectMessageNotifications(
   const incoming = newChatMessages(state, cursor.current);
   if (!incoming.length) return;
   const account = state.me.id,
-   native = isTauri();
+   native = tauri.isTauri();
   function playSound() {
    sound.current ??= new Audio(new URL('../assets/message-tone.wav', import.meta.url).href);
    sound.current.currentTime = 0;
@@ -41,7 +40,7 @@ export function useDirectMessageNotifications(
    let focused = document.hasFocus();
    if (native) {
     try {
-     focused = await getCurrentWindow().isFocused();
+     focused = await tauri.window.isFocused();
     } catch {
      /* Browser focus is the conservative fallback. */
     }
@@ -102,7 +101,7 @@ export function useDirectMessageNotifications(
    for (const item of notifications) {
     if (current.current.state?.me.id !== account || cursor.current !== batchCursor) return;
     try {
-     await invoke('notify_direct_message', {
+     await tauri.commands.notifications.notify({
       sender: item.sender,
       text: item.text,
       avatar: item.avatar,

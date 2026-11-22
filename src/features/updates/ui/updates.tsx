@@ -1,7 +1,5 @@
 import {useEffect, useState, useSyncExternalStore} from 'react';
-import {invoke, isTauri} from '@tauri-apps/api/core';
-import {getVersion} from '@tauri-apps/api/app';
-import {Channel} from '@tauri-apps/api/core';
+import {tauri, Channel} from '@/shared/api';
 import {Button} from '@/shared/ui/button';
 import {Badge} from '@/shared/ui/badge';
 import {Check, RefreshCw} from 'lucide-react';
@@ -11,7 +9,7 @@ import './updates.css';
 
 const updater = createUpdater({
  async check() {
-  const info = await invoke<{version: string; body?: string} | null>('check_update');
+  const info = await tauri.commands.updates.check();
   return info
    ? {
       ...info,
@@ -27,21 +25,19 @@ const updater = createUpdater({
         cb({event: 'Progress', data: {chunkLength: event.received - last}});
         last = event.received;
        };
-       await invoke('download_update', {progress});
+       await tauri.commands.updates.download(progress);
       },
-      install: () => invoke<void>('install_update'),
+      install: () => tauri.commands.updates.install(),
       close: async () => {}
      }
    : null;
  },
- relaunch: () => invoke('restart_app')
+ relaunch: () => tauri.commands.updates.restart()
 });
 const useUpdate = () => useSyncExternalStore(updater.subscribe, updater.snapshot);
 let availability: Promise<boolean> | undefined;
 function configured() {
- return (availability ??= isTauri()
-  ? invoke<boolean>('updater_configured').catch(() => false)
-  : Promise.resolve(false));
+ return (availability ??= tauri.isTauri() ? tauri.commands.updates.configured() : Promise.resolve(false));
 }
 export function UpdateNotice() {
  const state = useUpdate();
@@ -111,8 +107,9 @@ export function UpdateSettings({inCall}: {inCall: boolean}) {
   [version, setVersion] = useState('');
  useEffect(() => {
   void configured().then(setEnabled);
-  if (isTauri())
-   void getVersion()
+  if (tauri.isTauri())
+   void tauri
+    .appVersion()
     .then(setVersion)
     .catch(() => {});
  }, []);
@@ -135,7 +132,7 @@ export function UpdateSettings({inCall}: {inCall: boolean}) {
       {enabled === null
        ? 'Проверяем настройки…'
        : !enabled
-         ? isTauri()
+         ? tauri.isTauri()
            ? 'Канал обновлений ещё не настроен для этой сборки.'
            : 'Обновления доступны в установленном приложении.'
          : message(state)}

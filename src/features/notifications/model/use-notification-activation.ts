@@ -1,6 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {invoke, isTauri} from '@tauri-apps/api/core';
-import {listen} from '@tauri-apps/api/event';
+import {tauri} from '@/shared/api';
 import {toast} from 'sonner';
 import {stateService} from '@/shared/api';
 import type {ChatState} from '@/shared/types';
@@ -28,7 +27,7 @@ export function useNotificationActivation(
   return () => window.removeEventListener('authchange', changed);
  }, []);
  useEffect(() => {
-  if (!isTauri()) return;
+  if (!tauri.isTauri()) return;
   let alive = true,
    unlisten: (() => void) | undefined;
   // Serialize drains: simultaneous ready/event IPC replies must not discard a consumed target.
@@ -37,12 +36,13 @@ export function useNotificationActivation(
    chain = chain
     .then(async () => {
      if (!alive) return;
-     const value = await invoke<unknown>('take_notification_target');
+     const value = await tauri.commands.notifications.takeTarget<unknown>();
      if (alive && validNotificationTarget(value)) setPending(value);
     })
     .catch(() => {});
   };
-  void listen('notification-activate', drain)
+  void tauri.events
+   .listen('notification-activate', drain)
    .then(stop => {
     if (!alive) {
      stop();

@@ -1,9 +1,9 @@
 import {useEffect, useState} from 'react';
-import {getCurrentWindow} from '@tauri-apps/api/window';
+import {tauri} from '@/shared/api';
 
 /**
- * Keeps the custom title bar icon in sync with the real window state,
- * including maximize via double-click, snap layouts and the OS shortcuts.
+ * Держит иконку заголовка в согласии с настоящим состоянием окна: разворот двойным
+ * щелчком, привязка к краям и системные сочетания тоже приходят сюда.
  */
 export function useWindowMaximized(inTauri: boolean) {
  const [isMaximized, setIsMaximized] = useState(false);
@@ -11,31 +11,20 @@ export function useWindowMaximized(inTauri: boolean) {
  useEffect(() => {
   if (!inTauri) return;
 
-  const appWindow = getCurrentWindow();
   let disposed = false;
   let unlisten: (() => void) | undefined;
 
-  function syncMaximizedState() {
-   appWindow
-    .isMaximized()
-    .then(value => {
-     if (!disposed) setIsMaximized(value);
-    })
-    .catch(() => {
-     // window state is optional for the UI
-    });
-  }
+  const sync = async () => {
+   const value = await tauri.window.isMaximized();
+   if (!disposed) setIsMaximized(value);
+  };
 
-  syncMaximizedState();
-
-  appWindow
-   .onResized(syncMaximizedState)
-   .then(stopListening => {
-    if (disposed) stopListening();
-    else unlisten = stopListening;
-   })
-   .catch(() => {
-    // listening is best-effort
+  void sync();
+  void tauri.window
+   .onResized(() => void sync())
+   .then(stop => {
+    if (disposed) stop();
+    else unlisten = stop;
    });
 
   return () => {

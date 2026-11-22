@@ -1,4 +1,4 @@
-import {invoke, isTauri} from '@tauri-apps/api/core';
+import {tauri} from './tauri';
 
 export type VoiceTransportCategory =
  | 'ice_checking'
@@ -33,21 +33,21 @@ type Categories = {
   | 'mic_silent'
   | 'mic_silent_recovered';
 };
-export const desktopDiagnosticsAvailable = isTauri;
+export const desktopDiagnosticsAvailable = tauri.isTauri;
 const lastReport = new Map<string, number>();
 
 export function recordDesktopDiagnostic<K extends keyof Categories>(operation: K, category: Categories[K]) {
- if (!isTauri()) return;
+ if (!tauri.isTauri()) return;
  const key = `${operation}:${category}`;
  const time = performance.now();
  const previous = lastReport.get(key);
  const cooldown = operation === 'voice_transport' || operation === 'voice_output' ? 30_000 : 5_000;
  if (previous !== undefined && time - previous < cooldown) return;
  lastReport.set(key, time);
- void invoke('record_desktop_diagnostic', {operation, category}).catch(() => {});
+ void tauri.commands.diagnostics.record(operation, category).catch(() => {});
 }
 
-if (typeof window !== 'undefined' && isTauri()) {
+if (typeof window !== 'undefined' && tauri.isTauri()) {
  window.addEventListener('error', () => recordDesktopDiagnostic('webview', 'js_error'));
  window.addEventListener('unhandledrejection', () => recordDesktopDiagnostic('webview', 'unhandled_rejection'));
 }
