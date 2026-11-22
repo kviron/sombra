@@ -1,5 +1,5 @@
 .profile-media{display:grid;grid-template-columns:148px minmax(0,348px);align-items:start;gap:16px;margin-bottom:8px}
-.profile-media-item{display:grid;gap:6px;min-width:0}
+.profile-media-item{display:grid;gap:8px;min-width:0}
 .profile-media-preview{position:relative;min-width:0}
 .profile-media-item[data-target='avatar'] .profile-media-preview{height:148px;display:grid;place-items:center;border:1px solid var(--border);border-radius:16px;background:radial-gradient(80% 80% at 30% 20%,#2c3140,#171a21 70%)}
 .profile-media-preview .settings-cover-preview{margin:0}

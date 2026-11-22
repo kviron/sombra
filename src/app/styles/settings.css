@@ -77,7 +77,7 @@
   .account-modal > aside.settings-sidebar { width: 184px; }
   .account-modal article header { padding: 10px 16px; }
   .account-modal article > div { padding: 20px 16px; }
-  .account-modal .settings-field { grid-template-columns: 1fr; gap: 6px; }
+  .account-modal .settings-field { grid-template-columns: 1fr; gap: var(--s2); }
   .account-modal .settings-actions { padding-left: 0; }
 }
 @media (max-width: 480px) {

@@ -3926,7 +3926,7 @@ dependencies = [
 
 [[package]]
 name = "sombra"
-version = "0.1.28"
+version = "0.1.29"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3948,7 +3948,7 @@ dependencies = [
 
 [[package]]
 name = "sombra-core"
-version = "0.1.28"
+version = "0.1.29"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3965,7 +3965,7 @@ dependencies = [
 
 [[package]]
 name = "sombra-server"
-version = "0.1.28"
+version = "0.1.29"
 dependencies = [
  "serde_json",
  "sombra-core",
