@@ -1,0 +1,104 @@
+/* Дизайн-система «Sombra · Mira» (shadcn Base Mira · Violet, dark).
+   Источник: ~/.dsh/design-systems/Mira-b5x0FmL44/tokens.css — значения переведены
+   из OKLCH в sRGB-эквиваленты, которыми пользуются макеты.
+
+   Поверхности: страница #0a0a0a с мягким градиентом, карточка — полупрозрачный
+   виолетовый слой (--card 90%); backdrop-filter намеренно не ставим — при
+   масштабировании превью он мылит текст.
+   Границы — белый 10% (поля — 15%). Текст #fafafa, вторичный #a1a1a1.
+   Primary #5d0ec0 (текст на нём #f5f3ff) — главное действие, выбранный пункт,
+   акцентные блоки. Links/мелкие акценты #c4b5fd. Радиус 10px, теней нет. */
+:root{
+  color-scheme:dark;
+
+  /* поверхности */
+  --background:#0a0a0a;
+  --surface:#171717;
+  --surface-2:#262626;
+  --card-tint:color-mix(in srgb,var(--surface) 92%,var(--primary));
+  --card:color-mix(in srgb,var(--card-tint) 90%,transparent);
+  --card-solid:var(--card-tint);
+  --card-blur:16px;
+  --line:rgb(255 255 255 / .1);
+  --border:var(--line);
+  --input-line:rgb(255 255 255 / .15);
+  --field:rgb(255 255 255 / .045);
+
+  /* текст */
+  --foreground:#fafafa;
+  --muted-foreground:#a1a1a1;
+
+  /* бренд */
+  --primary:#5d0ec0;
+  --primary-foreground:#f5f3ff;
+  --link:#c4b5fd;
+  --accent:#262626;
+  --accent-foreground:#fafafa;
+  --highlight:color-mix(in srgb,var(--primary) 32%,transparent);
+  --ring:color-mix(in srgb,var(--primary) 55%,var(--foreground));
+  --danger:#f2707b;
+
+  /* фон страницы */
+  --glow-cool:#141a24;
+  --glow-violet:#241239;
+  --page-gradient:
+    radial-gradient(ellipse at 0% 12%,var(--glow-cool),transparent 58%),
+    radial-gradient(ellipse at 96% 100%,var(--glow-violet),transparent 55%);
+
+  /* Предпросмотр профиля */
+  --profile-cover-height:124px;
+  --profile-avatar-size:56px;
+  --profile-editor-gap:24px;
+  --profile-cover-gradient:radial-gradient(ellipse at 75% 20%,var(--primary),transparent 65%),linear-gradient(120deg,var(--glow-cool),var(--glow-violet));
+
+  /* Хронология журнала */
+  --journal-time-width:72px;
+  --journal-time-width-compact:62px;
+  --journal-timeline-gap:16px;
+  --journal-marker-size:7px;
+
+  /* Данные и память */
+  --storage-row-gap:16px;
+  --storage-row-padding:16px;
+  --storage-action-height:40px;
+
+  /* Обновления */
+  --release-section-gap:24px;
+  --release-panel-padding:16px;
+  --release-timeline-indent:20px;
+  --release-marker-size:7px;
+
+  /* Стикеры */
+  --sticker-catalog-gap:20px;
+  --sticker-banner-padding:24px;
+  --sticker-banner-padding-compact:16px;
+  --sticker-banner-accent-width:3px;
+
+  /* Пароль и безопасность */
+  --security-form-width:620px;
+  --security-section-gap:20px;
+  --security-field-gap:12px;
+  --security-section-padding:16px;
+  --security-section-title-size:16px;
+
+  /* Активные сеансы */
+  --session-grid-gap:16px;
+  --session-card-gap:12px;
+  --session-card-padding:20px;
+  --session-device-title-size:18px;
+  --session-action-height:44px;
+
+  /* форма */
+  --auth-width:440px;
+  --auth-control-height:44px;
+  --auth-stack-gap:16px;
+  --radius:10px;
+  --radius-sm:6px;
+  --radius-md:8px;
+  --radius-lg:10px;
+  --radius-xl:14px;
+  --radius-full:999px;
+  --shadow:none;
+  --heading-weight:700;
+  --font-sans:'PingFang SC','HarmonyOS Sans SC','Microsoft YaHei',system-ui,sans-serif
+}

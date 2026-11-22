@@ -1,0 +1,6 @@
+.profile-cover{position:relative;width:100%;aspect-ratio:3/1;overflow:hidden;flex-shrink:0;background:radial-gradient(90% 150% at 12% 0%,#8c92ff4d,transparent 62%),radial-gradient(70% 140% at 88% 10%,#5c3fa84d,transparent 60%),linear-gradient(120deg,#131a2c,#201a33 55%,#2a1f3d)}
+.profile-cover>img{position:absolute;max-width:none;max-height:none;object-fit:fill;pointer-events:none}
+.profile-cover>img.profile-cover-effect{inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.profile-cover-glow{position:absolute;inset:auto -10% -70% 30%;height:160px;background:radial-gradient(closest-side,#8c92ff3d,transparent)}
+.profile-cover-grid{position:absolute;inset:0;background-image:linear-gradient(#ffffff0d 1px,transparent 1px),linear-gradient(90deg,#ffffff0d 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(180deg,#0009,transparent 92%)}
+.settings-cover-preview{border-radius:12px;border:1px solid #ffffff24;margin-bottom:12px}

@@ -1,0 +1,38 @@
+[package]
+name = "sombra"
+version.workspace = true
+edition.workspace = true
+description = "Sombra — настольный мессенджер"
+default-run = "sombra"
+
+[[bin]]
+name = "sombra"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+sombra-core = { path = "../crates/sombra-core" }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-updater = "2"
+tauri-plugin-opener = "2"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider", "gzip"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+ring = "0.17"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+base64 = "0.22"
+
+[dev-dependencies]
+axum = { version = "0.8", features = ["ws"] }
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Data_Xml_Dom", "UI_Notifications", "Win32_Media_Audio", "Win32_UI_Shell", "Win32_System_Com", "Win32_System_RemoteDesktop", "Win32_Security_Cryptography", "Win32_System_WinRT"] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+default = ["custom-protocol"]

@@ -1,0 +1,32 @@
+# Зависимости и сборка
+/node_modules/
+/dist/
+/target/
+/data/
+/shots/
+
+# Локальные секреты и ключи
+.env
+*.key
+*.key.pub
+/release-secrets/
+
+# Артефакты выпуска
+/latest.json
+/src-tauri/tauri.release.local.json
+/release/
+
+# Python-кэш и тестовые прогоны
+__pycache__/
+*.pyc
+/testsfixturesui-qa/
+/*-qa/
+
+# Служебные файлы ОС
+.DS_Store
+Thumbs.db
+
+# Инструменты разработки (локальные скилы), в публичный репозиторий не нужны
+/.agents/
+/.claude/
+/skills-lock.json

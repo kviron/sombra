@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Sombra TURN relay probe periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=30s
+Unit=turn-monitor.service
+
+[Install]
+WantedBy=timers.target

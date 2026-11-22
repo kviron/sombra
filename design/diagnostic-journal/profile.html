@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="dsh-design" content="desktop windows"><title>Учётная запись · Sombra</title><link rel="stylesheet" href="tokens.css"><link rel="stylesheet" href="journal.css"><script defer src="account-preview.js"></script><style>
+/* Профиль: форма сверху, предпросмотр — на всю ширину панели.
+   Широкая обложка поэтому выше узкой: 180px вместо токенных 124px. */
+.preview{--profile-cover-height:180px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--card-solid)}
+.preview-note{padding:10px 16px;border-top:1px solid var(--border)}
+.email-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ---------- Обложка ---------- */
+.cover{position:relative;height:var(--profile-cover-height);background:var(--profile-cover-gradient);background-size:cover;background-position:center;transition:background .3s ease}
+.cover--aurora{background:radial-gradient(ellipse at 20% 30%,var(--primary),transparent 62%),radial-gradient(ellipse at 82% 74%,#1d3f7a,transparent 58%),linear-gradient(120deg,var(--glow-cool),var(--glow-violet));background-size:220% 220%,220% 220%,100% 100%;animation:cover-aurora 16s ease-in-out infinite}
+.cover--ember{background:radial-gradient(circle at 26% 84%,#d1602a,transparent 44%),radial-gradient(circle at 74% 12%,#7a2e0e,transparent 52%),linear-gradient(160deg,#1a0f0b,var(--background));animation:cover-ember 11s ease-in-out infinite}
+.cover--neon{background:linear-gradient(100deg,var(--background) 10%,#2a0b52 38%,#a855f7 50%,#2a0b52 62%,var(--background) 90%);background-size:300% 100%;animation:cover-neon 8s linear infinite}
+.cover--depth{background:radial-gradient(ellipse at 50% 120%,#123a63,#0a1626 58%,#070a0f);animation:cover-depth 18s ease-in-out infinite}
+.cover--pixel{background:repeating-linear-gradient(90deg,#3a1f6b 0 16px,#1a0f33 16px 32px),linear-gradient(180deg,var(--glow-cool),#2a1150);background-size:64px 100%,100% 100%;animation:cover-pixel 8s steps(16) infinite}
+.cover--calm{background:linear-gradient(120deg,var(--glow-cool),#2a1a44,var(--glow-cool));background-size:220% 100%;animation:cover-calm 24s ease-in-out infinite}
+@keyframes cover-aurora{0%,100%{background-position:0% 50%,100% 50%,0 0}50%{background-position:100% 50%,0% 50%,0 0}}
+@keyframes cover-ember{0%,100%{filter:brightness(1)}50%{filter:brightness(1.28)}}
+@keyframes cover-neon{to{background-position:-300% 0}}
+@keyframes cover-depth{0%,100%{background-size:100% 100%}50%{background-size:132% 132%}}
+@keyframes cover-pixel{to{background-position:64px 0,0 0}}
+@keyframes cover-calm{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+
+/* ---------- Идентичность ---------- */
+.identity{position:relative;display:flex;gap:16px;padding:0 20px 18px;overflow-wrap:anywhere}
+.avatar-slot{position:relative;flex:0 0 auto;width:var(--profile-avatar-size);height:var(--profile-avatar-size);margin-top:calc(var(--profile-avatar-size) / -2)}
+.avatar-slot .avatar{width:100%;height:100%;background-size:cover;background-position:center}
+.avatar-frame{position:absolute;inset:-3px;border-radius:var(--radius-full);pointer-events:none;display:none}
+.avatar-slot[data-frame="ember"] .avatar-frame{display:block;background:conic-gradient(from 210deg,#ffe2bd,#ff8a3d,#b8440c,#ffb066,#ffe2bd);-webkit-mask:radial-gradient(farthest-side,#0000 calc(100% - 4px),#000 0);mask:radial-gradient(farthest-side,#0000 calc(100% - 4px),#000 0);filter:drop-shadow(0 0 7px rgb(255 128 30 / .5))}
+.avatar-slot[data-frame="slime"] .avatar-frame{display:block}
+.avatar-slot[data-frame="slime"] .avatar-frame::after{content:'';position:absolute;top:auto;right:-3px;bottom:-3px;left:auto;width:50%;height:46%;border-radius:52% 48% 44% 56%;background:radial-gradient(circle at 32% 22%,#cbffb2,#54ad46 56%,#1d5420);box-shadow:inset 0 0 0 1px rgb(255 255 255 / .18),0 2px 6px rgb(0 0 0 / .45)}
+.avatar-slot[data-frame="slime"] .avatar-frame::before{content:'';position:absolute;right:14px;bottom:17px;width:4px;height:4px;border-radius:50%;background:#08150b;box-shadow:7px 0 0 0 #08150b;z-index:1}
+.identity-text{display:grid;gap:2px;min-width:0;flex:1;padding-top:10px}
+.name-row,.bio-row{display:flex;align-items:center;gap:6px;min-width:0}
+.identity h2{font-size:20px;line-height:28px;margin:0;min-width:0;overflow-wrap:anywhere}
+.identity p{margin:0;font-size:14px;line-height:20px}
+/* Ник и описание без эффекта на наведении: показывается только карандаш. */
+.name-edit,.bio-edit{opacity:0;transition:opacity .15s ease}
+.name-row:hover .name-edit,.bio-row:hover .bio-edit,.name-edit:focus-visible,.bio-edit:focus-visible,.identity:focus-within .name-edit{opacity:1}
+@media(hover:none){.name-edit,.bio-edit{opacity:1}}
+.inline-edit{flex:1;min-width:0;height:28px;padding:0 6px;border:1px solid var(--ring);border-radius:var(--radius-sm);background:var(--field);color:var(--foreground);font:inherit;font-size:20px;font-weight:var(--heading-weight)}
+.bio-row .inline-edit{height:26px;font-size:14px;font-weight:400}
+.inline-edit[hidden]{display:none}
+.inline-edit:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
+
+/* ---------- Действия под предпросмотром ---------- */
+.preview-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--border)}
+.preview-foot .actions{margin-inline-start:auto}
+
+/* ---------- Окно выбора обложки ---------- */
+.dialog{width:min(620px,calc(100vw - 32px));max-width:none;padding:0;border:1px solid var(--border);border-radius:var(--radius-xl);background:var(--card-solid);color:var(--foreground)}
+.dialog::backdrop{background:rgb(10 10 10 / .72)}
+.dialog-card{display:grid;gap:16px;padding:20px}
+.dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.dialog-head h2{margin:0;font-size:16px;line-height:22px}
+.dialog-head p{margin:2px 0 0;font-size:12px;color:var(--muted-foreground)}
+.dialog-tabs{display:flex;gap:4px;padding:3px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--field);justify-self:start}
+.dialog-tab{height:30px;padding:0 14px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--muted-foreground);font:inherit;font-size:12px;font-weight:500;cursor:pointer}
+.dialog-tab:hover{color:var(--foreground)}
+.dialog-tab[aria-selected="true"]{background:var(--primary);color:var(--primary-foreground)}
+.dialog-panel[hidden]{display:none}
+.dialog-section{display:grid;gap:8px}
+.dialog-section>h3{margin:0;font-size:12px;font-weight:500;color:var(--muted-foreground)}
+.frame-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.frame-option{display:grid;gap:10px;justify-items:center;padding:14px 8px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--field);color:inherit;font:inherit;cursor:pointer}
+.frame-option:hover{border-color:color-mix(in srgb,var(--foreground) 24%,transparent)}
+.frame-option[aria-pressed="true"]{border-color:var(--ring);background:color-mix(in srgb,var(--primary) 14%,transparent)}
+.frame-option>span:last-child{font-size:12px;color:var(--muted-foreground)}
+.frame-option[aria-pressed="true"]>span:last-child{color:var(--foreground)}
+.frame-option:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.frame-sample{margin-top:0;width:52px;height:52px}
+.drop--avatar .drop-thumb{aspect-ratio:1/1;max-width:196px;margin-inline:auto}
+.drop{display:grid;gap:6px;place-items:center;min-height:168px;padding:20px;border:1px dashed var(--input-line);border-radius:var(--radius-md);background:var(--field);text-align:center;cursor:pointer;position:relative;overflow:hidden}
+.drop:hover{border-color:color-mix(in srgb,var(--foreground) 28%,transparent)}
+.drop:focus-within{outline:2px solid var(--ring);outline-offset:-2px}
+.drop input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.drop svg{color:var(--muted-foreground)}
+.drop strong{font-size:13px;font-weight:500}
+.drop span{font-size:12px;color:var(--muted-foreground)}
+.drop-thumb{display:none;width:100%;aspect-ratio:16/7;border-radius:var(--radius-sm);background-size:cover;background-position:center;border:1px solid var(--border)}
+.drop[data-has-file="true"] .drop-thumb{display:block}
+.drop[data-has-file="true"] .drop-empty{display:none}
+.cover-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.cover-option{display:grid;gap:6px;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:start;cursor:pointer}
+.cover-option .cover-tile{position:relative;aspect-ratio:16/9;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--profile-cover-gradient);background-size:cover;background-position:center}
+.cover-option .cover-tile::after{content:'';position:absolute;inset:0;border-radius:var(--radius-sm);outline:2px solid transparent;outline-offset:-2px}
+.cover-option span{font-size:12px;color:var(--muted-foreground)}
+.cover-option:hover span{color:var(--foreground)}
+.cover-option[aria-pressed="true"] .cover-tile::after{outline-color:var(--ring)}
+.cover-option[aria-pressed="true"] span{color:var(--foreground)}
+.cover-option .check{position:absolute;top:6px;right:6px;display:grid;place-items:center;width:20px;height:20px;border-radius:var(--radius-full);background:var(--primary);color:var(--primary-foreground);opacity:0}
+.cover-option[aria-pressed="true"] .check{opacity:1}
+.cover-option:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:var(--radius-sm)}
+.dialog-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding-top:4px;border-top:1px solid var(--border)}
+.dialog-foot .hint{margin-inline-end:auto}
+@media(prefers-reduced-motion:reduce){.cover,.cover-tile{animation:none!important}}
+@media(max-width:680px){.email-grid{grid-template-columns:1fr}.cover-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style></head><body><main class="window" data-section="profile"><section class="pane"><header class="pane-head"><div><h1>Учётная запись</h1><p>Настройте, как вас видят собеседники.</p></div></header><div class="pane-body">
+<div class="preview"><div class="cover" id="preview-cover"></div><div class="identity"><span class="avatar-slot" id="avatar-slot" data-frame="none"><span id="preview-avatar" class="avatar" aria-hidden="true">H</span><span class="avatar-frame" aria-hidden="true"></span></span><div class="identity-text"><div class="name-row"><h2 id="preview-name">HollyWood</h2><button id="edit-name" type="button" class="icon-btn name-edit" aria-label="Изменить имя пользователя" title="Изменить имя"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><input id="name-inline" class="inline-edit" maxlength="32" hidden aria-label="Новое имя пользователя"></div><div class="bio-row"><p id="preview-bio" class="muted">Описание пока не добавлено.</p><button id="edit-bio" type="button" class="icon-btn bio-edit" aria-label="Изменить описание" title="Изменить описание"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><input id="bio-inline" class="inline-edit" maxlength="190" hidden aria-label="Новое описание"></div></div></div><div class="preview-foot"><p class="hint">Так профиль выглядит для собеседников — имя и описание правятся карандашом</p><div class="actions"><span id="profile-status" class="hint" role="status"></span><button id="avatar-open" type="button" class="btn btn--secondary"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Изменить аватар</button><button id="cover-open" type="button" class="btn btn--secondary"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>Изменить обложку</button></div></div></div>
+<section class="section"><div class="section-head"><h2>Электронная почта</h2></div><div class="email-grid"><label class="field"><span>Почта</span><input class="input" type="email" value="hollywood@example.com" autocomplete="email"></label><label class="field"><span>Текущий пароль</span><input class="input" type="password" autocomplete="current-password"></label></div><div class="actions"><button type="button" class="btn btn--secondary" disabled>Изменить почту</button></div></section>
+</div></section></main>
+
+<dialog id="cover-dialog" class="dialog" aria-labelledby="cover-title">
+ <form method="dialog" class="dialog-card">
+  <div class="dialog-head"><div><h2 id="cover-title">Обложка профиля</h2><p>Широкая картинка за аватаром. Загрузите свою или выберите готовую анимацию.</p></div><button type="button" class="icon-btn" id="cover-close" aria-label="Закрыть"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18m0-12 12 12"/></svg></button></div>
+  <div class="dialog-tabs" role="tablist" aria-label="Источник обложки"><button type="button" class="dialog-tab" role="tab" id="tab-upload" aria-selected="true" aria-controls="panel-upload">Загрузить</button><button type="button" class="dialog-tab" role="tab" id="tab-anim" aria-selected="false" aria-controls="panel-anim">Анимации</button></div>
+  <div class="dialog-panel" id="panel-upload" role="tabpanel" aria-labelledby="tab-upload"><label class="drop" id="cover-drop"><input id="cover-file" type="file" accept="image/*"><div class="drop-thumb" id="cover-thumb"></div><div class="drop-empty" style="display:grid;gap:6px;place-items:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><strong>Выберите изображение</strong><span>PNG, JPEG или WebP · до 10 МБ · 1200 × 400 покажет лучше всего</span></div></label></div>
+  <div class="dialog-panel" id="panel-anim" role="tabpanel" aria-labelledby="tab-anim" hidden><div class="cover-grid" id="cover-grid"><button type="button" class="cover-option" data-cover="aurora" aria-pressed="false"><span class="cover-tile cover--aurora"><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></span><span>Аврора</span></button><button type="button" class="cover-option" data-cover="ember" aria-pressed="false"><span class="cover-tile cover--ember"><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></span><span>Пепел</span></button><button type="button" class="cover-option" data-cover="neon" aria-pressed="false"><span class="cover-tile cover--neon"><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></span><span>Неон</span></button><button type="button" class="cover-option" data-cover="depth" aria-pressed="false"><span class="cover-tile cover--depth"><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></span><span>Глубина</span></button><button type="button" class="cover-option" data-cover="pixel" aria-pressed="false"><span class="cover-tile cover--pixel"><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></span><span>Пиксель</span></button><button type="button" class="cover-option" data-cover="calm" aria-pressed="false"><span class="cover-tile cover--calm"><span class="check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg></span></span><span>Покой</span></button></div><p class="hint" style="margin-top:10px">Анимация проигрывается прямо в профиле и занимает немного трафика.</p></div>
+  <div class="dialog-foot"><p class="hint" id="cover-status" role="status"></p><button type="button" class="btn btn--secondary" id="cover-cancel">Отмена</button><button type="button" class="btn btn--primary" id="cover-apply">Применить</button></div>
+ </form>
+</dialog>
+
+<dialog id="avatar-dialog" class="dialog" aria-labelledby="avatar-title">
+ <form method="dialog" class="dialog-card">
+  <div class="dialog-head"><div><h2 id="avatar-title">Аватар профиля</h2><p>Квадратная картинка и рамка вокруг неё.</p></div><button type="button" class="icon-btn" id="avatar-close" aria-label="Закрыть"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18m0-12 12 12"/></svg></button></div>
+  <div class="dialog-section"><h3>Изображение</h3><label class="drop drop--avatar" id="avatar-drop"><input id="avatar-file" type="file" accept="image/*"><div class="drop-thumb" id="avatar-thumb"></div><div class="drop-empty" style="display:grid;gap:6px;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><strong>Выберите изображение</strong><span>PNG, JPEG или WebP · квадрат 256 × 256 покажет лучше всего</span></div></label></div>
+  <div class="dialog-section"><h3>Рамка</h3><div class="frame-grid" id="frame-grid"><button type="button" class="frame-option" data-frame="none" aria-pressed="true"><span class="avatar-slot frame-sample" data-frame="none"><span class="avatar">H</span><span class="avatar-frame"></span></span><span>Без рамки</span></button><button type="button" class="frame-option" data-frame="ember" aria-pressed="false"><span class="avatar-slot frame-sample" data-frame="ember"><span class="avatar">H</span><span class="avatar-frame"></span></span><span>Пламенный обод</span></button><button type="button" class="frame-option" data-frame="slime" aria-pressed="false"><span class="avatar-slot frame-sample" data-frame="slime"><span class="avatar">H</span><span class="avatar-frame"></span></span><span>Слайм-питомец</span></button></div></div>
+  <div class="dialog-foot"><p class="hint" id="avatar-status" role="status"></p><button type="button" class="btn btn--secondary" id="avatar-cancel">Отмена</button><button type="button" class="btn btn--primary" id="avatar-apply">Применить</button></div>
+ </form>
+</dialog>
+
+<script>
+const previewName=document.querySelector('#preview-name'),previewBio=document.querySelector('#preview-bio');
+const previewAvatar=document.querySelector('#preview-avatar'),cover=document.querySelector('#preview-cover');
+const status=document.querySelector('#profile-status');
+/* Формы в профиле нет: имя и описание правятся карандашом прямо в карточке. */
+const profile={name:'HollyWood',bio:'',cover:{kind:'gradient'}};
+
+function renderName(){const name=profile.name.trim();previewName.textContent=name||'Имя пользователя';previewAvatar.textContent=(name||'H').charAt(0).toUpperCase();}
+function renderBio(){const bio=profile.bio.trim();previewBio.textContent=bio||'Описание пока не добавлено.';previewBio.classList.toggle('muted',!bio);}
+renderName();renderBio();
+
+/* Карандаш у ника и описания: правка на месте, без отдельного окна. */
+function inlineEditor({trigger,text,input,read,write}){
+ const finish=(save)=>{if(input.hidden)return;if(save)write(input.value);input.hidden=true;text.hidden=false;trigger.focus();};
+ trigger.onclick=()=>{input.value=read();input.hidden=false;text.hidden=true;input.focus();input.select();};
+ input.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();finish(true);}else if(event.key==='Escape'){event.preventDefault();finish(false);}};
+ input.onblur=()=>finish(true);
+}
+inlineEditor({trigger:document.querySelector('#edit-name'),text:previewName,input:document.querySelector('#name-inline'),
+ read:()=>profile.name,write:value=>{profile.name=value;renderName();}});
+inlineEditor({trigger:document.querySelector('#edit-bio'),text:previewBio,input:document.querySelector('#bio-inline'),
+ read:()=>profile.bio,write:value=>{profile.bio=value;renderBio();}});
+
+/* Аватар — окно с загрузкой картинки и выбором рамки. */
+const avatarDialog=document.querySelector('#avatar-dialog'),avatarSlot=document.querySelector('#avatar-slot');
+const avatarDrop=document.querySelector('#avatar-drop'),avatarThumb=document.querySelector('#avatar-thumb');
+const frameOptions=[...avatarDialog.querySelectorAll('.frame-option')];
+const avatar={url:null,frame:'none'};
+let pickedAvatarUrl=null,pickedFrame='none';
+
+document.querySelector('#avatar-file').onchange=event=>{
+ const file=event.target.files[0];
+ if(!file?.type.startsWith('image/')){document.querySelector('#avatar-status').textContent='Нужен файл изображения.';return;}
+ if(pickedAvatarUrl)URL.revokeObjectURL(pickedAvatarUrl);
+ pickedAvatarUrl=URL.createObjectURL(file);
+ avatarThumb.style.backgroundImage=`url(${pickedAvatarUrl})`;
+ avatarDrop.dataset.hasFile='true';
+ document.querySelector('#avatar-status').textContent='';
+};
+for(const option of frameOptions)option.onclick=()=>{
+ pickedFrame=option.dataset.frame;
+ for(const other of frameOptions)other.setAttribute('aria-pressed',String(other===option));
+};
+
+function openAvatar(){
+ if(pickedAvatarUrl)URL.revokeObjectURL(pickedAvatarUrl);
+ pickedAvatarUrl=null;
+ avatarThumb.style.backgroundImage='';avatarDrop.dataset.hasFile='false';
+ document.querySelector('#avatar-file').value='';
+ pickedFrame=avatar.frame;
+ for(const option of frameOptions)option.setAttribute('aria-pressed',String(option.dataset.frame===pickedFrame));
+ document.querySelector('#avatar-status').textContent='';
+ avatarDialog.showModal();
+}
+document.querySelector('#avatar-open').onclick=openAvatar;
+
+function applyAvatar(){
+ const uploaded=Boolean(pickedAvatarUrl);
+ if(uploaded){
+  if(avatar.url)URL.revokeObjectURL(avatar.url);
+  avatar.url=pickedAvatarUrl;pickedAvatarUrl=null;
+  previewAvatar.style.backgroundImage=`url(${avatar.url})`;previewAvatar.style.color='transparent';
+ }
+ avatar.frame=pickedFrame;
+ avatarSlot.dataset.frame=pickedFrame;
+ status.textContent=uploaded?'Аватар обновлён в макете.':'Рамка обновлена в макете.';
+ avatarDialog.close();
+}
+document.querySelector('#avatar-apply').onclick=applyAvatar;
+document.querySelector('#avatar-cancel').onclick=()=>avatarDialog.close();
+document.querySelector('#avatar-close').onclick=()=>avatarDialog.close();
+avatarDialog.addEventListener('click',event=>{if(event.target===avatarDialog)avatarDialog.close();});
+
+/* Обложка — окно с загрузкой или готовой анимацией. */
+const dialog=document.querySelector('#cover-dialog'),drop=document.querySelector('#cover-drop'),thumb=document.querySelector('#cover-thumb');
+const coverTabs=[...document.querySelectorAll('[role=tab][aria-controls]')];
+const animOptions=[...document.querySelectorAll('[data-cover]')];
+const picker={tab:'upload',file:null,animation:null,url:null};
+let coverUrl;
+
+function showTab(tab){
+ picker.tab=tab;
+ for(const button of coverTabs){const active=button.id==='tab-'+tab;button.setAttribute('aria-selected',String(active));document.querySelector('#'+button.getAttribute('aria-controls')).hidden=!active;}
+}
+for(const button of coverTabs)button.onclick=()=>showTab(button.id==='tab-anim'?'anim':'upload');
+
+document.querySelector('#cover-file').onchange=event=>{
+ const file=event.target.files[0];
+ if(!file?.type.startsWith('image/')){document.querySelector('#cover-status').textContent='Нужен файл изображения.';return;}
+ picker.file=file;
+ if(picker.url)URL.revokeObjectURL(picker.url);
+ picker.url=URL.createObjectURL(file);
+ thumb.style.backgroundImage=`url(${picker.url})`;
+ drop.dataset.hasFile='true';
+ document.querySelector('#cover-status').textContent='';
+};
+
+for(const option of animOptions)option.onclick=()=>{
+ picker.animation=option.dataset.cover;
+ for(const other of animOptions)other.setAttribute('aria-pressed',String(other===option));
+ document.querySelector('#cover-status').textContent='';
+};
+
+function openCover(){
+ picker.file=null;picker.url=null;drop.dataset.hasFile='false';thumb.style.backgroundImage='';
+ document.querySelector('#cover-file').value='';
+ picker.animation=profile.cover.kind==='animation'?profile.cover.value:null;
+ for(const option of animOptions)option.setAttribute('aria-pressed',String(option.dataset.cover===picker.animation));
+ showTab(profile.cover.kind==='animation'?'anim':'upload');
+ document.querySelector('#cover-status').textContent='';
+ dialog.showModal();
+}
+document.querySelector('#cover-open').onclick=openCover;
+
+function applyCover(){
+ if(picker.tab==='anim'){
+  if(!picker.animation){document.querySelector('#cover-status').textContent='Выберите анимацию.';return;}
+  if(coverUrl)URL.revokeObjectURL(coverUrl),coverUrl=undefined;
+  cover.className=`cover cover--${picker.animation}`;cover.style.backgroundImage='';
+  profile.cover={kind:'animation',value:picker.animation};
+ }else{
+  if(!picker.file){document.querySelector('#cover-status').textContent='Выберите изображение или откройте вкладку «Анимации».';return;}
+  if(coverUrl)URL.revokeObjectURL(coverUrl);
+  coverUrl=picker.url;picker.url=null;
+  cover.className='cover';cover.style.backgroundImage=`url(${coverUrl})`;
+  profile.cover={kind:'image'};
+ }
+ status.textContent='Обложка обновлена в макете.';
+ dialog.close();
+}
+document.querySelector('#cover-apply').onclick=applyCover;
+document.querySelector('#cover-cancel').onclick=()=>dialog.close();
+document.querySelector('#cover-close').onclick=()=>dialog.close();
+dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
+</script></body></html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="dsh-design" content="desktop windows">
+<title>Голос и видео C · Sombra</title>
+<link rel="stylesheet" href="journal.css">
+<script defer src="account-preview.js"></script>
+<style>.voice-block{display:grid;align-content:start;gap:12px;padding:16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--field);min-width:0}.voice-block h2,.voice-ledger h2{font-size:16px}.voice-input{border-block-start-color:var(--link)}.voice-block .mic-test{display:grid;gap:12px;grid-column:auto}.voice-block .progress{width:100%}.voice-block .btn{justify-self:start;min-height:44px}.voice-split{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:24px;align-items:start}.voice-ledger{display:grid;gap:12px;min-width:0}.voice-ledger>.field{padding-block:8px;border-bottom:1px solid var(--border)}.voice-ledger .voice-block{padding:8px 0;border:0;background:transparent}@media(max-width:780px){.voice-split{grid-template-columns:1fr}}</style></head>
+<body>
+<main class="window">
+
+  <aside class="sidebar">
+    <div class="account">
+      <span class="avatar" aria-hidden="true">H</span>
+      <div>
+        <strong class="account-name">HollyWood</strong>
+        <a href="#"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Редактировать</a>
+      </div>
+    </div>
+
+    <label class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.7-3.7"/></svg>
+      <input type="search" aria-label="Поиск по настройкам" placeholder="Поиск по настройкам">
+    </label>
+
+    <nav class="nav" aria-label="Настройки">
+      <a class="nav-item" href="updates.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>Обновления</a>
+      <a class="nav-item" href="voice-c.html" aria-current="page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><path d="M12 19v3"/></svg>Голос и видео</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Уведомления</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Данные и память</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>Учётная запись</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v6c0 4.5 3 8 7 9 4-1 7-4.5 7-9V6Z"/></svg>Пароль и безопасность</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>Активные сеансы</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/></svg>Стикеры</a>
+      <a class="nav-item" href="index.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M8 3v18"/></svg>Журнал</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>Выйти из аккаунта</a>
+    </div>
+  </aside>
+
+  <section class="pane">
+    <header class="pane-head">
+      <div>
+        <h1>Голос и видео</h1>
+        <p>Выберите устройства для звонков.</p>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn--primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>Обновить устройства</button>
+        <button type="button" class="icon-btn modal-close" aria-label="Закрыть настройки"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+    </header>
+
+    <div class="pane-body">
+<div class="voice-split"><div class="voice-ledger"><h2>Устройства и громкость</h2><label class="field">
+              <span>Микрофон</span>
+              <select class="select"><option>По умолчанию</option></select>
+            </label><label class="field">
+              <span>Наушники и динамики</span>
+              <select class="select"><option>По умолчанию</option></select>
+            </label><label class="field">
+              <span>Громкость микрофона · <span data-slider-value aria-hidden="true">100%</span></span>
+              <input class="slider" type="range" aria-label="Громкость микрофона" value="100" max="100" style="--fill:100%">
+            </label><label class="field">
+              <span>Громкость собеседников · <span data-slider-value aria-hidden="true">80%</span></span>
+              <input class="slider" type="range" aria-label="Громкость собеседников" value="80" max="100" style="--fill:80%">
+            </label><section class="voice-block"><h2>Обработка звука</h2><label class="field">
+              <span>Шумоподавление</span>
+              <select class="select"><option>Стандартное</option></select>
+            </label><label class="switch-row">
+              <span>Эхоподавление</span>
+              <input class="switch" type="checkbox" role="switch" checked>
+            </label></section><label class="field">
+              <span>Устройство видео</span>
+              <select class="select"><option>По умолчанию</option></select>
+            </label></div><section class="voice-block voice-input"><h2>Проверка устройств</h2><p class="muted">Уровень входящего сигнала и проверка камеры.</p><div class="mic-test wide">
+              <button type="button" class="btn btn--secondary">Проверить микрофон</button>
+              <progress class="progress" value="0" max="100" aria-label="Уровень микрофона"></progress>
+            </div><button type="button" class="btn btn--secondary">Проверить камеру</button></section></div>
+<p class="hint">Устройства и уровень микрофона демонстрационные.</p>
+    </div>
+  </section>
+
+</main>
+<script>
+  document.querySelectorAll('input.slider').forEach(slider => {
+    const valueLabel = slider.closest('label').querySelector('[data-slider-value]');
+    const update = () => {
+      const min = Number(slider.min);
+      const max = Number(slider.max);
+      const position = (slider.valueAsNumber - min) / (max - min);
+      const fill = `calc(${position * 100}% + ${6 - position * 12}px)`;
+      slider.style.setProperty('--fill', fill);
+      valueLabel.textContent = `${slider.value}%`;
+    };
+    slider.addEventListener('input', update);
+    update();
+  });
+</script>
+</body>
+</html>

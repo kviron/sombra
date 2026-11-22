@@ -1,0 +1,18 @@
+# Server-only build context: no frontend, node_modules, database or credentials.
+*
+!Cargo.toml
+!Cargo.lock
+!crates/
+!crates/**
+!src-tauri/
+!src-tauri/Cargo.toml
+!src-tauri/build.rs
+!src-tauri/tauri.conf.json
+!src-tauri/capabilities/
+!src-tauri/capabilities/**
+!src-tauri/icons/
+!src-tauri/icons/**
+!src-tauri/src/
+!src-tauri/src/**
+!deploy/
+!deploy/**

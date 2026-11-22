@@ -1,0 +1,67 @@
+/* Карточка профиля на всю ширину: обложка-баннер, аватар поверх неё, имя и описание.
+   Раньше поля жили в левой колонке; теперь всё редактирование — на самой карточке. */
+.approved-profile-grid{grid-template-columns:minmax(0,1fr);gap:0}
+.approved-profile-grid .profile-media{position:relative;display:block;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.approved-profile-grid .profile-media-item[data-target="cover"]{display:block;position:relative;margin:0;padding:0}
+.approved-profile-grid .profile-media-item[data-target="cover"] .settings-cover-preview{width:100%;height:180px;aspect-ratio:auto;margin:0;border:0;border-radius:0}
+.approved-profile-grid .profile-media-item[data-target="avatar"]{position:absolute;z-index:2;top:136px;left:20px;margin:0}
+.approved-profile-grid .profile-media-label{display:none}
+.approved-profile-grid .profile-media-item[data-target="avatar"] .user-avatar{width:88px;height:88px;border:3px solid var(--card);background:var(--card)}
+
+.profile-media-chips{position:absolute;z-index:3;display:flex;align-items:center;gap:6px}
+[data-target="cover"] .profile-media-chips{top:12px;right:12px}
+[data-target="avatar"] .profile-media-chips{left:calc(100% + 12px);top:50%;transform:translateY(-50%)}
+[data-target="avatar"] .profile-media-chips{left:110px}
+.profile-media-chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;font:inherit;font-size:12px;font-weight:500;white-space:nowrap;border-radius:var(--radius-full);border:1px solid rgb(255 255 255 / .18);background:color-mix(in srgb,var(--card) 86%,#000);color:var(--foreground);cursor:pointer;transition:background 150ms ease}
+.profile-media-chip:hover{background:color-mix(in srgb,var(--card) 66%,#000)}
+.profile-media-chip:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.profile-media-chip:disabled{opacity:.6;cursor:default}
+.profile-media-chip svg{width:14px;height:14px}
+.profile-media-chip[data-icon]{width:30px;padding:0;justify-content:center}
+
+.approved-profile-identity{display:grid;gap:2px;padding:56px 20px 18px;overflow-wrap:anywhere}
+.profile-identity-field{display:flex;align-items:center;gap:6px;min-width:0}
+.profile-identity-input{field-sizing:content;min-width:8ch;max-width:100%;padding:2px 4px;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;color:var(--foreground);font:inherit;outline:none}
+.profile-identity-input:hover{border-color:var(--border)}
+.profile-identity-input:focus{border-color:var(--ring);background:color-mix(in srgb,var(--foreground) 5%,transparent)}
+#account-name{font-size:20px;font-weight:600;line-height:1.3}
+#account-bio{font-size:14px;color:var(--muted-foreground)}
+#account-bio::placeholder{color:var(--muted-foreground)}
+.profile-identity-edit{display:inline-grid;place-items:center;flex:none;width:26px;height:26px;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--muted-foreground);cursor:pointer;opacity:0;transition:opacity 150ms ease,background 150ms ease}
+.profile-identity-edit:hover{background:color-mix(in srgb,var(--foreground) 8%,transparent);color:var(--foreground)}
+.profile-identity-edit:focus-visible{outline:2px solid var(--ring);outline-offset:1px;opacity:1}
+.profile-identity-field:hover .profile-identity-edit,.profile-identity-field:focus-within .profile-identity-edit{opacity:1}
+@media(hover:none){.profile-identity-edit{opacity:1}}
+.approved-profile-identity small{display:block;margin-top:12px;color:var(--muted-foreground)}
+
+/* ---------- Окна «Аватар» и «Обложка» ---------- */
+.profile-media-overlay{position:fixed;inset:0;z-index:1400;background:color-mix(in srgb,var(--sombra-menu-solid,#0b0b0d) 82%,transparent)}
+.profile-media-dialog{position:fixed;z-index:1401;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;gap:14px;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;padding:20px;border:1px solid var(--border);border-radius:var(--radius);background:var(--sombra-menu-solid,var(--card));color:var(--foreground);box-shadow:0 24px 64px rgb(0 0 0 / .45)}
+.profile-media-dialog header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.profile-media-dialog h2{margin:0;font-size:17px;line-height:24px}
+.profile-media-dialog header p{margin:2px 0 0;font-size:12px;color:var(--muted-foreground)}
+.profile-media-dialog :is(h2,h3){font-weight:600}
+.profile-media-section{display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--border)}
+.profile-media-section h3{margin:0;font-size:12px;font-weight:500;color:var(--muted-foreground)}
+.profile-media-picture{display:grid;place-items:start}
+.profile-media-picture[data-kind="cover"] .profile-media-cover{width:100%;height:150px;aspect-ratio:auto;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.profile-media-picture-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.profile-media-hint{font-size:12px;color:var(--muted-foreground)}
+.profile-media-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.profile-media-option{display:grid;gap:8px;justify-items:center;padding:12px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:color-mix(in srgb,var(--foreground) 3%,transparent);color:inherit;font:inherit;cursor:pointer;transition:border-color 150ms ease,background 150ms ease}
+.profile-media-option:hover{border-color:var(--input-line)}
+.profile-media-option[aria-pressed="true"]{border-color:var(--ring);background:color-mix(in srgb,var(--primary) 12%,transparent)}
+.profile-media-option:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.profile-media-option>span:last-child{font-size:12px;color:var(--muted-foreground)}
+.profile-media-option[aria-pressed="true"]>span:last-child{color:var(--foreground)}
+.profile-media-option-sample{display:grid;place-items:center;width:100%}
+.profile-media-option-sample[data-target="avatar"] .user-avatar{width:56px;height:56px}
+.profile-media-option-sample[data-target="cover"] .profile-media-cover{width:100%;height:54px;aspect-ratio:auto;border-radius:6px;overflow:hidden}
+.profile-media-catalog{justify-self:start}
+.profile-media-error{margin:0;font-size:13px;color:#ff9aa2}
+.profile-media-notice{margin:0;font-size:12px;color:var(--muted-foreground)}
+.profile-media-dialog footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding-top:12px;border-top:1px solid var(--border)}
+@media(max-width:640px){
+ .profile-media-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .approved-profile-grid .profile-media-item[data-target="avatar"]{top:auto;bottom:calc(100% - 180px - 44px)}
+}

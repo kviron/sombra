@@ -1,0 +1,32 @@
+﻿services:
+  backend:
+    build:
+      context: .
+      target: backend
+    restart: unless-stopped
+    environment:
+      MINES_ICE_SERVERS: ${MINES_ICE_SERVERS:-[]}
+    volumes:
+      - mines-data:/data
+  gateway:
+    build:
+      context: .
+      target: gateway
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      MINES_DOMAIN: ${MINES_DOMAIN:?Set MINES_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  mines-data:
+  caddy-data:
+  caddy-config:
+

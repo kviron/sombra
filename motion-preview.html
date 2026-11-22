@@ -1,0 +1,9 @@
+<!doctype html><html lang="ru"><meta charset="UTF-8"><title>Sombra — анимации иконок</title><style>body{margin:0;background:#171b24;color:#e8eaf1;font:16px system-ui;display:grid;place-items:center;min-height:100vh}main{width:560px}p{color:#abb2c2;line-height:1.6}section{display:flex;gap:24px;margin:32px 0}button{display:grid;place-items:center;width:48px;height:48px;border:0;border-radius:10px;background:#282f3d;color:#ccd2e0;cursor:pointer}button:hover{background:#343d50}button:focus-visible{outline:2px solid #a698ff;outline-offset:4px}label{display:grid;justify-items:center;gap:12px;font-size:13px;color:#abb2c2}</style><main><h2>Sombra · живые иконки</h2><p>Наведи курсор или используй Tab. Нажми на микрофон и наушники, чтобы переключить состояние.</p><div id="root"></div></main><script type="module">
+import React from 'react';
+import{createRoot}from'react-dom/client';
+import{Mic,MicOff,Headphones,HeadphoneOff,Settings,Send}from'lucide-react';
+import{MotionIcon}from'/src/shared/ui/motion-icon.tsx';
+import{useScreenGlitch}from'/src/shared/ui/use-screen-glitch.ts';
+const h=React.createElement;
+function Preview(){const[screen,setScreen]=React.useState(0);const motion=useScreenGlitch(String(screen));const[m,M]=React.useState(false),[d,D]=React.useState(false);return h('div',{ref:motion},h('p',null,screen%2?'Настройки · пробный переход':'Чат · пробный переход'),h('section',null,...[[m?MicOff:Mic,'Микрофон','device',m,()=>M(!m)],[d?HeadphoneOff:Headphones,'Наушники','device',d,()=>D(!d)],[Settings,'Настройки','settings',undefined,()=>setScreen(screen+1)],[Send,'Отправить','send']].map(([icon,label,kind,pressed,click])=>h('label',{key:label},h('button',{'aria-label':label,'aria-pressed':pressed,onClick:click},h(MotionIcon,{icon,kind,size:20})),label))))}createRoot(document.getElementById('root')).render(h(Preview));
+</script></html>

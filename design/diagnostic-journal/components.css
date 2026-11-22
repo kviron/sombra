@@ -1,0 +1,105 @@
+/* Компоненты дизайн-системы «Sombra · Mira».
+   Карточка = матовое стекло: виолетовый тинт поверх страницы + blur 12px.
+   Внутри карточки — поля на белом 4.5% с рамкой белый 15%, как в дизайн-системе. */
+
+/* ---------- Секция внутри модального окна ---------- */
+.card{display:grid;gap:12px;padding-top:16px;border-top:1px solid var(--border)}
+.pane-body>.card:first-child{padding-top:0;border-top:0}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-head h2{margin:0;font-size:15px;line-height:20px}
+.card-body{display:grid;gap:16px}
+.card-foot{padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted-foreground)}
+
+/* ---------- Кнопка ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:36px;padding:0 14px;
+  border:1px solid transparent;border-radius:var(--radius-md);
+  background:transparent;color:var(--foreground);
+  font:inherit;font-size:13px;font-weight:500;white-space:nowrap;cursor:pointer;
+  transition:background var(--dur,200ms) ease,color var(--dur,200ms) ease
+}
+.btn svg{flex:none;opacity:.9}
+.btn:active{transform:translateY(1px)}
+.btn--primary{background:var(--primary);color:var(--primary-foreground)}
+.btn--primary svg{opacity:1}
+.btn--primary:hover{background:color-mix(in srgb,var(--primary) 88%,#fff)}
+.btn--secondary{border-color:var(--border);color:var(--foreground)}
+.btn--secondary:hover{background:var(--highlight)}
+.icon-btn{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--muted-foreground);cursor:pointer}
+.icon-btn:hover{background:var(--highlight);color:var(--foreground)}
+
+/* ---------- Поля ---------- */
+.field{display:grid;gap:6px;min-width:0}
+.field>span{font-size:12px;color:var(--muted-foreground)}
+.input,.select{
+  width:100%;height:36px;padding:0 10px;
+  border:1px solid var(--input-line);border-radius:var(--radius-md);
+  background:var(--field);color:var(--foreground);
+  font:inherit;font-size:13px
+}
+.input::placeholder{color:var(--muted-foreground)}
+.select{
+  appearance:none;padding-inline-end:32px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1a1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center
+}
+.input:hover,.select:hover{border-color:color-mix(in srgb,var(--foreground) 24%,transparent)}
+.input:focus-visible,.select:focus-visible,.btn:focus-visible,.nav-item:focus-visible,.switch:focus-visible,.slider:focus-visible{
+  outline:2px solid var(--ring);outline-offset:-2px
+}
+
+/* ---------- Переключатель: выкл. — дорожка на белом 80%, вкл. — primary ---------- */
+.switch{
+  appearance:none;flex:none;width:42px;height:24px;margin:0;
+  border:1px solid var(--input-line);border-radius:var(--radius-full);
+  background:rgb(255 255 255 / .12);cursor:pointer;position:relative;
+  transition:background .15s ease,border-color .15s ease
+}
+.switch::after{
+  content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+  background:var(--foreground);transition:transform .15s ease,background .15s ease
+}
+.switch:checked{background:var(--primary);border-color:transparent}
+.switch:checked::after{transform:translateX(18px);background:var(--primary-foreground)}
+
+/* ---------- Ползунок и прогресс ---------- */
+.slider{appearance:none;width:100%;height:24px;margin:0;background:transparent;cursor:pointer}
+.slider:focus-visible{outline-offset:2px}
+.slider::-webkit-slider-runnable-track{height:4px;border-radius:var(--radius-full);background:linear-gradient(to right,var(--primary) var(--fill,0%),var(--border) var(--fill,0%))}
+.slider::-webkit-slider-thumb{appearance:none;box-sizing:border-box;width:12px;height:12px;margin-top:-4px;border:1px solid var(--border);border-radius:50%;background:var(--foreground)}
+.slider::-moz-range-track{height:4px;border-radius:var(--radius-full);background:var(--border)}
+.slider::-moz-range-progress{height:4px;border-radius:var(--radius-full);background:var(--primary)}
+.slider::-moz-range-thumb{box-sizing:border-box;width:12px;height:12px;border:1px solid var(--border);border-radius:50%;background:var(--foreground)}
+
+.progress{flex:1;min-width:0;height:4px;border:0;border-radius:var(--radius-full);overflow:hidden;appearance:none;background:rgb(255 255 255 / .12)}
+.progress::-webkit-progress-bar{background:rgb(255 255 255 / .12);border-radius:var(--radius-full)}
+.progress::-webkit-progress-value{background:var(--primary);border-radius:var(--radius-full)}
+.progress::-moz-progress-bar{background:var(--primary);border-radius:var(--radius-full)}
+
+/* ---------- Бейдж ---------- */
+.badge{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:var(--radius-full);background:var(--accent);color:var(--accent-foreground);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- Навигация ---------- */
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:var(--radius-md);color:var(--muted-foreground);font-size:13px;text-decoration:none;white-space:nowrap;transition:background .15s ease,color .15s ease}
+.nav-item svg{flex:none}
+.nav-item:hover{background:var(--highlight);color:var(--foreground)}
+.nav-item[aria-current]{background:var(--primary);color:var(--primary-foreground)}
+.nav-item[aria-current]:hover{background:var(--primary);color:var(--primary-foreground)}
+
+/* ---------- Строки и блок кода ---------- */
+.rows{display:block;margin:0;padding:0;list-style:none}
+.rows>li+li{border-top:1px solid var(--border)}
+.code{border:1px solid var(--input-line);border-radius:var(--radius-md);background:var(--field);overflow:hidden}
+.code-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px 6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted-foreground)}
+.code-head .code-tools{display:flex;align-items:center;gap:8px}
+.code pre{margin:0;padding:12px 14px;font:inherit;font-size:12px;line-height:1.7;color:var(--foreground);white-space:pre-wrap;overflow-wrap:anywhere}
+.code b{color:var(--link);font-weight:500}
+.code em{color:var(--foreground);font-style:normal}
+
+/* ---------- Текст ---------- */
+.muted{color:var(--muted-foreground)}
+.hint{margin:0;font-size:12px;color:var(--muted-foreground)}
+.stack{display:grid;gap:12px}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}

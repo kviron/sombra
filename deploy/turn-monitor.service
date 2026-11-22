@@ -1,0 +1,19 @@
+[Unit]
+Description=Sombra external TURN relay probe
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+LoadCredential=turn.json:/etc/sombra-turn-monitor/turn.json
+ExecStart=/usr/bin/python3 -I -B /usr/local/lib/sombra-turn-monitor/turn-monitor.py --config %d/turn.json
+TimeoutStartSec=75s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitCORE=0
+UMask=0077

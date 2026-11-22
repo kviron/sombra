@@ -1,0 +1,40 @@
+# SOURCE ONLY; not installed/enabled. Docker absent on inspected host.
+[Unit]
+Description=Sombra scoped Hermes broker (explicit operator opt-in)
+After=network-online.target docker.service
+Requires=docker.service
+Conflicts=sombra-hermes.service
+ConditionPathExists=/etc/sombra-hermes-broker/config.json
+
+[Service]
+Type=simple
+User=sombra-hermes-broker
+Group=sombra-hermes-broker
+# Docker daemon access is root-equivalent. Separate reviewed restricted daemon/provisioner required.
+# Do not casually add this principal to an existing shared docker group.
+WorkingDirectory=/opt/sombra-hermes-runtime
+ExecStart=/usr/bin/python3 /opt/sombra-hermes-runtime/broker.py
+Restart=no
+MemoryMax=1G
+TasksMax=128
+CPUQuota=100%
+UMask=0077
+StateDirectory=sombra-hermes-broker
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/sombra-hermes-broker
+# Host provider resolver needs a separately approved host-only credential service/grant;
+# do not make Telegram home readable here or mount it in containers.
+
+[Install]
+WantedBy=multi-user.target

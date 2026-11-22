@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><base href="../">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="dsh-design" content="desktop windows">
+<title>Журнал B · Sombra</title>
+<link rel="stylesheet" href="journal.css">
+<script defer src="account-preview.js"></script>
+<style>.journal-alt h2{font-size:16px;margin-bottom:12px}.journal-alt summary{cursor:pointer;list-style:none}.journal-alt summary::-webkit-details-marker{display:none}.journal-alt summary:hover{background:var(--accent)}.journal-alt time,.journal-alt summary code{font-variant-numeric:tabular-nums;color:var(--muted-foreground)}.journal-alt summary code{display:block;margin-top:4px}.payload{padding:0 12px 12px}.gridlog{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}.logline{display:grid;grid-template-columns:80px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;min-height:44px;border-bottom:1px solid var(--border)}.loghead{background:var(--field);color:var(--muted-foreground)}.timeline{list-style:none;margin:0;padding:0}.timeline li{display:grid;grid-template-columns:72px minmax(0,1fr);gap:16px;align-items:start}.timeline li>time{padding-top:14px}.timeline details{position:relative;border-inline-start:1px solid var(--border);padding:0 0 12px 16px}.timeline details::before{content:'';position:absolute;left:-4px;top:20px;width:7px;height:7px;border-radius:50%;background:var(--link)}.timeline summary{min-height:44px;padding:12px;border-radius:var(--radius);background:var(--field)}.timeline summary strong{display:block;margin-top:8px}.timeline .payload{padding-top:12px}@media(max-width:600px){.logline{grid-template-columns:62px minmax(0,1fr) auto;gap:8px;padding:10px 8px}.timeline li{grid-template-columns:62px minmax(0,1fr);gap:8px}.timeline details{padding-left:10px}}.journal-alt details:not([open])>.payload{display:none}.logline{grid-template-columns:80px minmax(0,1fr) 44px}@media(max-width:600px){.logline{grid-template-columns:62px minmax(0,1fr) 40px}}</style></head>
+<body>
+<main class="window">
+
+  <aside class="sidebar">
+    <div class="account">
+      <span class="avatar" aria-hidden="true">H</span>
+      <div>
+        <strong class="account-name">HollyWood</strong>
+        <a href="#"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Редактировать</a>
+      </div>
+      <details class="account-switcher">
+        <summary class="icon-btn" aria-label="Список аккаунтов" title="Список аккаунтов"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="account-switcher-panel">
+          <p class="account-switcher-title">Аккаунты</p>
+          <div class="account-option"><span class="avatar" aria-hidden="true">H</span><strong>HollyWood</strong><span class="account-current" aria-label="Текущий аккаунт">✓</span></div>
+          <div class="account-option"><span class="avatar" aria-hidden="true">М</span><span>Мира</span></div>
+          <div class="account-option"><span class="avatar" aria-hidden="true">П</span><span>Павел</span></div>
+          <a href="login.html" class="btn btn--secondary" style="text-decoration:none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Добавить аккаунт</a>
+        </div>
+      </details>
+    </div>
+
+    <label class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.7-3.7"/></svg>
+      <input type="search" aria-label="Поиск по настройкам" placeholder="Поиск по настройкам">
+    </label>
+
+    <nav class="nav" aria-label="Настройки">
+      <a class="nav-item" href="updates.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>Обновления</a>
+      <a class="nav-item" href="voice.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><path d="M12 19v3"/></svg>Голос и видео</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Уведомления</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Данные и память</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>Учётная запись</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v6c0 4.5 3 8 7 9 4-1 7-4.5 7-9V6Z"/></svg>Пароль и безопасность</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>Активные сеансы</a>
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/></svg>Стикеры</a>
+      <a class="nav-item" href="drafts/index-b.html" aria-current="page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M8 3v18"/></svg>Журнал</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <a class="nav-item" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>Выйти из аккаунта</a>
+    </div>
+  </aside>
+
+  <section class="pane">
+    <header class="pane-head">
+      <div>
+        <h1>Журнал</h1>
+        <p>Диагностика за последние 48 часов</p>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn--primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg>Обновить</button>
+        <button type="button" class="btn btn--secondary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M4 21h16"/></svg>Скачать</button>
+        <button type="button" class="btn btn--secondary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg>Копировать</button>
+        <button type="button" class="icon-btn modal-close" aria-label="Закрыть настройки"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+    </header>
+
+    <div class="pane-body">
+      <p class="stat"><strong>4</strong> Ошибки в сохранённых записях</p>
+
+      <section class="journal-alt"><h2>Реестр ошибок</h2><div class="gridlog" role="group" aria-label="Таблица ошибок"><div class="logline loghead" aria-hidden="true"><span>Время</span><span>Событие</span><span>Код</span></div><details><summary class="logline"><time>23:31:09</time><span><strong>Не удалось обновить состояние голосовой комнаты</strong><code>voice_poll</code></span><span class="badge">400</span></summary><div class="payload"><div class="code">
+                  <div class="code-head">
+                    <strong>Детали ошибки</strong>
+                    <span class="code-tools">JSON<button type="button" class="icon-btn" aria-label="Копировать JSON ошибки"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg></button></span>
+                  </div>
+                  <pre><code>{
+  <b>"source"</b>: <em>"desktop"</em>,
+  <b>"operation"</b>: <em>"voice_poll"</em>,
+  <b>"category"</b>: <em>"request_rejected"</em>,
+  <b>"status"</b>: 400
+}</code></pre>
+                </div></div></details><details><summary class="logline"><time>23:31:08</time><span><strong>Не удалось обновить состояние голосовой комнаты</strong><code>voice_poll</code></span><span class="badge">502</span></summary><div class="payload"><div class="code">
+                  <div class="code-head"><strong>Детали ошибки</strong><span class="code-tools">JSON<button type="button" class="icon-btn" aria-label="Копировать JSON ошибки"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg></button></span></div>
+                  <pre><code>{
+  <b>"source"</b>: <em>"desktop"</em>,
+  <b>"operation"</b>: <em>"voice_poll"</em>,
+  <b>"category"</b>: <em>"http_error"</em>,
+  <b>"status"</b>: 502
+}</code></pre>
+                </div></div></details><details><summary class="logline"><time>23:31:08</time><span><strong>Некорректный ответ музыкального сервиса</strong><code>music_state</code></span><span class="badge">502</span></summary><div class="payload"><div class="code">
+                  <div class="code-head"><strong>Детали ошибки</strong><span class="code-tools">JSON<button type="button" class="icon-btn" aria-label="Копировать JSON ошибки"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg></button></span></div>
+                  <pre><code>{
+  <b>"source"</b>: <em>"desktop"</em>,
+  <b>"operation"</b>: <em>"music_state"</em>,
+  <b>"category"</b>: <em>"invalid_response"</em>,
+  <b>"status"</b>: 502
+}</code></pre>
+                </div></div></details><details><summary class="logline"><time>23:31:07</time><span><strong>Не удалось загрузить состояние приложения</strong><code>state</code></span><span class="badge">502</span></summary><div class="payload"><div class="code">
+                  <div class="code-head"><strong>Детали ошибки</strong><span class="code-tools">JSON<button type="button" class="icon-btn" aria-label="Копировать JSON ошибки"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg></button></span></div>
+                  <pre><code>{
+  <b>"source"</b>: <em>"desktop"</em>,
+  <b>"operation"</b>: <em>"state"</em>,
+  <b>"category"</b>: <em>"http_error"</em>,
+  <b>"status"</b>: 502
+}</code></pre>
+                </div></div></details></div></section>
+
+      <p class="hint">В макете показаны тестовые записи. Звук, сообщения и токены не сохраняются.</p>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
