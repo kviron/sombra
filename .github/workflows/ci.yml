@@ -53,10 +53,19 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
       - uses: Swatinem/rust-cache@v2
         with:
           key: windows-tests
           cache-on-failure: true
+      # tauri::generate_context!() встраивает фронтенд и падает без dist/.
+      - name: Frontend for generate_context
+        run: |
+          npm ci
+          npm run build
       - name: Test the API and the app
         run: cargo test --workspace --locked
       - name: Build the server binary
