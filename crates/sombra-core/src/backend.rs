@@ -18,16 +18,17 @@ mod chat_preferences;
 pub mod diagnostics;
 mod dialog_calls;
 mod dialog_metadata;
+mod effect_catalog;
 mod group_roles;
 mod human_typing;
-mod message_reads;
 mod mentions;
+mod message_pages;
+mod message_reads;
 mod message_references;
 mod music;
 mod profile_covers;
 mod profile_decorations;
 mod profile_effect_drafts;
-mod effect_catalog;
 mod sticker_catalog;
 fn id() -> String {
     uuid::Uuid::new_v4().to_string()
@@ -126,9 +127,17 @@ struct UserDto {
     cover: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     decorations: Option<Value>,
-    #[serde(rename = "decorationRefs", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "decorationRefs",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     decoration_refs: Option<Value>,
-    #[serde(rename = "profileEffectAssets", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        rename = "profileEffectAssets",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     profile_effect_assets: Option<Value>,
     id: String,
     name: String,
@@ -398,7 +407,9 @@ impl Backend {
                 .unwrap_or(0)
         });
         let decorations = profile_decorations::public(&u["decorations"]);
-        let decoration_refs = decorations.as_ref().and_then(|d| self.effect_references(u, viewer, d));
+        let decoration_refs = decorations
+            .as_ref()
+            .and_then(|d| self.effect_references(u, viewer, d));
         serde_json::to_value(UserDto {
             cover_supported: true,
             decoration_supported: true,
@@ -635,7 +646,8 @@ impl Backend {
                     for channel in channels {
                         let cid = s(channel, "id").to_owned();
                         channel["unreadCount"] = json!(self.unread_count(uid, &cid));
-                        channel["unreadMentionCount"] = json!(mention_counts.get(&cid).copied().unwrap_or(0));
+                        channel["unreadMentionCount"] =
+                            json!(mention_counts.get(&cid).copied().unwrap_or(0));
                     }
                 }
                 dto
@@ -660,12 +672,19 @@ impl Backend {
             .iter()
             .filter(|message| self.message_visible(message, uid))
             .collect();
-        let refs = visible.iter().map(|&message| (s(message, "id"), message)).collect();
-        let messages: Vec<_> = visible.into_iter().map(|message| {
-            let mut dto = self.receipt_message(message, uid);
-            Self::project_reply(&mut dto, message, &refs);
-            dto
-        }).collect();
+        let refs = visible
+            .iter()
+            .map(|&message| (s(message, "id"), message))
+            .collect();
+        // В снапшот идут только последние сообщения канала: история целиком — страницами.
+        let messages: Vec<_> = message_pages::capped(&visible, message_pages::STATE_PAGE)
+            .into_iter()
+            .map(|message| {
+                let mut dto = self.receipt_message(message, uid);
+                Self::project_reply(&mut dto, message, &refs);
+                dto
+            })
+            .collect();
         let sent: std::collections::HashSet<&str> = messages
             .iter()
             .map(|message| s(message, "sticker"))
@@ -692,7 +711,7 @@ impl Backend {
                 Some(sticker)
             })
             .collect();
-        json!({"features":{"avatarAssets":true,"messageReferences":message_references::supported()},"decorationSupported":true,"profileEffectDraftsSupported":self.profile_effect_drafts_supported(u),"effectCatalogSupported":true,"profileEffectUploadsSupported":true,"stickerCatalogSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":me,"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":users})
+        json!({"features":{"avatarAssets":true,"messageReferences":message_references::supported()},"decorationSupported":true,"profileEffectDraftsSupported":self.profile_effect_drafts_supported(u),"effectCatalogSupported":true,"profileEffectUploadsSupported":true,"stickerCatalogSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":me,"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"historyTruncated":self.channels_with_more(uid),"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":users})
     }
     /// One avatar for a client that asked for `avatar_assets`. The hash pins the
     /// exact picture the caller saw, so a stale snapshot never returns a newer file.
@@ -713,9 +732,9 @@ impl Backend {
                             .any(|b| s(b, "id") == id && b["enabled"] != false))
             })
         } else {
-            arr(&self.db["groups"]).into_iter().find(|g| {
-                s(g, "id") == id && arr(&g["members"]).contains(&json!(s(&viewer, "id")))
-            })
+            arr(&self.db["groups"])
+                .into_iter()
+                .find(|g| s(g, "id") == id && arr(&g["members"]).contains(&json!(s(&viewer, "id"))))
         }
         .ok_or("AVATAR_NOT_FOUND")?;
         let avatar = s(&record, "avatar");
@@ -882,7 +901,16 @@ impl Backend {
         if v["op"] == "set_profile_decoration" {
             return self.set_profile_decoration(&v);
         }
-        if matches!(s(&v, "op"), "list_profile_effects" | "create_profile_effect" | "publish_profile_effect" | "unpublish_profile_effect" | "apply_profile_effect" | "upload_profile_effect" | "profile_effect_file") {
+        if matches!(
+            s(&v, "op"),
+            "list_profile_effects"
+                | "create_profile_effect"
+                | "publish_profile_effect"
+                | "unpublish_profile_effect"
+                | "apply_profile_effect"
+                | "upload_profile_effect"
+                | "profile_effect_file"
+        ) {
             return self.effect_catalog_request(&v);
         }
         if v["op"] == "attachment_file" {
@@ -1002,7 +1030,10 @@ impl Backend {
         {
             return self.bot_worker(&v);
         }
-        if matches!(op, profile_effect_drafts::CREATE | profile_effect_drafts::GET) {
+        if matches!(
+            op,
+            profile_effect_drafts::CREATE | profile_effect_drafts::GET
+        ) {
             return self.profile_effect_draft_user(&v);
         }
         let u = self.authenticate(s(&v, "token"))?;
@@ -1099,6 +1130,7 @@ impl Backend {
    },
    "change_password"=>{let password=s(&v,"password");if !(8..=256).contains(&password.len()){return Err("Пароль: 8–256 символов".into())}let expected=B64.decode(s(&u,"hash")).map_err(|_|"Invalid password hash")?;pbkdf2::verify(pbkdf2::PBKDF2_HMAC_SHA256,NonZeroU32::new(600_000).unwrap(),s(&u,"salt").as_bytes(),s(&v,"current_password").as_bytes(),&expected).map_err(|_|"Неверный текущий пароль")?;let salt=id();let user=self.db["users"].as_array_mut().unwrap().iter_mut().find(|x|x["id"]==uid).unwrap();user["salt"]=json!(salt);user["hash"]=json!(hash(password,&salt));self.db["sessions"].as_array_mut().unwrap().retain(|x|x["user_id"]!=uid);},
    "state"=>return Ok(self.state_with(&u,v["sticker_assets"]==true,v["avatar_assets"]==true)),
+   "messages_page"=>return self.history_page(&v,uid),
    "avatar_file"=>return self.avatar_file(&v),
    "logout"=>self.db["sessions"].as_array_mut().unwrap().retain(|x|x["token_hash"]!=current),
    "create_group"=>{let name=s(&v,"name").trim();if name.is_empty()||name.chars().count()>60{return Err("Название: 1–60 символов".into())}let group=json!({"id":id(),"name":name,"owner":uid,"invite":id(),"roles_revision":0,"member_invites":false,"members":[uid],"channels":[{"id":id(),"name":"общий","kind":"text"},{"id":id(),"name":"Гостиная","kind":"voice"}]});self.db["groups"].as_array_mut().unwrap().push(group.clone());self.save()?;return Ok(self.group_dto(&group,uid))},
@@ -1376,8 +1408,10 @@ mod tests {
             .request(json!({"op":"avatar_file","token":guest_token,"kind":"group","id":group_id,"sha":group_hash}))
             .is_err());
         assert_eq!(
-            b.request(json!({"op":"avatar_file","token":guest_token,"kind":"user","id":uid,"sha":hash})).unwrap()
-                ["data"],
+            b.request(
+                json!({"op":"avatar_file","token":guest_token,"kind":"user","id":uid,"sha":hash})
+            )
+            .unwrap()["data"],
             json!(avatar)
         );
         // The poll that matters is the one that got smaller: a 40 KB picture must not
@@ -1392,7 +1426,10 @@ mod tests {
             .unwrap();
         let plain_len = serde_json::to_vec(&plain).unwrap().len();
         let compact_len = serde_json::to_vec(&compact).unwrap().len();
-        assert!(compact_len + 30_000 < plain_len, "{compact_len} vs {plain_len}");
+        assert!(
+            compact_len + 30_000 < plain_len,
+            "{compact_len} vs {plain_len}"
+        );
         drop(b);
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
@@ -2101,29 +2138,40 @@ pub fn api_router(backend: Backend) -> axum::Router {
             }
             Ok(Err(error)) => match error.as_str() {
                 "AUTH_REQUIRED" => (StatusCode::UNAUTHORIZED, "authentication", error),
-                "PROFILE_EFFECT_DRAFT_FORBIDDEN" | "PROFILE_EFFECT_DRAFT_DISABLED" =>
-                    (StatusCode::FORBIDDEN, "authorization", error),
+                "PROFILE_EFFECT_DRAFT_FORBIDDEN" | "PROFILE_EFFECT_DRAFT_DISABLED" => {
+                    (StatusCode::FORBIDDEN, "authorization", error)
+                }
                 "PROFILE_EFFECT_DRAFT_NOT_FOUND" => (StatusCode::NOT_FOUND, "validation", error),
                 "PROFILE_EFFECT_DRAFT_CONFLICT" => (StatusCode::CONFLICT, "validation", error),
-                "PROFILE_EFFECT_DRAFT_LIMIT" => (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error),
-                "Нет доступа к изменению диалога" | "Нет доступа к участникам переписки" => (StatusCode::FORBIDDEN, "authorization", error),
-                "Диалог изменён. Обновите данные и повторите попытку" => (StatusCode::CONFLICT, "validation", error),
-                "MUSIC_ROOM_FORBIDDEN" | "MUSIC_VOICE_REQUIRED" =>
-                    (StatusCode::FORBIDDEN, "authorization", error),
+                "PROFILE_EFFECT_DRAFT_LIMIT" => {
+                    (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error)
+                }
+                "Нет доступа к изменению диалога" | "Нет доступа к участникам переписки" => {
+                    (StatusCode::FORBIDDEN, "authorization", error)
+                }
+                "Диалог изменён. Обновите данные и повторите попытку" => {
+                    (StatusCode::CONFLICT, "validation", error)
+                }
+                "MUSIC_ROOM_FORBIDDEN" | "MUSIC_VOICE_REQUIRED" => {
+                    (StatusCode::FORBIDDEN, "authorization", error)
+                }
                 "MUSIC_FILE_NOT_AVAILABLE" => (StatusCode::NOT_FOUND, "validation", error),
                 "AVATAR_NOT_FOUND" => (StatusCode::NOT_FOUND, "validation", error),
-                "MUSIC_STREAM_INVALID_OFFSET" => (StatusCode::RANGE_NOT_SATISFIABLE, "validation", error),
+                "MUSIC_STREAM_INVALID_OFFSET" => {
+                    (StatusCode::RANGE_NOT_SATISFIABLE, "validation", error)
+                }
                 "MUSIC_STREAM_UNAVAILABLE" => (StatusCode::BAD_GATEWAY, "upstream", error),
                 "MUSIC_STREAM_TIMEOUT" => (StatusCode::GATEWAY_TIMEOUT, "upstream", error),
                 "MUSIC_STREAM_BUSY" => (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error),
-                "MESSAGE_REFERENCE_UNAVAILABLE" | "MESSAGE_FORWARD_TARGET_UNAVAILABLE" =>
-                    (StatusCode::NOT_FOUND, "authorization", error),
-                "MESSAGE_READ_FORBIDDEN" | "MESSAGE_REFERENCES_DISABLED"
+                "MESSAGE_REFERENCE_UNAVAILABLE" | "MESSAGE_FORWARD_TARGET_UNAVAILABLE" => {
+                    (StatusCode::NOT_FOUND, "authorization", error)
+                }
+                "MESSAGE_READ_FORBIDDEN"
+                | "MESSAGE_REFERENCES_DISABLED"
                 | "BOT_SETTINGS_FORBIDDEN"
                 | "BOT_POLICY_FORBIDDEN"
-                | "BOT_DECORATION_FORBIDDEN" | "PROFILE_EFFECT_FORBIDDEN" => {
-                    (StatusCode::FORBIDDEN, "authorization", error)
-                },
+                | "BOT_DECORATION_FORBIDDEN"
+                | "PROFILE_EFFECT_FORBIDDEN" => (StatusCode::FORBIDDEN, "authorization", error),
                 "PROFILE_EFFECT_NOT_FOUND" => (StatusCode::NOT_FOUND, "authorization", error),
                 "DIAGNOSTICS_FORBIDDEN" => (
                     StatusCode::FORBIDDEN,
