@@ -39,14 +39,14 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
  useEffect(() => resetDraft(), [resetDraft]);
  return (
   <section
-   className="room-music"
+   className="room-music mx-auto mt-4 w-[min(100%,416px)] flex-none text-start [overflow-wrap:anywhere]"
    data-aui-theme="elements"
    data-aui="card"
    data-aui-surface="true"
    aria-label="Музыка в комнате"
   >
-   <header className="room-music-header">
-    <span>
+   <header className="room-music-header flex min-w-0 flex-wrap items-center justify-between gap-2">
+    <span className="inline-flex items-center gap-2">
      <Music2 size={16} /> Музыка в комнате
     </span>
     <button
@@ -60,23 +60,28 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
      <ListMusic size={16} /> Очередь <span>{queue.length}</span>
     </button>
    </header>
-   <div className="room-music-track">
+   <div className="room-music-track flex min-w-0 flex-wrap items-center gap-2">
     <span className="room-music-art">
      <Music2 size={23} />
     </span>
-    <div>
+    <div className="min-w-0">
      <strong>{track?.title ?? 'Сейчас ничего не играет'}</strong>
-     <small>{music.statusText(joined)}</small>
+     <small className="block">{music.statusText(joined)}</small>
     </div>
    </div>
    {track && (
     <>
-     <div className="room-music-progress">
+     <div className="room-music-progress flex min-w-0 flex-wrap items-center gap-2">
       <span>{music.trackTime(elapsed)}</span>
-      <progress aria-label="Позиция воспроизведения" value={elapsed} max={Math.max(1, track.durationMs)} />
+      <progress
+       className="min-w-0 flex-1 [accent-color:var(--primary)]"
+       aria-label="Позиция воспроизведения"
+       value={elapsed}
+       max={Math.max(1, track.durationMs)}
+      />
       <span>{music.trackTime(track.durationMs)}</span>
      </div>
-     <div className="room-music-actions">
+     <div className="room-music-actions flex min-w-0 flex-wrap items-center gap-2">
       <button
        data-aui="button"
        data-aui-style="primary"
@@ -110,7 +115,7 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
       >
        <Square size={16} />
       </button>
-      <label>
+      <label className="inline-flex min-w-20 flex-1 items-center gap-2">
        <Volume2 size={16} />
        <input
         data-aui="slider"
@@ -127,7 +132,7 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
    )}
    {music.loadingPrivate && <small role="status">Загружаем аудио комнаты…</small>}
    {music.privateFailure && (
-    <div role="alert" className="room-music-error">
+    <div role="alert" className="room-music-error text-destructive">
      {music.privateFailure}{' '}
      <button type="button" data-aui="button" data-aui-style="ghost" onClick={music.retryAudio}>
       Повторить
@@ -139,9 +144,9 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
      Включить звук на этом устройстве
     </button>
    )}
-   <div id={queueId} hidden={!expanded}>
+   <div id={queueId} hidden={!expanded} className="min-w-0">
     {queue.length ? (
-     <div className="room-music-queue">
+     <div className="room-music-queue max-h-[132px] overflow-auto">
       {renderGenerativeUI(
        {
         $type: 'ListView',
@@ -175,13 +180,13 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
     )}
    </div>
    <form
-    className="room-music-add"
+    className="room-music-add grid min-w-0 grid-cols-[minmax(0,1fr)_80px_max-content] flex-wrap [align-items:end] gap-2"
     onSubmit={event => {
      event.preventDefault();
      if (!music.addDisabled(joined)) void music.addTrack();
     }}
    >
-    <label className="room-music-link">
+    <label className="room-music-link text-muted-foreground grid min-w-0 gap-1 text-[12px]">
      Ссылка
      <input
       data-aui="input"
@@ -194,7 +199,7 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
       disabled={music.pending}
      />
     </label>
-    <label className="room-music-limit">
+    <label className="room-music-limit text-muted-foreground grid min-w-0 gap-1 text-[12px]">
      Треков
      <input
       data-aui="input"
@@ -212,7 +217,7 @@ export function RoomMusic({music, joined}: {music: ReturnType<typeof useRoomMusi
     </button>
    </form>
    {music.error && (
-    <p role="alert" className="room-music-error">
+    <p role="alert" className="room-music-error text-destructive">
      {music.error}
     </p>
    )}

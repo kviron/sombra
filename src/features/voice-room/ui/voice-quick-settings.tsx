@@ -43,7 +43,7 @@ export function VoiceQuickSettings({
      data-slot="popover-content"
      aria-label={model.labels.aria}
     >
-     <label className="voice-quick-label" htmlFor={`quick-${kind}-device`}>
+     <label className="voice-quick-label mb-[9px] block font-semibold" htmlFor={`quick-${kind}-device`}>
       {model.labels.device}
      </label>
      <Select
@@ -55,8 +55,10 @@ export function VoiceQuickSettings({
       onValueChange={model.setDevice}
      />
      {model.missing && (
-      <div className="audio-device-missing">
-       <p role="status">Выбранное устройство недоступно. Настройка сохранена.</p>
+      <div className="audio-device-missing mt-1.5 min-w-0">
+       <p className="my-1.5 text-[12px] leading-[1.5] text-[#b1b8c6]" role="status">
+        Выбранное устройство недоступно. Настройка сохранена.
+       </p>
        <Button
         type="button"
         variant="secondary"
@@ -72,9 +74,9 @@ export function VoiceQuickSettings({
      )}
      <AudioDeviceAccess devices={model.audioDevices} disabled={voice.busy} />
      <Separator className="my-4" />
-     <div className="voice-quick-volume">
+     <div className="voice-quick-volume mb-[9px] flex items-center justify-between gap-3 font-semibold">
       <label id={`quick-${kind}-volume`}>{model.labels.volume}</label>
-      <output>{model.volume}%</output>
+      <output className="text-[#aeb7ca] tabular-nums">{model.volume}%</output>
      </div>
      <Slider
       aria-labelledby={`quick-${kind}-volume`}

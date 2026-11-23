@@ -1,4 +1,9 @@
-﻿/* Selected vocabulary rules from https://r.assistant-ui.com/base/generative-ui-style.json */
+/* Selected vocabulary rules from https://r.assistant-ui.com/base/generative-ui-style.json */
+/* Файл целиком остаётся в CSS (группа C): это словарь assistant-ui для разметки,
+   которую рисует renderGenerativeUI — элементы очереди приходят из чужого рендера
+   с атрибутами [data-aui], а не из нашего JSX, поэтому утилиты туда не положить.
+   Плюс псевдоэлементы бегунка range (::-webkit-slider-thumb) и токены --aui-*,
+   которые задаёт библиотека. */
 .room-music [data-aui] {
  box-sizing: border-box;
 }

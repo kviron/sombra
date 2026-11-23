@@ -1,3 +1,11 @@
+/* Быстрые настройки голоса: панель портала и триггер живут в чужой разметке
+   футера pages/chat. Раскладка подписи, громкости и ошибки набрана утилитами
+   в voice-quick-settings.tsx; здесь остаётся группа C — нелейерные правила
+   .chat-shell/.profile против утилит, состояния radix (data-state), поворот
+   стрелки, токены общего слайдера и фокус кнопок панели. */
+
+/* Триггер и микрофон в футере профиля красит чат: правило цепляется за чужие
+   классы .chat-shell/.profile и живёт вне слоёв, поэтому остаётся здесь. */
 .chat-shell .profile .voice-device-control > button:enabled:is(:hover, :focus-visible),
 .chat-shell .profile .voice-device-control > .voice-quick-trigger[data-state='open'] {
  background: var(--surface-border);
@@ -31,36 +39,18 @@
 .voice-quick-trigger[data-state='open'] svg {
  transform: rotate(180deg);
 }
+
+/* Панель: фон, рамку, тень и радиус даёт общий .sombra-menu-surface, свои
+   значения поверх него не дублируем. Здесь только размеры и типографика
+   портала — он живёт вне окна чата и наследует другой шрифт. */
 .voice-quick-panel {
  z-index: 110;
  width: 280px;
  max-width: calc(100vw - 24px);
  padding: 16px;
- border: 1px solid #ffffff24;
- border-radius: 12px;
- background: #17191f;
- color: #e1e5ee;
- box-shadow: 0 16px 44px #0009;
  font:
   13px Arial,
   sans-serif;
-}
-.voice-quick-label {
- display: block;
- margin-bottom: 9px;
- font-weight: 600;
-}
-.voice-quick-volume {
- display: flex;
- align-items: center;
- justify-content: space-between;
- gap: 12px;
- margin-bottom: 9px;
- font-weight: 600;
-}
-.voice-quick-volume output {
- font-variant-numeric: tabular-nums;
- color: #aeb7ca;
 }
 .voice-quick-panel [data-slot='slider'] {
  min-height: 24px;
@@ -74,12 +64,7 @@
  justify-content: flex-start;
  padding: 0 8px;
 }
-.voice-quick-error {
- margin: 9px 0;
- color: #d3b98b;
- font-size: 12px;
- line-height: 1.5;
-}
+/* Фокус общей кнопки перебивается нелейерным правилом панели. */
 .voice-quick-panel button:focus-visible {
  outline: 2px solid #9b9fff;
  outline-offset: 2px;

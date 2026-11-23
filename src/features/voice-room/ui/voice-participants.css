@@ -1,54 +1,13 @@
-.voice-channel-participants {
- list-style: none;
- margin: 2px 0 8px 28px;
- padding: 0 4px 0 10px;
- border-left: 1px solid #ffffff16;
-}
+/* Участники голосового канала: строка — общий UserRow, раскладка приходит
+   утилитами из voice-participants.tsx. Здесь остаётся группа C — переопределение
+   общего ряда и индикатор уровня в абсолютной позиции вдоль его левой кромки. */
+
+/* Плотность строки та же, что у user-row[data-variant='voice']; свой радиус и
+   позиция нужны под индикатор. Цвет с фолбэком сохранён как был. */
 .voice-channel-participant {
  position: relative;
- display: flex;
- align-items: center;
- gap: 8px;
- min-height: 34px;
- padding: 4px 6px;
  color: var(--muted-foreground, #aeb4c0);
- font-size: 13px;
  border-radius: 6px;
-}
-.voice-channel-participant:hover {
- background: #ffffff08;
- color: var(--foreground, #eee);
-}
-.voice-channel-avatar {
- width: 24px;
- height: 24px;
- flex-shrink: 0;
- display: grid;
- place-items: center;
- border-radius: 50%;
- overflow: hidden;
- background: #5865b2;
- color: #fff;
- font-size: 12px;
-}
-.voice-channel-avatar img {
- width: 100%;
- height: 100%;
- object-fit: cover;
-}
-.voice-channel-name {
- flex: 1;
- min-width: 0;
- overflow: hidden;
- text-overflow: ellipsis;
- white-space: nowrap;
-}
-.voice-channel-participant small {
- font-size: 10px;
- opacity: 0.7;
-}
-.voice-channel-participant svg {
- flex-shrink: 0;
 }
 .voice-channel-level {
  display: block;
@@ -71,6 +30,9 @@
  transform-origin: bottom;
  transition: transform 0.1s linear;
 }
+/* Класс приглушённого вида: voice-level.tsx склеивает его без пробела
+   («voice-channel-levelis-muted»), поэтому правило пока не срабатывает.
+   Разметку не трогаем — это отдельная правка поведения. */
 .voice-channel-level.is-muted {
  background: #ed424526;
  box-shadow: inset 0 0 0 1px #ed424566;

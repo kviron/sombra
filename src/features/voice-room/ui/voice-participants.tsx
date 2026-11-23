@@ -44,7 +44,10 @@ export function VoiceParticipants({voice, room, title, me, users, presence, volu
     }));
  if (!participants.length) return null;
  return (
-  <ul className="voice-channel-participants" aria-label={`Участники — ${title}`}>
+  <ul
+   className="voice-channel-participants m-0 mt-0.5 mb-2 ml-7 list-none border-l border-l-[#ffffff16] py-0 pr-1 pl-2.5"
+   aria-label={`Участники — ${title}`}
+  >
    {participants.map(({key, id, user, self, muted, deaf}) => {
     const name = user?.name || 'Участник';
     const canAdjustVolume = self || id !== me.id;
@@ -71,7 +74,7 @@ export function VoiceParticipants({voice, room, title, me, users, presence, volu
       key={key}
       as="li"
       variant="voice"
-      className="voice-channel-participant"
+      className="voice-channel-participant [&_svg]:shrink-0"
       identity={user ?? {id, name}}
       title={name}
       meta={self ? <small>Вы</small> : null}

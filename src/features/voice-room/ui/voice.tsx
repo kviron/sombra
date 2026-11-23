@@ -26,21 +26,23 @@ export function Media({
  muted,
  volume,
  speaker,
- audioOnly = false
+ audioOnly = false,
+ className
 }: {
  stream: MediaStream;
  muted: boolean;
  volume: number;
  speaker?: string;
  audioOnly?: boolean;
+ className?: string;
 }) {
  const playback = useMediaPlayback({stream, volume, speaker, audioOnly});
  return (
   <>
    {audioOnly ? (
-    <audio ref={playback.attach} autoPlay muted={muted} onError={playback.onError} />
+    <audio className={className} ref={playback.attach} autoPlay muted={muted} onError={playback.onError} />
    ) : (
-    <video ref={playback.attach} autoPlay playsInline muted={muted} onError={playback.onError} />
+    <video className={className} ref={playback.attach} autoPlay playsInline muted={muted} onError={playback.onError} />
    )}
    {playback.blocked && (
     <Button variant="secondary" onClick={() => void playback.resume()}>
@@ -55,7 +57,7 @@ export function Media({
 // Keep one audible element per room/client; visual tiles always remain muted.
 export function VoicePlayback({voice, volumeForUser}: {voice: Voice; volumeForUser: (id: string) => number}) {
  return (
-  <div className="voice-playback" data-voice-room={voice.room}>
+  <div className="voice-playback absolute right-4 bottom-[70px] z-[3]" data-voice-room={voice.room}>
    {Object.entries(voice.streams).map(([client, stream]) => {
     // WebRTC can deliver video before audio. Don't start playback on an empty stream.
     if (!stream.getAudioTracks().some(track => track.readyState === 'live')) return null;
@@ -154,7 +156,7 @@ export function VoiceStage({
  const selfRail = useLevelRail(v.local, !microphoneOff);
  const selfIdentity: User = meUser ?? {id: '', name: me, bio: '', created_at: 0, online: true};
  const selfTile = (
-  <div className="voice-tile">
+  <div className="voice-tile relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-[12px] border border-[#ffffff26] bg-[#131329] [&>video]:h-[200px] [&>video]:w-full [&>video]:object-cover">
    <div className="voice-tile-rail" ref={selfRail} aria-hidden="true">
     <i />
    </div>
@@ -170,14 +172,14 @@ export function VoiceStage({
      <UserAvatar user={selfIdentity} size="xl" decoration={selfIdentity.decorations?.avatar} />
     </button>
    )}
-   <span>
+   <span className="absolute bottom-2 left-2 rounded-[5px] bg-[#090912cc] px-2.5 py-1.5 text-[12px]">
     {me} · Вы {microphoneOff ? '· микрофон выключен' : ''}
    </span>
   </div>
  );
  return (
-  <div className="voice-stage">
-   <h1>{title}</h1>
+  <div className="voice-stage overflow-auto">
+   <h1 className="shrink-0">{title}</h1>
    <p>
     {joined
      ? v.peers.length
@@ -186,7 +188,7 @@ export function VoiceStage({
      : 'Присоединитесь, чтобы общаться голосом и видео'}
    </p>
    {joined && (
-    <div className="voice-grid">
+    <div className="voice-grid mx-0 my-2 mb-6 grid max-h-[60%] w-full max-w-[800px] grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 overflow-auto">
      {meUser ? <UserContextMenu user={meUser}>{selfTile}</UserContextMenu> : selfTile}
      {v.peers.map(p => {
       const identity: User = users?.find(user => user.id === p.user) ?? {
@@ -197,7 +199,7 @@ export function VoiceStage({
        online: true
       };
       const tile = (
-       <div className="voice-tile">
+       <div className="voice-tile relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-[12px] border border-[#ffffff26] bg-[#131329] [&>video]:h-[200px] [&>video]:w-full [&>video]:object-cover">
         {
          <VoicePeerVisual
           stream={v.streams[p.client]}
@@ -206,7 +208,7 @@ export function VoiceStage({
           onOpen={() => actions?.openProfile(identity.id)}
          />
         }
-        <span>
+        <span className="absolute bottom-2 left-2 rounded-[5px] bg-[#090912cc] px-2.5 py-1.5 text-[12px]">
          {identity.name} ·{' '}
          {v.connections[p.client] === 'connected'
           ? 'На связи'
@@ -225,15 +227,16 @@ export function VoiceStage({
     </div>
    )}
    {v.error && (
-    <p className="voice-error" role="alert">
+    <p className="voice-error max-w-[550px] rounded-[8px] bg-[#3c162e] p-3.5 text-[#ffe0e0]" role="alert">
      {v.error}
     </p>
    )}
-   <div className="voice-controls">
+   <div className="voice-controls flex flex-wrap justify-center gap-2.5">
     {joined ? (
      <>
       <Button
        variant="secondary"
+       className="min-h-10"
        title={microphoneOff ? 'Включить микрофон' : 'Выключить микрофон'}
        aria-label="Микрофон"
        aria-pressed={microphoneOff}
@@ -243,6 +246,7 @@ export function VoiceStage({
       </Button>
       <Button
        variant="secondary"
+       className="min-h-10"
        title={v.deaf ? 'Включить звук' : 'Отключить звук'}
        aria-label="Наушники"
        aria-pressed={v.deaf}
@@ -252,22 +256,23 @@ export function VoiceStage({
       </Button>
       <Button
        variant="secondary"
+       className="min-h-10"
        disabled={v.busy}
        title={v.camera ? 'Выключить камеру' : 'Включить камеру'}
        onClick={() => void v.toggleCamera()}
       >
        {v.camera ? <Video /> : <VideoOff />}
       </Button>
-      <Button variant="secondary" className="voice-hangup" title="Отключиться" onClick={v.leave}>
+      <Button variant="secondary" className="voice-hangup min-h-10" title="Отключиться" onClick={v.leave}>
        <PhoneOff />
       </Button>
      </>
     ) : (
-     <Button variant="secondary" disabled={v.busy} onClick={() => void v.join(id)}>
+     <Button variant="secondary" className="min-h-10" disabled={v.busy} onClick={() => void v.join(id)}>
       {v.busy ? 'Подключение…' : 'Присоединиться к голосовому каналу'}
      </Button>
     )}
-    <Button variant="secondary" title="Настройки голоса и видео" onClick={onSettings}>
+    <Button variant="secondary" className="min-h-10" title="Настройки голоса и видео" onClick={onSettings}>
      <MotionIcon icon={Settings} kind="settings" />
     </Button>
    </div>
@@ -289,8 +294,10 @@ function DeviceField({field}: {field: VoiceSettingsModel['fields'][number]}) {
     options={field.options}
    />
    {field.missing && (
-    <div className="audio-device-missing">
-     <p role="status">Выбранное устройство недоступно. Настройка сохранена.</p>
+    <div className="audio-device-missing mt-1.5 min-w-0">
+     <p className="my-1.5 text-[12px] leading-[1.5] text-[#b1b8c6]" role="status">
+      Выбранное устройство недоступно. Настройка сохранена.
+     </p>
      <Button
       type="button"
       variant="secondary"
@@ -385,7 +392,9 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
       Проверить камеру
      </Button>
     </div>
-    {settings.preview?.getVideoTracks().length ? <Media stream={settings.preview} muted volume={0} /> : null}
+    {settings.preview?.getVideoTracks().length ? (
+     <Media stream={settings.preview} muted volume={0} className="mt-4 max-h-[280px] w-full rounded-[8px] bg-[#111]" />
+    ) : null}
    </section>
    {settings.preview && (
     <Button variant="secondary" onClick={() => settings.stop()}>
