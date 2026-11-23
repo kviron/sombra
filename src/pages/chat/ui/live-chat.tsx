@@ -221,7 +221,7 @@ export function LiveChat() {
     removeFriend: id => void contacts.remove(id)
    }}
   >
-   <main className="chat-shell flex min-h-0 flex-1 text-[14px] leading-[normal]">
+   <main className="chat-shell flex min-h-0 flex-1 bg-transparent [font-family:var(--font-sans),Arial,sans-serif] text-[14px] leading-[normal] text-[#dce0e8]">
     {/* Playback belongs to the joined session, never Home/DM/channel navigation. */}
     <VoicePlayback voice={call} volumeForUser={calls.volumeForUser} />
     {roomMusic.audio}

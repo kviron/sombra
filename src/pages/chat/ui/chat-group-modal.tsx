@@ -28,7 +28,7 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
  return (
   <div className="modal-backdrop">
    <form
-    className="group-modal surface-matte"
+    className="group-modal surface-matte max-h-[85vh] w-[440px] overflow-auto"
     role="dialog"
     aria-modal="true"
     aria-label={

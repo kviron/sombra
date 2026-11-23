@@ -40,7 +40,8 @@ export function Bots({
      <div className="bot-installation-heading">
       <UserAvatar user={row.user} size="sm" presence={false} />
       <div>
-       <strong>{row.bot.name}</strong> <small className="bot-badge">БОТ</small>
+       <strong>{row.bot.name}</strong>{' '}
+       <small className="bot-badge rounded-[4px] bg-[#7278ed25] px-[5px] py-px text-[9px] text-[#b1b8ff]">БОТ</small>
        {row.bot.username && <p>@{row.bot.username}</p>}
       </div>
      </div>

@@ -319,7 +319,7 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
  const settings = useVoiceSettings({voice: v});
  const p = v.preferences;
  return (
-  <section className="voice-settings account-media-voice">
+  <section className="voice-settings account-media-voice @container">
    <p>{v.room ? 'Устройства можно менять прямо во время звонка.' : 'Выберите устройства для звонков.'}</p>
    <AudioDeviceAccess devices={settings.devices} disabled={settings.devicesDisabled} />
    <section className="media-settings-panel" aria-label="Аудиоустройства">

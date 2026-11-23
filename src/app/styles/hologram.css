@@ -6,6 +6,8 @@
  width: 100px;
  height: 100px;
 }
+/* gap остаётся: рядом `.sombra-logo--compact` задаёт 7px тем же классом, и
+   спор двух утилит решался бы порядком генерации, а не файлом. */
 .sombra-logo {
  display: inline-flex;
  align-items: center;
@@ -13,14 +15,6 @@
  max-width: 100%;
  color: #e5ceff;
  vertical-align: middle;
-}
-.sombra-wordmark {
- display: block;
- font-family: inherit;
- font-size: 24px;
- font-weight: 600;
- line-height: 1.1;
- letter-spacing: 0;
 }
 .sombra-logo--compact {
  gap: 7px;

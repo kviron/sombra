@@ -35,7 +35,7 @@ export function StickerSuggestions({
  }
  return (
   <div
-   className="sticker-suggestions sombra-menu-surface"
+   className="sticker-suggestions sombra-menu-surface absolute bottom-[calc(100%_+_6px)] left-0 z-[4] flex max-w-full gap-1 overflow-x-auto p-[5px]"
    data-slot="suggestion-menu-content"
    role="group"
    aria-label="Подходящие стикеры"

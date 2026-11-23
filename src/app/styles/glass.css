@@ -1,8 +1,11 @@
 /* Preserve reference geometry; apply macOS-inspired materials to surfaces only. */
+/* --title-bar-height и фон остаются здесь: это токен и материал корня окна,
+   а MainLayout уже несёт bg-background — утилита спорила бы с ним порядком. */
 .app-surface {
  --title-bar-height: 2.5rem;
  background: radial-gradient(ellipse at 5% 10%, #cdd8e7, transparent 65%), var(--background);
 }
+/* Токен высоты полосы заголовка для .modal-backdrop. */
 .chat-window {
  --title-bar-height: 32px;
 }
@@ -22,19 +25,6 @@
  border-color: var(--surface-border);
  -webkit-backdrop-filter: blur(var(--surface-blur)) saturate(var(--surface-saturate));
  backdrop-filter: blur(var(--surface-blur)) saturate(var(--surface-saturate));
-}
-.chat-shell {
- background: transparent;
- color: #dce0e8;
-}
-.server-rail {
- background: #0c0f1652;
-}
-.channel-sidebar {
- box-shadow: inset 1px 1px 0 #ffffff0d;
-}
-.conversation {
- background: #05070c61;
 }
 .channel-sidebar > header,
 .profile,
@@ -101,6 +91,8 @@
  outline: none;
  box-shadow: none;
 }
+/* chat.css задаёт .modal-backdrop background и inset нелейерно — утилиты слоя
+   проиграли бы ему, поэтому подложка и отступ остаются здесь. */
 .modal-backdrop {
  inset-block-start: var(--title-bar-height);
  background: #00030a7a;

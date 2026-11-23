@@ -74,7 +74,7 @@ export function BotImageActivity({state, channel}: {state: ChatState; channel: s
      <Bubble data-image-message="true">
       <MessageHeader>
        <strong>{image.name}</strong>
-       <small className="bot-badge">БОТ</small>
+       <small className="bot-badge rounded-[4px] bg-[#7278ed25] px-[5px] py-px text-[9px] text-[#b1b8ff]">БОТ</small>
       </MessageHeader>
       <BubbleContent>
        <ImageGeneration prompt={image.label} generating />

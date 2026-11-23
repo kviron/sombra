@@ -15,9 +15,6 @@
 .app-surface .account-modal [data-slot='input'] {
  border-radius: 10px;
 }
-.chat-shell {
- font-family: var(--font-sans), Arial, sans-serif;
-}
 .chat-shell .channel {
  height: 40px;
  padding: 0 12px;
@@ -49,6 +46,8 @@
  background: #dce6fa12;
  flex-shrink: 0;
 }
+/* gap остаётся: при ширине ≤760 chat.css задаёт .profile gap 4px, и утилита
+   слоя проиграла бы ему. Сейчас 5px выигрывает у среза — порядок сохраняем. */
 .profile {
  gap: 5px;
 }
@@ -61,30 +60,15 @@
  text-overflow: ellipsis;
  white-space: nowrap;
 }
-.conversation-empty {
- font-size: 13px;
- color: #8793a5;
- padding: 12px 2px;
-}
-/* Раскладку карточки и аватара задаёт messages.css: его селекторы с data-slot
-   специфичнее, поэтому здесь остаются только свойства, которых там нет. */
+/* Раскладку карточки задаёт messages.css; радиус остаётся здесь: в разметке
+   сообщения уже есть rounded-sm, и радиус утилиты зависел бы от порядка классов. */
 .chat-message {
  border-radius: 10px;
- flex-shrink: 0;
 }
+/* Фон под курсором остаётся: messages.css задаёт .chat-message background: none
+   нелейерно, и hover-утилита слоя ему проиграла бы. */
 .chat-message:hover {
  background: #dce6fa04;
-}
-.message-avatar {
- place-items: center;
- background: #b2c8e81a;
- color: #d5dfef;
- flex-shrink: 0;
- font-size: 12px;
-}
-.message-meta {
- display: flex;
- align-items: center;
 }
 .message-meta time {
  font-size: 10px;
@@ -100,24 +84,6 @@
  overflow-wrap: anywhere;
  line-height: 1.6;
 }
-.sent-sticker {
- width: 144px;
- height: 144px;
- object-fit: contain;
- margin: 8px 0;
-}
-.bot-badge {
- font-size: 9px;
- color: #b1b8ff;
- background: #7278ed25;
- border-radius: 4px;
- padding: 1px 5px;
-}
-.reactions {
- display: flex;
- gap: 6px;
- flex-wrap: wrap;
-}
 .reactions > button {
  border: 1px solid #dce6fa20;
  background: #dce6fa09;
@@ -127,23 +93,8 @@
  background: #8188ec26;
  border-color: #969eea70;
 }
-.expression-control {
- position: relative;
-}
-.composer {
- position: relative;
-}
-/* Материал панели задаёт .sombra-menu-surface: его селектор с [data-slot] специфичнее,
-   поэтому фон, рамка, радиус, тень и цвет здесь не дублируются. */
-.expression-panel {
- position: absolute;
- bottom: 42px;
- right: 0;
- width: 292px;
- max-width: calc(100vw - 40px);
- padding: 16px;
- z-index: 5;
-}
+/* Кадр панели экспрессий задан утилитами в expression-picker, материал —
+   .sombra-menu-surface; здесь остаются только правила её содержимого. */
 .expression-panel header {
  display: flex;
  align-items: center;
@@ -162,40 +113,15 @@
  color: #a5acba;
  margin-top: 12px;
 }
-.emoji-grid {
- display: grid;
- grid-template-columns: repeat(4, 1fr);
- gap: 8px;
-}
 .emoji-grid button {
  font-size: 25px;
  padding: 8px;
  border-radius: 8px;
 }
-.sticker-grid {
- display: grid;
- grid-template-columns: repeat(3, 1fr);
- max-height: 220px;
- overflow: auto;
- gap: 8px;
-}
 .sticker-grid img {
  width: 72px;
  height: 72px;
  object-fit: contain;
-}
-.sticker-upload {
- display: flex;
- align-items: center;
- justify-content: center;
- gap: 8px;
- border: 1px dashed #a5acba70;
- border-radius: 10px;
- padding: 12px;
- font-size: 12px;
- cursor: pointer;
- position: relative;
- margin-top: 12px;
 }
 .sticker-upload input {
  position: absolute;
@@ -227,14 +153,6 @@
  color: #fff;
  font-size: 11px;
 }
-.friends-page {
- max-width: 1000px;
- width: 100%;
- margin: 0 auto;
- padding: 12px 20px;
- overflow: auto;
- min-height: 0;
-}
 .friends-page nav {
  display: flex;
  gap: 8px;
@@ -252,27 +170,6 @@
  background: #dce6fa18;
  color: #f0f3f8;
 }
-.friend-search {
- width: 100%;
- padding: 12px 16px;
- margin-top: 24px;
- border: 1px solid #dce6fa20;
- border-radius: 10px;
- background: #dce6fa06;
- font-size: 13px;
-}
-.friends-count {
- font-size: 11px;
- color: #97a3b6;
- margin: 24px 0 12px;
-}
-.friend-row {
- display: flex;
- align-items: center;
- gap: 14px;
- padding: 16px 0;
- border-bottom: 1px solid #dce6fa12;
-}
 .friend-row strong {
  font-size: 13px;
 }
@@ -282,26 +179,11 @@
  color: #97a3b6;
  margin-top: 5px;
 }
-.friend-actions {
- display: flex;
- gap: 10px;
- margin-left: auto;
-}
 .friend-actions button {
  width: 34px;
  height: 34px;
  border-radius: 10px;
  background: #dce6fa0a;
-}
-.friends-empty {
- min-height: 300px;
- display: flex;
- flex-direction: column;
- align-items: center;
- justify-content: center;
- gap: 16px;
- text-align: center;
- color: #97a3b6;
 }
 .friends-empty h2 {
  font-size: 18px;
@@ -332,11 +214,6 @@
 .bot-token input {
  font-family: monospace;
 }
-.group-modal {
- max-height: 85vh;
- overflow: auto;
- width: 440px;
-}
 @media (max-width: 760px) {
  .friends-page {
   padding: 4px;
@@ -356,16 +233,8 @@
  }
 }
 
-.expression-panel {
- width: 344px;
- padding: 12px;
-}
 .expression-panel header {
  margin-bottom: 8px;
-}
-.expression-tabs {
- display: flex;
- gap: 4px;
 }
 .expression-tabs button,
 .manage-stickers {
@@ -379,12 +248,6 @@
  color: #f0f3f8;
 }
 .expression-panel .sticker-scopes {
- margin-bottom: 8px;
-}
-.expression-filters {
- display: grid;
- grid-template-columns: minmax(0, 1fr) auto;
- gap: 6px;
  margin-bottom: 8px;
 }
 .expression-panel input,
@@ -443,6 +306,8 @@
  border: 1px solid #dce6fa26;
  border-radius: 7px;
 }
+/* Плотность набора остаётся: в разметке уже есть p-0/rounded-none/border-0 и
+   open:-варианты, утилиты слоя решали бы спор порядком генерации, а не файлом. */
 .sticker-pack {
  margin-top: 12px;
  padding: 10px;
@@ -457,29 +322,9 @@
  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
  margin: 8px 0;
 }
-.sticker-library-item {
- display: grid;
- justify-items: center;
-}
 .sticker-library-item img {
  width: 60px;
  height: 60px;
-}
-.sticker-remove-actions {
- display: flex;
- gap: 8px;
-}
-/* Рамку, радиус, фон и тень подсказок стикеров берёт .sombra-menu-surface. */
-.sticker-suggestions {
- position: absolute;
- z-index: 4;
- bottom: calc(100% + 6px);
- left: 0;
- display: flex;
- gap: 4px;
- max-width: 100%;
- overflow-x: auto;
- padding: 5px;
 }
 .chat-shell .sticker-suggestions button {
  flex: 0 0 50px;

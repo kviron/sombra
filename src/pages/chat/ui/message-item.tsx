@@ -157,7 +157,9 @@ export function MessageItem({
            model.name
           )}
          </strong>
-         {(m.bot_name || model.identity?.bot) && <small className="bot-badge">БОТ</small>}
+         {(m.bot_name || model.identity?.bot) && (
+          <small className="bot-badge rounded-[4px] bg-[#7278ed25] px-[5px] py-px text-[9px] text-[#b1b8ff]">БОТ</small>
+         )}
         </MessageHeader>
        )}
        {m.replyTo && <MessageQuote reply={m.replyTo} userName={userName} onJump={model.replyOpen} />}
@@ -195,7 +197,7 @@ export function MessageItem({
         }
        >
         {reactions.length > 0 && (
-         <div className="reactions">
+         <div className="reactions flex flex-wrap gap-[6px]">
           {reactions.map(reaction => (
            <button
             type="button"

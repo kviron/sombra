@@ -69,7 +69,7 @@ export function ChatSidebar({state, nav, panels, calls, call}: Props) {
  return (
   <>
    <nav
-    className="server-rail flex w-[72px] shrink-0 [scrollbar-width:none] flex-col items-center gap-2 overflow-auto px-3"
+    className="server-rail flex w-[72px] shrink-0 [scrollbar-width:none] flex-col items-center gap-2 overflow-auto bg-[#0c0f1652] px-3"
     aria-label="Группы"
    >
     <button
@@ -115,7 +115,7 @@ export function ChatSidebar({state, nav, panels, calls, call}: Props) {
      <Users />
     </button>
    </nav>
-   <aside className="channel-sidebar flex shrink-0 flex-col rounded-tl-[10px] border border-b-0">
+   <aside className="channel-sidebar flex shrink-0 flex-col rounded-tl-[10px] border border-b-0 [box-shadow:inset_1px_1px_0_#ffffff0d]">
     <ColumnResizer label="Ширина списка каналов" side="right" variable="--channel-width" min={190} max={480} />
     {home ? (
      <header className="dialog-search-header flex h-[54px] min-h-[54px] shrink-0 items-center gap-2 border-b px-2.5 py-2">

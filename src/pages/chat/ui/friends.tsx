@@ -19,7 +19,7 @@ export function Friends({
   onDialog
  });
  return (
-  <section className="friends-page">
+  <section className="friends-page mx-auto min-h-0 w-full max-w-[1000px] overflow-auto px-5 py-3">
    <nav aria-label="Список друзей">
     {tabs.map(item => (
      <button key={item.id} aria-pressed={tab === item.id} onClick={() => actions.setTab(item.id)}>
@@ -30,23 +30,23 @@ export function Friends({
     ))}
    </nav>
    <input
-    className="friend-search"
+    className="friend-search mt-6 w-full rounded-[10px] border border-[#dce6fa20] bg-[#dce6fa06] px-4 py-3 text-[13px]"
     aria-label="Найти человека"
     placeholder="Поиск по имени"
     value={query}
     onChange={event => actions.setQuery(event.target.value)}
    />
-   <p className="friends-count">
+   <p className="friends-count mt-6 mb-3 text-[11px] text-[#97a3b6]">
     {count} · {rows.length}
    </p>
    {rows.map(row => (
-    <div className="friend-row" key={row.user.id}>
+    <div className="friend-row flex items-center gap-[14px] border-b border-b-[#dce6fa12] py-4" key={row.user.id}>
      <UserAvatar user={row.user} size="md" presence={false} decoration={row.user.decorations?.avatar} />
      <div>
       <strong>{row.user.name}</strong>
       <small>{row.note}</small>
      </div>
-     <div className="friend-actions">
+     <div className="friend-actions ml-auto flex gap-[10px]">
       {row.kind === 'add' ? (
        <button disabled={busy} title="Отправить заявку" onClick={() => actions.request(row.user.id)}>
         <UserPlus size={19} />
@@ -76,7 +76,7 @@ export function Friends({
     </div>
    ))}
    {empty && (
-    <div className="friends-empty">
+    <div className="friends-empty flex min-h-[300px] flex-col items-center justify-center gap-4 text-center text-[#97a3b6]">
      <UserPlus size={36} />
      <h2>{empty.title}</h2>
      <p>{empty.note}</p>

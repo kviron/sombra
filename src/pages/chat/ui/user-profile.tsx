@@ -88,7 +88,10 @@ export function UserProfile({
         id="user-profile-name"
         className="mt-0 mb-1.5 text-[24px] leading-[1.15] [font-weight:650] tracking-[-0.015em] [overflow-wrap:anywhere] text-[#f6f7fb]"
        >
-        {user.name} {user.bot && <small className="bot-badge">БОТ</small>}
+        {user.name}{' '}
+        {user.bot && (
+         <small className="bot-badge rounded-[4px] bg-[#7278ed25] px-[5px] py-px text-[9px] text-[#b1b8ff]">БОТ</small>
+        )}
        </h2>
        {user.username && <p>@{user.username}</p>}
        <p

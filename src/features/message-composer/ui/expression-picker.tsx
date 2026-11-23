@@ -28,7 +28,7 @@ export function ExpressionPicker({
  const {panel, busy, category, query, scope, activePack, filtered, actions} = model;
 
  return (
-  <div className="expression-control flex items-center gap-1.5">
+  <div className="expression-control relative flex items-center gap-1.5">
    <ComposerIconButton
     title="Эмодзи"
     disabled={disabled}
@@ -47,12 +47,12 @@ export function ExpressionPicker({
    </ComposerIconButton>
    {panel && (
     <section
-     className="expression-panel sombra-menu-surface"
+     className="expression-panel sombra-menu-surface absolute right-0 bottom-[42px] z-[5] w-[344px] max-w-[calc(100vw_-_40px)] p-3"
      data-slot="expression-menu-content"
      aria-label="Эмодзи и стикеры"
     >
      <header>
-      <nav className="expression-tabs" aria-label="Тип вложения">
+      <nav className="expression-tabs flex gap-1" aria-label="Тип вложения">
        <button type="button" aria-pressed={panel === 'emoji'} onClick={() => actions.show('emoji')}>
         Эмодзи
        </button>
@@ -66,7 +66,7 @@ export function ExpressionPicker({
      </header>
      {panel === 'emoji' ? (
       <>
-       <div className="expression-filters">
+       <div className="expression-filters mb-2 grid grid-cols-[minmax(0,1fr)_auto] gap-[6px]">
         <input
          aria-label="Поиск эмодзи"
          placeholder="Поиск эмодзи"
@@ -83,7 +83,7 @@ export function ExpressionPicker({
          options={model.categoryOptions}
         />
        </div>
-       <div className="emoji-grid" key={category}>
+       <div className="emoji-grid grid grid-cols-[repeat(4,1fr)] gap-2" key={category}>
         {model.emojiItems.map(item => (
          <button key={item.id} type="button" title={item.name} onClick={() => actions.chooseEmoji(item.emoji)}>
           {item.emoji}
@@ -95,7 +95,7 @@ export function ExpressionPicker({
      ) : (
       <>
        {group && (
-        <nav className="expression-tabs sticker-scopes" aria-label="Библиотека стикеров">
+        <nav className="expression-tabs sticker-scopes flex gap-1" aria-label="Библиотека стикеров">
          <button type="button" aria-pressed={scope === 'personal'} onClick={() => actions.chooseScope('personal')}>
           Мои стикеры
          </button>
@@ -108,7 +108,7 @@ export function ExpressionPicker({
         <Select label="Набор стикеров" value={activePack} onValueChange={actions.setPack} options={model.packOptions} />
        )}
        {filtered.length ? (
-        <div className="sticker-grid">
+        <div className="sticker-grid grid max-h-[220px] grid-cols-[repeat(3,1fr)] gap-2 overflow-auto">
          {filtered.map(sticker => (
           <button
            type="button"

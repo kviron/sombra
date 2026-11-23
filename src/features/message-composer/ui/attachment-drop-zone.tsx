@@ -19,7 +19,7 @@ export function AttachmentDropZone({
 
  return (
   <section
-   className="conversation relative isolate"
+   className="conversation relative isolate bg-[#05070c61]"
    onDragEnter={handlers.enter}
    onDragOver={handlers.over}
    onDragLeave={handlers.leave}

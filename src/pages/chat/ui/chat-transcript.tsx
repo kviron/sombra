@@ -213,11 +213,17 @@ export function ChatTranscript({
      aria-label="Сообщения"
     >
      {!channel && home && state ? (
-      <p className="conversation-empty">Выберите переписку слева или начните новый диалог кнопкой +.</p>
+      <p className="conversation-empty px-[2px] py-3 text-[13px] text-[#8793a5]">
+       Выберите переписку слева или начните новый диалог кнопкой +.
+      </p>
      ) : (
       <>
        {historyControls}
-       {!visibleMessages.length && !search && <p className="conversation-empty">{conversationEmptyText(!!channel)}</p>}
+       {!visibleMessages.length && !search && (
+        <p className="conversation-empty px-[2px] py-3 text-[13px] text-[#8793a5]">
+         {conversationEmptyText(!!channel)}
+        </p>
+       )}
        {rows}
        {state && !search && channel && <BotImageActivity state={state} channel={channel.id} />}
       </>

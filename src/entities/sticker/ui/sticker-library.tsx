@@ -75,7 +75,7 @@ function StickerPackPreview({
      {!pack && !error && <p role="status">Загрузка…</p>}
      {pack && (
       <>
-       <div className="sticker-grid">
+       <div className="sticker-grid grid max-h-[220px] grid-cols-[repeat(3,1fr)] gap-2 overflow-auto">
         {pack.stickers.map(sticker => (
          <StickerImage key={sticker.id} sticker={sticker} />
         ))}
@@ -113,7 +113,7 @@ export function SentSticker({
   trigger = useRef<HTMLButtonElement>(null);
  const id = sticker.packId;
  if (!id || !shouldPreviewSentSticker(sticker, user, catalog))
-  return <StickerImage className="sent-sticker" sticker={sticker} />;
+  return <StickerImage className="sent-sticker my-2 size-[144px] object-contain" sticker={sticker} />;
  return (
   <>
    <button
@@ -123,7 +123,7 @@ export function SentSticker({
     aria-label={`Открыть набор «${sticker.pack}»`}
     onClick={() => setOpen(true)}
    >
-    <StickerImage className="sent-sticker" sticker={sticker} />
+    <StickerImage className="sent-sticker my-2 size-[144px] object-contain" sticker={sticker} />
    </button>
    {open && (
     <StickerPackPreview
@@ -243,7 +243,12 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
      placeholder="Подставится из имени файла"
     />
    </label>
-   <label className={cn('sticker-upload', 'cursor-pointer')}>
+   <label
+    className={cn(
+     'sticker-upload relative flex cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-dashed border-[#a5acba70] p-3 text-[12px]',
+     'mt-3'
+    )}
+   >
     <Upload size={18} aria-hidden="true" />
     Импортировать ZIP или изображения
     <input
@@ -300,9 +305,9 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
         </span>
        </summary>
       )}
-      <div className="sticker-grid">
+      <div className="sticker-grid grid max-h-[220px] grid-cols-[repeat(3,1fr)] gap-2 overflow-auto">
        {items.map(sticker => (
-        <div key={sticker.id} className="sticker-library-item">
+        <div key={sticker.id} className="sticker-library-item grid justify-items-center">
          <StickerImage sticker={sticker} />
          {!added && (
           <Button
@@ -327,7 +332,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
       {!added &&
        pack &&
        (confirm === key ? (
-        <div className="sticker-remove-actions">
+        <div className="sticker-remove-actions flex gap-2">
          <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={actions.cancelRemove}>
           Отмена
          </Button>

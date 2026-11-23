@@ -195,9 +195,6 @@
  border-top: 1px solid var(--border);
 }
 /* Responsive layout around the shared shadcn controls. */
-.voice-settings {
- container-type: inline-size;
-}
 .account-modal .voice-settings [data-slot='label'] {
  margin: 0;
  font-size: 13px;
@@ -222,7 +219,8 @@
  --ring: #7278ed;
 }
 
-/* Одна шкала: расстояния и радиусы берутся отсюда, а не подбираются на глаз по файлам. */
+/* Одна шкала: расстояния и радиусы берутся отсюда, а не подбираются на глаз по файлам.
+   Это словарь токенов, а не стиль элемента — утилитами не выражается. */
 .account-modal {
  --s1: 4px;
  --s2: 8px;
