@@ -1,4 +1,4 @@
-"""Keep five stable release versions. Dry-run by default; no database/backups touched."""
+"""Keep only the latest stable release on the server. Dry-run by default; no database/backups touched."""
 import argparse
 import json
 import re
@@ -11,6 +11,8 @@ PUBLIC_MANIFEST = re.compile(r'latest\.before-(\d+\.\d+\.\d+)\.json\Z')
 STAGED_MANIFEST = re.compile(r'latest-(\d+\.\d+\.\d+)\.json\Z')
 ROOT = Path('/var/www/sombra-updates')
 STAGE = Path('/root/sombra-attachments-stage')
+# История выпусков живёт на GitHub; на VPS остаётся только актуальный установщик.
+KEEP = 1
 
 def version(value):
     if not VERSION.fullmatch(value):
@@ -29,7 +31,9 @@ def checked_child(path, root, directory=False):
         raise ValueError('Unexpected release entry: '+str(path))
     return path
 
-def plan(root=ROOT, stage=STAGE):
+def plan(root=ROOT, stage=STAGE, keep=KEEP):
+    if keep < 1:
+        raise ValueError('keep must be at least 1')
     root, stage = checked_root(root), checked_root(stage)
     manifest_path=checked_child(root/'latest.json', root)
     raw=manifest_path.read_bytes()
@@ -43,17 +47,17 @@ def plan(root=ROOT, stage=STAGE):
             # A staged, not-yet-published newer directory must not evict a stable release.
             if version(entry.name)<=stable: releases.append(entry.name)
     releases.sort(key=version, reverse=True)
-    keep=releases[:5]
-    if current not in keep: raise ValueError('Current stable release is missing')
+    retained=releases[:keep]
+    if current not in retained: raise ValueError('Current stable release is missing')
     for platform in manifest['platforms'].values():
         url=urlparse(platform['url'])
         parts=url.path.split('/')
-        if url.scheme!='https' or url.hostname!='sombra.mi-nerva.ru' or len(parts)!=4 or parts[1]!='updates' or parts[2] not in keep:
+        if url.scheme!='https' or url.hostname!='sombra.mi-nerva.ru' or len(parts)!=4 or parts[1]!='updates' or parts[2] not in retained:
             raise ValueError('Manifest target would not be retained')
         target=checked_child(root/parts[2]/parts[3], root/parts[2])
         checked_child(target.with_name(target.name+'.sig'), root/parts[2])
     remove=[]
-    for name in releases[5:]:
+    for name in releases[keep:]:
         directory=checked_child(root/name, root, directory=True)
         allowed={f'Sombra_{name}_x64-setup.exe',f'Sombra_{name}_x64-setup.exe.sig','latest.json'}
         children=list(directory.iterdir())
@@ -61,7 +65,7 @@ def plan(root=ROOT, stage=STAGE):
             if child.name not in allowed: raise ValueError('Unexpected content, refusing to delete: '+str(child))
             checked_child(child,directory)
         remove.append((directory,children))
-    cutoff=version(keep[-1])
+    cutoff=version(retained[-1])
     loose=[]
     for directory, patterns in [(root,[PUBLIC_MANIFEST]),(stage,[INSTALLER,STAGED_MANIFEST])]:
         for path in directory.iterdir():
@@ -70,15 +74,15 @@ def plan(root=ROOT, stage=STAGE):
                 if match and version(match[1])<cutoff:
                     loose.append(checked_child(path,directory))
                     break
-    return manifest_path,raw,keep,remove,loose
+    return manifest_path,raw,retained,remove,loose
 
-def run(apply=False):
+def run(apply=False, keep=KEEP):
     import fcntl
     with Path('/run/lock/sombra-release-retention.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
-        manifest,raw,keep,remove,loose=plan()
+        manifest,raw,retained,remove,loose=plan(keep=keep)
         paths=[child for _,children in remove for child in children]+loose
-        print('KEEP:',', '.join(keep))
+        print('KEEP:',', '.join(retained))
         for directory,_ in remove: print('REMOVE DIRECTORY:',directory)
         for path in loose: print('REMOVE FILE:',path)
         size=sum(path.stat().st_size for path in paths)
@@ -93,11 +97,13 @@ def run(apply=False):
                 if manifest.read_bytes()!=raw: raise RuntimeError('Stable manifest changed; stopping cleanup')
                 checked_child(path,path.parent).unlink()
             assert manifest.read_bytes()==raw
-            _,_,remaining,old,old_loose=plan()
-            assert remaining==keep and not old and not old_loose
+            _,_,remaining,old,old_loose=plan(keep=keep)
+            assert remaining==retained and not old and not old_loose
         print(('REMOVED' if apply else 'WOULD REMOVE')+f': {size} bytes; {len(remove)} release directories')
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apply',action='store_true')
-    run(parser.parse_args().apply)
+    parser.add_argument('--keep',type=int,default=KEEP,help='number of latest releases to keep (default: 1)')
+    args=parser.parse_args()
+    run(args.apply,args.keep)

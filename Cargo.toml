@@ -3,7 +3,7 @@ resolver = "2"
 members = ["src-tauri", "crates/sombra-core", "crates/sombra-server"]
 
 [workspace.package]
-version = "0.1.32"
+version = "0.1.33"
 edition = "2021"
 
 # Smaller and faster release builds: one codegen unit, thin LTO, stripped symbols.

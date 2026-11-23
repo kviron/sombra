@@ -15,16 +15,22 @@ class RetentionTests(unittest.TestCase):
   manifest={'version':'0.1.16','platforms':{'windows-x86_64':{'url':'https://sombra.mi-nerva.ru/updates/0.1.16/Sombra_0.1.16_x64-setup.exe'}}}
   (root/'latest.json').write_text(json.dumps(manifest))
   return root,stage
- def test_numeric_sort_keep_five_and_ignore_unpublished(self):
+ def test_numeric_sort_keeps_only_latest_and_ignores_unpublished(self):
   with tempfile.TemporaryDirectory() as temp:
    root,stage=self.fixture(Path(temp).resolve())
    (stage/'Sombra_0.1.10_x64-setup.exe').write_bytes(b'old')
    (stage/'Sombra_0.1.18_x64-setup.exe').write_bytes(b'pending')
    _,_,keep,remove,loose=retention.plan(root,stage)
-   self.assertEqual(keep,['0.1.16','0.1.15','0.1.14','0.1.13','0.1.12'])
-   self.assertEqual({path.name for path,_ in remove},{'0.1.10','0.1.11'})
+   self.assertEqual(keep,['0.1.16'])
+   self.assertEqual({path.name for path,_ in remove},{f'0.1.{n}' for n in range(10,16)})
    self.assertEqual([path.name for path in loose],['Sombra_0.1.10_x64-setup.exe'])
    self.assertTrue((root/'0.1.10').exists())
+ def test_keep_argument_can_retain_more_versions(self):
+  with tempfile.TemporaryDirectory() as temp:
+   root,stage=self.fixture(Path(temp).resolve())
+   _,_,keep,remove,_=retention.plan(root,stage,keep=2)
+   self.assertEqual(keep,['0.1.16','0.1.15'])
+   self.assertIn('0.1.14',{path.name for path,_ in remove})
  def test_unknown_content_refuses_entire_deletion_plan(self):
   with tempfile.TemporaryDirectory() as temp:
    root,stage=self.fixture(Path(temp).resolve())
