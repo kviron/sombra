@@ -53,8 +53,14 @@ export function ChatWorkspace({
 }: Props) {
  const {channel} = nav;
  return (
-  <div className="conversation-body" ref={motionRef}>
-   <div className={messages.voiceLayout ? 'chat-main voice-layout' : 'chat-main'}>
+  <div className="conversation-body flex min-h-0 flex-1" ref={motionRef}>
+   <div
+    className={
+     messages.voiceLayout
+      ? 'chat-main voice-layout relative flex min-w-0 flex-1 flex-col'
+      : 'chat-main relative flex min-w-0 flex-1 flex-col'
+    }
+   >
     {messages.voiceLayout && (
      <ColumnResizer
       label="Ширина чата канала"
@@ -89,7 +95,7 @@ export function ChatWorkspace({
     />
    </div>
    {!panels.materialsOpen && nav.canShowMembers && panels.members && (
-    <aside className="member-list" aria-label="Участники">
+    <aside className="member-list border-l" aria-label="Участники">
      <ColumnResizer label="Ширина списка участников" side="left" variable="--member-width" min={180} max={420} />
      {state && nav.group ? (
       <MemberList members={nav.group.members} users={state.users} meId={state.me.id} group={nav.group} />

@@ -1,16 +1,17 @@
 /* Reference lock: retain original dark shell and compact panels; classic chat bubbles. */
+/* Раскладку карточки задаёт этот файл, а не утилиты: .chat-message и его слоты —
+   общий компонент shared/ui/message, который переопределяют нелейерные правила
+   chat-extras.css, а утилиты Tailwind лежат в слое и всегда им проигрывают. */
 .chat-message[data-slot='message'] {
  display: flex;
+ flex-direction: row;
  align-items: flex-end;
+ justify-content: flex-start;
  gap: 8px;
- margin: 6px 0;
+ margin: 5px 0 0;
  padding: 0;
  background: none;
  max-width: 100%;
-}
-.chat-message[data-slot='message'] {
- flex-direction: row;
- justify-content: flex-start;
 }
 .chat-message[data-slot='message'] .message-content {
  flex: 0 1 auto;
@@ -27,18 +28,6 @@
  justify-content: center;
  margin-bottom: 2px;
 }
-.message-avatar img {
- width: 100%;
- height: 100%;
- object-fit: cover;
-}
-.message-bubble {
- padding: 8px 12px 5px;
- border: 1px solid #ffffff12;
- border-radius: 14px 14px 14px 4px;
- background: #202630;
- color: #e3e7ef;
-}
 [data-own='true'] .message-bubble {
  background: #303d62;
  border-color: #798dc22b;
@@ -48,19 +37,15 @@
  background: transparent;
  border-color: transparent;
 }
-.message-image-caption {
- padding: 7px 10px 5px;
- border: 1px solid #ffffff12;
- border-radius: 12px;
- background: #202630;
-}
 [data-own='true'] .message-image-caption {
  background: #303d62;
  border-color: #798dc22b;
 }
 .chat-message .message-meta {
  gap: 8px;
- min-height: 20px;
+ min-height: 18px;
+ margin-bottom: 1px;
+ padding-right: 8px;
  color: #b6c8e7;
  font-size: 12px;
 }
@@ -72,19 +57,12 @@
  min-width: 24px;
  min-height: 24px;
 }
+.chat-message .message-meta .message-author {
+ min-height: 18px;
+}
 .chat-message .message-content .message-text {
  font-size: 14px;
  line-height: 1.4;
-}
-.message-footer {
- display: flex;
- justify-content: flex-end;
- align-items: center;
- gap: 4px;
- margin-top: 3px;
- font-size: 10px;
- color: #adb8ca;
- line-height: 15px;
 }
 [data-own='true'] .message-footer {
  color: #c0cdec;
@@ -94,18 +72,6 @@
 }
 .chat-message .reactions:not(:empty) {
  margin-top: 5px;
-}
-.chat-day {
- display: flex;
- justify-content: center;
- margin: 10px 0 6px;
- font-size: 11px;
- color: #aeb6c5;
-}
-.chat-day span {
- padding: 4px 10px;
- border-radius: 20px;
- background: #ffffff09;
 }
 .voice-messages .chat-message .message-content {
  max-width: 85%;
@@ -120,9 +86,6 @@
 }
 
 /* Compact bubble spacing; show the author once per consecutive run. */
-.chat-message[data-slot='message'] {
- margin: 5px 0 0;
-}
 .chat-message[data-slot='message'][data-grouped='true'] {
  margin-top: 2px;
 }
@@ -130,19 +93,6 @@
  height: 0;
  margin-bottom: 0;
  visibility: hidden;
-}
-.chat-message .message-bubble {
- position: relative;
- display: flow-root;
- padding: 4px 8px;
-}
-.chat-message .message-meta {
- min-height: 18px;
- margin-bottom: 1px;
- padding-right: 8px;
-}
-.chat-message .message-meta .message-author {
- min-height: 18px;
 }
 /* Media starts on the same outer grid as a text bubble, not inside a second padded bubble. */
 .chat-message .message-bubble[data-image-message='true'] {
@@ -152,12 +102,6 @@
 }
 .chat-message .message-bubble[data-image-message='true'] > .message-meta {
  padding: 7px 21px 0 11px;
-}
-.chat-message .bubble-content {
- display: contents;
-}
-.chat-message .message-footer {
- white-space: nowrap;
 }
 /* A single paragraph can share its last line with an atomic footer; keep
    lists, separate paragraphs, code blocks, tables and media in normal flow. */
@@ -181,19 +125,6 @@
 }
 .chat-message .sent-sticker {
  display: block;
-}
-.chat-message .message-avatar {
- flex-shrink: 0;
-}
-.chat-message .message-bottom-inline {
- display: contents;
-}
-.chat-message .message-bottom-row {
- display: flex;
- align-items: flex-end;
- justify-content: space-between;
- gap: 8px;
- margin-top: 4px;
 }
 .chat-message .message-bottom-row .message-footer {
  flex-shrink: 0;
@@ -238,21 +169,6 @@
   transform: rotate(1turn);
  }
 }
-.message-retry {
- display: inline-flex;
- flex: 0 0 auto;
- align-items: center;
- justify-content: center;
- width: 15px;
- height: 15px;
- padding: 0;
- margin: 0;
- border: 0;
- border-radius: 4px;
- background: none;
- color: #f87171;
- cursor: pointer;
-}
 .message-retry:focus-visible {
  outline: 2px solid var(--ring);
  outline-offset: 2px;
@@ -265,32 +181,6 @@
 
 /* История канала: кнопка догрузки над первым сообщением и невидимый маркер автодогрузки.
    Высота строки постоянна, чтобы подмена «кнопка → загрузка» не сдвигала прокрутку. */
-.chat-history {
- display: flex;
- flex: 0 0 auto;
- align-items: center;
- justify-content: center;
- min-height: 30px;
- padding: 2px 0;
-}
-.chat-history-button {
- display: inline-flex;
- align-items: center;
- justify-content: center;
- min-height: 24px;
- padding: 3px 12px;
- border: 1px solid #ffffff1a;
- border-radius: 12px;
- background: #ffffff0a;
- color: #b6c8e7;
- font: inherit;
- font-size: 12px;
- line-height: 18px;
- cursor: pointer;
- transition:
-  background-color 0.15s ease,
-  color 0.15s ease;
-}
 .chat-history-button:hover {
  background: #ffffff14;
  color: #e3e7ef;
@@ -298,27 +188,6 @@
 .chat-history-button:focus-visible {
  outline: 2px solid var(--ring);
  outline-offset: 2px;
-}
-.chat-history-loading {
- font-size: 12px;
- line-height: 18px;
- color: #aeb6c5;
-}
-.chat-history-error {
- display: flex;
- flex-wrap: wrap;
- align-items: center;
- justify-content: center;
- gap: 6px;
- font-size: 12px;
- line-height: 18px;
- color: #f87171;
- text-align: center;
-}
-.chat-history-marker {
- flex: 0 0 auto;
- height: 1px;
- pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
  .chat-history-button {

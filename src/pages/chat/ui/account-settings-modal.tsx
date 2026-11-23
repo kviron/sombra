@@ -34,7 +34,7 @@ export function AccountSettingsModal({
     role="dialog"
     aria-modal="true"
     aria-labelledby="account-settings-title"
-    className="account-modal dark settings-mira surface-matte"
+    className="account-modal dark settings-mira surface-matte [color-scheme:dark]"
     data-section={section}
     onClick={e => e.stopPropagation()}
    >

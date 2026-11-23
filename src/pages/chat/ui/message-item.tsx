@@ -12,6 +12,7 @@ import {
  BubbleContent
 } from '@/shared/ui/message';
 import {UserAvatar} from '@/shared/ui/user-avatar';
+import {cn} from '@/shared/lib';
 import {MessageActionDialog} from '@/features/message-actions';
 import {MessageReadersDialog} from '@/features/message-actions';
 import {MessageQuote} from '@/features/message-actions';
@@ -137,6 +138,9 @@ export function MessageItem({
      </MessageAvatar>
      <MessageContent>
       <Bubble
+       className={cn(
+        'relative flow-root rounded-[14px_14px_14px_4px] border border-[#ffffff12] bg-[#202630] px-2 py-1 text-[#e3e7ef]'
+       )}
        data-inline-time={model.hasText && !m.attachment && !sticker && reactions.length === 0}
        data-sticker-only={!!sticker && !model.hasText}
        data-image-only={model.hasImage && !model.hasText}
@@ -163,10 +167,10 @@ export function MessageItem({
          Переслано от {userName(m.forwardedFrom.author)}
         </div>
        )}
-       <BubbleContent>
+       <BubbleContent className="contents">
         {m.text &&
          (model.hasImage ? (
-          <div className="message-image-caption">
+          <div className="message-image-caption rounded-[12px] border border-[#ffffff12] bg-[#202630] px-[10px] pt-[7px] pb-[5px]">
            <MessageText text={m.text} mentions={m.mentions} />
           </div>
          ) : (
@@ -183,7 +187,13 @@ export function MessageItem({
         )}
         {m.attachment && <MessageAttachment messageId={m.id} attachment={m.attachment} />}
        </BubbleContent>
-       <div className={reactions.length ? 'message-bottom-row' : 'message-bottom-inline'}>
+       <div
+        className={
+         reactions.length
+          ? 'message-bottom-row mt-1 flex items-end justify-between gap-2'
+          : 'message-bottom-inline contents'
+        }
+       >
         {reactions.length > 0 && (
          <div className="reactions">
           {reactions.map(reaction => (
@@ -200,7 +210,7 @@ export function MessageItem({
           ))}
          </div>
         )}
-        <MessageFooter>
+        <MessageFooter className="mt-[3px] flex items-center justify-end gap-1 text-[10px] leading-[15px] whitespace-nowrap text-[#adb8ca]">
          <time dateTime={model.dateTime}>{model.time}</time>
          {author &&
           (pending === 'sending' ? (
@@ -208,7 +218,7 @@ export function MessageItem({
           ) : pending === 'failed' ? (
            <button
             type="button"
-            className="message-retry"
+            className="message-retry inline-flex size-[15px] flex-none cursor-pointer items-center justify-center rounded border-0 p-0 text-[#f87171] [background:none]"
             aria-label={model.pendingHint}
             title={model.pendingHint}
             onClick={actions.retry}

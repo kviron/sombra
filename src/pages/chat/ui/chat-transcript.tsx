@@ -121,8 +121,8 @@ export function ChatTranscript({
       className={jumpTarget === message.id ? 'message-jump-highlight' : undefined}
      >
       {startsDay(visibleMessages, index) && (
-       <div className="chat-day">
-        <span>{dayLabel(message.time)}</span>
+       <div className="chat-day mt-[10px] mb-[6px] flex justify-center text-[11px] text-[#aeb6c5]">
+        <span className="rounded-[20px] bg-[#ffffff09] px-[10px] py-1">{dayLabel(message.time)}</span>
        </div>
       )}
       <MessageItem
@@ -147,28 +147,39 @@ export function ChatTranscript({
  const historyControls = historyVisible ? (
   <>
    {historyBarVisible && (
-    <div className="chat-history">
+    <div className="chat-history flex min-h-[30px] flex-none items-center justify-center py-[2px]">
      {historyButtonVisible(history) && (
-      <button type="button" className="chat-history-button" onClick={loadOlderHistory}>
+      <button
+       type="button"
+       className="chat-history-button inline-flex min-h-6 cursor-pointer items-center justify-center rounded-[12px] border border-[#ffffff1a] bg-[#ffffff0a] px-3 py-[3px] text-[12px] leading-[18px] text-[#b6c8e7] [transition:background-color_0.15s_ease,color_0.15s_ease]"
+       onClick={loadOlderHistory}
+      >
        Показать более ранние
       </button>
      )}
      {historyLoadingVisible(history) && (
-      <span className="chat-history-loading" role="status">
+      <span className="chat-history-loading text-xs leading-[18px] text-[#aeb6c5]" role="status">
        Загрузка…
       </span>
      )}
      {historyRetryVisible(history) && (
-      <span className="chat-history-error" role="alert">
+      <span
+       className="chat-history-error flex flex-wrap items-center justify-center gap-1.5 text-center text-xs leading-[18px] text-[#f87171]"
+       role="alert"
+      >
        <span>{historyErrorText(history.error)}</span>
-       <button type="button" className="chat-history-button" onClick={loadOlderHistory}>
+       <button
+        type="button"
+        className="chat-history-button inline-flex min-h-6 cursor-pointer items-center justify-center rounded-[12px] border border-[#ffffff1a] bg-[#ffffff0a] px-3 py-[3px] text-[12px] leading-[18px] text-[#b6c8e7] [transition:background-color_0.15s_ease,color_0.15s_ease]"
+        onClick={loadOlderHistory}
+       >
         Повторить
        </button>
       </span>
      )}
     </div>
    )}
-   <div ref={historyMarker} className="chat-history-marker" aria-hidden="true" />
+   <div ref={historyMarker} className="chat-history-marker pointer-events-none h-px flex-none" aria-hidden="true" />
   </>
  ) : null;
 
@@ -194,7 +205,13 @@ export function ChatTranscript({
      onSettings={() => panels.actions.openSettings('voice')}
     />
    ) : (
-    <div className="message-scroll" ref={scrollRef} tabIndex={-1} role="region" aria-label="Сообщения">
+    <div
+     className="message-scroll flex flex-1 flex-col overflow-auto"
+     ref={scrollRef}
+     tabIndex={-1}
+     role="region"
+     aria-label="Сообщения"
+    >
      {!channel && home && state ? (
       <p className="conversation-empty">Выберите переписку слева или начните новый диалог кнопкой +.</p>
      ) : (
@@ -205,7 +222,7 @@ export function ChatTranscript({
        {state && !search && channel && <BotImageActivity state={state} channel={channel.id} />}
       </>
      )}
-     {search && !visibleMessages.length && <p className="no-results">Сообщения не найдены</p>}
+     {search && !visibleMessages.length && <p className="no-results p-5 text-[#888]">Сообщения не найдены</p>}
      <div ref={end} />
     </div>
    )}

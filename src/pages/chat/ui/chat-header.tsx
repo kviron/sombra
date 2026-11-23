@@ -27,16 +27,16 @@ export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigge
  const {home, channel, title, friends, peer, dmBot, typingUntil} = nav;
  return (
   <>
-   <header className="chat-header">
+   <header className="chat-header flex h-[50px] shrink-0 items-center gap-2.5 border-b px-4">
     {!peer &&
      (home && channel && 'members' in channel && channel.members.length > 2 && channel.avatar ? (
       <img className="dialog-header-avatar" src={channel.avatar} alt="" />
      ) : home ? (
-      <MessageCircle />
+      <MessageCircle className="text-[#808089]" />
      ) : messages.voiceLayout ? (
-      <Volume2 />
+      <Volume2 className="text-[#808089]" />
      ) : (
-      <MessageCircle />
+      <MessageCircle className="text-[#808089]" />
      ))}
     {channel && !friends ? (
      <button
@@ -55,7 +55,7 @@ export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigge
     ) : (
      <strong>{title}</strong>
     )}
-    <div className="header-actions">
+    <div className="header-actions ml-auto flex items-center gap-5 [&_svg]:w-5">
      {dmBot && (
       <Button
        type="button"
@@ -110,6 +110,7 @@ export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigge
      )}
      <label className="chat-search">
       <input
+       className="w-[210px] text-[13px] outline-none [background:none]"
        aria-label="Поиск сообщений"
        placeholder="Поиск сообщений"
        value={messages.search}
@@ -134,18 +135,18 @@ export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigge
     </div>
    </header>
    {chat.error && (
-    <div className="chat-notice" role="alert">
+    <div className="chat-notice flex items-center gap-3 border-b px-4 py-3 text-[13px]" role="alert">
      {chat.error}
      <a href="#login">Войти</a>
-     <button onClick={chat.actions.clearError} title="Закрыть">
+     <button className="ml-auto" onClick={chat.actions.clearError} title="Закрыть">
       <X size={16} />
      </button>
     </div>
    )}
    {calls.error && !calls.incoming && (
-    <div className="chat-notice" role="alert">
+    <div className="chat-notice flex items-center gap-3 border-b px-4 py-3 text-[13px]" role="alert">
      {calls.error}
-     <button type="button" aria-label="Закрыть ошибку звонка" onClick={calls.clearError}>
+     <button className="ml-auto" type="button" aria-label="Закрыть ошибку звонка" onClick={calls.clearError}>
       <X size={16} />
      </button>
     </div>
