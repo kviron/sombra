@@ -1,7 +1,7 @@
 // Снапшот состояния страницы: одно хранилище на страницу, потому что чат в окне один.
 // Здесь же ревизии: более свежие группа, название переписки и предпочтения не перетираются опросом.
 import {createStore} from 'zustand/vanilla';
-import {accountService} from '@/features/account-settings';
+import {accountService} from '@/entities/account';
 import {sessionService, stateService} from '@/shared/api';
 import type {ChatMessage, ChatPreferences, ChatState, Dialog, ProfileEffectTarget, User} from '@/shared/types';
 

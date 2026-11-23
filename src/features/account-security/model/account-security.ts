@@ -1,12 +1,11 @@
 // Состояние настроек безопасности: профиль, картинки, пароль, почта и активные сеансы.
 import {createStore} from 'zustand/vanilla';
-import type {ProfileDecorationDoc, SessionDto, User} from '@/shared/types';
+import type {ProfileDecorationDoc, ProfileEffectTarget, SessionDto, User} from '@/shared/types';
 import type {PreparedProfileImage} from '@/shared/lib/image-crop';
 import {sessionService} from '@/shared/api';
+import {accountService} from '@/entities/account';
 import {userService} from '@/entities/user';
-import {accountService} from './services/account-service';
 import {coverProblem, identityUnchanged, mediaNotice, nameProblem, passwordProblem} from './account-security-rules';
-import type {MediaTarget} from './profile-decoration';
 
 export type CropDraft = {file: File; kind: 'avatar' | 'cover'};
 
@@ -19,8 +18,8 @@ export type AccountSecurityState = {
  bio: string;
  email: string;
  crop: CropDraft | undefined;
- media: MediaTarget | undefined;
- effects: MediaTarget | undefined;
+ media: ProfileEffectTarget | undefined;
+ effects: ProfileEffectTarget | undefined;
 };
 
 const initialState: AccountSecurityState = {
@@ -108,13 +107,13 @@ export function createAccountSecurityModel(initial: {name: string; bio: string; 
   cancelCrop() {
    store.setState({crop: undefined, busy: false});
   },
-  openMedia(media: MediaTarget) {
+  openMedia(media: ProfileEffectTarget) {
    store.setState({media});
   },
   closeMedia() {
    store.setState({media: undefined});
   },
-  openCatalog(effects: MediaTarget) {
+  openCatalog(effects: ProfileEffectTarget) {
    store.setState({effects});
   },
   closeCatalog() {
@@ -200,7 +199,7 @@ export function createAccountSecurityModel(initial: {name: string; bio: string; 
    kind: 'avatar' | 'cover';
    result?: PreparedProfileImage;
    coverSupported: boolean;
-   onSaved: (user: User, field: MediaTarget) => void;
+   onSaved: (user: User, field: ProfileEffectTarget) => void;
    begin: () => OperationGuards;
   }) {
    if (store.getState().busy) throw new Error('Дождитесь сохранения');
@@ -239,10 +238,10 @@ export function createAccountSecurityModel(initial: {name: string; bio: string; 
    onSaved,
    guard
   }: {
-   target: MediaTarget;
+   target: ProfileEffectTarget;
    decoration: ProfileDecorationDoc | null;
    id?: string;
-   onSaved: (user: User, field: `decoration:${MediaTarget}`) => void;
+   onSaved: (user: User, field: `decoration:${ProfileEffectTarget}`) => void;
    guard: () => SessionGuards;
   }) {
    const guards = guard();
@@ -264,9 +263,9 @@ export function createAccountSecurityModel(initial: {name: string; bio: string; 
    onSaved,
    guard
   }: {
-   target: MediaTarget;
+   target: ProfileEffectTarget;
    decoration: ProfileDecorationDoc | null;
-   onSaved: (user: User, field: `decoration:${MediaTarget}`) => void;
+   onSaved: (user: User, field: `decoration:${ProfileEffectTarget}`) => void;
    guard: () => SessionGuards;
   }) {
    const guards = guard();

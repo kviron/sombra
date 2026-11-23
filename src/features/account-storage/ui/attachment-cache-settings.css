@@ -121,3 +121,51 @@
   gap: 8px;
  }
 }
+/* Общие «утверждённые» правила раздела: перенесены из account-approved.css. */
+.approved-cache-ledger h3 {
+ margin: 0;
+ font-size: 16px;
+ font-weight: 600;
+}
+.approved-cache .approved-cache-ledger > h3 {
+ padding-block: 12px;
+ border-top: 1px solid var(--border);
+}
+.approved-cache .approved-cache-row,
+.approved-cache .cache-usage {
+ display: grid;
+ grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+ align-items: center;
+ gap: 16px;
+ padding: 16px 0;
+ border: 0;
+ border-top: 1px solid var(--border);
+ border-radius: 0;
+ background: transparent;
+}
+.approved-cache .approved-cache-actions {
+ display: flex;
+ align-items: center;
+ justify-content: flex-end;
+ flex-wrap: wrap;
+ gap: 8px;
+}
+.approved-cache .cache-clear {
+ justify-self: end;
+}
+.approved-cache .cache-limit {
+ min-width: 0;
+ width: 100%;
+}
+@media (max-width: 740px) {
+ .approved-cache .approved-cache-row,
+ .approved-cache .cache-usage {
+  grid-template-columns: 1fr;
+ }
+ .approved-cache .cache-clear {
+  justify-self: start;
+ }
+ .approved-cache .approved-cache-actions {
+  justify-content: flex-start;
+ }
+}

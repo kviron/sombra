@@ -1,16 +1,18 @@
 import type {RefObject} from 'react';
-import {
- AccountSecurity,
- AccountSettingsModal,
- AttachmentCacheSettings,
- DiagnosticJournal,
- NotificationSettings
-} from '@/features/account-settings';
+// Порядок импортов задаёт порядок каскада: стили разделов грузятся до стилей окна.
+import {AccountSecurity} from '@/features/account-security';
+import {ProfileDecorationPicker} from '@/features/profile-decoration';
+import {ProfileMediaDialog} from '@/features/profile-media';
+import {AccountSettingsModal} from './account-settings-modal';
+import {AttachmentCacheSettings} from '@/features/account-storage';
+import {DiagnosticJournal} from '@/features/account-diagnostics';
+import {NotificationSettings} from '@/features/account-notifications';
 import {UpdateSettings} from '@/features/updates';
 import {StickerLibrary} from '@/entities/sticker';
 import {VoiceSettings} from '@/features/voice-room';
 import type {Voice} from '@/features/voice-room';
 import type {ChatState} from '@/shared/types';
+import {accountSections} from './account-sections';
 import type {ChatPanelsModel} from '../model/use-chat-panels';
 import type {ChatStateModel} from '../model/use-chat-state';
 
@@ -28,8 +30,10 @@ export function ChatSettingsModal({chat, state, panels, call, panelRef}: Props) 
  return (
   <AccountSettingsModal
    me={state?.me}
+   sections={accountSections}
    section={panels.accountSection}
    onSection={panels.actions.setAccountSection}
+   onEditProfile={() => panels.actions.setAccountSection('profile')}
    onLogout={panels.actions.logout}
    onClose={panels.actions.closeSettings}
    panelRef={panelRef}
@@ -64,6 +68,8 @@ export function ChatSettingsModal({chat, state, panels, call, panelRef}: Props) 
      refresh={chat.actions.refresh}
      section={panels.accountSection}
      onMediaSaved={chat.actions.mediaSaved}
+     mediaDialog={ProfileMediaDialog}
+     decorationPicker={ProfileDecorationPicker}
     />
    )}
   </AccountSettingsModal>

@@ -1,7 +1,7 @@
 // Состояние настроек уведомлений: одна операция сохранения на открытый раздел.
 import {createStore} from 'zustand/vanilla';
 import type {ChatPreferences} from '@/shared/types';
-import {accountService} from './services/account-service';
+import {accountService} from '@/entities/account';
 import {notificationError, notificationPayload, type NotificationKey} from './notification-settings-rules';
 
 export type NotificationSettingsState = {busy: boolean; error: string};

@@ -1,10 +1,16 @@
 // Окна и панели страницы: настройки аккаунта, общее окно действий, материалы и профиль.
 // Хранилище модульное: страница в окне одна, а черновик формы живёт в том же объекте, что и режим окна.
 import {createStore} from 'zustand/vanilla';
-import type {AccountSection} from '@/features/account-settings';
 import type {GroupSettingsSection} from '@/features/group-management';
 import type {MaterialCategory} from '@/entities/message';
 import type {Channel, Group} from '@/shared/types';
+
+/**
+ * Раздел окна настроек: какие экраны существуют, знает страница, а не отдельная фича.
+ * Поэтому тип живёт в модели композиции, а меню получает разделы списком.
+ */
+export type AccountSection =
+ 'profile' | 'security' | 'sessions' | 'voice' | 'updates' | 'stickers' | 'notifications' | 'storage' | 'journal';
 
 export type ChatPanelsState = {
  settings: boolean;

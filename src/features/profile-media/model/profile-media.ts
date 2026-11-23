@@ -1,13 +1,12 @@
 // Состояние диалога медиа профиля: сохранение рамки, удаление и сообщения об успехе.
 import {createStore} from 'zustand/vanilla';
-import type {ProfileDecorationDoc} from '@/shared/types';
+import type {ProfileDecorationDoc, ProfileEffectTarget} from '@/shared/types';
 import {DECORATION_PRESETS, normalizeDecoration} from '@/shared/ui/avatar-fx';
-import type {MediaTarget} from './profile-decoration';
 import {decorationNotice, mediaError, removeNotice} from './profile-media-rules';
 
 export type ProfileMediaOption = {key: string; title: string; doc: ProfileDecorationDoc | null};
 
-const OPTIONS: Record<MediaTarget, ProfileMediaOption[]> = {
+const OPTIONS: Record<ProfileEffectTarget, ProfileMediaOption[]> = {
  avatar: [
   {key: 'none', title: 'Без рамки', doc: null},
   {
@@ -25,7 +24,7 @@ const OPTIONS: Record<MediaTarget, ProfileMediaOption[]> = {
 };
 
 /** Варианты одной цели: пресет сравнивается с текущим украшением через движок. */
-export function mediaOptions(target: MediaTarget): ProfileMediaOption[] {
+export function mediaOptions(target: ProfileEffectTarget): ProfileMediaOption[] {
  return OPTIONS[target];
 }
 
@@ -33,7 +32,7 @@ export function mediaOptions(target: MediaTarget): ProfileMediaOption[] {
 export function isDecorationSelected(
  doc: ProfileDecorationDoc | null,
  frame: ProfileDecorationDoc | null,
- target: MediaTarget
+ target: ProfileEffectTarget
 ): boolean {
  return (
   JSON.stringify(normalizeDecoration(doc, {target}).value) ===
@@ -55,7 +54,7 @@ export type RemoveArgs = {busy: boolean; isAlive: () => boolean; onRemove: () =>
  * Хранилище создаётся на открытый диалог: статус прошлой рамки или обложки не попадает
  * в следующее открытие, даже если родитель переиспользует компонент с другим ключом.
  */
-export function createProfileMediaModel(target: MediaTarget) {
+export function createProfileMediaModel(target: ProfileEffectTarget) {
  const store = createStore<ProfileMediaState>(() => ({saving: false, error: '', notice: ''}));
 
  async function run(

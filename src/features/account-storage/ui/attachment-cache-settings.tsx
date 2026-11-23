@@ -3,7 +3,6 @@ import {Button} from '@/shared/ui/button';
 import {Select} from '@/shared/ui/select';
 import {useAttachmentCache} from '../model/use-attachment-cache';
 import './attachment-cache-settings.css';
-import './account-approved.css';
 
 export function AttachmentCacheSettings({ready, onChanged}: {ready: boolean; onChanged: () => Promise<unknown>}) {
  const model = useAttachmentCache({ready, onChanged});

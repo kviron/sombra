@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {AvatarFrame, DECORATION_PRESETS, fxSchedulerState} from '@/shared/ui/avatar-fx';
 import type {DecorationInput, PaletteName} from '@/shared/ui/avatar-fx';
-import {ProfileDecorationPicker} from '@/features/account-settings'; // The local QA page exercises the real app modal.
+import {ProfileDecorationPicker} from '@/features/profile-decoration'; // The local QA page exercises the real app modal.
 import {UserProfile} from '@/pages/chat';
 import type {User} from '@/shared/types';
 import '@/shared/ui/profile-cover.css';

@@ -1,11 +1,10 @@
 import {useRef} from 'react';
 import {Dialog} from 'radix-ui';
 import {Sparkles, Upload, X} from 'lucide-react';
-import type {ProfileDecorationDoc, User} from '@/shared/types';
+import type {ProfileDecorationDoc, ProfileEffectTarget, User} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {ProfileCover} from '@/shared/ui/profile-cover';
 import {Button} from '@/shared/ui/button';
-import type {MediaTarget} from './profile-decoration-picker';
 import {useProfileMedia} from '../model/use-profile-media';
 import './profile-media-dialogs.css';
 
@@ -23,7 +22,7 @@ export function ProfileMediaDialog({
  onClose
 }: {
  user: User;
- target: MediaTarget;
+ target: ProfileEffectTarget;
  busy: boolean;
  disabled: boolean;
  pickHint: string;

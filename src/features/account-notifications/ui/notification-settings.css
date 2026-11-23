@@ -75,16 +75,6 @@
  color: #f4a3ac;
  margin-top: 16px;
 }
-.dialog-row-flags {
- display: inline-flex;
- align-items: center;
- gap: 5px;
- flex-shrink: 0;
- color: #b8c4dc;
-}
-.dialog-row-flags svg {
- flex-shrink: 0;
-}
 @media (max-width: 760px) {
  .notification-option {
   gap: 10px;

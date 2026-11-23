@@ -9,7 +9,7 @@ import type {
 } from '@/shared/types';
 import {DECORATION_PRESETS, normalizeDecoration} from '@/shared/ui/avatar-fx';
 import {PROFILE_EFFECT_MAX_BYTES} from '@/shared/ui/profile-effect-image';
-import {accountService} from './services/account-service';
+import {accountService} from '@/entities/account';
 import {
  appendEffectPage,
  asChoice,

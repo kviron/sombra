@@ -3,7 +3,7 @@ import type {ChatMessage, Dialog, DialogPreferences, User} from '@/shared/types'
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {UserRow} from '@/entities/user';
 import {UnreadMentionBadge} from '@/entities/conversation';
-import '@/features/account-settings/ui/notification-settings.css';
+import './dialog-list-row.css';
 
 export function DialogListRow({
  dialog,

@@ -1,13 +1,12 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useStore} from 'zustand';
-import type {ProfileDecorationDoc, User} from '@/shared/types';
+import type {ProfileDecorationDoc, ProfileEffectTarget, User} from '@/shared/types';
 import {createProfileMediaModel, isDecorationSelected, mediaOptions} from './profile-media';
-import type {MediaTarget} from './profile-decoration';
 import {mediaDescription, mediaFrame, mediaHasImage, mediaTitle} from './profile-media-rules';
 
 type Options = {
  user: User;
- target: MediaTarget;
+ target: ProfileEffectTarget;
  busy: boolean;
  onApply: (doc: ProfileDecorationDoc | null) => Promise<void>;
  onRemove: () => Promise<void>;

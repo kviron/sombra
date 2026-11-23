@@ -1,23 +1,42 @@
-// Own stylesheet first: `profile-media-dialogs.css` (ниже, через импорт компонента и
-// последнюю строку) намеренно переопределяет старую раскладку карточки профиля.
-import './account-approved.css';
-import {useEffect, useRef, type FormEvent, type KeyboardEvent} from 'react';
-import {type ChatState, type User} from '@/shared/types';
+// Стили раздела одной таблицей: карточка профиля и секции безопасности. Раньше
+// переопределения карточки подключались из profile-media-dialogs.css — порядок сохранён.
+import './account-security.css';
+import {useEffect, useRef, type ComponentType, type FormEvent, type KeyboardEvent} from 'react';
+import type {ChatState, ProfileDecorationDoc, ProfileEffectTarget, User} from '@/shared/types';
 import {Button} from '@/shared/ui/button';
 import {Input} from '@/shared/ui/input';
 import {ImageCropDialog} from '@/shared/ui/image-crop-dialog';
 import {ProfileCover} from '@/shared/ui/profile-cover';
-import {ProfileDecorationPicker} from './profile-decoration-picker';
-import {ProfileMediaDialog} from './profile-media-dialogs';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {Monitor, Pencil, Trash2} from 'lucide-react';
 import {Label} from '@/shared/ui/label';
-import type {AccountSection} from './account-sidebar';
 import {useAccountSecurity} from '../model/use-account-security';
 import {deviceLabel, emailUnchanged, lastSeenLabel, sessionTitle} from '../model/account-security-rules';
-import type {MediaTarget} from '../model/profile-decoration';
 
-import './profile-media-dialogs.css';
+/** Что компоненту нужно от диалога медиа; форма описана здесь, чтобы фича не импортировала соседнюю. */
+type MediaDialogProps = {
+ user: User;
+ target: ProfileEffectTarget;
+ busy: boolean;
+ disabled: boolean;
+ pickHint: string;
+ onPickImage: () => void;
+ onRemove: () => Promise<void>;
+ onApply: (doc: ProfileDecorationDoc | null) => Promise<void>;
+ onCatalog: () => void;
+ onClose: () => void;
+};
+
+type DecorationPickerProps = {
+ user: User;
+ target: ProfileEffectTarget;
+ catalogSupported?: boolean;
+ draftsSupported?: boolean;
+ uploadsSupported?: boolean;
+ onSave: (doc: ProfileDecorationDoc | null, id?: string) => Promise<void>;
+ onClose: () => void;
+ onRestoreFocus: () => void;
+};
 
 /**
  * Компонент только показывает: сеансы, профиль, картинки, пароль и почта приходят
@@ -27,12 +46,17 @@ export function AccountSecurity({
  state,
  refresh,
  section,
- onMediaSaved
+ onMediaSaved,
+ mediaDialog: MediaDialog,
+ decorationPicker: DecorationPicker
 }: {
  state: ChatState | null;
  refresh: () => Promise<ChatState>;
- section: AccountSection;
- onMediaSaved: (user: User, field: MediaTarget | `decoration:${MediaTarget}`) => void;
+ /** Раздел принадлежит композиции экрана, поэтому здесь только строка. */
+ section: string;
+ onMediaSaved: (user: User, field: ProfileEffectTarget | `decoration:${ProfileEffectTarget}`) => void;
+ mediaDialog: ComponentType<MediaDialogProps>;
+ decorationPicker: ComponentType<DecorationPickerProps>;
 }) {
  const {sessions, error, notice, busy, email, name, bio, crop, media, effects, coverSupported, actions} =
   useAccountSecurity({state, refresh, section, onMediaSaved});
@@ -62,11 +86,11 @@ export function AccountSecurity({
    event.currentTarget.blur();
   }
  }
- function pickImage(target: MediaTarget) {
+ function pickImage(target: ProfileEffectTarget) {
   actions.closeMedia();
   (target === 'avatar' ? avatarPicker : coverPicker).current?.click();
  }
- function openCatalog(target: MediaTarget) {
+ function openCatalog(target: ProfileEffectTarget) {
   actions.closeMedia();
   effectOrigin.current = document.querySelector<HTMLButtonElement>(
    `.profile-media [data-target="${target}"] [aria-haspopup="dialog"]`
@@ -245,7 +269,7 @@ export function AccountSecurity({
      <p className="settings-hint">Украшения появятся после обновления сервера.</p>
     )}
     {state && media && section === 'profile' && (
-     <ProfileMediaDialog
+     <MediaDialog
       key={`${state.me.id}:${media}`}
       user={state.me}
       target={media}
@@ -264,7 +288,7 @@ export function AccountSecurity({
      />
     )}
     {state && effects && section === 'profile' && (
-     <ProfileDecorationPicker
+     <DecorationPicker
       key={state.me.id + effects}
       user={state.me}
       target={effects}

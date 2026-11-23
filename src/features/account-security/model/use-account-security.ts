@@ -1,16 +1,15 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useStore} from 'zustand';
-import type {ChatState, ProfileDecorationDoc, SessionDto, User} from '@/shared/types';
+import type {ChatState, ProfileDecorationDoc, ProfileEffectTarget, SessionDto, User} from '@/shared/types';
 import type {PreparedProfileImage} from '@/shared/lib/image-crop';
 import {sessionService} from '@/shared/api';
 import {createAccountSecurityModel, type OperationGuards, type SessionGuards} from './account-security';
-import type {MediaTarget} from './profile-decoration';
 
 type Options = {
  state: ChatState | null;
  refresh: () => Promise<ChatState>;
  section: string;
- onMediaSaved: (user: User, field: MediaTarget | `decoration:${MediaTarget}`) => void;
+ onMediaSaved: (user: User, field: ProfileEffectTarget | `decoration:${ProfileEffectTarget}`) => void;
 };
 
 /**
@@ -102,13 +101,13 @@ export function useAccountSecurity({state, refresh, section, onMediaSaved}: Opti
  );
 
  const saveEffect = useCallback(
-  (target: MediaTarget, decoration: ProfileDecorationDoc | null, id?: string) =>
+  (target: ProfileEffectTarget, decoration: ProfileDecorationDoc | null, id?: string) =>
    actions.saveEffect({target, decoration, id, onSaved: onMediaSaved, guard: sessionGuards}),
   [actions, onMediaSaved, sessionGuards]
  );
 
  const applyDecoration = useCallback(
-  (target: MediaTarget, decoration: ProfileDecorationDoc | null) =>
+  (target: ProfileEffectTarget, decoration: ProfileDecorationDoc | null) =>
    actions.applyDecoration({target, decoration, onSaved: onMediaSaved, guard: sessionGuards}),
   [actions, onMediaSaved, sessionGuards]
  );

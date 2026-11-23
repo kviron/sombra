@@ -1,7 +1,6 @@
 import {useCallback, useEffect, useMemo} from 'react';
 import {useStore} from 'zustand';
 import {toast} from 'sonner';
-import type {AccountSection} from '@/features/account-settings';
 import type {GroupSettingsSection} from '@/features/group-management';
 import type {MaterialCategory} from '@/entities/message';
 import {canGroup, groupService} from '@/entities/group';
@@ -9,7 +8,7 @@ import {authService} from '@/entities/user';
 import {conversationService} from '@/entities/conversation';
 import type {Channel, ChatState, Dialog, Group, GroupPermission, User} from '@/shared/types';
 import type {Voice} from '@/features/voice-room';
-import {chatPanelsActions, chatPanelsStore} from './chat-panels';
+import {chatPanelsActions, chatPanelsStore, type AccountSection} from './chat-panels';
 import {chatNavigationActions} from './chat-navigation';
 import {chatSnapshotActions, chatSnapshotStore} from './chat-state';
 import {canEditGroup, defaultChannelKind} from './chat-rules';
