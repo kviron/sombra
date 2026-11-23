@@ -51,7 +51,7 @@
 .voice-settings > .audio-device-access {
  margin: 12px 0 16px;
  padding: 12px;
- border: 1px solid var(--glass-line, #e1ebff21);
+ border: 1px solid var(--surface-border, #e1ebff21);
  border-radius: 10px;
  background: #dce6fa08;
 }

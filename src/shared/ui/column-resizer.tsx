@@ -1,4 +1,5 @@
-﻿import {useEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
+import {cn} from '@/shared/lib/utils';
 
 type Props = {label: string; side: 'left' | 'right'; variable: string; min: number; max: number; target?: string};
 
@@ -28,7 +29,7 @@ export function ColumnResizer({label, side, variable, min, max, target}: Props) 
  }
  return (
   <div
-   className={`column-resizer column-resizer-${side}${dragging ? 'is-dragging' : ''}`}
+   className={cn('column-resizer', `column-resizer-${side}`, dragging && 'is-dragging')}
    role="separator"
    aria-label={label}
    aria-orientation="vertical"

@@ -9,7 +9,9 @@
  --sombra-menu-highlight: rgba(210, 224, 250, 0.14);
  --sombra-menu-highlight-text: #f5f7fc;
  --sombra-menu-shadow: 0 16px 44px #0006, inset 0 1px 0 #ffffff12;
- --sombra-menu-blur: blur(24px) saturate(125%);
+ /* Меню живут в портале вне темы окна, поэтому плотность и цвет у них свои,
+    а сила матовости — из общей системы поверхностей. */
+ --sombra-menu-blur: blur(var(--surface-blur, 24px)) saturate(var(--surface-saturate, 125%));
 }
 .sombra-menu-surface[data-slot] {
  background: var(--sombra-menu-surface);

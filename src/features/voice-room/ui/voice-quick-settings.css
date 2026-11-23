@@ -1,6 +1,6 @@
 .chat-shell .profile .voice-device-control > button:enabled:is(:hover, :focus-visible),
 .chat-shell .profile .voice-device-control > .voice-quick-trigger[data-state='open'] {
- background: var(--glass-line);
+ background: var(--surface-border);
  color: var(--accent-foreground);
 }
 .voice-device-control {

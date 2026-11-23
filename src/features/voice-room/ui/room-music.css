@@ -7,7 +7,7 @@
  margin: 16px auto 0;
  text-align: start;
  overflow-wrap: anywhere;
- border: 1px solid var(--glass-line, var(--border));
+ border: 1px solid var(--surface-border, var(--border));
 }
 @supports (backdrop-filter: blur(1px)) {
  @media (prefers-reduced-transparency: no-preference) {

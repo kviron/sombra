@@ -22,7 +22,7 @@
  gap: 16px;
  padding: 16px 0;
  min-height: 44px;
- border-bottom: 1px solid var(--glass-line, #e1ebff21);
+ border-bottom: 1px solid var(--surface-border, #e1ebff21);
 }
 .notification-option > svg {
  flex-shrink: 0;

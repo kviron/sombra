@@ -9,36 +9,21 @@
  --border: rgb(255 255 255 / 0.1);
  --input: rgb(255 255 255 / 0.15);
  --ring: var(--settings-link);
+ /* Настройки плотнее общего стекла только по блюру, остальное — общие токены. */
+ --surface-tint: #1b1621;
+ --surface-alpha: 0.55;
+ --surface-blur: 44px;
+ --surface-saturate: 160%;
+ --surface-border: rgb(255 255 255 / 0.18);
  width: min(1080px, 100%);
  height: min(660px, 100%);
  color: var(--foreground);
- /* Матовое стекло: тёмная полупрозрачная панель над размытым чатом. */
- background: color-mix(in srgb, #1b1621 68%, transparent);
- background-image:
-  linear-gradient(180deg, #ffffff12, #ffffff00 38%), radial-gradient(130% 90% at 100% 0%, #5d0ec02e, transparent 58%);
- border: 1px solid #ffffff2e;
  border-radius: 14px;
- -webkit-backdrop-filter: blur(30px) saturate(150%);
- backdrop-filter: blur(30px) saturate(150%);
- box-shadow:
-  0 32px 90px #000000a6,
-  inset 0 1px 0 #ffffff2e;
 }
 /* Подложка под окном настроек светлее обычной модальной: иначе чат за стеклом
    сначала гасится на половину, и матовость панели не видно. */
 .modal-backdrop.settings-backdrop {
  background: rgb(4 6 12 / 0.34);
- -webkit-backdrop-filter: blur(3px);
- backdrop-filter: blur(3px);
-}
-/* Прозрачность — украшение: при системной настройке «уменьшить прозрачность» панель непрозрачна. */
-@media (prefers-reduced-transparency: reduce) {
- .app-surface .account-modal.settings-mira {
-  background: #1b1621;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: none;
- }
 }
 .app-surface .account-modal.settings-mira[data-section='journal'] {
  height: min(752px, 100%);
@@ -75,10 +60,12 @@
  z-index: 2;
  margin-inline: -24px;
  padding: 20px 64px 20px 24px;
- border-bottom: 1px solid var(--border);
- background: color-mix(in srgb, #1b1621 90%, transparent);
- -webkit-backdrop-filter: blur(16px) saturate(130%);
- backdrop-filter: blur(16px) saturate(130%);
+ border: 0;
+ border-bottom: 1px solid var(--surface-border);
+ border-radius: 0;
+ box-shadow: none;
+ /* Шапка липнет поверх прокрутки: подложка плотнее окна, чтобы строки не просвечивали. */
+ --surface-alpha: 0.92;
 }
 .settings-mira #account-panel .journal-summary {
  gap: 4px;
@@ -106,7 +93,6 @@
  width: 236px;
  padding: 12px;
  gap: 12px;
- background: transparent;
  border-inline-end: 1px solid var(--border);
 }
 .chat-shell .account-modal.settings-mira aside [data-sidebar='menu-button'][data-active='true'] {

@@ -17,7 +17,7 @@
  align-items: center;
  gap: 16px;
  padding: 16px;
- border: 1px solid var(--glass-line, #e1ebff21);
+ border: 1px solid var(--surface-border, #e1ebff21);
  border-radius: 10px;
  background: #dce6f908;
 }
@@ -88,7 +88,7 @@
 }
 .cache-notes {
  padding-top: 16px;
- border-top: 1px solid var(--glass-line, #e1ebff21);
+ border-top: 1px solid var(--surface-border, #e1ebff21);
 }
 .cache-notes h3 {
  font-size: 14px;

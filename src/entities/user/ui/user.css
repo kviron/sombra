@@ -175,7 +175,7 @@
  gap: 10px;
 }
 .chat-shell .dialog-row[data-variant='dialog']:is(:hover, :focus-visible) {
- background: var(--glass-line);
+ background: var(--surface-border);
  color: var(--accent-foreground);
 }
 .chat-shell .user-row[data-variant='dialog'][data-selected='true'] {

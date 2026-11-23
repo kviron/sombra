@@ -145,7 +145,7 @@ export function ProfileDecorationPicker({
    <Dialog.Portal>
     <Dialog.Overlay className="profile-effects-overlay" />
     <Dialog.Content
-     className="profile-effects-dialog dark"
+     className="profile-effects-dialog dark surface-matte"
      data-target={target}
      aria-busy={busy}
      onOpenAutoFocus={event => {

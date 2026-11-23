@@ -17,11 +17,8 @@
  max-height: calc(100vh - 48px);
  overflow: auto;
  padding: 20px;
- border: 1px solid var(--border);
  border-radius: var(--radius);
- background: var(--sombra-menu-solid, var(--card));
  color: var(--foreground);
- box-shadow: 0 24px 64px rgb(0 0 0 / 0.45);
 }
 .profile-media-dialog header {
  display: flex;

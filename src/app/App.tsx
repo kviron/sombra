@@ -10,6 +10,7 @@ import {AppRouter, type AuthState} from '@/app/providers/router';
 import {useTheme, withTheme} from '@/app/providers/ThemeProvider';
 import {useWindowMaximized} from '@/app/lib/use-window-maximized';
 
+import './styles/surfaces.css';
 import './styles/glass.css';
 import './styles/settings.css';
 import './styles/chat-extras.css';

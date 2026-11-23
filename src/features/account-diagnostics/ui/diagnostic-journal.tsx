@@ -20,7 +20,7 @@ export function DiagnosticJournal({
  const {phase, entries, feedback, loading} = model;
  return (
   <section className="diagnostic-journal" aria-label="Журнал диагностики">
-   <div className="journal-heading">
+   <div className="journal-heading surface-matte">
     <div>
      <h2>Журнал</h2>
      <p>Диагностика Sombra за последние 48 часов</p>

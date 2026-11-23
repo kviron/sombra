@@ -5,12 +5,8 @@
  --secondary: #d2e0fa16;
  --border: #dce6fa20;
  --input: #dce6fa26;
- background: linear-gradient(125deg, #29313cde, #181c25ed);
- backdrop-filter: blur(36px) saturate(115%);
- -webkit-backdrop-filter: blur(36px) saturate(115%);
 }
 .app-surface .account-modal > aside.settings-sidebar {
- background: #10151c38;
  border-color: #dce6fa20;
 }
 .app-surface .account-modal [data-slot='input'],
@@ -406,10 +402,6 @@
  }
 }
 @media (prefers-reduced-transparency: reduce) {
- .app-surface .account-modal {
-  background: #202632;
-  backdrop-filter: none;
- }
  .expression-panel {
   background: #202632;
   backdrop-filter: none;

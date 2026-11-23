@@ -28,7 +28,7 @@ src/
       ErrorBoundary/     index.ts, ui/{ErrorBoundary,ErrorScreen,BugButton}.tsx, lib/error-summary.ts
       ThemeProvider/     index.ts, ui/{ThemeProvider,withTheme}.tsx, lib/{theme-context,useTheme}.ts
       router/            index.ts, config/routeConfig.tsx, ui/{AppRouter,RequireAuth}.tsx
-    styles/              index.css, glass.css, settings.css, chat-extras.css, hologram.css
+    styles/              index.css, surfaces.css, glass.css, settings.css, chat-extras.css, hologram.css
     dev/avatar-fx-preview/  стенд предпросмотра эффектов аватара (вне сборки приложения)
 ```
 
@@ -115,7 +115,7 @@ src/
 - **`shared/lib/user-actions.tsx`.** Это контекст внедрения зависимостей (страница передаёт колбэки открытия профиля, дружбы, личных сообщений), а не правило пользователя. Поэтому он в `shared`, а не в `entities/user`: так `entities/message` и `features/voice-room` используют его без импорта между срезами.
 - **`app/dev/avatar-fx-preview/`.** Стенд предпросмотра эффектов аватара. Раньше он лежал в `shared/ui/avatar-fx/preview` и импортировал код из `app` (импорт вверх). Теперь он в `app` и может импортировать что угодно; в сборку приложения не входит.
 - **`shared/api` разделён на слои.** `api.ts` — единый объект запросов с группами по владельцу данных; `transport.ts` — сам транспорт (`request`), сеанс и `authenticate`/`logout`, его вызывают только `api` и сервисы; `services/` — то, что не принадлежит ни одной сущности (снапшот состояния, сеанс, кэш вложений, файлы). Транспортные типы переехали в `shared/types` и импортируются оттуда: `backend.ts` больше нет, как и импортов «тип + вызов» из одного места.
-- **Глобальные стили.** `glass.css`, `settings.css`, `chat-extras.css`, `hologram.css` подключаются один раз в `App.tsx`, чтобы порядок каскада остался прежним. Поэтому они лежат в `app/styles/`, а не рядом со срезами, которые их используют.
+- **Глобальные стили.** `surfaces.css`, `glass.css`, `settings.css`, `chat-extras.css`, `hologram.css` подключаются один раз в `App.tsx`, чтобы порядок каскада остался прежним. Поэтому они лежат в `app/styles/`, а не рядом со срезами, которые их используют.
 
 ## Известные остатки
 

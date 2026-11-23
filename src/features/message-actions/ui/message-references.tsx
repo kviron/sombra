@@ -98,7 +98,7 @@ export function ForwardPicker({
   >
    <Dialog.Portal>
     <Dialog.Overlay className="modal-backdrop" />
-    <Dialog.Content className="group-modal forward-picker dark">
+    <Dialog.Content className="group-modal forward-picker dark surface-matte">
      <header>
       <Dialog.Title>Переслать сообщение</Dialog.Title>
       <Dialog.Close asChild>

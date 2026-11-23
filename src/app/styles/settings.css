@@ -10,7 +10,7 @@
  width: 224px;
  padding: 12px 8px;
  gap: 12px;
- background: var(--sidebar);
+ background: transparent;
  border-color: var(--border);
 }
 .account-modal [data-sidebar='header'] {
@@ -249,7 +249,6 @@
  --accent: #414651;
  --input: #454952;
  --border: #353840;
- background: #25272e;
 }
 .account-modal > aside.settings-sidebar {
  width: 260px;

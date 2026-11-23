@@ -92,11 +92,8 @@
  z-index: 1401;
  width: min(820px, calc(100vw - 32px));
  overflow: hidden;
- background: var(--popover);
  color: var(--popover-foreground);
- border: 1px solid var(--border);
  border-radius: 16px;
- box-shadow: var(--sombra-menu-shadow);
 }
 .profile-effects-scroll {
  position: relative;

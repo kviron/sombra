@@ -44,7 +44,7 @@ export function ProfileMediaDialog({
    <Dialog.Portal>
     <Dialog.Overlay className="profile-media-overlay" />
     <Dialog.Content
-     className="profile-media-dialog dark"
+     className="profile-media-dialog dark surface-matte"
      data-target={target}
      aria-busy={model.busy}
      onOpenAutoFocus={event => {

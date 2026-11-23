@@ -193,20 +193,17 @@
 [data-target='avatar'] .profile-media-chips {
  left: 110px;
 }
-/* Кнопки поверх обложки и аватара — обычные Button из shared/ui (shadcn):
-   размер, радиус, наведение, фокус и disabled приходят от системы. Здесь только
-   подложка: на фотографии прозрачный secondary не читается, нужен затемнённый слой. */
+/* Кнопки поверх обложки и аватара — тот же матовый класс: на фотографии нужна
+   плотная подложка, поэтому здесь только переопределены токены, а не фон и блюр. */
 .account-modal #account-panel .profile-media-chips [data-slot='button'] {
- background: color-mix(in srgb, #08070d 70%, transparent);
- -webkit-backdrop-filter: blur(10px) saturate(140%);
- backdrop-filter: blur(10px) saturate(140%);
+ --surface-alpha: 0.72;
+ --surface-blur: 10px;
+ --surface-saturate: 140%;
+ --surface-shadow: 0 2px 10px rgb(0 0 0 / 0.4);
  color: #f7f7fb;
- box-shadow:
-  0 2px 10px #00000066,
-  0 0 0 1px #ffffff24;
 }
 .account-modal #account-panel .profile-media-chips [data-slot='button']:hover {
- background: color-mix(in srgb, #08070d 86%, transparent);
+ --surface-alpha: 0.82;
 }
 
 .approved-profile-identity {

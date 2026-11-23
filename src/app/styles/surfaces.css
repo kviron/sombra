@@ -1,0 +1,61 @@
+/* Единая матовая поверхность. Окна и диалоги не задают блюр, фон и тень сами:
+   они берут их из токенов и общего класса .surface-matte. */
+:root {
+ --surface-tint: #fbfdff;
+ --surface-alpha: 0.64;
+ --surface-blur: 36px;
+ --surface-saturate: 145%;
+ --surface-border: rgb(255 255 255 / 0.55);
+ --surface-shadow: 0 24px 64px rgb(10 18 35 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.45);
+}
+.dark,
+.app-surface.chat-window {
+ --surface-tint: #1b1e26;
+ --surface-alpha: 0.55;
+ --surface-blur: 40px;
+ --surface-saturate: 160%;
+ --surface-border: rgb(225 235 255 / 0.14);
+ --surface-shadow: 0 28px 72px rgb(0 0 0 / 0.52), inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+.surface-matte {
+ background-color: color-mix(in srgb, var(--surface-tint) calc(var(--surface-alpha) * 100%), transparent);
+ border: 1px solid var(--surface-border);
+ box-shadow: var(--surface-shadow);
+ -webkit-backdrop-filter: blur(var(--surface-blur)) saturate(var(--surface-saturate));
+ backdrop-filter: blur(var(--surface-blur)) saturate(var(--surface-saturate));
+ background-clip: padding-box;
+}
+/* Без поддержки блюра подложка плотная, иначе текст поедет по картинке. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+ :root,
+ .dark,
+ .app-surface.chat-window {
+  --surface-alpha: 1;
+ }
+ .surface-matte {
+  background-color: var(--surface-tint);
+ }
+}
+/* Системная настройка «уменьшить прозрачность»: плотный фон без блюра. */
+@media (prefers-reduced-transparency: reduce) {
+ :root,
+ .dark,
+ .app-surface.chat-window {
+  --surface-alpha: 1;
+ }
+ .surface-matte {
+  background-color: var(--surface-tint);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+ }
+}
+@media (forced-colors: active) {
+ .surface-matte {
+  background-color: Canvas;
+  color: CanvasText;
+  border-color: ButtonText;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+ }
+}

@@ -126,6 +126,7 @@ export function AccountSecurity({
           type="button"
           variant="secondary"
           size="sm"
+          className="surface-matte"
           aria-haspopup="dialog"
           disabled={busy || state.me.bot || !coverSupported}
           onClick={() => actions.openMedia('cover')}
@@ -138,6 +139,7 @@ export function AccountSecurity({
            type="button"
            variant="secondary"
            size="icon-lg"
+           className="surface-matte"
            aria-label="Удалить обложку"
            title="Удалить обложку"
            disabled={busy}
@@ -155,6 +157,7 @@ export function AccountSecurity({
           type="button"
           variant="secondary"
           size="sm"
+          className="surface-matte"
           aria-haspopup="dialog"
           disabled={busy || state.me.bot}
           onClick={() => actions.openMedia('avatar')}
@@ -167,6 +170,7 @@ export function AccountSecurity({
            type="button"
            variant="secondary"
            size="icon-lg"
+           className="surface-matte"
            aria-label="Удалить аватар"
            title="Удалить аватар"
            disabled={busy}
