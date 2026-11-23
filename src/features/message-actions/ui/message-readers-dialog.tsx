@@ -27,36 +27,38 @@ export function MessageReadersDialog({
    <Dialog.Portal>
     <Dialog.Overlay className="readers-overlay" />
     <Dialog.Content
-     className="readers-dialog"
+     className="readers-dialog fixed top-1/2 left-1/2 z-[111] max-h-[80dvh] w-[min(400px,calc(100%_-_32px))] -translate-x-1/2 -translate-y-1/2 overflow-auto p-5"
      aria-describedby={undefined}
      onCloseAutoFocus={event => {
       event.preventDefault();
       trigger.current?.focus({preventScroll: true});
      }}
     >
-     <header>
-      <Dialog.Title>Кто посмотрел</Dialog.Title>
-      <Dialog.Close aria-label="Закрыть">
+     <header className="flex items-center justify-between gap-4">
+      <Dialog.Title className="text-base font-semibold">Кто посмотрел</Dialog.Title>
+      <Dialog.Close className="min-h-11 min-w-11" aria-label="Закрыть">
        <X size={20} />
       </Dialog.Close>
      </header>
      {model.error ? (
       <div role="alert">
        <p>{model.error}</p>
-       <button type="button" onClick={model.actions.retry}>
+       <button type="button" className="min-h-11 min-w-11" onClick={model.actions.retry}>
         Повторить
        </button>
       </div>
      ) : model.readers === null ? (
       <p role="status">Загрузка…</p>
      ) : model.rows.length ? (
-      <ul>
+      <ul className="m-0 mt-3 list-none p-0">
        {model.rows.map(reader => (
-        <li key={reader.id}>
+        <li key={reader.id} className="flex items-center gap-3 py-3">
          <UserAvatar user={reader.user} size="sm" presence={false} decoration={reader.decoration} />
-         <div>
-          <strong>{reader.name}</strong>
-          <time dateTime={reader.iso}>{reader.label}</time>
+         <div className="min-w-0">
+          <strong className="block text-sm [overflow-wrap:anywhere]">{reader.name}</strong>
+          <time className="text-muted-foreground block text-xs" dateTime={reader.iso}>
+           {reader.label}
+          </time>
          </div>
         </li>
        ))}

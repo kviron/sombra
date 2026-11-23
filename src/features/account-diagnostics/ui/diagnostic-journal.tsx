@@ -20,12 +20,12 @@ export function DiagnosticJournal({
  const {phase, entries, feedback, loading} = model;
  return (
   <section className="diagnostic-journal" aria-label="Журнал диагностики">
-   <div className="journal-heading surface-matte">
+   <div className="journal-heading surface-matte flex flex-wrap items-start justify-between gap-3">
     <div>
      <h2>Журнал</h2>
      <p>Диагностика Sombra за последние 48 часов</p>
     </div>
-    <div className="journal-actions">
+    <div className="journal-actions flex flex-wrap items-center gap-2">
      <Button type="button" disabled={!model.available || loading} onClick={model.refresh}>
       <RefreshCw />
       Обновить
@@ -66,14 +66,19 @@ export function DiagnosticJournal({
     </div>
    </div>
    {feedback && <p role="status">{feedback}</p>}
-   <div className="journal-summary" role="status">
-    <strong className="journal-total">{entries?.length ?? '—'}</strong>
+   <div
+    className="journal-summary bg-secondary text-secondary-foreground mt-5 flex items-center gap-3 rounded-[var(--radius-lg)] px-4 py-3"
+    role="status"
+   >
+    <strong className="journal-total text-destructive text-2xl leading-[1.25] tabular-nums">
+     {entries?.length ?? '—'}
+    </strong>
     <div>
      <strong>Ошибки</strong>
      <p>В сохранённых записях</p>
     </div>
    </div>
-   <h3>Хронология ошибок</h3>
+   <h3 className="mt-4 mb-3 text-base leading-[1.5] font-semibold">Хронология ошибок</h3>
    {!model.available ? (
     <p role="status">Журнал доступен только в настольном приложении.</p>
    ) : loading ? (
@@ -87,31 +92,39 @@ export function DiagnosticJournal({
     <p role="status">За последние 48 часов ошибок не сохранено.</p>
    ) : null}
    {!!entries?.length && (
-    <ol className="journal-entries">
+    <ol className="journal-entries m-0 list-none p-0">
      {entries.map(({time, operation, category, status}, index) => {
       const date = new Date(time * 1000);
       const valid = Number.isFinite(date.getTime());
       const details = model.details({operation, category, status});
       return (
-       <li key={`${time}-${operation}-${index}`}>
+       <li
+        key={`${time}-${operation}-${index}`}
+        className="grid grid-cols-[72px_minmax(0,1fr)] items-start gap-4 [overflow-wrap:anywhere]"
+       >
         {valid ? (
-         <time dateTime={date.toISOString()} title={model.fullDate(date)} aria-label={model.fullDate(date)}>
+         <time
+          className="text-muted-foreground pt-3.5 tabular-nums"
+          dateTime={date.toISOString()}
+          title={model.fullDate(date)}
+          aria-label={model.fullDate(date)}
+         >
           {model.clock(date)}
          </time>
         ) : (
-         <span>—</span>
+         <span className="text-muted-foreground pt-3.5 tabular-nums">—</span>
         )}
-        <details open={index === 0 || undefined}>
-         <summary className="journal-entry-heading">
+        <details className="border-border relative min-w-0 border-s pb-3 pl-4" open={index === 0 || undefined}>
+         <summary className="journal-entry-heading bg-secondary hover:bg-accent relative min-h-11 cursor-pointer list-none rounded-[var(--radius-lg)] px-9 pt-3 pb-3 pl-3 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ring)]">
           {status !== null && <Badge variant="secondary">HTTP {status}</Badge>}
           <strong>{model.label(operation, category)}</strong>
           <code>{operation}</code>
           <ChevronDown size={16} aria-hidden="true" />
          </summary>
-         <div className="journal-entry-details">
-          <div className="journal-code-head">
+         <div className="journal-entry-details border-border bg-secondary overflow-hidden rounded-b-[var(--radius-lg)] border-t">
+          <div className="journal-code-head border-border flex flex-wrap items-center justify-between gap-2 border-b px-3 py-1">
            <strong>Детали ошибки</strong>
-           <span>
+           <span className="text-muted-foreground inline-flex items-center gap-1 text-xs leading-[1.5]">
             JSON{' '}
             <Button
              type="button"
@@ -124,13 +137,13 @@ export function DiagnosticJournal({
             </Button>
            </span>
           </div>
-          <pre>
+          <pre className="m-0 overflow-auto px-3.5 py-3 text-xs leading-[1.5] whitespace-pre">
            <code>
             {'{\n'}
             {Object.entries(details).map(([key, value], i) => (
              <span key={key}>
               {'  '}
-              <b>{JSON.stringify(key)}</b>
+              <b className="text-ring font-medium">{JSON.stringify(key)}</b>
               {': '}
               {JSON.stringify(value)}
               {i < 3 ? ',' : ''}
@@ -147,7 +160,7 @@ export function DiagnosticJournal({
      })}
     </ol>
    )}
-   <footer>Звук, сообщения и токены не сохраняются.</footer>
+   <footer className="mt-4">Звук, сообщения и токены не сохраняются.</footer>
   </section>
  );
 }

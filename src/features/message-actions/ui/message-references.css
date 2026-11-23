@@ -1,3 +1,13 @@
+/* Цитата, пересылка и пикер пересылки. Почти всё осталось в CSS:
+   - .message-reference и .reference-draft живут в композере внутри .chat-shell,
+     а chat.css безусловно задаёт `.chat-shell button` (display/gap) вне слоя,
+     да и сами классы общие с pages/chat;
+   - .message-forwarded и .forward-composer рисует pages/chat (message-item,
+     chat-composer), срез держит их стили;
+   - .forward-picker поверх .group-modal перебивает глобальные правила чата
+     (`.group-modal h2`, `.modal-backdrop`), поэтому остаётся нелейерным.
+   Список и шапка пикера — в портале, вне .chat-shell, и собраны утилитами. */
+
 .message-reference,
 .reference-draft {
  display: flex;
@@ -92,6 +102,7 @@ button.message-reference:hover,
  padding: 8px;
  background: transparent;
 }
+/* Окно пикера: перебивает .group-modal из chat.css. */
 .forward-picker.group-modal {
  position: fixed;
  z-index: 101;
@@ -104,37 +115,8 @@ button.message-reference:hover,
  padding: 16px;
  overflow: auto;
 }
-.forward-picker header {
- display: flex;
- align-items: center;
- gap: 8px;
- color: var(--foreground);
-}
 .forward-picker h2 {
  margin: 0;
-}
-.forward-picker ul {
- display: grid;
- gap: 2px;
- max-height: min(45vh, 340px);
- overflow: auto;
- padding: 0;
- margin: 0;
- list-style: none;
-}
-.forward-picker li button {
- display: flex;
- align-items: center;
- text-align: left;
- gap: 12px;
- width: 100%;
- min-height: 48px;
- padding: 6px 10px;
- border-radius: 6px;
- color: var(--muted-foreground);
-}
-.forward-picker label {
- width: 100%;
 }
 .forward-picker button:focus-visible,
 .reference-draft button:focus-visible,

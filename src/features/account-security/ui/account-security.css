@@ -1,69 +1,17 @@
-.approved-profile-grid,
-.account-modal .approved-email,
+/* Карточка профиля и секции безопасности. Раздел живёт в #account-panel, где
+   settings.css и chat.css задают p, h2, label, inputs вне слоёв, поэтому часть
+   правил остаётся в CSS. Утилитами собраны карточка сеанса, шаги пароля и поля
+   личности. Отдельно: блок .profile-media* переопределяет базовые классы из
+   features/profile-decoration — они не в слое, значит переопределения тоже. */
+
+/* Сетки форм почты и сеансов: gap перебивает `.settings-form` из settings.css. */
+.approved-email,
 .approved-sessions {
  display: grid;
  grid-template-columns: repeat(2, minmax(0, 1fr));
  gap: 16px;
 }
-.approved-profile-grid {
- gap: 24px;
- align-items: start;
-}
-.approved-profile-fields,
-.approved-password-step,
-.approved-session-card {
- display: grid;
- gap: 12px;
- min-width: 0;
-}
-.approved-profile-fields h3,
-.approved-password-step h3,
-.approved-session-count {
- margin: 0;
- font-size: 16px;
- font-weight: 600;
-}
-.approved-profile-grid .profile-media {
- display: grid;
- grid-template-columns: 1fr;
- padding: 0;
- gap: 0;
- min-width: 0;
- background: var(--card);
- border: 1px solid var(--border);
- border-radius: var(--radius);
- overflow: hidden;
-}
-.approved-profile-grid .profile-media-item[data-target='cover'] {
- grid-row: 1;
-}
-.approved-profile-grid .profile-media-item[data-target='cover'] .settings-cover-preview {
- width: 100%;
- height: 124px;
-}
-.approved-profile-grid .profile-media-item[data-target='avatar'] {
- grid-row: 2;
- justify-self: start;
- margin: -26px 0 0 16px;
- z-index: 1;
-}
-.approved-profile-grid .profile-media-label {
- display: none;
-}
-.approved-profile-identity {
- padding: 12px 16px 16px;
- overflow-wrap: anywhere;
-}
-.approved-profile-identity strong {
- font-size: 20px;
-}
-.approved-profile-identity :is(p, small) {
- color: var(--muted-foreground);
-}
-.approved-profile-identity small {
- display: block;
- margin-top: 12px;
-}
+/* !important — поверх max-width у .settings-form в settings.css. */
 .approved-email {
  max-width: none !important;
 }
@@ -74,67 +22,15 @@
 .approved-password {
  max-width: 620px !important;
 }
-.approved-password-step {
- border-top: 1px solid var(--border);
- padding-top: 16px;
-}
 .approved-password > .settings-actions {
  justify-content: flex-end;
 }
-.approved-session-count {
- margin-block: 16px 12px;
-}
-.approved-session-count span {
- font-size: 13px;
- background: var(--muted);
- border-radius: 999px;
- padding: 2px 8px;
-}
-.approved-sessions {
- list-style: none;
- margin: 0;
- padding: 0;
-}
-.approved-session-card {
- padding: 20px;
- border: 1px solid var(--border);
- border-radius: var(--radius);
- background: var(--card);
- justify-items: start;
- overflow-wrap: anywhere;
-}
-.approved-session-card[data-current='true'] {
- border-top-color: var(--ring);
-}
-.approved-session-card svg {
- color: var(--ring);
-}
-.approved-session-card strong {
- font-size: 18px;
-}
+/* Подписи внутри карточек: цвет перебивает `.account-modal p`. */
 .approved-session-card :is(p, small) {
  color: var(--muted-foreground);
 }
-.approved-session-actions {
- border-top: 1px solid var(--border);
- padding-top: 16px;
- margin-top: 16px;
-}
-
-@media (max-width: 740px) {
- .approved-profile-grid,
- .account-modal .approved-email,
- .approved-sessions {
-  grid-template-columns: 1fr;
- }
-}
-
-/* Карточка профиля на всю ширину: обложка-баннер, аватар поверх неё, имя и описание.
-   Раньше поля жили в левой колонке; теперь всё редактирование — на самой карточке. */
-.approved-profile-grid {
- grid-template-columns: minmax(0, 1fr);
- gap: 0;
-}
+/* Карточка профиля: обложка-баннер, аватар поверх неё, имя и описание.
+   Переопределения базовых .profile-media* (они не в слое). */
 .approved-profile-grid .profile-media {
  position: relative;
  display: block;
@@ -173,7 +69,7 @@
  border: 3px solid var(--card);
  background: var(--card);
 }
-
+/* Плашки поверх обложки: тот же матовый класс, переопределены только токены. */
 .profile-media-chips {
  position: absolute;
  z-index: 3;
@@ -193,8 +89,6 @@
 [data-target='avatar'] .profile-media-chips {
  left: 110px;
 }
-/* Кнопки поверх обложки и аватара — тот же матовый класс: на фотографии нужна
-   плотная подложка, поэтому здесь только переопределены токены, а не фон и блюр. */
 .account-modal #account-panel .profile-media-chips [data-slot='button'] {
  --surface-alpha: 0.72;
  --surface-blur: 10px;
@@ -205,19 +99,16 @@
 .account-modal #account-panel .profile-media-chips [data-slot='button']:hover {
  --surface-alpha: 0.82;
 }
-
-.approved-profile-identity {
- display: grid;
- gap: 4px;
- padding: 56px 24px 16px;
- overflow-wrap: anywhere;
+/* Описание под именем: цвет перебивает `.account-modal p`. */
+.approved-profile-identity :is(p, small) {
+ color: var(--muted-foreground);
 }
-.profile-identity-field {
- display: flex;
- align-items: center;
- gap: 8px;
- min-width: 0;
+.approved-profile-identity small {
+ display: block;
+ margin-top: 12px;
+ color: var(--muted-foreground);
 }
+/* Поле-строка личности: рамка проявляется на hover, фон — на фокусе. */
 .profile-identity-input {
  field-sizing: content;
  min-width: 8ch;
@@ -227,7 +118,6 @@
  border-radius: var(--radius-sm);
  background: transparent;
  color: var(--foreground);
- font: inherit;
  outline: none;
 }
 .profile-identity-input:hover {
@@ -237,42 +127,28 @@
  border-color: var(--ring);
  background: color-mix(in srgb, var(--foreground) 5%, transparent);
 }
-#account-name {
- font-size: 20px;
- font-weight: 600;
- line-height: 1.3;
-}
+/* Имя и описание: цвет задаёт ID-правило — его перебивает только .profile-identity-input
+   цветом foreground, поэтому цвет описания остаётся в CSS. */
 #account-bio {
- font-size: 14px;
  color: var(--muted-foreground);
 }
 #account-bio::placeholder {
  color: var(--muted-foreground);
 }
-/* «Карандаши» у имени и описания — Button variant=ghost из shared/ui; здесь
-   остаётся только появление при наведении, остальное даёт система. */
-.profile-identity-edit {
- opacity: 0;
- transition: opacity 150ms ease;
-}
-.profile-identity-edit:focus-visible {
- opacity: 1;
-}
-.profile-identity-field:hover .profile-identity-edit,
-.profile-identity-field:focus-within .profile-identity-edit {
- opacity: 1;
-}
+/* На сенсорном экране «карандаш» виден всегда. */
 @media (hover: none) {
  .profile-identity-edit {
   opacity: 1;
  }
 }
-.approved-profile-identity small {
- display: block;
- margin-top: 12px;
- color: var(--muted-foreground);
+/* Узкий экран: формы становятся одноколоночными (перебивает утилиты). */
+@media (max-width: 740px) {
+ .approved-profile-grid,
+ .account-modal .approved-email,
+ .approved-sessions {
+  grid-template-columns: 1fr;
+ }
 }
-
 @media (max-width: 640px) {
  .approved-profile-grid .profile-media-item[data-target='avatar'] {
   top: auto;

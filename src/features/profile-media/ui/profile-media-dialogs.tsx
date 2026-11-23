@@ -5,6 +5,7 @@ import type {ProfileDecorationDoc, ProfileEffectTarget, User} from '@/shared/typ
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {ProfileCover} from '@/shared/ui/profile-cover';
 import {Button} from '@/shared/ui/button';
+import {cn} from '@/shared/lib';
 import {useProfileMedia} from '../model/use-profile-media';
 import './profile-media-dialogs.css';
 
@@ -44,7 +45,10 @@ export function ProfileMediaDialog({
    <Dialog.Portal>
     <Dialog.Overlay className="profile-media-overlay" />
     <Dialog.Content
-     className="profile-media-dialog dark surface-matte"
+     className={cn(
+      'profile-media-dialog dark surface-matte',
+      'text-foreground fixed top-1/2 left-1/2 z-[1401] grid max-h-[calc(100vh_-_48px)] w-[min(560px,calc(100vw_-_32px))] [transform:translate(-50%,-50%)] gap-3.5 overflow-auto rounded-[var(--radius)] p-5'
+     )}
      data-target={target}
      aria-busy={model.busy}
      onOpenAutoFocus={event => {
@@ -62,12 +66,14 @@ export function ProfileMediaDialog({
       if (model.busy) event.preventDefault();
      }}
     >
-     <header>
+     <header className="flex items-start justify-between gap-4">
       <div>
-       <Dialog.Title ref={heading} tabIndex={-1}>
+       <Dialog.Title ref={heading} tabIndex={-1} className="m-0 text-[17px] leading-6 font-semibold">
         {model.title}
        </Dialog.Title>
-       <Dialog.Description>{model.description}</Dialog.Description>
+       <Dialog.Description className="text-muted-foreground mt-0.5 text-xs leading-[1.5]">
+        {model.description}
+       </Dialog.Description>
       </div>
       <Dialog.Close asChild>
        <Button type="button" variant="ghost" size="icon" disabled={model.busy} aria-label="Закрыть окно">
@@ -75,9 +81,9 @@ export function ProfileMediaDialog({
        </Button>
       </Dialog.Close>
      </header>
-     <section className="profile-media-section">
-      <h3>Изображение</h3>
-      <div className="profile-media-picture" data-kind={target}>
+     <section className={cn('profile-media-section', 'border-border grid gap-2 border-t pt-4')}>
+      <h3 className="text-muted-foreground m-0 text-xs leading-[1.5] font-medium">Изображение</h3>
+      <div className="profile-media-picture grid place-items-start" data-kind={target}>
        {target === 'avatar' ? (
         <UserAvatar user={user} size="xl" presence={false} decorative effectAsset={null} decoration={model.frame} />
        ) : (
@@ -90,7 +96,7 @@ export function ProfileMediaDialog({
         />
        )}
       </div>
-      <div className="profile-media-picture-actions">
+      <div className="profile-media-picture-actions flex flex-wrap items-center gap-2">
        <Button type="button" variant="outline" size="sm" disabled={disabled || model.busy} onClick={onPickImage}>
         <Upload />
         Загрузить
@@ -106,13 +112,15 @@ export function ProfileMediaDialog({
          Удалить
         </Button>
        )}
-       <span className="profile-media-hint">{pickHint}</span>
+       <span className="profile-media-hint text-muted-foreground text-xs leading-[1.5]">{pickHint}</span>
       </div>
      </section>
-     <section className="profile-media-section">
-      <h3>{target === 'avatar' ? 'Рамка' : 'Анимация'}</h3>
+     <section className={cn('profile-media-section', 'border-border grid gap-2 border-t pt-4')}>
+      <h3 className="text-muted-foreground m-0 text-xs leading-[1.5] font-medium">
+       {target === 'avatar' ? 'Рамка' : 'Анимация'}
+      </h3>
       <div
-       className="profile-media-options"
+       className="profile-media-options grid grid-cols-3 gap-3"
        role="group"
        aria-label={target === 'avatar' ? 'Рамки аватара' : 'Анимации обложки'}
       >
@@ -127,7 +135,7 @@ export function ProfileMediaDialog({
           disabled={model.busy}
           onClick={() => void model.apply(option.doc)}
          >
-          <span className="profile-media-option-sample" data-target={target}>
+          <span className="profile-media-option-sample grid w-full place-items-center" data-target={target}>
            {target === 'avatar' ? (
             <UserAvatar
              user={{...user, avatar: ''}}
@@ -156,7 +164,7 @@ export function ProfileMediaDialog({
        type="button"
        variant="ghost"
        size="sm"
-       className="profile-media-catalog"
+       className="profile-media-catalog justify-self-start"
        disabled={model.busy}
        onClick={onCatalog}
       >
@@ -166,13 +174,17 @@ export function ProfileMediaDialog({
      </section>
      {(model.error || model.notice) && (
       <p
-       className={model.error ? 'profile-media-error' : 'profile-media-notice'}
+       className={cn(
+        model.error ? 'profile-media-error' : 'profile-media-notice',
+        'm-0',
+        model.error ? 'text-[13px] text-[#ff9aa2]' : 'text-muted-foreground text-xs leading-[1.5]'
+       )}
        role={model.error ? 'alert' : 'status'}
       >
        {model.error || model.notice}
       </p>
      )}
-     <footer>
+     <footer className="border-border flex items-center justify-end gap-2 border-t pt-3">
       <Dialog.Close asChild>
        <Button type="button" variant="outline" disabled={model.busy}>
         Готово

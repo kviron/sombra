@@ -99,7 +99,7 @@ export function ForwardPicker({
    <Dialog.Portal>
     <Dialog.Overlay className="modal-backdrop" />
     <Dialog.Content className="group-modal forward-picker dark surface-matte">
-     <header>
+     <header className="text-foreground flex items-center gap-2">
       <Dialog.Title>Переслать сообщение</Dialog.Title>
       <Dialog.Close asChild>
        <button type="button" aria-label="Закрыть">
@@ -116,7 +116,7 @@ export function ForwardPicker({
        </span>
       </div>
      </Dialog.Description>
-     <label className="dialog-search">
+     <label className="dialog-search w-full">
       <Search size={17} aria-hidden="true" />
       <input
        autoFocus
@@ -126,12 +126,16 @@ export function ForwardPicker({
        onChange={event => model.actions.setQuery(event.target.value)}
       />
      </label>
-     <ul aria-label="Куда переслать">
+     <ul className="m-0 grid max-h-[min(45vh,340px)] list-none gap-0.5 overflow-auto p-0" aria-label="Куда переслать">
       {model.matches.map(item => {
        const Icon = item.voice ? Volume2 : item.group ? Hash : MessageCircle;
        return (
         <li key={item.id}>
-         <button type="button" onClick={() => onChoose(item)}>
+         <button
+          type="button"
+          className="text-muted-foreground flex min-h-12 w-full items-center gap-3 rounded-[6px] px-2.5 py-1.5 text-left"
+          onClick={() => onChoose(item)}
+         >
           <Icon size={18} aria-hidden="true" />
           <span>
            <strong>{item.name}</strong>

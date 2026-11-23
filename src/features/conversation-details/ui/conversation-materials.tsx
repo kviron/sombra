@@ -9,6 +9,7 @@ import {
 } from '@/entities/message';
 import {MessageAttachment} from '@/entities/message';
 import {handleMessageLinkClick} from '@/entities/message';
+import {cn} from '@/shared/lib';
 import './conversation-materials.css';
 const categories = [
  {id: 'photos', label: 'Фото', icon: Image},
@@ -125,7 +126,7 @@ export function ConversationMaterials({
      </button>
     )}
    </label>
-   <div className="materials-content">
+   <div className="materials-content min-h-0 flex-1 overflow-auto overscroll-contain px-3 pb-5">
     {overview ? (
      <>
       <nav className="materials-categories" aria-label="Категории материалов">
@@ -145,10 +146,10 @@ export function ConversationMaterials({
         </button>
        ))}
       </nav>
-      <div className="materials-summary">
+      <div className="materials-summary px-3 py-7 text-center text-[var(--materials-muted)] [&>svg]:mx-auto [&>svg]:mb-3 [&>svg]:opacity-80">
        <Link2 size={24} />
-       <p>Вложения и ссылки этой переписки — в одном месте.</p>
-       <span>
+       <p className="m-0 mb-2 text-[13px] leading-[1.5]">Вложения и ссылки этой переписки — в одном месте.</p>
+       <span className="block text-xs leading-[1.5]">
         {items.length
          ? 'Выберите категорию или воспользуйтесь поиском.'
          : 'Пока здесь нет материалов. Они появятся после отправки вложения или ссылки.'}
@@ -157,28 +158,35 @@ export function ConversationMaterials({
      </>
     ) : (
      <>
-      <p className="materials-results" role="status">
+      <p className="materials-results mx-0 mt-1 mb-3 text-xs leading-[1.5] text-[var(--materials-muted)]" role="status">
        {filtered.length ? `Найдено: ${filtered.length}` : query ? 'Ничего не найдено' : 'В этой категории пока пусто'}
       </p>
       {[...grouped].map(([monthLabel, entries]) => (
        <section className="materials-month-group" key={monthLabel}>
-        <h3 className="materials-month">{monthLabel}</h3>
-        <div className={category === 'photos' ? 'materials-photo-grid' : 'materials-list'}>
+        <h3 className="materials-month mt-4 mb-2 text-xs leading-[1.5] font-semibold text-[#c2ccdc] capitalize">
+         {monthLabel}
+        </h3>
+        <div className={category === 'photos' ? 'materials-photo-grid' : 'materials-list grid gap-2'}>
          {entries.map(item => (
           <article
            key={item.id}
-           className="material-card"
+           className={cn(
+            'material-card',
+            'relative min-w-0 overflow-hidden rounded-[9px] border border-[var(--materials-line)] bg-[#c0d0ef06]',
+            'data-[category=photos]:border-transparent data-[category=photos]:bg-transparent'
+           )}
            data-material-id={item.id}
            data-category={item.category}
            data-expired={(item.message.attachment?.expired && !item.message.attachment.cached) || undefined}
           >
            {item.href ? (
-            <div className="material-link">
-             <div className="material-link-symbol">
+            <div className="material-link flex min-w-0 items-start gap-2.5 px-3 pt-3 pb-1">
+             <div className="material-link-symbol grid size-9 shrink-0 place-items-center rounded-[8px] bg-[#9abaf01c] text-[#aacbff]">
               <Link2 size={19} />
              </div>
-             <div>
+             <div className="min-w-0 flex-1">
               <a
+               className="line-clamp-2 block text-[13px] leading-[1.45] font-semibold [overflow-wrap:anywhere] text-[#b3d2ff] hover:underline"
                href={item.href}
                target="_blank"
                rel="noopener noreferrer"
@@ -187,8 +195,12 @@ export function ConversationMaterials({
               >
                {item.title}
               </a>
-              <span>{new URL(item.href).hostname}</span>
-              <p>{item.href}</p>
+              <span className="mt-1 block text-[11px] [overflow-wrap:anywhere] text-[var(--materials-muted)]">
+               {new URL(item.href).hostname}
+              </span>
+              <p className="mt-[5px] mb-0 overflow-hidden text-xs leading-[1.4] text-ellipsis whitespace-nowrap text-[#9ab6e3]">
+               {item.href}
+              </p>
              </div>
             </div>
            ) : (
@@ -198,8 +210,11 @@ export function ConversationMaterials({
              </>
             )
            )}
-           <footer className="material-caption">
-            <span title={userName(item.message.user)}>
+           <footer className="material-caption flex min-w-0 items-center gap-2 px-2 pt-1 pb-1 pl-3 text-[11px] text-[var(--materials-muted)]">
+            <span
+             className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+             title={userName(item.message.user)}
+            >
              {userName(item.message.user)} · {date(item.message.time)}
             </span>
             <button

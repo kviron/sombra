@@ -117,7 +117,7 @@ export function AccountSecurity({
      Информация об учётной записи
     </h2>
     {state && (
-     <div className="approved-profile-grid">
+     <div className="approved-profile-grid grid grid-cols-[minmax(0,1fr)] gap-0">
       <div className="profile-media">
        <div className="profile-media-item" data-target="cover">
         <ProfileCover user={state.me} accountId={state.me.id} className="settings-cover-preview" />
@@ -181,11 +181,11 @@ export function AccountSecurity({
          )}
         </div>
        </div>
-       <div className="approved-profile-identity">
-        <div className="profile-identity-field">
+       <div className="approved-profile-identity grid gap-1 px-6 pt-14 pb-4 [overflow-wrap:anywhere]">
+        <div className="profile-identity-field group flex min-w-0 items-center gap-2">
          <input
           id="account-name"
-          className="profile-identity-input"
+          className="profile-identity-input text-xl leading-[1.3] font-semibold"
           autoComplete="nickname"
           aria-label="Имя пользователя"
           value={name}
@@ -198,7 +198,7 @@ export function AccountSecurity({
           type="button"
           variant="ghost"
           size="icon-xs"
-          className="profile-identity-edit"
+          className="profile-identity-edit opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
           title="Изменить имя"
           aria-label="Изменить имя пользователя"
           onClick={() => document.querySelector<HTMLInputElement>('#account-name')?.focus()}
@@ -206,10 +206,10 @@ export function AccountSecurity({
           <Pencil aria-hidden="true" />
          </Button>
         </div>
-        <div className="profile-identity-field">
+        <div className="profile-identity-field group flex min-w-0 items-center gap-2">
          <input
           id="account-bio"
-          className="profile-identity-input"
+          className="profile-identity-input text-[14px]"
           aria-label="О себе"
           placeholder="Описание пока не добавлено."
           value={bio}
@@ -221,7 +221,7 @@ export function AccountSecurity({
           type="button"
           variant="ghost"
           size="icon-xs"
-          className="profile-identity-edit"
+          className="profile-identity-edit opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
           title="Изменить описание"
           aria-label="Изменить описание"
           onClick={() => document.querySelector<HTMLInputElement>('#account-bio')?.focus()}
@@ -351,8 +351,8 @@ export function AccountSecurity({
      Пароль и безопасность
     </h2>
     <form className="settings-form approved-password" onSubmit={password}>
-     <div className="approved-password-step">
-      <h3>1. Подтвердите текущий пароль</h3>
+     <div className="approved-password-step border-border grid min-w-0 gap-3 border-t pt-4">
+      <h3 className="m-0 text-base leading-[1.5] font-semibold">1. Подтвердите текущий пароль</h3>
       <div className="settings-field">
        <Label htmlFor="password-current">Текущий пароль</Label>
        <Input
@@ -365,8 +365,8 @@ export function AccountSecurity({
        />
       </div>
      </div>
-     <div className="approved-password-step">
-      <h3>2. Задайте новый пароль</h3>
+     <div className="approved-password-step border-border grid min-w-0 gap-3 border-t pt-4">
+      <h3 className="m-0 text-base leading-[1.5] font-semibold">2. Задайте новый пароль</h3>
       <div className="settings-field">
        <Label htmlFor="password-new">Новый пароль</Label>
        <Input
@@ -410,15 +410,19 @@ export function AccountSecurity({
     <p className="settings-hint">
      С опцией «Оставаться в системе» вход сохраняется на год. Без неё — до 30 дней или 7 дней бездействия.
     </p>
-    <h3 className="approved-session-count">
-     Устройства <span>{sessions.length}</span>
+    <h3 className="approved-session-count m-0 mt-4 mb-3 text-base leading-[1.5] font-semibold">
+     Устройства <span className="bg-muted rounded-full px-2 py-0.5 text-[13px] leading-[1.5]">{sessions.length}</span>
     </h3>
-    <ul className="approved-sessions">
+    <ul className="approved-sessions m-0 list-none p-0">
      {sessions.map(session => (
-      <li key={session.id} className="approved-session-card" data-current={session.current}>
+      <li
+       key={session.id}
+       className="approved-session-card border-border bg-card grid min-w-0 justify-items-start gap-3 rounded-[var(--radius)] border p-5 [overflow-wrap:anywhere] data-[current=true]:border-t-[var(--ring)] [&>svg]:text-[var(--ring)]"
+       data-current={session.current}
+      >
        <Monitor size={24} aria-hidden="true" />
        <div>
-        <strong>{sessionTitle(session)}</strong>
+        <strong className="text-lg leading-[1.5]">{sessionTitle(session)}</strong>
         <p title={session.device}>{deviceLabel(session.device)}</p>
         <small>Последняя активность: {lastSeenLabel(session.last_seen)}</small>
        </div>
@@ -428,7 +432,7 @@ export function AccountSecurity({
       </li>
      ))}
     </ul>
-    <div className="approved-session-actions">
+    <div className="approved-session-actions border-border mt-4 border-t pt-4">
      <Button variant="outline" size="sm" disabled={busy} onClick={actions.logoutAll}>
       Выйти на всех устройствах
      </Button>

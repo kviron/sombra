@@ -1,3 +1,14 @@
+/* Пикер украшений. Утилитами собраны раскладка, отступы, типографика и состояния,
+   которые видит только это окно. Здесь осталось невыразимое:
+   - классы .profile-media* — общий ресурс для account-security и settings-mira;
+   - оверлей: glass.css вешает на .profile-effects-overlay размытие подложки;
+   - токены меню и всё, что зависит от data-target окна;
+   - слоты shared/ui (.profile-cover, .profile-cover-glow) и псевдоэлементы;
+   - цвета на color-mix(), @keyframes нет, медиа-условия и фокус-рамка. */
+
+/* ---------- .profile-media*: карточка профиля в настройках аккаунта ---------- */
+/* Разметку рисует features/account-security, переопределения — её же таблица
+   стилей и pages/chat/settings-mira.css; срез только держит базовые классы. */
 .profile-media {
  display: grid;
  grid-template-columns: 148px minmax(0, 348px);
@@ -68,12 +79,16 @@
  outline: 2px solid var(--ring);
  outline-offset: 2px;
 }
+
+/* ---------- Окно пикера ---------- */
+/* Оверлей — hook для :is(...) из glass.css. */
 .profile-effects-overlay {
  position: fixed;
  inset: 0;
  background: color-mix(in srgb, var(--sombra-menu-solid) 80%, transparent);
  z-index: 1400;
 }
+/* Токены меню: окно живёт в «менюшной» палитре, а не в теме приложения. */
 .profile-effects-dialog {
  --popover: var(--sombra-menu-solid);
  --popover-foreground: var(--sombra-menu-text);
@@ -86,189 +101,10 @@
  --primary: var(--sombra-menu-text);
  --primary-foreground: var(--sombra-menu-solid);
  --ring: var(--sombra-menu-muted);
- position: fixed;
- inset: 50% auto auto 50%;
- transform: translate(-50%, -50%);
- z-index: 1401;
- width: min(820px, calc(100vw - 32px));
- overflow: hidden;
  color: var(--popover-foreground);
- border-radius: 16px;
 }
-.profile-effects-scroll {
- position: relative;
- overflow: hidden;
-}
-.profile-effects-viewport {
- width: 100%;
- max-height: calc(100dvh - 34px);
-}
-.profile-effects-body {
- display: grid;
- gap: 20px;
- padding: 24px;
-}
-.profile-effects-scrollbar {
- display: flex;
- width: 10px;
- padding: 2px;
- touch-action: none;
- user-select: none;
-}
-.profile-effects-thumb {
- position: relative;
- flex: 1;
- border-radius: 999px;
- background: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
-}
-.profile-effects-thumb:hover {
- background: var(--muted-foreground);
-}
-.profile-effects-dialog header {
- display: flex;
- justify-content: space-between;
- align-items: start;
- gap: 12px;
-}
-.profile-effects-dialog h2 {
- margin: 0;
- font-size: 24px;
- line-height: 1.2;
- font-weight: 650;
-}
-.profile-effects-dialog header p {
- margin: 6px 0 0;
- color: var(--muted-foreground);
- font-size: 14px;
-}
-.profile-effect-options {
- display: grid;
- grid-template-columns: repeat(3, minmax(0, 1fr));
- gap: 12px;
-}
-.profile-effect-entry {
- display: grid;
- grid-template-rows: 1fr auto;
- align-items: start;
- min-width: 0;
-}
-.profile-effect-card {
- display: grid;
- grid-template-rows: auto 1fr;
- gap: 8px;
- width: 100%;
- height: 100%;
- min-width: 0;
- padding: 8px;
- border: 1px solid var(--border);
- border-radius: 12px;
- background: var(--card);
- color: var(--card-foreground);
- cursor: pointer;
- text-align: left;
-}
-.profile-effect-card:hover:not(:disabled) {
- background: var(--accent);
-}
-.profile-effect-card[aria-pressed='true'] {
- border-color: var(--ring);
- background: var(--accent);
-}
-.profile-effect-card:disabled {
- cursor: default;
-}
-.profile-effect-sample {
- position: relative;
- isolation: isolate;
- overflow: hidden;
- min-width: 0;
- display: grid;
- place-items: center;
- border-radius: 6px;
- background: radial-gradient(80% 80% at 30% 20%, var(--accent), var(--popover) 70%);
-}
-.profile-effects-dialog[data-target='avatar'] .profile-effect-sample {
- min-height: 100px;
-}
-.profile-effect-sample .profile-cover {
- border-radius: 6px;
- background: radial-gradient(120% 150% at 12% 0%, var(--accent), var(--popover) 70%);
-}
-.profile-effect-sample .profile-cover-glow {
- display: none;
-}
-.profile-effect-title {
- display: flex;
- align-items: center;
- justify-content: space-between;
- gap: 8px;
- overflow-wrap: anywhere;
- padding: 0 2px 2px;
-}
-.profile-effect-title strong,
-.profile-effect-title small {
- display: block;
- font-size: 14px;
- line-height: 1.4;
-}
-.profile-effect-title small {
- font-size: 12px;
- color: var(--muted-foreground);
-}
-.profile-effect-title svg {
- flex-shrink: 0;
-}
-.profile-effect-image {
- position: absolute;
- z-index: 2;
- inset: 0;
- width: 100%;
- height: 100%;
- object-fit: cover;
- pointer-events: none;
-}
-.profile-effects-dialog[data-target='avatar'] .profile-effect-image {
- inset: 50% auto auto 50%;
- width: 64px;
- height: 64px;
- transform: translate(-50%, -50%);
- border-radius: 50%;
-}
-.profile-effects-dialog footer {
- display: flex;
- justify-content: flex-end;
- gap: 8px;
-}
-.profile-effect-error,
-.profile-effect-state {
- margin: 0;
- font-size: 14px;
- line-height: 1.45;
- overflow-wrap: anywhere;
-}
-.profile-effect-state {
- color: var(--muted-foreground);
-}
-.profile-effects-dialog footer {
- flex-wrap: wrap;
-}
-.profile-effect-toolbar,
-.profile-effect-actions {
- display: flex;
- align-items: center;
- flex-wrap: wrap;
- gap: 8px;
-}
-.profile-effect-toolbar {
- justify-content: space-between;
-}
-.profile-effect-tabs {
- display: flex;
- gap: 4px;
- padding: 4px;
- border-radius: 10px;
- background: color-mix(in srgb, var(--popover), #000 20%);
-}
+/* Кнопки вкладок и подпись видимости остаются в CSS: hover обязан перебивать
+   aria-pressed, а порядок одинаковых по весу утилит в слое этого не гарантирует. */
 .profile-effect-tabs button,
 .profile-effect-visibility button {
  min-height: 44px;
@@ -300,88 +136,62 @@
  cursor: default;
  opacity: 0.6;
 }
-.profile-effect-visibility {
- display: flex;
- align-items: center;
- justify-content: space-between;
- flex-wrap: wrap;
- padding: 0 4px;
- color: var(--muted-foreground);
- font-size: 12px;
-}
 .profile-effect-visibility button {
  font-size: 12px;
  text-decoration: underline;
  text-underline-offset: 3px;
 }
-.profile-effect-form {
- display: grid;
- gap: 8px;
- min-width: 0;
-}
-.profile-effect-form textarea {
- width: 100%;
- min-height: 88px;
- resize: vertical;
- padding: 8px 12px;
- border: 1px solid var(--border);
- border-radius: 8px;
- background: var(--card);
- color: var(--card-foreground);
- font: inherit;
-}
-.profile-effect-form p {
- margin: 0;
- color: var(--muted-foreground);
- font-size: 14px;
- line-height: 1.45;
- overflow-wrap: anywhere;
-}
+/* Футер формы начинается ниже последнего поля. */
 .profile-effect-form footer {
  margin-top: 8px;
 }
-.profile-effect-draft {
- display: grid;
- gap: 8px;
- max-width: 240px;
- padding: 8px;
- border: 1px solid var(--border);
- border-radius: 12px;
- background: var(--card);
- text-align: center;
- overflow-wrap: anywhere;
+
+/* Тёмная плашка под превью: цвет на color-mix, утилита его не выразит одинаково. */
+.profile-effect-tabs {
+ background: color-mix(in srgb, var(--popover), #000 20%);
 }
+/* Тень ползунка — color-mix от --muted-foreground. */
+.profile-effects-thumb {
+ background: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+}
+.profile-effects-thumb:hover {
+ background: var(--muted-foreground);
+}
+/* Превью эффекта: градиент из токенов окна. */
+.profile-effect-sample {
+ background: radial-gradient(80% 80% at 30% 20%, var(--accent), var(--popover) 70%);
+}
+.profile-effects-dialog[data-target='avatar'] .profile-effect-sample {
+ min-height: 100px;
+}
+/* .profile-cover и .profile-cover-glow — слоты shared/ui, классы не наши. */
+.profile-effect-sample .profile-cover {
+ border-radius: 6px;
+ background: radial-gradient(120% 150% at 12% 0%, var(--accent), var(--popover) 70%);
+}
+.profile-effect-sample .profile-cover-glow {
+ display: none;
+}
+/* Геометрия картинки зависит от data-target всего окна. */
+.profile-effects-dialog[data-target='avatar'] .profile-effect-image {
+ inset: 50% auto auto 50%;
+ width: 64px;
+ height: 64px;
+ transform: translate(-50%, -50%);
+ border-radius: 50%;
+}
+/* Общая фокус-рамка окна перебивает рамки shadcn-кнопок (они в слое). */
 .profile-effects-dialog :is(button, textarea, input):focus-visible {
  outline: 2px solid var(--ring);
  outline-offset: 2px;
 }
+/* Кнопка закрытия — Button size=icon, размер задаёт окно. */
 .profile-effects-dialog header button {
  width: 44px;
  height: 44px;
  flex-shrink: 0;
 }
-.profile-effect-upload {
- display: grid;
- justify-items: start;
- gap: 8px;
- padding: 16px;
- border: 1px dashed var(--border);
- border-radius: 12px;
- background: var(--card);
-}
-.profile-effect-upload input {
- max-width: 100%;
- font: inherit;
-}
-.profile-effect-upload input[type='text'] {
- width: min(100%, 320px);
- min-height: 44px;
- padding: 8px 12px;
- border: 1px solid var(--border);
- border-radius: 8px;
- background: var(--popover);
- color: var(--card-foreground);
-}
+/* ::file-selector-button утилитами не задать. */
 .profile-effect-upload input::file-selector-button {
  margin-right: 8px;
  padding: 8px;
@@ -392,18 +202,8 @@
  font: inherit;
  cursor: pointer;
 }
-.profile-effect-upload-preview {
- width: min(100%, 320px);
- overflow: hidden;
- border-radius: 8px;
- background: var(--popover);
-}
-.profile-effect-upload-preview img {
- display: block;
- width: 100%;
- height: 140px;
- object-fit: contain;
-}
+
+/* Узкий экран: нелейерное правило перебивает отступы и колонки утилит. */
 @media (max-width: 540px) {
  .profile-effects-body {
   padding: 16px;
@@ -420,6 +220,7 @@
   width: 148px;
  }
 }
+/* На сенсорном экране hover-действия показаны всегда. */
 @media (hover: none) {
  .profile-media-controls {
   opacity: 1;

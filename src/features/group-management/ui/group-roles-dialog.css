@@ -1,36 +1,29 @@
-.group-roles-panel {
- display: flex;
- flex-direction: column;
- min-height: 0;
- flex: 1;
- overflow: hidden;
-}
+/* Окно ролей группы. Раскладка, отступы и типографика переехали в className;
+   в CSS осталось то, что утилитами не выразить или что проиграло бы по каскаду:
+   - оверлей: на .group-roles-overlay ссылается glass.css (размытие подложки);
+   - поверхность окна и токены --gr-*: их же читает окно настроек группы;
+   - элементы внутри окна (button, input, th/td, label) — правила на теги,
+     потому что кнопки и поля приходят ещё и из shared/ui (Select, Checkbox);
+   - :focus-visible, [aria-pressed], :disabled, ::-webkit-*, соседние селекторы,
+     зонтик попапа radix и узкий экран. */
+
 .group-roles-overlay {
  position: fixed;
  inset: 0;
  z-index: 110;
  background: rgba(5, 6, 9, 0.76);
 }
+/* Токены и поверхность окна: непрозрачная тёмная плита, не matte-стекло.
+   Их же использует окно настроек группы (.group-settings-dialog). */
 .group-roles-dialog {
  --gr-bg: #191b20;
  --gr-surface: #23262d;
  --gr-line: #393d47;
  --gr-text: #f1f2f5;
  --gr-muted: #b7bdca;
- position: fixed;
- z-index: 110;
- top: 50%;
- left: 50%;
- transform: translate(-50%, -50%);
- width: min(840px, calc(100vw - 32px));
- max-height: calc(100dvh - 32px);
- display: flex;
- flex-direction: column;
- overflow: hidden;
  color: var(--gr-text);
  background: var(--gr-bg);
  border: 1px solid var(--gr-line);
- border-radius: 16px;
  box-shadow: 0 24px 80px #0009;
  font:
   14px/1.5 system-ui,
@@ -43,6 +36,8 @@
 .group-roles-dialog input {
  font: inherit;
 }
+/* Базовая кнопка окна: так же оформлены кнопки shared/ui (Select, Dialog.Close),
+   которым класс не навесить. */
 .group-roles-dialog button {
  min-height: 40px;
  padding: 8px 12px;
@@ -63,14 +58,29 @@
  outline: 2px solid #a9bdff;
  outline-offset: 3px;
 }
-.group-roles-header {
- flex-shrink: 0;
- display: flex;
- align-items: center;
- justify-content: space-between;
- gap: 16px;
- padding: 20px 24px 16px;
+/* Кнопка закрытия — иконка: базовая кнопка окна не в слое, поэтому отступы
+   задаёт только это правило. */
+.group-roles-dialog .gr-icon {
+ display: grid;
+ place-items: center;
+ min-width: 40px;
+ padding: 8px;
 }
+
+/* Общие подписи двух файлов среза: .gr-note и .gr-error используют и окно ролей,
+   и окно настроек (.gs-footer .gr-note, .gs-avatar-field .gr-note перебивают их). */
+.gr-note {
+ color: var(--gr-muted);
+ margin: 0 0 16px;
+ max-width: 76ch;
+}
+.gr-error {
+ color: #ffb4b4;
+ margin: 0 0 12px;
+ overflow-wrap: anywhere;
+}
+
+/* Заголовки шапки и подпись — теги, классы не навешиваются. */
 .group-roles-header h2 {
  margin: 0;
  font-size: 20px;
@@ -80,45 +90,19 @@
  margin: 4px 0 0;
  color: var(--gr-muted);
 }
-.group-roles-dialog .gr-icon {
- display: grid;
- place-items: center;
- min-width: 40px;
- padding: 8px;
-}
-.group-roles-tabs {
- display: flex;
- gap: 8px;
- padding: 0 24px 12px;
- border-bottom: 1px solid var(--gr-line);
-}
+/* Вкладки: фон нажатой перебивает базовую кнопку окна (она не в слое). */
 .group-roles-tabs button[aria-pressed='true'] {
  background: #3b4356;
  border-color: #7181a7;
 }
-.group-roles-body {
- min-height: 0;
- overflow: auto;
- overscroll-behavior: contain;
- padding: 16px 24px 24px;
-}
-.gr-note {
- color: var(--gr-muted);
- margin: 0 0 16px;
- max-width: 76ch;
-}
-.gr-role-picker {
- display: flex;
- align-items: end;
- gap: 12px;
- margin-bottom: 16px;
-}
+/* Поле роли: подпись — тег внутри flex-строки. */
 .gr-role-picker label {
  display: grid;
  gap: 6px;
  min-width: 0;
  flex: 1;
 }
+/* Select из shared/ui: размеры задаёт только нелейерное правило. */
 .group-roles-dialog [data-slot='select-trigger'] {
  width: 100%;
  min-width: 0;
@@ -127,26 +111,7 @@
  background: var(--gr-surface);
  border-color: var(--gr-line);
 }
-.gr-name {
- display: grid;
- gap: 6px;
- margin: 0 0 16px;
-}
-.gr-name input {
- width: 100%;
- height: 40px;
- padding: 8px 12px;
- background: #121419;
- border: 1px solid var(--gr-line);
- border-radius: 8px;
- color: var(--gr-text);
-}
-.gr-matrix-scroll {
- max-width: 100%;
- overflow: auto;
- border: 1px solid var(--gr-line);
- border-radius: 10px;
-}
+/* Таблица прав: ячейки и служебные классы генерируются в map(). */
 .gr-matrix {
  border-collapse: collapse;
  width: 100%;
@@ -187,13 +152,8 @@
  color: var(--gr-muted);
  margin-top: 2px;
 }
-.gr-category {
- display: block;
- color: #c0ceef;
- font-size: 12px;
- margin-bottom: 6px;
- font-weight: 600;
-}
+/* Чекбокс и кнопки-акценты: базовую кнопку окна перебивает только нелейерное
+   правило, утилиты в слое проиграли бы ей. */
 .group-roles-dialog .gr-checkbox {
  width: 32px;
  height: 32px;
@@ -223,13 +183,7 @@
 .group-roles-dialog .gr-danger {
  color: #ffb4b4;
 }
-.gr-delete {
- padding: 12px;
- margin-top: 16px;
- background: #2b2226;
- border: 1px solid #624149;
- border-radius: 8px;
-}
+/* Плашка удаления: внутри абзац и пара кнопок с отступом между ними. */
 .gr-delete p {
  margin: 0 0 12px;
  overflow-wrap: anywhere;
@@ -237,18 +191,7 @@
 .gr-delete button + button {
  margin-left: 8px;
 }
-.gr-members {
- display: grid;
- gap: 8px;
-}
-.gr-member {
- display: flex;
- align-items: center;
- gap: 12px;
- padding: 12px;
- background: var(--gr-surface);
- border-radius: 10px;
-}
+/* Строка участника: текстовая колонка и Select — дочерние элементы. */
 .gr-member > div:first-child {
  flex: 1;
  min-width: 0;
@@ -258,12 +201,7 @@
  width: 190px;
  flex-shrink: 0;
 }
-.group-roles-footer {
- flex-shrink: 0;
- padding: 12px 24px 16px;
- border-top: 1px solid var(--gr-line);
- background: var(--gr-bg);
-}
+/* Футер: строка с примечанием и кнопками. */
 .group-roles-footer > div {
  display: flex;
  align-items: center;
@@ -275,14 +213,11 @@
  color: var(--gr-muted);
  font-size: 12px;
 }
-.gr-error {
- color: #ffb4b4;
- margin: 0 0 12px;
- overflow-wrap: anywhere;
-}
+/* Попап Select раскрывается в портале рядом с окном. */
 .group-roles-dialog ~ [data-radix-popper-content-wrapper] {
  z-index: 120 !important;
 }
+/* Узкий экран: отступы и переносы перебивают утилиты (слой против нелейерного). */
 @media (max-width: 600px) {
  .group-roles-dialog {
   width: calc(100vw - 16px);

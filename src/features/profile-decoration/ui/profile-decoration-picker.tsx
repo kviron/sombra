@@ -6,6 +6,7 @@ import {UserAvatar} from '@/shared/ui/user-avatar';
 import {ProfileEffectImage} from '@/shared/ui/profile-effect-image';
 import {ProfileCover} from '@/shared/ui/profile-cover';
 import {Button} from '@/shared/ui/button';
+import {cn} from '@/shared/lib';
 import {useProfileDecorationPicker} from '../model/use-profile-decoration-picker';
 import type {DecorationChoice, MediaTarget} from '../model/profile-decoration';
 import '@/shared/ui/menu-material.css';
@@ -13,6 +14,8 @@ import './profile-decoration-picker.css';
 
 export type {MediaTarget};
 const MAX_EFFECT_TITLE = 64;
+/** Абзацы формы: те же размеры, что были у `.profile-effect-form p`. */
+const note = 'm-0 text-sm leading-[1.45] text-muted-foreground [overflow-wrap:anywhere]';
 
 function EffectSample({
  user,
@@ -26,13 +29,23 @@ function EffectSample({
  asset?: ProfileEffectAsset;
 }) {
  return (
-  <span className="profile-effect-sample" data-avatar-fx-priority="picker" aria-hidden="true">
+  <span
+   className={cn(
+    'profile-effect-sample',
+    'relative isolate grid min-w-0 place-items-center overflow-hidden rounded-[6px]'
+   )}
+   data-avatar-fx-priority="picker"
+   aria-hidden="true"
+  >
    {target === 'avatar' ? (
     <UserAvatar user={user} size="xl" presence={false} decorative decoration={decoration} effectAsset={null} />
    ) : (
     <ProfileCover user={user} accountId={user.id} decoration={decoration} effectAsset={null} />
    )}
-   <ProfileEffectImage asset={asset} className="profile-effect-image" />
+   <ProfileEffectImage
+    asset={asset}
+    className="profile-effect-image pointer-events-none absolute inset-0 z-[2] size-full object-cover"
+   />
   </span>
  );
 }
@@ -101,16 +114,25 @@ export function ProfileDecorationPicker({
    <button
     key={item.key}
     type="button"
-    className="profile-effect-card"
+    className={cn(
+     'profile-effect-card',
+     'border-border bg-card text-card-foreground grid h-full w-full min-w-0 cursor-pointer grid-rows-[auto_1fr] gap-2 rounded-[12px] border p-2 text-left',
+     'hover:enabled:bg-accent aria-pressed:border-ring aria-pressed:bg-accent disabled:cursor-default'
+    )}
     aria-pressed={selected}
     disabled={busy}
     onClick={() => actions.select(item)}
    >
     <EffectSample user={user} target={target} decoration={item.decoration} asset={item.asset} />
-    <span className="profile-effect-title">
+    <span
+     className={cn(
+      'profile-effect-title',
+      'flex items-center justify-between gap-2 px-0.5 pt-0 pb-0.5 [overflow-wrap:anywhere] [&_svg]:shrink-0'
+     )}
+    >
      <span>
-      <strong>{item.title}</strong>
-      <small>{kind}</small>
+      <strong className="block text-sm leading-[1.4]">{item.title}</strong>
+      <small className="text-muted-foreground block text-xs leading-[1.4]">{kind}</small>
      </span>
      {selected && <Check size={16} aria-hidden="true" />}
     </span>
@@ -118,9 +140,14 @@ export function ProfileDecorationPicker({
   );
   if (!record || record.ownerId !== user.id) return card;
   return (
-   <div className="profile-effect-entry" key={item.key}>
+   <div className={cn('profile-effect-entry', 'grid min-w-0 grid-rows-[1fr_auto] items-start')} key={item.key}>
     {card}
-    <div className="profile-effect-visibility">
+    <div
+     className={cn(
+      'profile-effect-visibility',
+      'text-muted-foreground flex flex-wrap items-center justify-between px-1 py-0 text-xs'
+     )}
+    >
      <span>{record.public ? 'В каталоге' : 'Личный'}</span>
      <button
       type="button"
@@ -145,7 +172,10 @@ export function ProfileDecorationPicker({
    <Dialog.Portal>
     <Dialog.Overlay className="profile-effects-overlay" />
     <Dialog.Content
-     className="profile-effects-dialog dark surface-matte"
+     className={cn(
+      'profile-effects-dialog dark surface-matte',
+      'fixed inset-[50%_auto_auto_50%] z-[1401] w-[min(820px,calc(100vw_-_32px))] [transform:translate(-50%,-50%)] overflow-hidden rounded-[16px]'
+     )}
      data-target={target}
      aria-busy={busy}
      onOpenAutoFocus={event => {
@@ -164,15 +194,15 @@ export function ProfileDecorationPicker({
       if (busy) event.preventDefault();
      }}
     >
-     <ScrollArea.Root className="profile-effects-scroll" type="hover">
-      <ScrollArea.Viewport className="profile-effects-viewport">
-       <div className="profile-effects-body">
-        <header>
+     <ScrollArea.Root className={cn('profile-effects-scroll', 'relative overflow-hidden')} type="hover">
+      <ScrollArea.Viewport className={cn('profile-effects-viewport', 'max-h-[calc(100dvh_-_34px)] w-full')}>
+       <div className={cn('profile-effects-body', 'grid gap-5 p-6')}>
+        <header className="flex items-start justify-between gap-3">
          <div>
-          <Dialog.Title ref={heading} tabIndex={-1}>
+          <Dialog.Title ref={heading} tabIndex={-1} className="m-0 text-2xl leading-[1.2] font-[650]">
            {view === 'upload' ? 'Добавить свою GIF' : target === 'avatar' ? 'Эффект аватара' : 'Эффект обложки'}
           </Dialog.Title>
-          <Dialog.Description>
+          <Dialog.Description className="text-muted-foreground mt-1.5 mb-0 text-sm leading-[1.5]">
            {view === 'upload'
             ? 'Выберите файл и проверьте, как он выглядит.'
             : 'Выберите готовый эффект или добавьте свою анимацию.'}
@@ -184,8 +214,12 @@ export function ProfileDecorationPicker({
           </Button>
          </Dialog.Close>
         </header>
-        <div className="profile-effect-toolbar">
-         <div className="profile-effect-tabs" role="group" aria-label="Коллекция эффектов">
+        <div className={cn('profile-effect-toolbar', 'flex flex-wrap items-center justify-between gap-2')}>
+         <div
+          className={cn('profile-effect-tabs', 'flex gap-1 rounded-[10px] p-1')}
+          role="group"
+          aria-label="Коллекция эффектов"
+         >
           <button
            type="button"
            aria-pressed={view === 'personal'}
@@ -203,7 +237,7 @@ export function ProfileDecorationPicker({
            Общее
           </button>
          </div>
-         <div className="profile-effect-actions">
+         <div className={cn('profile-effect-actions', 'flex flex-wrap items-center gap-2')}>
           {draftsSupported && (
            <Button
             type="button"
@@ -229,14 +263,19 @@ export function ProfileDecorationPicker({
         </div>
         {view === 'upload' ? (
          <form
-          className="profile-effect-form"
+          className={cn('profile-effect-form', 'grid min-w-0 gap-2')}
           onSubmit={event => {
            event.preventDefault();
            actions.upload();
           }}
          >
           {uploadsSupported ? (
-           <div className="profile-effect-upload">
+           <div
+            className={cn(
+             'profile-effect-upload',
+             'border-border bg-card grid justify-items-start gap-2 rounded-[12px] border border-dashed p-4'
+            )}
+           >
             <Upload size={22} aria-hidden="true" />
             <label htmlFor="profile-effect-file">Файл анимации</label>
             <input
@@ -245,13 +284,18 @@ export function ProfileDecorationPicker({
              accept="image/gif,.gif"
              required
              disabled={busy}
+             className="max-w-full [font:inherit]"
              onChange={event => actions.chooseFile(event.currentTarget.files?.[0])}
             />
-            <p>GIF · до 2 МиБ. При сохранении эффект останется личным.</p>
-            {fileError && <p role="alert">{fileError}</p>}
+            <p className={note}>GIF · до 2 МиБ. При сохранении эффект останется личным.</p>
+            {fileError && (
+             <p className={note} role="alert">
+              {fileError}
+             </p>
+            )}
             {file && preview && (
-             <div className="profile-effect-upload-preview">
-              <img src={preview} alt="Предпросмотр GIF" />
+             <div className="profile-effect-upload-preview bg-popover w-[min(100%,320px)] overflow-hidden rounded-[8px]">
+              <img src={preview} alt="Предпросмотр GIF" className="block h-[140px] w-full object-contain" />
              </div>
             )}
             <label htmlFor="profile-effect-name">Название</label>
@@ -262,16 +306,17 @@ export function ProfileDecorationPicker({
              maxLength={MAX_EFFECT_TITLE}
              value={title}
              disabled={busy}
+             className="border-border bg-popover text-card-foreground min-h-11 w-[min(100%,320px)] rounded-[8px] border px-3 py-2"
              onChange={event => actions.setTitle(event.target.value)}
              placeholder="Название эффекта"
             />
            </div>
           ) : (
-           <p role="status">
+           <p className={note} role="status">
             Этот сервер пока не поддерживает загрузку GIF. Готовые эффекты доступны в разделе «Личное».
            </p>
           )}
-          <footer>
+          <footer className="flex flex-wrap justify-end gap-2">
            <Button type="button" variant="ghost" disabled={busy} onClick={() => actions.switchView('personal')}>
             Назад
            </Button>
@@ -284,7 +329,7 @@ export function ProfileDecorationPicker({
          </form>
         ) : view === 'create' ? (
          <form
-          className="profile-effect-form"
+          className={cn('profile-effect-form', 'grid min-w-0 gap-2')}
           onSubmit={event => {
            event.preventDefault();
            actions.generate();
@@ -302,11 +347,18 @@ export function ProfileDecorationPicker({
            placeholder={
             target === 'avatar' ? 'Например, тёплые искры по краю аватара' : 'Например, звёзды над ночным городом'
            }
+           className="border-border bg-card text-card-foreground min-h-[88px] w-full resize-y rounded-[8px] border px-3 py-2 [font:inherit]"
           />
-          <p>Сначала появится превью. Сохранённый черновик будет личным, пока вы не опубликуете его сами.</p>
-          {pending && <p role="status">{draft?.status === 'queued' ? 'Черновик в очереди…' : 'Создаём эффект…'}</p>}
+          <p className={note}>
+           Сначала появится превью. Сохранённый черновик будет личным, пока вы не опубликуете его сами.
+          </p>
+          {pending && (
+           <p className={note} role="status">
+            {draft?.status === 'queued' ? 'Черновик в очереди…' : 'Создаём эффект…'}
+           </p>
+          )}
           {pollError && (
-           <p role="alert">
+           <p className={note} role="alert">
             {pollError}{' '}
             <Button type="button" variant="outline" onClick={actions.clearPollError}>
              Проверить ещё раз
@@ -314,18 +366,27 @@ export function ProfileDecorationPicker({
            </p>
           )}
           {draft?.status === 'failed' && (
-           <p role="alert">{draft.error || 'Не удалось создать эффект. Попробуйте ещё раз.'}</p>
+           <p className={note} role="alert">
+            {draft.error || 'Не удалось создать эффект. Попробуйте ещё раз.'}
+           </p>
           )}
           {draft?.status === 'ready' && !draftReady && (
-           <p role="alert">Не удалось показать этот эффект. Попробуйте создать его снова.</p>
+           <p className={note} role="alert">
+            Не удалось показать этот эффект. Попробуйте создать его снова.
+           </p>
           )}
           {draftReady && (
-           <div className="profile-effect-draft">
+           <div
+            className={cn(
+             'profile-effect-draft',
+             'border-border bg-card grid max-w-60 gap-2 rounded-[12px] border p-2 text-center [overflow-wrap:anywhere]'
+            )}
+           >
             <EffectSample user={user} target={target} decoration={draftReady.decoration} />
             <strong>{draftReady.title}</strong>
            </div>
           )}
-          <footer>
+          <footer className="flex flex-wrap justify-end gap-2">
            <Button
             type="submit"
             variant={draftReady ? 'outline' : 'default'}
@@ -343,24 +404,24 @@ export function ProfileDecorationPicker({
         ) : (
          <>
           <div
-           className="profile-effect-options"
+           className={cn('profile-effect-options', 'grid grid-cols-3 gap-3')}
            role="group"
            aria-label={target === 'avatar' ? 'Рамки аватара' : 'Эффекты обложки'}
           >
            {items.map(({choice: item, kind, record}) => renderCard(item, kind, record))}
           </div>
           {!catalogSupported && view === 'catalog' && (
-           <p className="profile-effect-state" role="status">
+           <p className={cn('profile-effect-state', note, 'text-muted-foreground')} role="status">
             Этот сервер пока не поддерживает общий каталог. Готовые эффекты доступны в разделе «Личное».
            </p>
           )}
           {pageLoading && (
-           <p className="profile-effect-state" role="status">
+           <p className={cn('profile-effect-state', note, 'text-muted-foreground')} role="status">
             Загружаем эффекты…
            </p>
           )}
           {pageError && (
-           <div className="profile-effect-state" role="alert">
+           <div className={cn('profile-effect-state', note, 'text-muted-foreground')} role="alert">
             {pageError}{' '}
             <Button type="button" variant="outline" disabled={busy} onClick={actions.retry}>
              Повторить
@@ -368,7 +429,7 @@ export function ProfileDecorationPicker({
            </div>
           )}
           {catalogSupported && !pageLoading && !pageError && !effectsCount && (
-           <p className="profile-effect-state">
+           <p className={cn('profile-effect-state', note, 'text-muted-foreground')}>
             {view === 'catalog'
              ? 'В каталоге пока нет эффектов для этого раздела.'
              : 'Здесь появятся созданные вами эффекты и эффекты, которые вы примените из каталога.'}
@@ -379,7 +440,7 @@ export function ProfileDecorationPicker({
             Показать ещё
            </Button>
           )}
-          <footer>
+          <footer className="flex flex-wrap justify-end gap-2">
            <Dialog.Close asChild>
             <Button type="button" variant="ghost" disabled={busy}>
              Отмена
@@ -392,7 +453,7 @@ export function ProfileDecorationPicker({
          </>
         )}
         {error && (
-         <p className="profile-effect-error" role="alert">
+         <p className={cn('profile-effect-error', note)} role="alert">
           {error}
          </p>
         )}
@@ -403,8 +464,11 @@ export function ProfileDecorationPicker({
         )}
        </div>
       </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar className="profile-effects-scrollbar" orientation="vertical">
-       <ScrollArea.Thumb className="profile-effects-thumb" />
+      <ScrollArea.Scrollbar
+       className={cn('profile-effects-scrollbar', 'flex w-2.5 touch-none p-0.5 select-none')}
+       orientation="vertical"
+      >
+       <ScrollArea.Thumb className={cn('profile-effects-thumb', 'relative flex-1 rounded-full')} />
       </ScrollArea.Scrollbar>
      </ScrollArea.Root>
     </Dialog.Content>

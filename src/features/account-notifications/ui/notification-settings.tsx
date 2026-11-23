@@ -22,9 +22,9 @@ export function NotificationSettings({
    aria-busy={model.busy}
   >
    <p>Выберите, откуда получать новые сообщения. Настройки сохраняются в вашем аккаунте.</p>
-   <div className="notification-option">
+   <div className="notification-option [&>svg]:shrink-0 [&>svg]:text-[#aeb8c9]">
     <label htmlFor="notify-direct">
-     <strong>Личные сообщения</strong>
+     <strong className="text-[15px] leading-[1.5] font-semibold text-[#e4e8f0]">Личные сообщения</strong>
      <span>Личные и групповые диалоги из списка переписок.</span>
     </label>
     <Switch
@@ -35,9 +35,9 @@ export function NotificationSettings({
      onCheckedChange={value => void model.change('direct', value)}
     />
    </div>
-   <div className="notification-option">
+   <div className="notification-option [&>svg]:shrink-0 [&>svg]:text-[#aeb8c9]">
     <label htmlFor="notify-groups">
-     <strong>Сообщения в группах</strong>
+     <strong className="text-[15px] leading-[1.5] font-semibold text-[#e4e8f0]">Сообщения в группах</strong>
      <span>Все текстовые каналы и чаты голосовых каналов ваших групп.</span>
     </label>
     <Switch
@@ -48,8 +48,8 @@ export function NotificationSettings({
      onCheckedChange={value => void model.change('groups', value)}
     />
    </div>
-   <div className="notification-help">
-    <h2>Отдельные чаты</h2>
+   <div className="notification-help mt-7">
+    <h2 className="flex items-center gap-2.5">Отдельные чаты</h2>
     <p>
      Нажмите правой кнопкой на переписку в списке личных сообщений, чтобы отключить или включить её уведомления. Общий
      переключатель имеет приоритет.
@@ -61,7 +61,7 @@ export function NotificationSettings({
     <p>Уведомления работают, пока Sombra запущена. В браузере они показываются внутри приложения.</p>
    </div>
    {model.busy && (
-    <p className="notification-saving" role="status">
+    <p className="notification-saving flex items-center gap-2" role="status">
      <LoaderCircle size={15} className="animate-spin" />
      Сохраняем…
     </p>

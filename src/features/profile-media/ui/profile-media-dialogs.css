@@ -1,60 +1,18 @@
-/* ---------- Окна «Аватар» и «Обложка» ---------- */
+/* Окно «Аватар» / «Обложка». Поверхность даёт .surface-matte, раскладка и текст —
+   утилиты в className. В CSS осталось:
+   - оверлей: на .profile-media-overlay ссылается glass.css (размытие подложки);
+   - кнопки-варианты (.profile-media-option): hover должен перебивать aria-pressed,
+     а порядок утилит в слое этого не гарантирует;
+   - слоты shared/ui (.user-avatar, .profile-media-cover) с привязкой к data-target;
+   - узкий экран. */
+
 .profile-media-overlay {
  position: fixed;
  inset: 0;
  z-index: 1400;
  background: color-mix(in srgb, var(--sombra-menu-solid, #0b0b0d) 82%, transparent);
 }
-.profile-media-dialog {
- position: fixed;
- z-index: 1401;
- left: 50%;
- top: 50%;
- transform: translate(-50%, -50%);
- display: grid;
- gap: 14px;
- width: min(560px, calc(100vw - 32px));
- max-height: calc(100vh - 48px);
- overflow: auto;
- padding: 20px;
- border-radius: var(--radius);
- color: var(--foreground);
-}
-.profile-media-dialog header {
- display: flex;
- align-items: flex-start;
- justify-content: space-between;
- gap: 16px;
-}
-.profile-media-dialog h2 {
- margin: 0;
- font-size: 17px;
- line-height: 24px;
-}
-.profile-media-dialog header p {
- margin: 2px 0 0;
- font-size: 12px;
- color: var(--muted-foreground);
-}
-.profile-media-dialog :is(h2, h3) {
- font-weight: 600;
-}
-.profile-media-section {
- display: grid;
- gap: 8px;
- padding-top: 16px;
- border-top: 1px solid var(--border);
-}
-.profile-media-section h3 {
- margin: 0;
- font-size: 12px;
- font-weight: 500;
- color: var(--muted-foreground);
-}
-.profile-media-picture {
- display: grid;
- place-items: start;
-}
+/* Обложка в рамке окна: размеры зависят от data-kind контейнера. */
 .profile-media-picture[data-kind='cover'] .profile-media-cover {
  width: 100%;
  height: 150px;
@@ -63,21 +21,7 @@
  border-radius: var(--radius-sm);
  overflow: hidden;
 }
-.profile-media-picture-actions {
- display: flex;
- align-items: center;
- gap: 8px;
- flex-wrap: wrap;
-}
-.profile-media-hint {
- font-size: 12px;
- color: var(--muted-foreground);
-}
-.profile-media-options {
- display: grid;
- grid-template-columns: repeat(3, minmax(0, 1fr));
- gap: 12px;
-}
+/* Кнопка-вариант: состояния и рамка. */
 .profile-media-option {
  display: grid;
  gap: 8px;
@@ -111,11 +55,7 @@
 .profile-media-option[aria-pressed='true'] > span:last-child {
  color: var(--foreground);
 }
-.profile-media-option-sample {
- display: grid;
- place-items: center;
- width: 100%;
-}
+/* Слоты shared/ui внутри образца варианта. */
 .profile-media-option-sample[data-target='avatar'] .user-avatar {
  width: 56px;
  height: 56px;
@@ -126,27 +66,6 @@
  aspect-ratio: auto;
  border-radius: 8px;
  overflow: hidden;
-}
-.profile-media-catalog {
- justify-self: start;
-}
-.profile-media-error {
- margin: 0;
- font-size: 13px;
- color: #ff9aa2;
-}
-.profile-media-notice {
- margin: 0;
- font-size: 12px;
- color: var(--muted-foreground);
-}
-.profile-media-dialog footer {
- display: flex;
- align-items: center;
- justify-content: flex-end;
- gap: 8px;
- padding-top: 12px;
- border-top: 1px solid var(--border);
 }
 @media (max-width: 640px) {
  .profile-media-options {

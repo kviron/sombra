@@ -1,17 +1,17 @@
-.attachment-cache-settings {
- max-width: 760px;
-}
-.attachment-cache-settings h2 {
- display: flex;
- align-items: center;
- gap: 10px;
-}
+/* Данные и память. Раздел живёт в #account-panel, где settings.css и chat.css
+   задают p, h2, label вне слоёв. Поэтому абзацы, подпись лимита, подсказки и
+   состояния остаются в CSS, а плитки, полоса и строки собраны утилитами.
+   Блок .approved-cache* — общие «утверждённые» правила раздела, они перебивают
+   базовые утилиты плиток и остаются нелейерными. */
+
+/* Подсказки и заметки: цвет задан литералом. */
 .attachment-cache-settings > p,
 .cache-notes li {
  font-size: 13px;
  line-height: 1.6;
  color: #b1b8c6;
 }
+/* Плитка использования: рамка и фон на литералах. */
 .cache-usage {
  display: flex;
  align-items: center;
@@ -21,42 +21,6 @@
  border-radius: 10px;
  background: #dce6f908;
 }
-.cache-usage > div {
- display: grid;
- gap: 4px;
- flex: 1;
- min-width: 0;
-}
-.cache-usage span {
- font-size: 13px;
- color: #b9c2d2;
-}
-.cache-usage strong {
- font-size: 24px;
- font-weight: 600;
- line-height: 32px;
- color: #e7edf7;
-}
-.cache-usage small {
- font-size: 12px;
- color: #aeb8c9;
-}
-.cache-meter {
- height: 4px;
- margin: 12px 0 24px;
- border-radius: 4px;
- background: #e1ebff18;
- overflow: hidden;
-}
-.cache-meter > span {
- display: block;
- height: 100%;
- background: #9bb8ed;
- border-radius: inherit;
-}
-.account-modal #account-panel .cache-limit [data-slot='select-trigger'] {
- justify-content: space-between;
-}
 .cache-limit {
  display: grid;
  grid-template-columns: 160px minmax(0, 280px);
@@ -64,56 +28,36 @@
  gap: 16px;
  min-height: 44px;
 }
+/* Select и подпись лимита — переопределения компонентов вне слоя. */
+.account-modal #account-panel .cache-limit [data-slot='select-trigger'] {
+ justify-content: space-between;
+}
 .account-modal #account-panel .cache-limit > label {
  display: block;
  font-size: 14px;
 }
-.attachment-cache-settings .cache-hint {
- font-size: 12px;
- line-height: 1.5;
- margin: 8px 0 16px;
-}
-.cache-clear {
- margin: 16px 0 24px;
-}
+/* Очистка: текст-предупреждение и кнопки. */
 .cache-clear > p {
  font-size: 13px;
  line-height: 1.6;
  color: #e6c4c8;
 }
-.cache-clear > div {
- display: flex;
- gap: 8px;
- flex-wrap: wrap;
-}
+/* Заметки: отбивка линией. */
 .cache-notes {
  padding-top: 16px;
  border-top: 1px solid var(--surface-border, #e1ebff21);
-}
-.cache-notes h3 {
- font-size: 14px;
- font-weight: 600;
- margin: 0 0 8px;
 }
 .cache-notes ul {
  margin: 0;
  padding-left: 18px;
 }
-.cache-notes li {
- margin: 8px 0;
- max-width: 72ch;
-}
+/* Цвета состояний поверх общего цвета абзацев. */
 .attachment-cache-settings .cache-notice {
  color: #b4dbbc;
 }
 .attachment-cache-settings .cache-error {
  color: #f0a6b0;
  overflow-wrap: anywhere;
-}
-.cache-operation {
- display: flex;
- align-items: center;
- gap: 8px;
 }
 @media (max-width: 760px) {
  .cache-limit {

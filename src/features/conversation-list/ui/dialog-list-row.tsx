@@ -3,7 +3,6 @@ import type {ChatMessage, Dialog, DialogPreferences, User} from '@/shared/types'
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {UserRow} from '@/entities/user';
 import {UnreadMentionBadge} from '@/entities/conversation';
-import './dialog-list-row.css';
 
 export function DialogListRow({
  dialog,
@@ -62,7 +61,7 @@ export function DialogListRow({
      <UnreadMentionBadge count={dialog.unreadMentionCount} />
      {readReceiptsSupported && (dialog.unreadCount || 0) > 0 && (
       <span
-       className="dm-unread-count"
+       className="bg-primary text-primary-foreground inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-[5px] text-[11px] font-semibold whitespace-nowrap"
        title={`Непрочитанных сообщений: ${dialog.unreadCount}`}
        aria-label={`Непрочитанных сообщений: ${dialog.unreadCount}`}
       >
@@ -70,7 +69,7 @@ export function DialogListRow({
       </span>
      )}
      {(preferences.pinned || preferences.muted) && (
-      <span className="dialog-row-flags">
+      <span className="inline-flex shrink-0 items-center gap-[5px] text-[#b8c4dc] [&_svg]:shrink-0">
        {preferences.pinned && (
         <span role="img" aria-label="Закреплённый чат" title="Закреплённый чат">
          <Pin size={12} />
