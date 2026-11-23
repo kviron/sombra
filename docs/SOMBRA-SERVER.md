@@ -48,6 +48,7 @@ docker build --platform linux/amd64 --target server-export --output type=local,d
 - Откат: остановить службу, вернуть `sombra-server.bak` на место, распаковать
   `data.tar.gz` в `/var/lib/sombra`, запустить службу. Скрипт развёртывания делает это
   автоматически, если новый бинарник не отвечает на `/health`.
+- Тесты backend: `cargo test --locked -p sombra-core -p sombra-server` — 149 + 1, все прошли.
 
 ## NGINX 1.30.7 — 19 ноября 2026
 
