@@ -10,7 +10,7 @@ export function BotToolAccess({bot, state, rootBusy}: {bot: Bot; state: ChatStat
  const panelId = useId();
  if (!managed) return null;
  return (
-  <div className="bot-tool-access">
+  <div className="mt-3 min-w-0">
    <button
     type="button"
     className="bot-tool-access-toggle"
@@ -53,8 +53,15 @@ function ToolPolicy({model, bot, state, rootBusy, panelId}: PolicyProps) {
   actions
  } = useBotToolPolicy({model, bot, state, rootBusy});
  return (
-  <section id={panelId} className="bot-tool-policy" aria-labelledby={`${panelId}-title`} aria-busy={pending}>
-   <h4 id={`${panelId}-title`}>Доверенные пользователи</h4>
+  <section
+   id={panelId}
+   className="bot-tool-policy border-border mt-3 min-w-0 rounded-[var(--radius)] border p-4 [overflow-wrap:anywhere]"
+   aria-labelledby={`${panelId}-title`}
+   aria-busy={pending}
+  >
+   <h4 id={`${panelId}-title`} className="mt-0 mb-3 text-[16px] leading-[1.5]">
+    Доверенные пользователи
+   </h4>
    <p>
     Расширенные инструменты Hermes доступны владельцу и только выбранным пользователям по неизменяемому ID. Роли и
     управление группой не дают этого доступа.
@@ -81,7 +88,7 @@ function ToolPolicy({model, bot, state, rootBusy, panelId}: PolicyProps) {
        onChange={event => actions.setQuery(event.target.value)}
       />
      </label>
-     <p className="bot-tool-count">Выбрано {draft.length} из 50 · владелец не учитывается</p>
+     <p className="text-muted-foreground text-[12px]">Выбрано {draft.length} из 50 · владелец не учитывается</p>
      <div className="bot-tool-users" aria-label="Пользователи Sombra">
       {users.map(user => (
        <label className="bot-tool-person" key={user.id}>
@@ -114,7 +121,7 @@ function ToolPolicy({model, bot, state, rootBusy, panelId}: PolicyProps) {
       {notice && <p role="status">{notice}</p>}
       {error && <p role="alert">{error}</p>}
      </div>
-     <div className="bot-tool-footer">
+     <div className="flex flex-wrap gap-2 pt-3">
       <button type="button" disabled={!canSave} onClick={actions.save}>
        Сохранить
       </button>
@@ -126,7 +133,7 @@ function ToolPolicy({model, bot, state, rootBusy, panelId}: PolicyProps) {
      </div>
     </>
    )}
-   <p className="bot-tool-runtime-note">
+   <p className="text-muted-foreground text-[12px]">
     Настройки не включают инструменты автоматически. Нужен отдельно развёрнутый плагин в изолированной среде Hermes —
     без общих файлов и памяти Telegram и без произвольного выполнения команд на сервере участниками. Выбранный
     пользователь сможет обращаться к инструментам только там, где ему уже разрешено взаимодействовать с ботом; членство

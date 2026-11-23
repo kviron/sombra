@@ -48,18 +48,22 @@ export function BotCommandSuggestions({
  if (!suggestions.length) return null;
  return (
   <section
-   className="bot-command-suggestions sombra-menu-surface"
+   className="bot-command-suggestions sombra-menu-surface absolute inset-x-0 bottom-[calc(100%+8px)] z-[25] my-2 max-h-[280px] overflow-y-auto p-2"
    data-slot="command-menu-content"
    aria-label="Команды ботов"
   >
-   <p>Команды ботов</p>
-   <ul>
+   <p className="text-muted-foreground m-[4px_8px_8px] text-[12px]">Команды ботов</p>
+   <ul className="m-0 list-none p-0">
     {suggestions.map(({bot, command, value}) => (
      <li key={`${bot.id}:${command.command}`}>
-      <button type="button" onClick={() => onSelect(value + ' ')}>
+      <button
+       type="button"
+       className="min-h-11 w-full flex-wrap rounded-[var(--radius)] border-0 bg-transparent p-2 text-left [overflow-wrap:anywhere]"
+       onClick={() => onSelect(value + ' ')}
+      >
        <strong>{value}</strong>
-       <span>{command.description}</span>
-       <small>{bot.name}</small>
+       <span className="flex-[1_1_160px]">{command.description}</span>
+       <small className="text-muted-foreground">{bot.name}</small>
       </button>
      </li>
     ))}

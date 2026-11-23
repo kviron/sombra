@@ -1,47 +1,36 @@
-/* One pinned activity block above the composer: the compact Elements JobProgress
-   line and the official Elements TypingIndicator with the bot avatar. Sombra changes
-   colours and sizes only; geometry stays with the vendored Elements utilities. */
-.bot-typing {
- display: flex;
- flex-direction: column;
- align-items: flex-start;
- gap: 6px;
- flex: none;
- min-width: 0;
- max-width: 100%;
- padding: 0 2px;
-}
-.bot-typing-announce {
- position: absolute;
- width: 1px;
- height: 1px;
- margin: -1px;
- padding: 0;
- overflow: hidden;
- clip: rect(0 0 0 0);
- clip-path: inset(50%);
- white-space: nowrap;
- border: 0;
-}
-.bot-typing-indicator {
- display: flex;
- align-items: flex-end;
- gap: 8px;
- min-width: 0;
- max-width: 100%;
-}
-.bot-typing-indicator .user-avatar {
+/* Строка активности бота над композером и карточка ещё не пришедшей картинки.
+   Раскладка, отступы и скрытая подпись собраны утилитами в className. Здесь
+   осталось невыразимое:
+   - слоты Elements (JobProgress, TypingIndicator, ImageGeneration): их цвета
+     включаются dark:-вариантом и побеждают утилиту слоя по специфичности, а точки
+     и подписи размечены внутри компонента;
+   - размер аватара бота: переменную --avatar-size задаёт data-[size] из shared/ui,
+     поэтому 28px перебивает только правило с той же переменной;
+   - :has() у раскрытой строки прогресса;
+   - отступ карточки: .chat-message[data-slot='message'] задаёт margin нелейерным
+     правилом из pages/chat, утилита слоя ему проигрывает;
+   - .message-meta — чужой слот shared/ui/message;
+   - @media reduced-motion / reduced-transparency и узкий экран. */
+
+.bot-typing .user-avatar {
  --avatar-size: 28px;
- flex-shrink: 0;
- margin-bottom: 1px;
 }
-/* Both rows share the indicator column so the block reads as one stack. */
+/* Раскрытая строка прогресса растягивает скругление под панель подробностей. */
+.bot-typing [data-slot='job-progress']:has(button[aria-expanded='true']) {
+ border-radius: 14px;
+}
 .bot-typing [data-slot='job-progress'] {
  margin-inline-start: 36px;
  max-width: calc(100% - 36px);
+ background: rgba(20, 22, 30, 0.68);
+ border-color: rgba(160, 174, 198, 0.16);
+ -webkit-backdrop-filter: blur(18px) saturate(135%);
+ backdrop-filter: blur(18px) saturate(135%);
+ box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
 }
-.bot-typing [data-slot='job-progress']:has(button[aria-expanded='true']) {
- border-radius: 14px;
+/* Точки «печатает» рисует Elements своими span. */
+.bot-typing [data-slot='typing-indicator'] span {
+ background: #a9ccff;
 }
 .bot-typing [data-slot='typing-indicator'] {
  padding: 9px 13px;
@@ -52,24 +41,11 @@
  backdrop-filter: blur(18px) saturate(135%);
  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
 }
-.bot-typing [data-slot='typing-indicator'] span {
- background: #a9ccff;
-}
-.bot-typing [data-slot='job-progress'] {
- background: rgba(20, 22, 30, 0.68);
- border-color: rgba(160, 174, 198, 0.16);
- -webkit-backdrop-filter: blur(18px) saturate(135%);
- backdrop-filter: blur(18px) saturate(135%);
- box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
-}
+/* Служебная строка прогресса: её внутренние узлы размечены Elements, не срезом. */
 .bot-typing [data-slot='job-progress'] time {
  color: #a9b0c2;
  font-size: 11px;
  font-variant-numeric: tabular-nums;
-}
-.bot-typing [data-slot='job-progress'] button:focus-visible {
- outline: 2px solid #8c92ff;
- outline-offset: 1px;
 }
 .bot-typing [data-slot='job-progress'] p {
  color: #a9b0c2;
@@ -77,6 +53,11 @@
  line-height: 1.4;
  overflow-wrap: anywhere;
 }
+.bot-typing [data-slot='job-progress'] button:focus-visible {
+ outline: 2px solid #8c92ff;
+ outline-offset: 1px;
+}
+/* Непрозрачная подложка вместо размытия. */
 @media (prefers-reduced-transparency: reduce) {
  .bot-typing [data-slot='typing-indicator'],
  .bot-typing [data-slot='job-progress'] {
@@ -93,23 +74,13 @@
  }
 }
 @media (max-width: 760px) {
- .bot-typing {
-  gap: 4px;
- }
  .bot-typing [data-slot='job-progress'] p {
   max-width: min(60vw, 240px);
  }
 }
 
-/* The "not yet arrived" image message at the end of the transcript. It reuses the normal
-   message composition (avatar column, header, transparent image bubble), so the card
-   lines up with the picture that replaces it; only colours and spacing are Sombra's. */
-.bot-image-activity {
- display: flex;
- flex-direction: column;
- min-width: 0;
- max-width: 100%;
-}
+/* Карточка «изображение ещё не пришло»: она повторяет обычную композицию сообщения,
+   поэтому отступ задаёт нелейерное правило чата, а не утилита. */
 .bot-image-activity .bot-image-message {
  margin: 6px 0 0;
 }

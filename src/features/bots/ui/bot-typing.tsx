@@ -19,19 +19,26 @@ export function BotTyping({state, channel}: {state: ChatState; channel: string})
  const typing = useBotTyping({state, channel});
  if (!typing) return null;
  return (
-  <div className="bot-typing" role="status" aria-live="polite" aria-atomic="false">
-   <span className="bot-typing-announce">{typing.announcement}</span>
+  <div
+   className="bot-typing flex max-w-full min-w-0 flex-none flex-col items-start gap-1.5 px-0.5 max-[760px]:gap-1"
+   role="status"
+   aria-live="polite"
+   aria-atomic="false"
+  >
+   {/* Скрытая подпись: sr-only плюс border-current вместо прежнего border: 0. */}
+   <span className="sr-only border-current">{typing.announcement}</span>
    <JobProgress
-    className="bot-typing-job"
     title={typing.name}
     stage={typing.stage}
     detail={typing.detail || undefined}
     startedAt={typing.startedAt}
    />
    {/* The live region above owns the announcement; the animated dots stay decorative. */}
-   <span className="bot-typing-indicator" aria-hidden="true">
-    {typing.user ? <UserAvatar user={typing.user} size="sm" presence={false} decorative /> : null}
-    <TypingIndicator variant="bubble" label={typing.announcement} className="bot-typing-bubble" />
+   <span className="flex max-w-full min-w-0 items-end gap-2" aria-hidden="true">
+    {typing.user ? (
+     <UserAvatar user={typing.user} size="sm" presence={false} decorative className="mb-px shrink-0" />
+    ) : null}
+    <TypingIndicator variant="bubble" label={typing.announcement} />
    </span>
   </div>
  );
@@ -54,7 +61,11 @@ export function BotImageActivity({state, channel}: {state: ChatState; channel: s
  const image = useBotImageActivity({state, channel});
  if (!image) return null;
  return (
-  <div ref={image.root} className="bot-image-activity" data-bot-image-activity={image.bot}>
+  <div
+   ref={image.root}
+   className="bot-image-activity flex max-w-full min-w-0 flex-col"
+   data-bot-image-activity={image.bot}
+  >
    <Message className="bot-image-message" align="start" aria-label={`${image.name}: ${image.label}`}>
     <MessageAvatar>
      {image.user ? <UserAvatar user={image.user} size="md" presence={false} decorative /> : image.name[0]}
@@ -66,7 +77,7 @@ export function BotImageActivity({state, channel}: {state: ChatState; channel: s
        <small className="bot-badge">БОТ</small>
       </MessageHeader>
       <BubbleContent>
-       <ImageGeneration prompt={image.label} generating className="bot-image-generation" />
+       <ImageGeneration prompt={image.label} generating />
       </BubbleContent>
      </Bubble>
     </MessageContent>

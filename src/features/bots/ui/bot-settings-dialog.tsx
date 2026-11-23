@@ -57,9 +57,10 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
    }}
   >
    <Dialog.Portal>
-    <Dialog.Overlay className="bot-management-overlay" />
+    {/* .bot-management-overlay — хук размытия подложки из app/styles/glass.css. */}
+    <Dialog.Overlay className="bot-management-overlay fixed inset-0 z-[80] bg-[#0009]" />
     <Dialog.Content
-     className="bot-management-dialog"
+     className="bot-management-dialog border-border bg-background text-foreground fixed top-1/2 left-1/2 z-[81] flex max-h-[calc(100dvh-48px)] w-[min(760px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border"
      data-bot-settings-dialog
      onEscapeKeyDown={event => {
       if (crop || busy) event.preventDefault();
@@ -68,16 +69,16 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
       if (crop || busy) event.preventDefault();
      }}
     >
-     <header>
+     <header className="flex items-center justify-between gap-4 px-6 py-5">
       <div>
-       <Dialog.Title>Управление ботом</Dialog.Title>
+       <Dialog.Title className="m-0 text-[20px] font-semibold">Управление ботом</Dialog.Title>
        <Dialog.Description>{bot.username ? '@' + bot.username : bot.name} · настройки владельца</Dialog.Description>
       </div>
       <button type="button" aria-label="Закрыть настройки бота" disabled={busy} onClick={onClose}>
        <X size={20} />
       </button>
      </header>
-     <nav aria-label="Разделы настроек бота">
+     <nav className="flex flex-wrap gap-2 px-6 pb-4" aria-label="Разделы настроек бота">
       {[
        ['general', 'Общее'],
        ['model', 'Модель'],
@@ -89,7 +90,7 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
        </button>
       ))}
      </nav>
-     <div className="bot-management-body">
+     <div className="bot-management-body min-h-0 overflow-y-auto px-6 pt-2 pb-6">
       {!supported && (
        <p role="note">
         Для управления этим ботом обновите сервер и подключение бота. Настройки доступны только для просмотра.
@@ -98,7 +99,7 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
       {busy && !loaded && <p role="status">Загрузка настроек…</p>}
       {tab === 'general' && (
        <>
-        <div className="bot-management-avatar">
+        <div className="flex flex-wrap items-center gap-3">
          <UserAvatar user={preview} size="md" presence={false} />
          <button type="button" ref={avatarButton} disabled={disabled} onClick={() => picker.current?.click()}>
           Изменить аватар
@@ -230,7 +231,7 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
        </button>
       )}
      </div>
-     <footer>
+     <footer className="border-border flex shrink-0 items-center justify-end gap-3 border-t px-6 py-4">
       <span>{dirty ? 'Есть несохранённые изменения' : ''}</span>
       <button type="button" disabled={busy} onClick={onClose}>
        Отмена
@@ -287,7 +288,9 @@ function ModelSettings({
  } = useBotModelSettings({bot, state, refresh, rootBusy});
  return (
   <section aria-labelledby="bot-model-settings-title" aria-busy={pending}>
-   <h3 id="bot-model-settings-title">Модель и размышление</h3>
+   <h3 id="bot-model-settings-title" className="mt-0 mb-1 text-[16px] font-semibold">
+    Модель и размышление
+   </h3>
    <p className="bot-model-note">
     Значения применяет Hermes: пустое значение означает его текущие модель и уровень по умолчанию, которые определяет
     провайдер. Каталог допустимых моделей публикует провайдер, сервер хранит только выбранный безопасный идентификатор.
@@ -333,7 +336,7 @@ function ModelSettings({
    )}
    {notice && <p role="status">{notice}</p>}
    {error && <p role="alert">{error}</p>}
-   <div className="bot-model-actions">
+   <div className="bot-model-actions mt-3 flex flex-wrap items-center gap-3">
     <button
      type="button"
      aria-label="Сохранить модель и уровень размышления"
@@ -342,7 +345,7 @@ function ModelSettings({
     >
      {pending && loaded ? 'Сохранение…' : 'Сохранить'}
     </button>
-    <span>{dirty ? 'Есть несохранённые изменения' : ''}</span>
+    <span className="text-muted-foreground text-[12px]">{dirty ? 'Есть несохранённые изменения' : ''}</span>
    </div>
   </section>
  );

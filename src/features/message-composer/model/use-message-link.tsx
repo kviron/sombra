@@ -4,7 +4,11 @@ import {Link2} from 'lucide-react';
 import {Button} from '@/shared/ui/button';
 import {Input} from '@/shared/ui/input';
 import {normalizeLinkUrl} from '@/shared/lib/message-links';
-import '../ui/message-link-dialog.css';
+
+/** Окно ссылки: портал вне .chat-shell, поэтому тени, отступы и типографика — утилитами. */
+const dialogClass =
+ 'fixed top-1/2 left-1/2 z-[171] max-h-[calc(100dvh-48px)] w-[min(420px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-[12px] border border-border bg-background p-6 text-foreground [box-shadow:0_24px_80px_#0008]';
+const labelClass = 'grid gap-2 text-[13px] font-medium';
 
 type Selection = {channel: string; draft: string; start: number; end: number};
 
@@ -103,9 +107,10 @@ export function useMessageLink({
    }}
   >
    <RadixDialog.Portal>
-    <RadixDialog.Overlay className="message-link-overlay" />
+    {/* .message-link-overlay — хук размытия подложки из app/styles/glass.css. */}
+    <RadixDialog.Overlay className="message-link-overlay fixed inset-0 z-[170] bg-[#0009]" />
     <RadixDialog.Content
-     className="message-link-dialog"
+     className={dialogClass}
      onCloseAutoFocus={event => {
       event.preventDefault();
       requestAnimationFrame(() => {
@@ -115,23 +120,25 @@ export function useMessageLink({
       });
      }}
     >
-     <RadixDialog.Title>
+     <RadixDialog.Title className="m-0 mb-2 flex items-center gap-2 text-[18px] font-semibold">
       <Link2 size={18} />
       Создать ссылку
      </RadixDialog.Title>
-     <RadixDialog.Description className="message-link-description">
+     <RadixDialog.Description className="text-muted-foreground mt-0 mb-5 text-[13px] leading-[1.5]">
       Ссылка будет вставлена в черновик. Сообщение не отправится автоматически.
      </RadixDialog.Description>
      <form
+      className="grid gap-4"
       onSubmit={event => {
        event.preventDefault();
        event.stopPropagation();
        submit();
       }}
      >
-      <label htmlFor="message-link-label">
+      <label className={labelClass} htmlFor="message-link-label">
        Текст
        <Input
+        className="min-h-11"
         id="message-link-label"
         autoFocus
         value={label}
@@ -143,9 +150,10 @@ export function useMessageLink({
         placeholder="Например, OpenAI Help Center"
        />
       </label>
-      <label htmlFor="message-link-url">
+      <label className={labelClass} htmlFor="message-link-url">
        URL
        <Input
+        className="min-h-11"
         id="message-link-url"
         value={url}
         onChange={event => {
@@ -160,15 +168,15 @@ export function useMessageLink({
        />
       </label>
       {error && (
-       <p role="alert" className="message-link-error">
+       <p role="alert" className="text-[13px] leading-[1.5] [overflow-wrap:anywhere] text-[#f5a4ac]">
         {error}
        </p>
       )}
-      <footer>
-       <Button type="button" variant="ghost" onClick={close}>
+      <footer className="mt-2 flex justify-end gap-2">
+       <Button className="min-h-10" type="button" variant="ghost" onClick={close}>
         Отмена
        </Button>
-       <Button type="submit" disabled={!url.trim()}>
+       <Button className="min-h-10" type="submit" disabled={!url.trim()}>
         Создать
        </Button>
       </footer>

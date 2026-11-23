@@ -1,7 +1,14 @@
-.bot-tool-access {
- margin-top: 12px;
- min-width: 0;
-}
+/* Панель доступа к инструментам показывается внутри окна настроек бота, а окно
+   живёт в портале Radix. Оболочка, отступы секции и служебные подписи собраны
+   утилитами в className. Здесь остались невыразимое и общее:
+   - размеры native-кнопок панели и перенос их текста;
+   - строки выбора: input, подпись и служебный ID размечены внутри label;
+   - прокручиваемый список с рамочным фокусом, :disabled и :focus-visible;
+   - цвета на токенах темы.
+   Правила .bot-settings .bot-tool-person и .bot-settings .bot-tool-search
+   удалены: окно в портале, поэтому .bot-settings до его разметки не дотягивается —
+   эти правила никогда не применялись. */
+
 .bot-tool-access-toggle,
 .bot-tool-policy button {
  min-height: 40px;
@@ -9,31 +16,9 @@
  max-width: 100%;
  overflow-wrap: anywhere;
 }
-.bot-tool-policy {
- margin-top: 12px;
- padding: 16px;
- border: 1px solid var(--border);
- border-radius: var(--radius);
- min-width: 0;
- overflow-wrap: anywhere;
-}
-.bot-tool-policy h4 {
- margin: 0 0 12px;
- font-size: 16px;
- line-height: 1.5;
-}
 .bot-tool-policy p {
  line-height: 1.5;
  margin: 12px 0;
-}
-.bot-settings .bot-tool-person {
- display: flex;
- align-items: center;
- gap: 12px;
- margin: 0;
- padding: 8px;
- min-height: 44px;
- cursor: pointer;
 }
 .bot-tool-person > input {
  flex: 0 0 20px;
@@ -58,18 +43,9 @@
  border-radius: var(--radius);
  cursor: default !important;
 }
-.bot-settings .bot-tool-search {
- margin: 16px 0 8px;
- display: grid;
- gap: 8px;
-}
 .bot-tool-search input {
  min-height: 40px;
  width: 100%;
-}
-.bot-tool-count {
- color: var(--muted-foreground);
- font-size: 12px;
 }
 .bot-tool-users {
  max-height: 240px;
@@ -92,19 +68,9 @@
  opacity: 0.55;
  cursor: not-allowed;
 }
-.bot-tool-footer {
- display: flex;
- flex-wrap: wrap;
- gap: 8px;
- padding-top: 12px;
-}
 .bot-tool-notices [role='alert'] {
  color: var(--destructive);
  font-weight: 500;
-}
-.bot-tool-runtime-note {
- color: var(--muted-foreground);
- font-size: 12px;
 }
 .bot-tool-missing button {
  display: block;

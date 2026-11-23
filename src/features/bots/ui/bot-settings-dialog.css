@@ -1,37 +1,11 @@
-.bot-management-overlay {
- position: fixed;
- inset: 0;
- background: #0009;
- z-index: 80;
-}
-.bot-management-dialog {
- position: fixed;
- top: 50%;
- left: 50%;
- transform: translate(-50%, -50%);
- width: min(760px, calc(100vw - 32px));
- max-height: calc(100dvh - 48px);
- display: flex;
- flex-direction: column;
- background: var(--background, #171923);
- color: var(--foreground, #ececf1);
- border: 1px solid var(--border, #393c49);
- border-radius: 16px;
- z-index: 81;
- overflow: hidden;
-}
-.bot-management-dialog > header {
- display: flex;
- align-items: center;
- justify-content: space-between;
- padding: 20px 24px;
- gap: 16px;
-}
-.bot-management-dialog h2 {
- font-size: 20px;
- font-weight: 600;
- margin: 0;
-}
+/* Окно управления ботом живёт в портале Radix — вне .chat-shell и .account-modal.
+   Раскладка окна, шапки, вкладок, тела и футера собрана утилитами в className.
+   Здесь остались невыразимое и общее:
+   - .bot-management-overlay — класс-хук размытия подложки из app/styles/glass.css;
+   - теговые правила подписей, полей и кнопок: в окно приходят native-поля,
+     ImageCropDialog и Elements SettingsPanel, их разметку срез не задаёт;
+   - состояния :disabled, :focus-visible, [role='alert'] и узкий экран. */
+
 .bot-management-dialog p {
  font-size: 14px;
  line-height: 1.5;
@@ -56,20 +30,10 @@
  outline: 2px solid var(--ring, #929bea);
  outline-offset: 2px;
 }
-.bot-management-dialog > nav {
- display: flex;
- gap: 8px;
- padding: 0 24px 16px;
- flex-wrap: wrap;
-}
+/* Вкладки: активная подсвечивается токенами темы. */
 .bot-management-dialog > nav [aria-pressed='true'] {
  background: var(--primary, #646ddd);
  color: var(--primary-foreground, #fff);
-}
-.bot-management-body {
- overflow-y: auto;
- min-height: 0;
- padding: 8px 24px 24px;
 }
 .bot-management-body label {
  display: flex;
@@ -78,6 +42,7 @@
  margin: 16px 0;
  font-size: 14px;
 }
+/* Поля окна: border/background снимают native-вид, поэтому правило нелейерное. */
 .bot-management-body input:not([type='checkbox']):not([type='radio']):not([type='file']),
 .bot-management-body textarea {
  width: 100%;
@@ -99,6 +64,7 @@
  margin: 0;
  min-width: 0;
 }
+/* Строка выбора: подпись становится строкой, а не колонкой. */
 .bot-management-body .bot-management-choice {
  flex-direction: row;
  align-items: center;
@@ -110,21 +76,7 @@
  height: 18px;
  flex-shrink: 0;
 }
-.bot-management-avatar {
- display: flex;
- align-items: center;
- gap: 12px;
- flex-wrap: wrap;
-}
-.bot-management-dialog > footer {
- display: flex;
- align-items: center;
- justify-content: flex-end;
- gap: 12px;
- padding: 16px 24px;
- border-top: 1px solid var(--border, #393c49);
- flex-shrink: 0;
-}
+/* Футер: кнопка сохранения несёт акцент окна. */
 .bot-management-dialog > footer > span {
  margin-right: auto;
  font-size: 12px;
@@ -156,12 +108,10 @@
  }
 }
 
-/* «Модель и размышление»: вендорный Elements SettingsPanel внутри диалога. */
-.bot-model-settings h3 {
- margin: 0 0 4px;
- font-size: 16px;
- font-weight: 600;
-}
+/* «Модель и размышление»: вендорный Elements SettingsPanel внутри диалога.
+   Его разметка чужая, поэтому плотность и состояния остаются здесь.
+   Подписи .bot-model-note и .bot-model-current держат (0,2,0): теговое правило
+   `.bot-management-dialog p` выше по специфичности, чем утилиты слоя. */
 .bot-model-settings .bot-model-note {
  margin: 0 0 12px;
  font-size: 12px;
@@ -203,18 +153,8 @@
  border-color: #e06a6a;
  box-shadow: 0 0 0 1px #e06a6a;
 }
-.bot-model-settings .bot-model-actions {
- display: flex;
- align-items: center;
- gap: 12px;
- margin-top: 12px;
- flex-wrap: wrap;
-}
+/* Кнопка сохранения модели несёт акцент окна. */
 .bot-model-settings .bot-model-actions > button {
  background: var(--primary, #646ddd);
  color: var(--primary-foreground, #fff);
-}
-.bot-model-settings .bot-model-actions > span {
- font-size: 12px;
- color: var(--muted-foreground, #aaaebf);
 }

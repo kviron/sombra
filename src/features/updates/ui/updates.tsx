@@ -123,8 +123,8 @@ export function UpdateSettings({inCall}: {inCall: boolean}) {
        ? () => updater.restart()
        : () => updater.check();
  return (
-  <section className="update-settings" aria-label="Обновления Sombra">
-   <div className="update-version-panel">
+  <section className="update-settings grid min-w-0 gap-6" aria-label="Обновления Sombra">
+   <div className="update-version-panel border-border bg-secondary flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border p-4">
     <div>
      <h2>Sombra {version && <Badge variant="secondary">{version}</Badge>}</h2>
      <p role="status">
