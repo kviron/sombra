@@ -20,9 +20,13 @@ export function DmHeaderIdentity({user, typingUntil = 0}: {user: User; typingUnt
  return (
   <>
    <UserAvatar user={user} size="sm" presence={!user.bot} decorative decoration={user.decorations?.avatar} />
-   <span className="dm-header-label">
-    <strong>{user.name}</strong>
-    <small className={typing ? 'dm-header-typing' : undefined} role="status" aria-live="polite">
+   <span className="dm-header-label flex min-w-0 flex-col items-start justify-center gap-0.5 overflow-hidden">
+    <strong className="w-full truncate text-[13px] leading-[17px]">{user.name}</strong>
+    <small
+     className={`block max-w-full truncate text-[12px] leading-[15px] ${typing ? 'dm-header-typing text-[#b8bdf1]' : ''}`}
+     role="status"
+     aria-live="polite"
+    >
      {peerStatus(user, typingUntil, now)}
     </small>
    </span>

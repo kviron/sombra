@@ -1,6 +1,8 @@
 /* Upstream assistant-ui Elements, MIT (see LICENSE). The canonical package defines the
    `.shimmer` label animation in its global theme; Sombra ships the same effect next to
-   the one Elements component that uses it, with Sombra's muted-foreground colours. */
+   the one Elements component that uses it, with Sombra's muted-foreground colours.
+   Сами градиент, обрезка и запуск анимации набраны в shimmer-label.tsx;
+   здесь остаются @keyframes и состояния reduced-motion / forced-colors. */
 @keyframes elements-shimmer-sweep {
  from {
   background-position: 200% 0;
@@ -8,15 +10,6 @@
  to {
   background-position: -200% 0;
  }
-}
-.elements-shimmer {
- background-image: linear-gradient(100deg, #8f97aa 20%, #eef1f9 50%, #8f97aa 80%);
- background-size: 200% 100%;
- -webkit-background-clip: text;
- background-clip: text;
- color: transparent;
- -webkit-text-fill-color: transparent;
- animation: elements-shimmer-sweep 1.9s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
  .elements-shimmer {
@@ -37,7 +30,8 @@
 /* Generating plate. Canonical Elements hides the gradient and keeps only the pulsing dot
    field, which reads as an almost empty dark rectangle in Sombra's compact chat. Sombra
    keeps the same dot field on top of a soft, slowly breathing gradient with a single
-   sheen sweep: visible work in progress, still no percentage, prompt or resolution. */
+   sheen sweep: visible work in progress, still no percentage, prompt or resolution.
+   Дыхание плиты и её слой позиционируются в image-generation.tsx. */
 @keyframes elements-image-breathe {
  0%,
  100% {
@@ -54,12 +48,6 @@
  to {
   transform: translateX(65%);
  }
-}
-.elements-image-plate {
- pointer-events: none;
-}
-.elements-image-plate-generating {
- animation: elements-image-breathe 3.4s ease-in-out infinite;
 }
 /* A dark scrim keeps the pastel placeholder palette calm inside Sombra's dark chat. */
 .elements-image-plate-generating::before {

@@ -27,7 +27,11 @@ export function AvatarFrame({decoration, target = 'avatar', size = 'md', classNa
  if (!normalized) return null;
  if (normalized.mode === 'scene') return <AvatarScene decoration={normalized} className={className} />;
  return (
-  <span className={cn('avatar-fx', `avatar-fx--${target}`, className)} aria-hidden="true" data-mode="frame">
+  <span
+   className={cn('avatar-fx', `avatar-fx--${target}`, 'pointer-events-none absolute inset-0 select-none', className)}
+   aria-hidden="true"
+   data-mode="frame"
+  >
    {normalized.layers.map((layer, index) => (
     <AvatarFxLayer
      key={`${index}:${layerKey(layer, target, normalized.seed)}`}
@@ -94,7 +98,13 @@ function AvatarScene({decoration, className}: {decoration: AvatarDecoration; cla
  };
  return (
   <span
-   className={cn('avatar-fx', 'avatar-fx--cover', 'avatar-fx--scene', className)}
+   className={cn(
+    'avatar-fx',
+    'avatar-fx--cover',
+    'avatar-fx--scene',
+    'pointer-events-none absolute inset-0 overflow-hidden select-none',
+    className
+   )}
    aria-hidden="true"
    data-mode="scene"
   >
@@ -103,7 +113,7 @@ function AvatarScene({decoration, className}: {decoration: AvatarDecoration; cla
     ref={canvasRef}
     width={plan.gridWidth}
     height={plan.gridHeight}
-    className="avatar-fx__canvas avatar-fx__canvas--scene"
+    className="avatar-fx__canvas avatar-fx__canvas--scene absolute block [image-rendering:pixelated]"
     style={style}
     aria-hidden="true"
     data-avatar-fx-effect="scene"
@@ -153,7 +163,7 @@ function AvatarFxLayer({
    ref={canvasRef}
    width={plan.gridWidth}
    height={plan.gridHeight}
-   className={cn('avatar-fx__canvas', `avatar-fx__canvas--${plan.kind}`)}
+   className={cn('avatar-fx__canvas absolute block [image-rendering:pixelated]', `avatar-fx__canvas--${plan.kind}`)}
    style={style}
    aria-hidden="true"
    data-avatar-fx-effect={layer.effect}

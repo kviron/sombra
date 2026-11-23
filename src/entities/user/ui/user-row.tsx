@@ -7,6 +7,18 @@ import './user.css';
 
 export type UserRowVariant = 'member' | 'voice' | 'dialog';
 
+/** Строка одна на все списки: вариант задаёт только плотность и цвет через data-variant. */
+const rowClass = cn(
+ 'user-row',
+ 'group flex w-full min-w-0 items-center gap-2.5 rounded-[8px] text-left text-[#c3c8d4]',
+ 'data-[variant=member]:min-h-10 data-[variant=member]:cursor-pointer data-[variant=member]:px-2 data-[variant=member]:py-1',
+ 'data-[variant=dialog]:min-h-16 data-[variant=dialog]:gap-2.5 data-[variant=dialog]:px-2 data-[variant=dialog]:py-2.5',
+ 'data-[variant=voice]:min-h-[34px] data-[variant=voice]:gap-2 data-[variant=voice]:px-1.5 data-[variant=voice]:py-1',
+ 'data-[variant=voice]:text-[13px] data-[variant=voice]:text-[#aeb4c0] data-[variant=voice]:[&>svg]:shrink-0',
+ '[&[role=button]]:focus-visible:bg-[#ffffff0a] [&[role=button]]:focus-visible:outline-2',
+ '[&[role=button]]:focus-visible:-outline-offset-2 [&[role=button]]:focus-visible:outline-[#8c92ff]'
+);
+
 export function UserRow({
  as = 'div',
  variant = 'member',
@@ -48,24 +60,32 @@ export function UserRow({
    {before}
    <UserAvatar user={identity} size={avatarSize} presence={presence} decoration={identity.decorations?.avatar} />
    {adornment}
-   <span className="user-row-main">
-    <span className="user-row-title">
-     <strong>{identity.name}</strong>
-     {identity.bot && <small className="user-bot-badge">БОТ</small>}
+   <span className="user-row-main flex min-w-0 flex-1 flex-col gap-0.5 group-data-[variant=voice]:gap-0">
+    <span className="user-row-title flex min-w-0 items-center gap-2">
+     <strong className="truncate text-[14px] font-semibold text-[#eef1f7]">{identity.name}</strong>
+     {identity.bot && (
+      <small className="user-bot-badge inline-flex min-h-[18px] shrink-0 items-center rounded-[4px] bg-[#322343] px-[5px] py-px text-[10px] leading-[1.4] font-bold tracking-[0.03em] text-[#dfc4fa]">
+       БОТ
+      </small>
+     )}
      {meta}
     </span>
-    {subtitle ? <span className="user-row-subtitle">{subtitle}</span> : null}
+    {subtitle ? (
+     <span className="user-row-subtitle truncate text-[12px] leading-[16px] text-[#98a2b5] group-data-[variant=dialog]:mt-0.5">
+      {subtitle}
+     </span>
+    ) : null}
    </span>
    {trailing}
   </>
  );
- const rowClass = cn('user-row', className);
+ const rowClassNames = cn(rowClass, className);
  const offline = identity.online === false ? 'true' : undefined;
  const row =
   as === 'button' ? (
    <button
     type="button"
-    className={rowClass}
+    className={rowClassNames}
     data-variant={variant}
     data-offline={offline}
     data-selected={selected || undefined}
@@ -77,7 +97,7 @@ export function UserRow({
    </button>
   ) : as === 'li' ? (
    <li
-    className={rowClass}
+    className={rowClassNames}
     data-variant={variant}
     data-offline={offline}
     data-selected={selected || undefined}
@@ -100,7 +120,7 @@ export function UserRow({
    </li>
   ) : (
    <div
-    className={rowClass}
+    className={rowClassNames}
     data-variant={variant}
     data-offline={offline}
     data-selected={selected || undefined}

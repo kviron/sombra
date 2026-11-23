@@ -1,5 +1,10 @@
 /* Голос и уведомления: разделы на общей поверхности, подпись слева, управление справа.
-   Никаких карточек в карточке — блоки разделены волосяной линией. */
+   Никаких карточек в карточке — блоки разделены волосяной линией.
+
+   Файл целиком остаётся в CSS (группа C): все селекторы цепляются за разметку чужих
+   срезов — .account-media-voice из features/voice-room, .notification-settings из
+   features/account-notifications, .voice-field/.voice-switch из voice.css. Утилиты в
+   чужой JSX не положить, а перенос правил в эти срезы запрещён границами задачи. */
 .account-media-voice,
 .notification-settings.account-media-notifications {
  display: grid;

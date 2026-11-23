@@ -1,3 +1,6 @@
+/* Личность в шапке личного диалога. Подпись набрана утилитами в
+   dm-header-identity.tsx; здесь остаётся обёртка, которую задаёт pages/chat
+   классом dm-header-info, и её узкий экран. */
 .chat-header .chat-conversation-info.dm-header-info {
  flex-direction: row;
  align-items: center;
@@ -6,38 +9,6 @@
  min-width: 0;
  max-width: min(360px, 45%);
  flex-shrink: 1;
-}
-.dm-header-info .user-avatar {
- flex-shrink: 0;
-}
-.dm-header-label {
- display: flex;
- flex-direction: column;
- align-items: flex-start;
- justify-content: center;
- gap: 2px;
- min-width: 0;
- overflow: hidden;
-}
-.dm-header-label strong {
- width: 100%;
- font-size: 13px;
- line-height: 17px;
- overflow: hidden;
- text-overflow: ellipsis;
- white-space: nowrap;
-}
-.chat-header .dm-header-label small {
- display: block;
- max-width: 100%;
- font-size: 12px;
- line-height: 15px;
- overflow: hidden;
- text-overflow: ellipsis;
- white-space: nowrap;
-}
-.chat-header .dm-header-label .dm-header-typing {
- color: #b8bdf1;
 }
 @media (max-width: 1100px) {
  .chat-header .chat-conversation-info.dm-header-info {

@@ -1,21 +1,8 @@
 /* Avatar/cover decoration layer. The canvases are low-resolution and upscaled by the browser with nearest
-   neighbour, so the effect stays a crisp pixel image at any avatar size and device pixel ratio. */
-.avatar-fx {
- position: absolute;
- inset: 0;
- pointer-events: none;
- user-select: none;
-}
-
+   neighbour, so the effect stays a crisp pixel image at any avatar size and device pixel ratio.
+   Позиционирование слоя и canvas'ов набрано утилитами в AvatarFrame.tsx; здесь остаются маски. */
 .avatar-fx--cover {
  overflow: hidden;
-}
-
-.avatar-fx__canvas {
- position: absolute;
- display: block;
- image-rendering: pixelated;
- /* Animated by the scheduler only while visible; no transitions of our own. */
 }
 
 /* A ring never paints over the avatar: the centre of the twice-as-big canvas is masked out at exactly the
@@ -30,7 +17,8 @@
 }
 
 /* A corner pet sits on a square canvas. Its glow is dimmed in the renderer and the puddle is cropped away, so
-   nothing here may look like a rectangle: keep the canvas edges clean rather than tinting the avatar. */
+   nothing here may look like a rectangle: keep the canvas edges clean rather than tinting the avatar.
+   Двойная маска с mask-composite утилитами Tailwind не выражается. */
 .avatar-fx__canvas--corner {
  -webkit-mask-image:
   linear-gradient(to right, transparent 0, #000 4%, #000 96%, transparent 100%),

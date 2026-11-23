@@ -1,4 +1,5 @@
 import type {LucideIcon} from 'lucide-react';
+import {cn} from '@/shared/lib/utils';
 import './motion-icon.css';
 
 /** Decorative layers inherit the existing button's accessible name and state. */
@@ -16,12 +17,27 @@ export function MotionIcon({
  return (
   <span
    aria-hidden="true"
-   className={`motion-icon motion-icon--${kind} ${className}`}
+   className={cn(
+    'motion-icon',
+    `motion-icon--${kind}`,
+    'pointer-events-none relative inline-grid shrink-0 align-middle transition-[transform,color] duration-[140ms] ease-[ease-out]',
+    '[&>svg]:col-start-1 [&>svg]:row-start-1 [&>svg]:m-0 [&>svg]:size-full',
+    className
+   )}
    style={{width: size, height: size}}
   >
-   <Icon className="motion-icon__base" size={size} />
-   <Icon className="motion-icon__echo motion-icon__echo--cyan" size={size} />
-   <Icon className="motion-icon__echo motion-icon__echo--violet" size={size} />
+   <Icon
+    className="motion-icon__base transition-[transform] duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+    size={size}
+   />
+   <Icon
+    className="motion-icon__echo motion-icon__echo--cyan text-[#62e8ef] opacity-0 [clip-path:inset(16%_0_49%_0)]"
+    size={size}
+   />
+   <Icon
+    className="motion-icon__echo motion-icon__echo--violet text-[#c297ff] opacity-0 [clip-path:inset(58%_0_12%_0)]"
+    size={size}
+   />
   </span>
  );
 }

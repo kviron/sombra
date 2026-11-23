@@ -82,9 +82,12 @@ export function AuthAmbient() {
  }, []);
  return (
   <>
-   <div className="auth-gradient" aria-hidden="true" />
-   <div className="login-particles" aria-hidden="true">
-    <canvas className="login-glitch" ref={canvas} />
+   <div className="auth-gradient pointer-events-none absolute inset-0 z-[-2] overflow-hidden" aria-hidden="true" />
+   <div className="login-particles pointer-events-none absolute inset-0 z-[-1] overflow-hidden" aria-hidden="true">
+    <canvas
+     className="login-glitch absolute inset-0 h-full w-full [mask-image:radial-gradient(ellipse_at_center,transparent_25%,black_62%)] [image-rendering:pixelated]"
+     ref={canvas}
+    />
    </div>
   </>
  );

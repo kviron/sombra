@@ -1,3 +1,4 @@
+import {cn} from '@/shared/lib/utils';
 import {useRef, useState} from 'react';
 import {Dialog, ScrollArea, Tabs} from 'radix-ui';
 import {ArrowLeft, Plus, Sticker as StickerIcon, Upload, X} from 'lucide-react';
@@ -9,6 +10,21 @@ import {useStickerLibrary} from '../model/use-sticker-library';
 import {useStickerCatalog} from '../model/use-sticker-catalog';
 import {useStickerPackPreview} from '../model/use-sticker-pack-preview';
 import {catalogPackNote, libraryPackNote, shouldPreviewSentSticker} from '../model/sticker-library-rules';
+
+/** Карточка набора: одна и та же кнопка в каталоге и summary в личной библиотеке. */
+const tileClass = cn(
+ 'sticker-collection-tile',
+ 'grid w-full min-w-0 cursor-pointer gap-2 rounded-[12px] border border-[var(--sticker-border)] p-2 text-left',
+ 'bg-[var(--sticker-tile)] hover:border-[var(--sticker-focus)]',
+ 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sticker-focus)]'
+);
+
+/** Вкладка «Личное» / «Общее»: форма задаётся здесь, рамку переопределяют настройки. */
+const tabClass = cn(
+ 'min-h-9 cursor-pointer rounded-[7px] px-3.5 py-1 text-sm text-[var(--sticker-muted)]',
+ 'data-[state=active]:bg-[var(--sticker-selected)] data-[state=active]:text-[#f0f3fa]',
+ 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sticker-focus)]'
+);
 
 export function StickerImage({sticker, className}: {sticker: Sticker; className?: string}) {
  const ref = useRef<HTMLImageElement>(null);
@@ -38,16 +54,16 @@ function StickerPackPreview({
    }}
   >
    <Dialog.Portal>
-    <Dialog.Overlay className="sticker-preview-overlay" />
+    <Dialog.Overlay className="sticker-preview-overlay fixed inset-0 z-[140] bg-[#0009]" />
     <Dialog.Content
-     className="sticker-preview-dialog"
+     className="sticker-preview-dialog fixed top-1/2 left-1/2 z-[141] grid max-h-[calc(100vh_-_32px)] w-[min(420px,calc(100vw_-_32px))] [transform:translate(-50%,-50%)] gap-4 overflow-auto rounded-[var(--radius)] border border-[var(--border)] bg-[var(--popover)] p-4 text-[var(--popover-foreground)] [box-shadow:0_12px_48px_#0007]"
      aria-describedby={undefined}
      onCloseAutoFocus={event => {
       event.preventDefault();
       trigger.current?.focus({preventScroll: true});
      }}
     >
-     <header>
+     <header className="flex items-center justify-between gap-3">
       <Dialog.Title>{pack?.name || 'Набор стикеров'}</Dialog.Title>
       <Dialog.Close asChild>
        <Button size="icon-sm" variant="ghost" aria-label="Закрыть">
@@ -69,7 +85,7 @@ function StickerPackPreview({
        ) : pack.installed ? (
         <p role="status">Набор уже добавлен</p>
        ) : (
-        <Button type="button" disabled={busy} onClick={() => void install()}>
+        <Button className="justify-self-start" type="button" disabled={busy} onClick={() => void install()}>
          Добавить в мои стикеры
         </Button>
        )}
@@ -103,7 +119,7 @@ export function SentSticker({
    <button
     ref={trigger}
     type="button"
-    className="sent-sticker-preview"
+    className="sent-sticker-preview inline-block cursor-pointer rounded-[var(--radius)] border-0 bg-none p-0 hover:bg-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--ring)]"
     aria-label={`Открыть набор «${sticker.pack}»`}
     onClick={() => setOpen(true)}
    >
@@ -125,9 +141,14 @@ export function SentSticker({
 
 function PackArt({stickers}: {stickers: Sticker[]}) {
  return (
-  <span className="sticker-collection-art" aria-hidden="true">
+  <span
+   className="sticker-collection-art grid min-h-[72px] auto-cols-[minmax(0,1fr)] grid-flow-col place-items-center gap-1 rounded-[8px] bg-[var(--sticker-surface)] p-2 text-[var(--sticker-muted)]"
+   aria-hidden="true"
+  >
    {stickers.length ? (
-    stickers.slice(0, 4).map(sticker => <StickerImage key={sticker.id} sticker={sticker} />)
+    stickers
+     .slice(0, 4)
+     .map(sticker => <StickerImage className="h-14 w-full object-contain" key={sticker.id} sticker={sticker} />)
    ) : (
     <StickerIcon />
    )}
@@ -139,16 +160,21 @@ function PublicStickerCatalog({user, refresh}: {user: string; refresh: () => Pro
  const {packs, next, busy, error, preview, actions} = useStickerCatalog({user, refresh});
  const trigger = useRef<HTMLButtonElement | null>(null);
  return (
-  <section aria-label="Публичные наборы" className="public-sticker-catalog">
+  <section
+   aria-label="Публичные наборы"
+   className="public-sticker-catalog grid w-full min-w-0 justify-items-start gap-3"
+  >
    {error && <p role="alert">{error}</p>}
    {busy && <p role="status">Загрузка…</p>}
-   {!packs.length && !busy && !error && <p>Пока нет опубликованных наборов.</p>}
-   <div className="sticker-collection-tiles">
+   {!packs.length && !busy && !error && (
+    <p className="text-sm text-[var(--sticker-muted)]">Пока нет опубликованных наборов.</p>
+   )}
+   <div className="grid w-full min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,180px),1fr))] items-start gap-3">
     {packs.map(pack => (
      <button
       key={pack.id}
       type="button"
-      className="sticker-collection-tile"
+      className={tileClass}
       onClick={event => {
        trigger.current = event.currentTarget;
        actions.openPreview(pack.id);
@@ -156,8 +182,10 @@ function PublicStickerCatalog({user, refresh}: {user: string; refresh: () => Pro
      >
       <PackArt stickers={pack.stickers} />
       <span className="sticker-collection-label">
-       <strong>{pack.name}</strong>
-       <small>{catalogPackNote(pack, user)}</small>
+       <strong className="block text-sm [overflow-wrap:anywhere]">{pack.name}</strong>
+       <small className="block text-xs [overflow-wrap:anywhere] text-[var(--sticker-muted)]">
+        {catalogPackNote(pack, user)}
+       </small>
       </span>
      </button>
     ))}
@@ -205,7 +233,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
  const addTrigger = useRef<HTMLButtonElement>(null);
  const importForm = (
   <>
-   <label className="sticker-pack-name">
+   <label className={cn('sticker-pack-name', 'grid gap-2 text-sm')}>
     Название набора
     <input
      value={name}
@@ -215,7 +243,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
      placeholder="Подставится из имени файла"
     />
    </label>
-   <label className="sticker-upload">
+   <label className={cn('sticker-upload', 'cursor-pointer')}>
     <Upload size={18} aria-hidden="true" />
     Импортировать ZIP или изображения
     <input
@@ -239,23 +267,36 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
   </>
  );
  const packList = (
-  <div className={group ? undefined : 'sticker-collection-tiles'}>
+  <div
+   className={
+    group
+     ? undefined
+     : 'grid w-full min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,180px),1fr))] items-start gap-3'
+   }
+  >
    {packs.map(([key, items]) => {
     const source = items[0],
      pack = source.pack || '',
      added = !group && !!source.packInstalled;
     return (
-     <details key={key} className="sticker-pack">
+     <details
+      key={key}
+      className="sticker-pack group m-0 min-w-0 rounded-none border-0 bg-transparent p-0 open:col-span-full open:rounded-[12px] open:border open:border-[var(--sticker-border)] open:p-2"
+     >
       {group ? (
        <summary>
         {pack || 'Без набора'} · {items.length}
        </summary>
       ) : (
-       <summary className="sticker-collection-tile">
+       <summary
+        className={cn(tileClass, 'group-open:border-[var(--sticker-focus)] group-open:bg-[var(--sticker-selected)]')}
+       >
         <PackArt stickers={items} />
         <span className="sticker-collection-label">
-         <strong>{pack || 'Без набора'}</strong>
-         <small>{libraryPackNote(items.length, source, added)}</small>
+         <strong className="block text-sm [overflow-wrap:anywhere]">{pack || 'Без набора'}</strong>
+         <small className="block text-xs [overflow-wrap:anywhere] text-[var(--sticker-muted)]">
+          {libraryPackNote(items.length, source, added)}
+         </small>
         </span>
        </summary>
       )}
@@ -316,7 +357,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
  return (
   <section className="sticker-library sticker-collection">
    {adding ? (
-    <div className="sticker-collection-import">
+    <div className="sticker-collection-import grid justify-items-start gap-3">
      {importForm}
      {feedback}
      <Button
@@ -334,7 +375,7 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
     </div>
    ) : (
     <Tabs.Root value={tab} onValueChange={actions.setTab}>
-     <div className="sticker-collection-toolbar settings-sticker-banner">
+     <div className="sticker-collection-toolbar settings-sticker-banner mb-4 flex flex-wrap items-center justify-between gap-3">
       <div className="settings-sticker-intro">
        <StickerIcon aria-hidden="true" />
        <div>
@@ -349,14 +390,21 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
       </Button>
      </div>
      <h2 className="settings-sticker-heading">Коллекция стикеров</h2>
-     <Tabs.List className="sticker-collection-tabs" aria-label="Коллекция стикеров">
-      <Tabs.Trigger value="library">Личное</Tabs.Trigger>
-      <Tabs.Trigger value="catalog">Общее</Tabs.Trigger>
+     <Tabs.List
+      className="sticker-collection-tabs flex gap-1 rounded-[10px] bg-[var(--sticker-surface)] p-1"
+      aria-label="Коллекция стикеров"
+     >
+      <Tabs.Trigger className={tabClass} value="library">
+       Личное
+      </Tabs.Trigger>
+      <Tabs.Trigger className={tabClass} value="catalog">
+       Общее
+      </Tabs.Trigger>
      </Tabs.List>
      <Tabs.Content value="library" className="sticker-collection-panel">
       {feedback}
       {!packs.length && (
-       <p className="sticker-collection-empty">
+       <p className="sticker-collection-empty text-sm text-[var(--sticker-muted)]">
         Пока нет личных наборов. Импортируйте свой набор или найдите его в общем каталоге.
        </p>
       )}
@@ -366,7 +414,9 @@ export function StickerLibrary({stickers, user, group, catalog, refresh}: Librar
       {catalog ? (
        <PublicStickerCatalog key={user} user={user} refresh={refresh} />
       ) : (
-       <p className="sticker-collection-empty">Этот сервер пока не поддерживает общий каталог стикеров.</p>
+       <p className="sticker-collection-empty text-sm text-[var(--sticker-muted)]">
+        Этот сервер пока не поддерживает общий каталог стикеров.
+       </p>
       )}
      </Tabs.Content>
     </Tabs.Root>
@@ -384,9 +434,9 @@ export function StickerCollectionModal({
  return (
   <Dialog.Root open={open} onOpenChange={onOpenChange}>
    <Dialog.Portal>
-    <Dialog.Overlay className="sticker-collection-overlay" />
+    <Dialog.Overlay className="sticker-collection-overlay fixed inset-0 z-[130] bg-[#080a10aa]" />
     <Dialog.Content
-     className="sticker-collection-modal"
+     className="sticker-collection-modal fixed top-1/2 left-1/2 z-[131] w-[min(820px,calc(100vw_-_32px))] [transform:translate(-50%,-50%)] overflow-hidden rounded-[16px] border border-[#4a5265] bg-[#1c202a] text-[#f0f3fa] [box-shadow:0_20px_60px_#080a1080] [--sticker-modal-inset:64px]"
      onOpenAutoFocus={() => {
       opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
      }}
@@ -397,13 +447,15 @@ export function StickerCollectionModal({
       }
      }}
     >
-     <ScrollArea.Root className="sticker-collection-scroll">
-      <ScrollArea.Viewport className="sticker-collection-viewport">
-       <div className="sticker-collection-frame">
-        <header>
+     <ScrollArea.Root className="sticker-collection-scroll relative overflow-hidden">
+      <ScrollArea.Viewport className="sticker-collection-viewport max-h-[calc(100dvh_-_var(--sticker-modal-inset)_-_2px)] w-full [overscroll-behavior:contain]">
+       <div className="sticker-collection-frame grid gap-5 p-6">
+        <header className="flex items-center justify-between gap-3">
          <div>
           <Dialog.Title>Коллекция стикеров</Dialog.Title>
-          <Dialog.Description>Управляйте личными наборами и находите новые в общем каталоге.</Dialog.Description>
+          <Dialog.Description className="mt-1.5 mb-0 text-sm text-[var(--sticker-muted)]">
+           Управляйте личными наборами и находите новые в общем каталоге.
+          </Dialog.Description>
          </div>
          <Dialog.Close asChild>
           <Button type="button" variant="ghost" size="icon-lg" aria-label="Закрыть коллекцию стикеров">
@@ -414,8 +466,11 @@ export function StickerCollectionModal({
         <StickerLibrary key={props.user} {...props} />
        </div>
       </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar orientation="vertical" className="sticker-collection-scrollbar">
-       <ScrollArea.Thumb className="sticker-collection-thumb" />
+      <ScrollArea.Scrollbar
+       orientation="vertical"
+       className="sticker-collection-scrollbar flex w-[9px] [touch-action:none] p-0.5 select-none"
+      >
+       <ScrollArea.Thumb className="sticker-collection-thumb relative flex-1 rounded-[999px] bg-[#b9c4d86b] hover:bg-[#b9c4d8a0]" />
       </ScrollArea.Scrollbar>
      </ScrollArea.Root>
     </Dialog.Content>

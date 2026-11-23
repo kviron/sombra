@@ -1,3 +1,7 @@
+/* Тёмная тема окна входа: токены и переопределения страниц входа (pages) — группа B/C.
+   Позиционирование слоёв фона задаётся утилитами в auth-ambient.tsx; здесь остаются
+   псевдоэлементы, @keyframes, reduced-motion и правила, которые цепляются за разметку
+   страниц входа. */
 .app-surface.auth-window.mira-auth {
  --background: #0a0a0a;
  --foreground: #fafafa;
@@ -13,13 +17,6 @@
  --radius: 10px;
  background: var(--background);
  font-family: 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
-}
-.auth-window.mira-auth > .auth-gradient {
- position: absolute;
- inset: 0;
- overflow: hidden;
- pointer-events: none;
- z-index: -2;
 }
 .auth-window.mira-auth > .auth-form-page > section {
  box-shadow: none;
@@ -92,13 +89,6 @@
   opacity: 0.64;
  }
 }
-.login-particles {
- position: absolute;
- inset: 0;
- overflow: hidden;
- pointer-events: none;
- z-index: -1;
-}
 .login-particles::before,
 .login-particles::after {
  content: '';
@@ -127,14 +117,6 @@
  to {
   transform: translate(56px, -48px);
  }
-}
-.login-glitch {
- position: absolute;
- inset: 0;
- width: 100%;
- height: 100%;
- image-rendering: pixelated;
- mask-image: radial-gradient(ellipse at center, transparent 25%, black 62%);
 }
 @media (prefers-reduced-motion: reduce) {
  .auth-window.mira-auth > .auth-gradient::before,

@@ -74,10 +74,11 @@ export function ImageGeneration({
     <div
      aria-hidden
      className={cn(
-      'absolute inset-0 overflow-hidden transition-[opacity,filter] duration-1000 ease-out motion-reduce:transition-none',
+      'elements-image-plate pointer-events-none absolute inset-0 overflow-hidden',
+      'transition-[opacity,filter] duration-1000 ease-out motion-reduce:transition-none',
       generating
-       ? 'elements-image-plate elements-image-plate-generating opacity-60'
-       : 'elements-image-plate blur-0 opacity-100'
+       ? 'elements-image-plate-generating animate-[elements-image-breathe_3.4s_ease-in-out_infinite] opacity-60'
+       : 'blur-0 opacity-100'
      )}
      style={{
       // Sombra palette: indigo → violet → warm highlight, same radial stack.
