@@ -15,7 +15,43 @@ import {
  FileSize,
  fileLabel
 } from '@/shared/ui/elements-media';
+import {cn} from '@/shared/lib';
 import './message-attachments.css';
+
+/** Оболочка карточки: ширина, отступ, рамка и фон приходят из токенов темы. */
+const attachmentShell = 'mt-2 min-w-0 max-w-full rounded-lg border border-border bg-background';
+/** Картинка рисует себя сама, поэтому рамку и фон оболочки она снимает. */
+const imageAttachmentShell = cn(attachmentShell, 'w-fit overflow-visible border-0 bg-transparent');
+/** Audio/File — это поверхность Elements; оболочка задаёт только ширину и снимает рамку. */
+const cardAttachmentShell = cn(attachmentShell, 'w-80 overflow-visible border-0 bg-transparent');
+/** Действие над картинкой: цель 44×44, тёмная плашка, светлая иконка. */
+const imageActionButton =
+ 'flex size-11 min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border-0 bg-[#111725d9] p-1 text-[#eef4ff] focus-visible:outline-2 focus-visible:outline-[#abc7ff] focus-visible:outline-offset-[3px]';
+const imageDownloadButton = cn(
+ 'attachment-image-download',
+ imageActionButton,
+ 'absolute top-2 right-2 pointer-events-none opacity-0 transition-opacity duration-150 ease-[ease]',
+ 'group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+ 'disabled:cursor-wait motion-reduce:transition-none'
+);
+const imageRetryButton = cn('attachment-image-retry', imageActionButton, 'absolute right-2 bottom-2');
+const viewerCloseButton = cn(
+ 'attachment-viewer-close',
+ imageActionButton,
+ 'absolute right-0 top-[max(-48px,calc(-10dvh_+_env(safe-area-inset-top,0px)_+_8px))]'
+);
+/** Кнопка скачивания аудио: появляется при наведении на плеер. */
+const audioDownloadButton = cn(
+ 'attachment-player-download',
+ 'absolute top-1.5 right-1.5 z-1 flex size-[30px] min-h-[30px] cursor-pointer items-center justify-center rounded-md border-0 bg-[#111725d9] p-0 text-[#eef4ff]',
+ 'pointer-events-none opacity-0 transition-opacity duration-150 ease-[ease]',
+ 'group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+ 'disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-[#abc7ff] focus-visible:outline-offset-[2px] motion-reduce:transition-none'
+);
+const audioRetryButton = cn(
+ 'attachment-audio-retry',
+ 'flex-none mt-0.5 flex size-8 min-h-8 min-w-8 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground'
+);
 
 export type MessageAttachmentProps = {messageId: string; attachment: MessageAttachmentMetadata};
 
@@ -45,7 +81,13 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
 
  if (isImage) {
   const placeholder = (
-   <span className="attachment-image-placeholder" role="status">
+   <span
+    className={cn(
+     'attachment-image-placeholder',
+     'text-muted-foreground flex min-h-[120px] items-center justify-center gap-2 p-5 text-xs leading-[normal] whitespace-normal'
+    )}
+    role="status"
+   >
     {!available ? (
      <>
       <FileWarning aria-hidden="true" />
@@ -61,7 +103,7 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
   const downloadButton = (
    <button
     type="button"
-    className="attachment-image-download"
+    className={imageDownloadButton}
     disabled={busy}
     aria-label={`Скачать ${attachment.name}`}
     title="Скачать изображение"
@@ -74,9 +116,13 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
    </button>
   );
   return (
-   <div ref={root} className="message-attachment message-attachment-image" aria-label="Изображение">
+   <div
+    ref={root}
+    className={cn('message-attachment message-attachment-image', imageAttachmentShell)}
+    aria-label="Изображение"
+   >
     <div
-     className="attachment-image-surface"
+     className={cn('attachment-image-surface', 'group relative max-w-full')}
      onContextMenu={event => {
       // Меню картинки не должно открывать меню сообщения и нативное меню WebView.
       event.preventDefault();
@@ -87,7 +133,12 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
      <button
       ref={trigger}
       type="button"
-      className="attachment-preview attachment-image-trigger"
+      className={cn(
+       'attachment-preview attachment-image-trigger',
+       'grid h-auto max-h-[var(--attachment-image-max-height)] min-h-[120px] w-[min(320px,100%)] max-w-full min-w-[min(160px,100%)]',
+       'text-muted-foreground cursor-zoom-in place-items-center content-center justify-center overflow-hidden rounded-md border-0 bg-transparent p-0 text-center text-xs leading-[normal]',
+       'disabled:cursor-default'
+      )}
       disabled={!available}
       aria-label={`Открыть фото ${attachment.name}`}
       title="Открыть фото"
@@ -101,6 +152,7 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
      >
       {available && preview && !error ? (
        <img
+        className={cn('block h-auto max-h-[var(--attachment-image-max-height)] w-auto max-w-full object-contain')}
         src={preview}
         alt="Изображение из переписки"
         onError={() => actions.setError('Не удалось показать изображение.')}
@@ -113,7 +165,7 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
      {available && error && (
       <button
        type="button"
-       className="attachment-image-retry"
+       className={imageRetryButton}
        aria-label="Повторить загрузку изображения"
        onClick={actions.retry}
       >
@@ -144,9 +196,13 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
     )}
     <Dialog.Root open={open && available} onOpenChange={actions.setOpen}>
      <Dialog.Portal>
-      <Dialog.Overlay className="attachment-viewer-overlay" />
+      <Dialog.Overlay className={cn('attachment-viewer-overlay', 'fixed inset-0 z-[140] bg-[#080b12e6]')} />
       <Dialog.Content
-       className="attachment-viewer material-viewer"
+       className={cn(
+        'attachment-viewer material-viewer',
+        'fixed top-1/2 left-1/2 z-[141] grid max-h-[90dvh] w-fit max-w-[90vw] -translate-x-1/2 -translate-y-1/2 place-items-center',
+        'overflow-visible rounded-none border-0 bg-transparent p-0 text-[#eef4ff] shadow-none'
+       )}
        onCloseAutoFocus={event => {
         event.preventDefault();
         trigger.current?.focus();
@@ -157,13 +213,16 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
         Изображение из переписки. Нажмите Escape, чтобы закрыть просмотр.
        </Dialog.Description>
        <Dialog.Close asChild>
-        <button type="button" className="attachment-viewer-close" aria-label="Закрыть просмотр фото">
+        <button type="button" className={viewerCloseButton} aria-label="Закрыть просмотр фото">
          <X size={20} />
         </button>
        </Dialog.Close>
-       <div className="attachment-viewer-image">
+       <div
+        className={cn('attachment-viewer-image', 'group relative grid max-h-[80dvh] max-w-[90vw] place-items-center')}
+       >
         {preview && !error ? (
          <img
+          className={cn('block h-auto max-h-[80dvh] w-auto max-w-[90vw] object-contain')}
           src={preview}
           alt="Изображение из переписки"
           onError={() => actions.setError('Не удалось показать изображение.')}
@@ -175,7 +234,7 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
         {error && (
          <button
           type="button"
-          className="attachment-image-retry"
+          className={imageRetryButton}
           aria-label="Повторить загрузку изображения"
           onClick={actions.retry}
          >
@@ -191,12 +250,16 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
  }
  if (isAudio && available)
   return (
-   <div ref={root} className="message-attachment message-attachment-card" aria-label="Аудио">
+   <div ref={root} className={cn('message-attachment message-attachment-card', cardAttachmentShell)} aria-label="Аудио">
     <AttachmentAudio messageId={messageId} attachment={attachment} />
    </div>
   );
  return (
-  <div ref={root} className="message-attachment message-attachment-card" aria-label="Вложение">
+  <div
+   ref={root}
+   className={cn('message-attachment message-attachment-card', cardAttachmentShell)}
+   aria-label="Вложение"
+  >
    <FileCard
     mime={attachment.mime}
     name={attachment.name}
@@ -230,7 +293,7 @@ type FileCardProps = {
 /** assistant-ui Elements File surface; Sombra supplies size/name and its own safe download. */
 function FileCard({mime, name, size, available, note, busy, onDownload}: FileCardProps) {
  return (
-  <FileRoot className="attachment-file-card bg-background w-full">
+  <FileRoot className={cn('attachment-file-card', 'bg-background w-full min-w-0')}>
    {available ? (
     <FileIconDisplay mimeType={mime} />
    ) : (
@@ -257,10 +320,10 @@ function AttachmentAudio({messageId, attachment}: MessageAttachmentProps) {
  // Плеер показывается только для подтверждённого URL; здесь это чистое представление.
  const player = !!url && !failed;
  return (
-  <div ref={root} className="attachment-audio">
+  <div ref={root} className={cn('attachment-audio', 'flex max-w-full min-w-0 flex-col')}>
    {player ? (
     <>
-     <div className="attachment-player">
+     <div className={cn('attachment-player', 'group relative max-w-full min-w-0')}>
       <AudioPlayer
        src={url}
        title={attachment.name}
@@ -270,7 +333,7 @@ function AttachmentAudio({messageId, attachment}: MessageAttachmentProps) {
       />
       <button
        type="button"
-       className="attachment-player-download"
+       className={audioDownloadButton}
        disabled={busy}
        aria-label={`Скачать ${attachment.name}`}
        title="Скачать аудиофайл"
@@ -282,7 +345,12 @@ function AttachmentAudio({messageId, attachment}: MessageAttachmentProps) {
        <Download size={16} />
       </button>
      </div>
-     <div className="attachment-audio-meta">
+     <div
+      className={cn(
+       'attachment-audio-meta',
+       'text-muted-foreground m-0 flex flex-wrap items-center gap-1 px-0.5 pt-1.5 text-[11px] [overflow-wrap:anywhere] whitespace-normal'
+      )}
+     >
       <FileSize bytes={attachment.size} />
       {attachment.cached ? <span>· {cacheNote(attachment)}</span> : null}
      </div>
@@ -301,14 +369,14 @@ function AttachmentAudio({messageId, attachment}: MessageAttachmentProps) {
     />
    )}
    {error && (
-    <div className="attachment-audio-status">
+    <div className={cn('attachment-audio-status', 'flex items-start gap-2 px-0.5')}>
      <p className="attachment-error" role="status">
       {error}
      </p>
      {!player && !failed && (
       <button
        type="button"
-       className="attachment-audio-retry"
+       className={audioRetryButton}
        aria-label="Повторить загрузку аудио"
        title="Повторить загрузку"
        onClick={actions.retry}

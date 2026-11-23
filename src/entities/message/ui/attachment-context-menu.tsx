@@ -1,6 +1,7 @@
 import {useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject} from 'react';
 import {createPortal} from 'react-dom';
 import {Copy, Download} from 'lucide-react';
+import {cn} from '@/shared/lib';
 import type {AttachmentActionId, AttachmentActionItem} from '../model/message-attachment-rules';
 
 const actionIcons = {copy: Copy, download: Download};
@@ -113,7 +114,11 @@ export function AttachmentContextMenu({
    role="menu"
    aria-label={label}
    tabIndex={-1}
-   className="attachment-context-menu"
+   className={cn(
+    'attachment-context-menu',
+    'border-border bg-popover text-popover-foreground fixed z-[160] flex max-w-[calc(100vw_-_16px)] min-w-44 flex-col gap-0.5 rounded-md border p-1',
+    'shadow-[0_16px_40px_#0005,inset_0_1px_0_#ffffff10]'
+   )}
    style={{left: position.left, top: position.top, visibility: position.ready ? undefined : 'hidden'}}
    onKeyDown={handleKeyDown}
    onContextMenu={event => event.preventDefault()}
@@ -126,7 +131,14 @@ export function AttachmentContextMenu({
       type="button"
       role="menuitem"
       tabIndex={-1}
-      className="attachment-context-menu-item"
+      className={cn(
+       'attachment-context-menu-item',
+       'flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-[calc(var(--radius-md,10px)_-_4px)] border-0 bg-transparent px-2 text-left text-inherit',
+       '[&:not([data-disabled])]:hover:bg-accent [&:not([data-disabled])]:hover:text-accent-foreground',
+       '[&:not([data-disabled])]:focus-visible:bg-accent [&:not([data-disabled])]:focus-visible:text-accent-foreground',
+       'data-[disabled]:cursor-default data-[disabled]:opacity-50',
+       'focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#abc7ff]'
+      )}
       data-disabled={item.disabled ? '' : undefined}
       aria-disabled={item.disabled || undefined}
       aria-label={item.disabled ? `${item.label}. ${item.title}` : undefined}

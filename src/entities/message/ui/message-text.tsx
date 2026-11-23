@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm';
 import {toast} from 'sonner';
 import {isTauri, openExternal} from '@/shared/api';
 import {normalizeLinkUrl} from '@/shared/lib/message-links';
+import {cn} from '@/shared/lib';
 import {remarkSombraLinks, normalizeMarkdownLinkUrl} from '../model/message-markdown-links';
 import './message-text.css';
 
@@ -36,7 +37,7 @@ export const MessageText = memo(
    [mentions]
   );
   return (
-   <div className="message-text">
+   <div className={cn('message-text', 'max-w-full min-w-0 leading-[1.6] [overflow-wrap:anywhere] whitespace-normal')}>
     <Markdown
      remarkPlugins={plugins}
      skipHtml
@@ -78,7 +79,14 @@ export const MessageText = memo(
       // Markdown never downloads images, including tracking pixels. Real chat
       // attachments remain exclusively in the authenticated attachment component.
       img: ({alt}) => (
-       <span className="message-markdown-image">{alt ? `[Изображение: ${alt}]` : '[Изображение скрыто]'}</span>
+       <span
+        className={cn(
+         'message-markdown-image',
+         'text-[0.95em] [overflow-wrap:anywhere] whitespace-normal text-[#b9bdc9]'
+        )}
+       >
+        {alt ? `[Изображение: ${alt}]` : '[Изображение скрыто]'}
+       </span>
       ),
       input: ({checked}) => (
        <input
@@ -90,7 +98,16 @@ export const MessageText = memo(
        />
       ),
       table: ({children}) => (
-       <div className="message-table-scroll" tabIndex={0} role="region" aria-label="Таблица сообщения">
+       <div
+        className={cn(
+         'message-table-scroll',
+         'my-[0.65em] block max-w-full overflow-x-auto rounded-md border border-[#ffffff18]',
+         'focus-visible:rounded-[2px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[currentColor]'
+        )}
+        tabIndex={0}
+        role="region"
+        aria-label="Таблица сообщения"
+       >
         <table>{children}</table>
        </div>
       )

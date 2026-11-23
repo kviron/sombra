@@ -1,36 +1,10 @@
-.message-attachment {
- width: 320px;
- max-width: 100%;
- min-width: 0;
- margin-top: 8px;
- border: 1px solid var(--border);
- border-radius: var(--radius-lg, 12px);
- overflow: hidden;
- background: var(--background);
-}
-.attachment-preview {
- display: grid;
- place-items: center;
- min-height: 120px;
- background: var(--muted);
- color: var(--muted-foreground);
- font-size: 12px;
-}
-.attachment-preview img {
- display: block;
- max-width: 100%;
- width: auto;
- max-height: 300px;
- object-fit: contain;
-}
-.message-attachment .attachment-error {
- padding: 0 8px 8px;
- margin: 0;
- font-size: 12px;
- color: var(--muted-foreground);
- overflow-wrap: anywhere;
- white-space: normal;
-}
+/* Здесь остались только правила, которые нельзя без потерь выразить утилитами:
+   глобальные исключения каскада (.chat-shell, glass), слоты assistant-ui Elements,
+   псевдоэлементы, :has(), медиа-условия и анимация контекстного меню.
+   Обычная раскладка, цвета, отступы и состояния вложений — в className (cn). */
+
+/* Композер живёт в features/message-composer и pages/chat, поэтому его классы
+   остаются общим ресурсом: срез entities/message только подключает этот файл. */
 .attachment-composer {
  display: flex;
  align-items: center;
@@ -72,6 +46,25 @@
   grid-row: 3;
  }
 }
+
+/* assistant-ui Elements File: hover принадлежит слоту, который Sombra не размечает. */
+.chat-shell .attachment-file-card [data-slot='file-download']:hover:not(:disabled) {
+ background-color: #d2e0fa21;
+ color: #eef4ff;
+}
+
+/* Текст под вложением. Глобальное `.message-content p` задаёт font-size, margin и
+   white-space со специфичностью (0,1,1); селекторы ниже дают (0,2,0) и перебивают
+   его. Утилиты Tailwind лежат в слое и проиграли бы этому правилу, поэтому заметки
+   остаются в CSS. */
+.message-attachment .attachment-error {
+ padding: 0 8px 8px;
+ margin: 0;
+ font-size: 12px;
+ color: var(--muted-foreground);
+ overflow-wrap: anywhere;
+ white-space: normal;
+}
 .message-attachment .attachment-cache-status {
  margin: 0;
  padding: 0 8px 8px;
@@ -80,133 +73,39 @@
  white-space: normal;
  overflow-wrap: anywhere;
 }
-.message-attachment.message-attachment-image {
- border: 0;
- background: transparent;
- overflow: visible;
- width: fit-content;
+.message-attachment .attachment-copy-status {
+ margin: 0;
+ padding: 6px 2px 0;
+ font-size: 12px;
+ color: var(--muted-foreground);
+ white-space: normal;
+ overflow-wrap: anywhere;
 }
-/* assistant-ui Elements File/AudioPlayer are the card themselves; the message wrapper only sizes them. */
-.message-attachment.message-attachment-card {
- border: 0;
- background: transparent;
- overflow: visible;
- width: 320px;
-}
-.attachment-file-card {
+.attachment-audio-status .attachment-error {
+ flex: 1;
  min-width: 0;
+ padding: 6px 0 0;
+ margin: 0;
 }
-.chat-shell .attachment-file-card [data-slot='file-download']:hover:not(:disabled) {
- background-color: #d2e0fa21;
- color: #eef4ff;
-}
-.attachment-image-surface {
- position: relative;
- max-width: 100%;
-}
+
+/* Потолок высоты картинки — токен среза; утилиты читают его через
+   max-h-[var(--attachment-image-max-height)]. */
 :root {
  --attachment-image-max-height: 420px;
 }
-.attachment-image-trigger {
- display: grid;
- /* Ширина остаётся прежней, высота подстраивается под пропорции картинки. */
- width: min(320px, 100%);
- max-width: 100%;
- height: auto;
- max-height: var(--attachment-image-max-height);
- min-width: min(160px, 100%);
- align-content: center;
- justify-content: center;
- padding: 0;
- border: 0;
- border-radius: 8px;
- overflow: hidden;
- cursor: zoom-in;
- background: transparent;
- text-align: center;
-}
-/* Пропорции берутся из файла: широкое фото не получает пустые поля сверху и снизу,
-   а высокое упирается в потолок и уменьшается по ширине. */
-/* Пока картинки нет, рамка держит минимальную высоту, чтобы не схлопнуться в полоску. */
+/* :has() утилитами Tailwind не выражается. */
 .attachment-image-trigger:has(.attachment-image-placeholder) {
  min-height: 180px;
 }
 
-.attachment-image-trigger img {
- display: block;
- width: auto;
- height: auto;
- max-width: 100%;
- max-height: var(--attachment-image-max-height);
- object-fit: contain;
-}
-
-/* В просмотрщике картинка тоже ограничена по высоте, но занимает всю доступную ширину. */
-.attachment-viewer img {
- max-width: 100%;
- max-height: min(80vh, var(--attachment-image-max-height));
- width: auto;
- height: auto;
- object-fit: contain;
-}
-
+/* glass.css красит фон любой кнопки .chat-shell на :hover, поэтому прозрачность
+   триггера держится более специфичным правилом, чем глобальный hover. */
 .chat-shell .attachment-image-trigger,
 .chat-shell .attachment-image-trigger:hover {
  background: transparent;
 }
-.attachment-image-trigger:disabled {
- cursor: default;
-}
-.attachment-image-trigger:focus-visible,
-.attachment-image-download:focus-visible,
-.attachment-image-retry:focus-visible,
-.attachment-viewer-close:focus-visible {
- outline: 2px solid #abc7ff;
- outline-offset: 3px;
-}
-.attachment-image-placeholder {
- display: flex;
- align-items: center;
- justify-content: center;
- gap: 8px;
- min-height: 120px;
- padding: 20px;
- color: var(--muted-foreground, #aeb8c9);
- font-size: 12px;
- white-space: normal;
-}
-.attachment-image-download,
-.attachment-image-retry,
-.attachment-viewer-close {
- display: flex;
- align-items: center;
- justify-content: center;
- width: 44px;
- height: 44px;
- min-width: 44px;
- min-height: 44px;
- padding: 4px;
- border: 0;
- border-radius: 8px;
- background: #111725d9;
- color: #eef4ff;
- cursor: pointer;
-}
-.attachment-image-download {
- position: absolute;
- right: 8px;
- top: 8px;
- opacity: 0;
- pointer-events: none;
- transition: opacity 150ms ease;
-}
-.attachment-image-surface:hover > .attachment-image-download,
-.attachment-image-surface:focus-within > .attachment-image-download,
-.attachment-viewer-image:hover > .attachment-image-download,
-.attachment-viewer-image:focus-within > .attachment-image-download {
- opacity: 1;
- pointer-events: auto;
-}
+
+/* Цвета hover кнопок картинки тоже должны перебивать глобальный hover .chat-shell. */
 .attachment-image-surface .attachment-image-download:hover,
 .attachment-viewer-image .attachment-image-download:hover,
 .attachment-image-surface .attachment-image-retry:hover,
@@ -214,61 +113,7 @@
  background: #1b263def;
  color: #fff;
 }
-.attachment-image-download:disabled {
- cursor: wait;
-}
-.attachment-image-retry {
- position: absolute;
- bottom: 8px;
- right: 8px;
-}
-.attachment-viewer-overlay {
- position: fixed;
- inset: 0;
- z-index: 140;
- background: #080b12e6;
-}
-.attachment-viewer.material-viewer {
- position: fixed;
- inset: 50% auto auto 50%;
- transform: translate(-50%, -50%);
- z-index: 141;
- display: grid;
- place-items: center;
- width: fit-content;
- max-width: 90vw;
- max-height: 90vh;
- max-height: 90dvh;
- padding: 0;
- border: 0;
- border-radius: 0;
- background: transparent;
- box-shadow: none;
- overflow: visible;
- color: #eef4ff;
-}
-.attachment-viewer-image {
- position: relative;
- display: grid;
- place-items: center;
- max-width: 90vw;
- max-height: 80vh;
- max-height: 80dvh;
-}
-.attachment-viewer-image > img {
- display: block;
- width: auto;
- height: auto;
- max-width: 90vw;
- max-height: 80vh;
- max-height: 80dvh;
- object-fit: contain;
-}
-.attachment-viewer-close {
- position: absolute;
- top: max(-48px, calc(-10dvh + env(safe-area-inset-top, 0px) + 8px));
- right: 0;
-}
+
 .attachment-visually-hidden {
  position: absolute !important;
  width: 1px !important;
@@ -280,29 +125,15 @@
  white-space: nowrap !important;
  border: 0 !important;
 }
+/* На сенсорном экране hover-действие показывается всегда. */
 @media (hover: none) {
  .attachment-image-download {
   opacity: 1;
   pointer-events: auto;
  }
 }
-@media (prefers-reduced-motion: reduce) {
- .attachment-image-download {
-  transition: none;
- }
-}
-/* Elements AudioPlayer: only the chat chrome (hover download) is Sombra-specific. */
-.attachment-audio {
- display: flex;
- flex-direction: column;
- min-width: 0;
- max-width: 100%;
-}
-.attachment-player {
- position: relative;
- min-width: 0;
- max-width: 100%;
-}
+
+/* Elements AudioPlayer: размеры и время — внутренние слоты, класс не навесить. */
 .attachment-player [data-slot='audio-player'] {
  max-width: 100%;
 }
@@ -318,89 +149,17 @@
 .message-attachment [data-slot='audio-player'] button {
  border-radius: 50%;
 }
-.message-attachment .attachment-player-download {
- position: absolute;
- z-index: 1;
- top: 6px;
- right: 6px;
- display: flex;
- align-items: center;
- justify-content: center;
- width: 30px;
- height: 30px;
- min-height: 30px;
- padding: 0;
- border: 0;
- border-radius: 8px;
- background: #111725d9;
- color: #eef4ff;
- opacity: 0;
- pointer-events: none;
- cursor: pointer;
- transition: opacity 150ms ease;
-}
+
+/* Хитбокс кнопки скачивания шире самой плашки; псевдоэлемент утилитами не задать. */
 .attachment-player-download::before {
  content: '';
  position: absolute;
  inset: -5px;
  border-radius: 12px;
 }
-.attachment-player:hover > .attachment-player-download,
-.attachment-player:focus-within > .attachment-player-download {
- opacity: 1;
- pointer-events: auto;
-}
 .chat-shell .attachment-player > .attachment-player-download:hover:not(:disabled) {
  background: #1b263def;
  color: #fff;
-}
-.attachment-player-download:focus-visible {
- outline: 2px solid #abc7ff;
- outline-offset: 2px;
-}
-.attachment-player-download:disabled {
- cursor: wait;
-}
-.attachment-audio-meta {
- display: flex;
- flex-wrap: wrap;
- align-items: center;
- gap: 4px;
- margin: 0;
- padding: 6px 2px 0;
- font-size: 11px;
- color: var(--muted-foreground);
- white-space: normal;
- overflow-wrap: anywhere;
-}
-.attachment-audio-status {
- display: flex;
- align-items: flex-start;
- gap: 8px;
- padding: 0 2px;
-}
-.attachment-audio-status .attachment-error {
- flex: 1;
- min-width: 0;
- padding: 6px 0 0;
- margin: 0;
-}
-.attachment-audio-retry {
- flex: none;
- display: flex;
- align-items: center;
- justify-content: center;
- width: 32px;
- height: 32px;
- min-width: 32px;
- min-height: 32px;
- margin-top: 2px;
- padding: 0;
- border: 0;
- border-radius: 8px;
- background: transparent;
- color: var(--muted-foreground);
- cursor: pointer;
 }
 .attachment-audio-retry:hover {
  background: #dce6fa12;
@@ -412,58 +171,14 @@
   pointer-events: auto;
  }
 }
-@media (prefers-reduced-motion: reduce) {
- .attachment-player-download {
-  transition: none;
- }
-}
-/* Контекстное меню картинки живёт в портале под body, поэтому тема берётся с :root. */
+
+/* Меню в портале: анимация и font-shorthand требуют точного CSS. */
 .attachment-context-menu {
- position: fixed;
- z-index: 160;
- display: flex;
- flex-direction: column;
- gap: 2px;
- min-width: 176px;
- max-width: calc(100vw - 16px);
- padding: 4px;
- border: 1px solid var(--border);
- border-radius: var(--radius-md, 10px);
- background: var(--popover);
- color: var(--popover-foreground);
- box-shadow:
-  0 16px 40px #0005,
-  inset 0 1px 0 #ffffff10;
  animation: attachment-context-menu-in 120ms ease-out;
 }
 .attachment-context-menu-item {
- display: flex;
- align-items: center;
- gap: 8px;
- width: 100%;
- min-height: 36px;
- padding: 0 8px;
- border: 0;
- border-radius: calc(var(--radius-md, 10px) - 4px);
- background: transparent;
- color: inherit;
  font: inherit;
  font-size: 13px;
- text-align: left;
- cursor: pointer;
-}
-.attachment-context-menu-item:not([data-disabled]):hover,
-.attachment-context-menu-item:not([data-disabled]):focus-visible {
- background: var(--accent);
- color: var(--accent-foreground);
-}
-.attachment-context-menu-item:focus-visible {
- outline: 2px solid #abc7ff;
- outline-offset: -2px;
-}
-.attachment-context-menu-item[data-disabled] {
- opacity: 0.5;
- cursor: default;
 }
 .attachment-context-menu-item > svg {
  flex: none;
@@ -472,14 +187,6 @@
 .attachment-context-menu-item:not([data-disabled]):hover > svg,
 .attachment-context-menu-item:not([data-disabled]):focus-visible > svg {
  color: inherit;
-}
-.message-attachment .attachment-copy-status {
- margin: 0;
- padding: 6px 2px 0;
- font-size: 12px;
- color: var(--muted-foreground);
- white-space: normal;
- overflow-wrap: anywhere;
 }
 @keyframes attachment-context-menu-in {
  from {
