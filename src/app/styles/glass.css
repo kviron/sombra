@@ -45,33 +45,24 @@
 }
 .app-surface .profile,
 .app-surface .composer,
-.app-surface .chat-notice,
-.app-surface .pin-panel {
+.app-surface .chat-notice {
  background-color: color-mix(in srgb, var(--surface-tint) calc(var(--surface-alpha) * 100%), transparent);
  border-color: var(--surface-border);
  box-shadow: var(--surface-shadow);
  -webkit-backdrop-filter: blur(var(--surface-blur)) saturate(var(--surface-saturate));
  backdrop-filter: blur(var(--surface-blur)) saturate(var(--surface-saturate));
 }
-.composer {
- border-radius: 14px;
-}
 .chat-shell .server,
-.chat-shell .small-button,
-.welcome-icon {
+.chat-shell .small-button {
  background-color: #cddcf512;
  box-shadow:
   inset 0 1px 0 #ffffff17,
   0 3px 10px #0000001f;
  border-color: var(--surface-border);
 }
-.chat-shell .channel.selected,
-.account-modal aside button.selected {
- background: #d2e0fa24;
+/* Подсветку строки даёт chat.css; здесь остаётся только цвет выбранного канала. */
+.chat-shell .channel.selected {
  color: #f5f7fc;
- box-shadow:
-  inset 0 1px 0 #ffffff21,
-  0 2px 6px #0000001f;
 }
 .channel,
 .category,
@@ -151,12 +142,6 @@
   backdrop-filter: none;
  }
 }
-.account-modal > aside {
- background: #c8d7f009;
-}
-.account-modal aside button {
- background: #dce6fa14;
-}
 .account-modal p,
 .group-modal p {
  color: #b1b8c6;
@@ -209,42 +194,6 @@
  height: 100%;
  object-fit: cover;
  border-radius: inherit;
-}
-
-.group-avatar-editor {
- display: flex;
- align-items: center;
- gap: 12px;
- margin: 10px 0 20px;
-}
-
-.group-avatar-editor > div {
- min-width: 0;
- flex: 1;
-}
-.group-modal .group-avatar-editor input {
- margin: 0;
- padding: 8px;
-}
-.group-avatar-editor p {
- margin: 5px 0 0;
- font-size: 12px;
-}
-
-.group-avatar-preview {
- display: grid;
- place-items: center;
- flex: 0 0 48px;
- height: 48px;
- border-radius: 12px;
- overflow: hidden;
- background: var(--secondary);
-}
-
-.group-avatar-preview img {
- width: 100%;
- height: 100%;
- object-fit: cover;
 }
 
 .group-modal .channel-settings-actions > :first-child {

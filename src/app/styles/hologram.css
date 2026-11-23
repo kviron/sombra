@@ -32,13 +32,6 @@
 .sombra-logo--compact .sombra-wordmark {
  font-size: 18px;
 }
-.sombra-logo--auth {
- flex-direction: column;
- gap: 18px;
-}
-.sombra-logo--auth .sombra-wordmark {
- font-size: 36px;
-}
 .sombra-logo--hero .sombra-mark {
  width: 64px;
  height: 64px;
