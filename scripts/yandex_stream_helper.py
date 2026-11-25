@@ -31,7 +31,7 @@ def track_metadata(track):
     artists = getattr(track, 'artists', None) or []
     artist = ' '.join(', '.join(a.name for a in artists if a.name).split())[:120]
     cover = (getattr(track, 'cover_uri', None) or '').removeprefix('https://').replace('%%', '200x200')
-    if not re.fullmatch(r'avatars\.(?:mds\.)?yandex\.net/[\w./-]{1,400}', cover, re.ASCII):
+    if not re.fullmatch(r'(?:avatars\.(?:mds\.)?|music-avatars\.music\.)yandex\.net/[\w./-]{1,400}', cover, re.ASCII):
         cover = ''
     return {**({'artist': artist} if artist else {}), **({'coverUrl': 'https://' + cover} if cover else {})}
 

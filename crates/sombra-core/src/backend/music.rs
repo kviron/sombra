@@ -569,7 +569,10 @@ struct ResolvedTrack {
 fn music_cover_url(value: &str) -> bool {
     value.len() <= 450 && Url::parse(value).is_ok_and(|url| {
         url.scheme() == "https"
-            && matches!(url.host_str(), Some("avatars.yandex.net" | "avatars.mds.yandex.net"))
+            && matches!(
+                url.host_str(),
+                Some("avatars.yandex.net" | "avatars.mds.yandex.net" | "music-avatars.music.yandex.net")
+            )
             && url.username().is_empty()
             && url.password().is_none()
             && url.port().is_none()
@@ -1507,6 +1510,7 @@ mod tests {
     fn provider_metadata_only_exposes_approved_cover_urls() {
         for (cover, expected) in [
             ("https://avatars.yandex.net/get-music-content/42/200x200", true),
+            ("https://music-avatars.music.yandex.net/get-music-content/42/200x200", true),
             ("https://avatars.yandex.net.example.org/200x200", false),
             ("http://avatars.yandex.net/200x200", false),
         ] {

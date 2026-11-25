@@ -18,6 +18,8 @@ class ResolverTests(unittest.TestCase):
             'artist': 'First, Second',
             'coverUrl': 'https://avatars.yandex.net/get-music-content/42/200x200',
         })
+        track.cover_uri = 'music-avatars.music.yandex.net/get-music-content/42/%%'
+        self.assertEqual(track_metadata(track)['coverUrl'], 'https://music-avatars.music.yandex.net/get-music-content/42/200x200')
         track.cover_uri = 'avatars.yandex.net.example.org/%%'
         self.assertNotIn('coverUrl', track_metadata(track))
         self.assertEqual(track_metadata(SimpleNamespace()), {})
