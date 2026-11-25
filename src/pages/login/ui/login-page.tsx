@@ -1,8 +1,8 @@
 import {Input} from '@/shared/ui/input';
 import {authService} from '@/entities/user';
 import {useState, type FormEvent} from 'react';
-import {CheckIcon, EyeIcon, EyeOffIcon} from 'lucide-react';
-import {Checkbox} from 'radix-ui';
+import {EyeIcon, EyeOffIcon} from 'lucide-react';
+import {Checkbox} from '@/shared/ui/checkbox';
 import {Button} from '@/shared/ui';
 import {Label} from '@/shared/ui/label';
 
@@ -47,7 +47,7 @@ export function LoginPage() {
        placeholder="you@example.com"
        required
        maxLength={254}
-       className="login-input h-11"
+       className="h-11"
       />
      </div>
      <div className="grid gap-1.5">
@@ -60,32 +60,24 @@ export function LoginPage() {
         autoComplete="current-password"
         placeholder="Введите пароль"
         required
-        className="login-input login-password h-11 pr-12"
+        className="h-11 pr-12"
        />
-       <button
+       <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={() => setVisible(!visible)}
         aria-label={visible ? 'Скрыть пароль' : 'Показать пароль'}
         aria-pressed={visible}
-        className="text-muted-foreground hover:text-foreground focus-visible:outline-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg focus-visible:outline-2"
+        className="absolute top-1/2 right-1 -translate-y-1/2"
        >
-        {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
-       </button>
+        {visible ? <EyeOffIcon /> : <EyeIcon />}
+       </Button>
       </div>
      </div>
      <div className="space-y-1">
       <div className="flex min-h-7 items-center gap-2.5 text-sm">
-       <Checkbox.Root
-        id="remember-me"
-        name="remember_me"
-        value="on"
-        aria-describedby="remember-hint"
-        className="border-input bg-input/30 focus-visible:ring-ring data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border after:absolute after:-inset-1 focus-visible:ring-2"
-       >
-        <Checkbox.Indicator>
-         <CheckIcon className="size-3.5" />
-        </Checkbox.Indicator>
-       </Checkbox.Root>
+       <Checkbox id="remember-me" name="remember_me" value="on" aria-describedby="remember-hint" />
        <Label htmlFor="remember-me" className="cursor-pointer font-normal">
         Оставаться в системе
        </Label>

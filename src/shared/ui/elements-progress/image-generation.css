@@ -1,29 +1,12 @@
-/* Upstream assistant-ui Elements, MIT (see LICENSE). The canonical package defines the
-   `.shimmer` label animation in its global theme; Sombra ships the same effect next to
-   the one Elements component that uses it, with Sombra's muted-foreground colours.
-   Сами градиент, обрезка и запуск анимации набраны в shimmer-label.tsx;
-   здесь остаются @keyframes и состояния reduced-motion / forced-colors. */
-@keyframes elements-shimmer-sweep {
- from {
-  background-position: 200% 0;
- }
- to {
-  background-position: -200% 0;
- }
-}
 @media (prefers-reduced-motion: reduce) {
  .elements-shimmer {
   animation: none;
-  background-image: none;
-  color: #c3cad9;
-  -webkit-text-fill-color: currentColor;
  }
 }
+
 @media (forced-colors: active) {
  .elements-shimmer {
-  background-image: none;
   color: CanvasText;
-  -webkit-text-fill-color: currentColor;
  }
 }
 
@@ -41,6 +24,7 @@
   opacity: 0.7;
  }
 }
+
 @keyframes elements-image-sweep {
  from {
   transform: translateX(-65%);
@@ -49,20 +33,21 @@
   transform: translateX(65%);
  }
 }
+
 /* A dark scrim keeps the pastel placeholder palette calm inside Sombra's dark chat. */
 .elements-image-plate-generating::before {
  content: '';
  position: absolute;
  inset: 0;
- background: linear-gradient(180deg, rgba(9, 11, 18, 0.3), rgba(9, 11, 18, 0.5));
 }
+
 .elements-image-plate-generating::after {
  content: '';
  position: absolute;
  inset: -45%;
- background: linear-gradient(105deg, transparent 38%, rgba(163, 176, 255, 0.3) 50%, transparent 62%);
  animation: elements-image-sweep 2.8s linear infinite;
 }
+
 @media (prefers-reduced-motion: reduce) {
  .elements-image-plate-generating {
   animation: none;
@@ -73,6 +58,7 @@
   opacity: 0;
  }
 }
+
 @media (forced-colors: active) {
  .elements-image-plate-generating::after {
   display: none;

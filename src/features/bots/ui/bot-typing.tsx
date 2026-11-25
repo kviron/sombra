@@ -1,6 +1,7 @@
 import type {ChatState} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
-import {Message, MessageAvatar, MessageContent, MessageHeader, Bubble, BubbleContent} from '@/shared/ui/message';
+import {Message, MessageAvatar, MessageContent, MessageHeader} from '@/shared/ui/message';
+import {Bubble, BubbleContent} from '@/shared/ui/sombra-bubble';
 import {ImageGeneration, JobProgress, TypingIndicator} from '@/shared/ui/elements-progress';
 import {useBotImageActivity, useBotTyping} from '../model/use-bot-typing';
 import './bot-typing.css';
@@ -61,21 +62,21 @@ export function BotImageActivity({state, channel}: {state: ChatState; channel: s
  const image = useBotImageActivity({state, channel});
  if (!image) return null;
  return (
-  <div
-   ref={image.root}
-   className="bot-image-activity flex max-w-full min-w-0 flex-col"
-   data-bot-image-activity={image.bot}
-  >
-   <Message className="bot-image-message" align="start" aria-label={`${image.name}: ${image.label}`}>
-    <MessageAvatar>
+  <div className="bot-image-activity flex max-w-full min-w-0 flex-col" data-bot-image-activity={image.bot}>
+   <Message
+    className="chat-message bot-image-message static w-auto shrink-0 text-inherit"
+    align="start"
+    aria-label={`${image.name}: ${image.label}`}
+   >
+    <MessageAvatar className="message-avatar text-primary min-w-0 translate-none! place-items-center bg-transparent text-[12px]">
      {image.user ? <UserAvatar user={image.user} size="md" presence={false} decorative /> : image.name[0]}
     </MessageAvatar>
-    <MessageContent>
+    <MessageContent className="message-content block w-auto wrap-normal">
+     <MessageHeader className="message-meta">
+      <strong>{image.name}</strong>
+      <small className="bot-badge text-primary rounded-[4px] px-[5px] py-px text-[9px]">БОТ</small>
+     </MessageHeader>
      <Bubble data-image-message="true">
-      <MessageHeader>
-       <strong>{image.name}</strong>
-       <small className="bot-badge rounded-[4px] bg-[#7278ed25] px-[5px] py-px text-[9px] text-[#b1b8ff]">БОТ</small>
-      </MessageHeader>
       <BubbleContent>
        <ImageGeneration prompt={image.label} generating />
       </BubbleContent>

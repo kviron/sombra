@@ -5,17 +5,16 @@
  min-height: 44px;
  padding: 0 18px;
 }
+
 .incoming-call-actions .accept-call {
- background: #2a9d68;
  color: white;
 }
-.incoming-call-actions .accept-call:hover {
- background: #24865a;
-}
+
 .dialog-call-header-actions {
  display: flex;
  gap: 12px;
 }
+
 .dialog-call-header-actions button {
  min-width: 28px;
  min-height: 28px;

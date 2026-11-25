@@ -1,6 +1,6 @@
 import {createStore} from 'zustand/vanilla';
 import {recordDesktopDiagnostic} from '@/shared/api/diagnostics';
-import {mediaError} from './use-voice';
+import {mediaError} from './voice-capture';
 import {captureVoiceStream, stopCapturedTrack, type MediaPreferences} from './voice-input';
 
 /** Проверка устройств в панели: поток, ошибка, уровень и признак работы. */

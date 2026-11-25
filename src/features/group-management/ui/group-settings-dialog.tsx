@@ -1,3 +1,5 @@
+import {Button} from '@/shared/ui/button';
+import {Input} from '@/shared/ui/input';
 import {Dialog} from 'radix-ui';
 import {Settings, ShieldCheck, X} from 'lucide-react';
 import {type ChatState, type Group} from '@/shared/types';
@@ -67,29 +69,33 @@ export function GroupSettingsDialog({
      {cropFile && (
       <ImageCropDialog file={cropFile} kind="avatar" onConfirm={actions.applyAvatar} onClose={actions.closeCrop} />
      )}
-     <aside
-      className={cn('gs-sidebar', 'min-w-0 overflow-auto border-r border-[var(--gr-line)] bg-[#15171c] px-3 py-6')}
-     >
-      <div className={cn('gs-group-name', 'px-3 pb-5 font-semibold [overflow-wrap:anywhere] text-[var(--gr-muted)]')}>
+     <aside className={cn('gs-sidebar', 'border-border bg-card min-w-0 overflow-auto border-r px-3 py-6')}>
+      <div className={cn('gs-group-name', 'text-muted-foreground px-3 pb-5 font-semibold [overflow-wrap:anywhere]')}>
        {current.name}
       </div>
       <nav className="grid gap-1.5 [&_svg]:shrink-0" aria-label="Настройки группы">
-       <button
+       <Button
+        type="button"
+        variant={section === 'general' ? 'secondary' : 'ghost'}
+        className="justify-start"
         aria-current={section === 'general' ? 'page' : undefined}
         disabled={rolePending}
         onClick={() => actions.setSection('general')}
        >
         <Settings size={18} />
         Общее
-       </button>
-       <button
+       </Button>
+       <Button
+        type="button"
+        variant={section === 'roles' ? 'secondary' : 'ghost'}
+        className="justify-start"
         aria-current={section === 'roles' ? 'page' : undefined}
         disabled={busy}
         onClick={() => actions.setSection('roles')}
        >
         <ShieldCheck size={18} />
         Роли и разрешения
-       </button>
+       </Button>
       </nav>
      </aside>
      <div className={cn('gs-main', 'flex min-h-0 min-w-0 flex-col overflow-hidden')}>
@@ -99,9 +105,15 @@ export function GroupSettingsDialog({
         <Dialog.Description>Настройки группы · {current.name}</Dialog.Description>
        </div>
        <Dialog.Close asChild>
-        <button className="gr-icon" disabled={busy || rolePending} aria-label="Закрыть настройки группы">
+        <Button
+         type="button"
+         variant="ghost"
+         size="icon"
+         disabled={busy || rolePending}
+         aria-label="Закрыть настройки группы"
+        >
          <X size={20} />
-        </button>
+        </Button>
        </Dialog.Close>
       </header>
       {section === 'roles' ? (
@@ -125,7 +137,7 @@ export function GroupSettingsDialog({
           <span
            className={cn(
             'gs-avatar',
-            'grid size-20 shrink-0 place-items-center overflow-hidden rounded-[24px] bg-[var(--gr-surface)] text-2xl leading-[1.5]'
+            'bg-muted grid size-20 shrink-0 place-items-center overflow-hidden rounded-[24px] text-2xl leading-[1.5]'
            )}
            aria-hidden="true"
           >
@@ -133,9 +145,10 @@ export function GroupSettingsDialog({
           </span>
           <div>
            <label htmlFor="gs-avatar">Аватар группы</label>
-           <input
+           <Input
             id="gs-avatar"
             type="file"
+            className="max-w-full"
             accept="image/png,image/jpeg,image/webp"
             disabled={busy || !avatarAllowed}
             aria-describedby="gs-avatar-hint"
@@ -152,15 +165,15 @@ export function GroupSettingsDialog({
             PNG, JPEG или WebP до 20 МБ / 32 Мп. PNG 256 × 256, до 256 КБ.
            </p>
            {avatar && avatarAllowed && (
-            <button disabled={busy} onClick={actions.removeAvatar}>
+            <Button type="button" variant="outline" disabled={busy} onClick={actions.removeAvatar}>
              Удалить аватар
-            </button>
+            </Button>
            )}
           </div>
          </section>
          <label className={cn('gs-name', 'mb-6 grid gap-2 font-semibold')} htmlFor="gs-name">
           Название группы
-          <input
+          <Input
            id="gs-name"
            value={name}
            maxLength={60}
@@ -173,12 +186,12 @@ export function GroupSettingsDialog({
          )}
 
          {member && canManageStickers && (
-          <button disabled={busy} onClick={() => onManageStickers(current.id)}>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => onManageStickers(current.id)}>
            Стикеры группы
-          </button>
+          </Button>
          )}
         </div>
-        <footer className={cn('gs-footer', 'shrink-0 border-t border-[var(--gr-line)] px-6 py-4')}>
+        <footer className={cn('gs-footer', 'border-border shrink-0 border-t px-6 py-4')}>
          {error && (
           <p role="alert" className="gr-error">
            {error}
@@ -189,9 +202,9 @@ export function GroupSettingsDialog({
            {busy ? 'Сохранение…' : nameChanged || avatarChanged ? 'Есть несохранённые изменения' : ''}
           </span>
           {(rename || avatarAllowed) && (
-           <button className="gr-primary" disabled={busy || !canSave} onClick={actions.save}>
+           <Button type="button" variant="default" disabled={busy || !canSave} onClick={actions.save}>
             Сохранить
-           </button>
+           </Button>
           )}
          </div>
         </footer>

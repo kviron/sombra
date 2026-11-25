@@ -17,6 +17,11 @@ import type {FriendStatus} from '@/shared/lib/user-actions';
 /** Сколько участников можно выбрать в новом диалоге: сервер ограничивает чат десятью людьми. */
 export const SELECT_LIMIT = 9;
 
+export function groupInviteCandidates(users: readonly User[], members: readonly string[]) {
+ const existing = new Set(members);
+ return users.filter(user => !user.bot && !existing.has(user.id));
+}
+
 /** Какая группа показана: выбранная, а если её нет — первая в списке. */
 export function currentGroup(state: ChatState | null, groupId: string) {
  return state?.groups.find(group => group.id === groupId) || state?.groups[0];

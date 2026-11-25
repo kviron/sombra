@@ -4,7 +4,7 @@ import type {ChatState} from '@/shared/types';
 import {createDialogCallsModel, type DialogCallsContext} from './dialog-calls';
 import {callsBusy, incomingCallsBusy} from './dialog-calls-rules';
 import type {Voice} from './use-voice';
-import {useIncomingRingtone} from './use-incoming-ringtone';
+import {startIncomingRingtone} from './voice-cues';
 
 type Options = {
  state: ChatState | null;
@@ -28,12 +28,14 @@ export function useDialogCalls({state, voice, refresh, onOpenDialog}: Options) {
  const busy = callsBusy(stored.operation, stored.declining);
  const incomingBusy = incomingCallsBusy({operation: stored.operation, declining: stored.declining, id: incoming?.id});
 
- useIncomingRingtone(
-  incoming && !incomingBusy ? incoming.id : undefined,
-  voice.deaf,
-  voice.preferences.speaker,
-  voice.preferences.volume
- );
+ const ringtoneId = !incomingBusy && !voice.deaf ? incoming?.id : undefined;
+ const {
+  speakerOutput,
+  preferences: {volume}
+ } = voice;
+ useEffect(() => {
+  if (ringtoneId) return startIncomingRingtone(speakerOutput, volume);
+ }, [ringtoneId, speakerOutput, volume]);
 
  // Секундный тик нужен только чтобы истёкший звонок перестал считаться входящим.
  useEffect(() => {

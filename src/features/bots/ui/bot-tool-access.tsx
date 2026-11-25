@@ -1,5 +1,8 @@
 import {useId} from 'react';
 import {type Bot, type ChatState} from '@/shared/types';
+import {Button} from '@/shared/ui/button';
+import {Checkbox} from '@/shared/ui/checkbox';
+import {Input} from '@/shared/ui/input';
 import {useBotToolAccess, useBotToolPolicy} from '../model/use-bot-tool-access';
 import {toolAccessFull, toolUpgradeNote} from '../model/bot-tool-access-rules';
 import './bot-tool-access.css';
@@ -11,16 +14,16 @@ export function BotToolAccess({bot, state, rootBusy}: {bot: Bot; state: ChatStat
  if (!managed) return null;
  return (
   <div className="mt-3 min-w-0">
-   <button
+   <Button
     type="button"
-    className="bot-tool-access-toggle"
+    variant="outline"
     aria-expanded={expanded}
     aria-controls={panelId}
     disabled={rootBusy}
     onClick={actions.toggle}
    >
     Доступ к инструментам
-   </button>
+   </Button>
    {expanded && <ToolPolicy model={model} bot={bot} state={state} rootBusy={rootBusy} panelId={panelId} />}
   </div>
  );
@@ -67,7 +70,7 @@ function ToolPolicy({model, bot, state, rootBusy, panelId}: PolicyProps) {
     управление группой не дают этого доступа.
    </p>
    <label className="bot-tool-person bot-tool-owner">
-    <input type="checkbox" checked disabled />
+    <Checkbox checked disabled />
     <span>
      <strong>{owner.name}</strong>
      <small>{bot.owner}</small>
@@ -80,7 +83,7 @@ function ToolPolicy({model, bot, state, rootBusy, panelId}: PolicyProps) {
     <>
      <label className="bot-tool-search">
       Поиск пользователей
-      <input
+      <Input
        type="search"
        value={query}
        disabled={blocked}
@@ -92,11 +95,10 @@ function ToolPolicy({model, bot, state, rootBusy, panelId}: PolicyProps) {
      <div className="bot-tool-users" aria-label="Пользователи Sombra">
       {users.map(user => (
        <label className="bot-tool-person" key={user.id}>
-        <input
-         type="checkbox"
+        <Checkbox
          checked={draft.includes(user.id)}
          disabled={disabled || toolAccessFull(draft, user.id)}
-         onChange={event => actions.select(user.id, event.target.checked)}
+         onCheckedChange={checked => actions.select(user.id, checked === true)}
         />
         <span>
          <strong>{user.name}</strong>
@@ -110,9 +112,9 @@ function ToolPolicy({model, bot, state, rootBusy, panelId}: PolicyProps) {
       <div className="bot-tool-missing">
        <p>Некоторые выбранные ID больше не доступны в списке активных людей. Удалите их перед сохранением.</p>
        {missing.map(id => (
-        <button type="button" key={id} disabled={disabled} onClick={() => actions.select(id, false)}>
+        <Button type="button" variant="outline" key={id} disabled={disabled} onClick={() => actions.select(id, false)}>
          Удалить {id}
-        </button>
+        </Button>
        ))}
       </div>
      )}
@@ -122,13 +124,13 @@ function ToolPolicy({model, bot, state, rootBusy, panelId}: PolicyProps) {
       {error && <p role="alert">{error}</p>}
      </div>
      <div className="flex flex-wrap gap-2 pt-3">
-      <button type="button" disabled={!canSave} onClick={actions.save}>
+      <Button type="button" disabled={!canSave} onClick={actions.save}>
        Сохранить
-      </button>
+      </Button>
       {!policy && !pending && !blocked && (
-       <button type="button" disabled={rootBusy} onClick={actions.retry}>
+       <Button type="button" variant="outline" disabled={rootBusy} onClick={actions.retry}>
         Повторить загрузку
-       </button>
+       </Button>
       )}
      </div>
     </>

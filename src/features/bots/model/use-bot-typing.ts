@@ -1,4 +1,4 @@
-import {useEffect, useLayoutEffect, useRef, useState} from 'react';
+import {useEffect, useState} from 'react';
 import {useStore} from 'zustand';
 import type {ChatState} from '@/shared/types';
 import {createBotTypingClock} from './bot-typing';
@@ -7,7 +7,6 @@ import {
  botIdentity,
  earliestUntil,
  expiryDelay,
- followsActivity,
  imageActivityLabel,
  imageDelivered,
  isImageActivity,
@@ -79,21 +78,9 @@ export function useBotTyping({state, channel}: Options) {
 export function useBotImageActivity({state, channel}: Options) {
  const {now} = useTypingClock(state, channel);
  const entry = activeEntries(state, channel, now).find(isImageActivity);
- const root = useRef<HTMLDivElement>(null);
-
- useLayoutEffect(() => {
-  const element = root.current;
-  if (!entry || !element) return;
-  let scroller: HTMLElement | null = element.parentElement;
-  while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
-  if (!scroller) return;
-  if (followsActivity(scroller, element.offsetHeight)) scroller.scrollTop = scroller.scrollHeight;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [entry?.bot, entry?.until]);
-
  if (!entry) return undefined;
  if (imageDelivered(state, entry)) return undefined;
  const activity = readActivity(entry);
  const {name, user} = botIdentity(state, entry.bot);
- return {bot: entry.bot, root, name, user, label: imageActivityLabel(activity)};
+ return {bot: entry.bot, name, user, label: imageActivityLabel(activity)};
 }

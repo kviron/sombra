@@ -9,18 +9,18 @@
 .cache-notes li {
  font-size: 13px;
  line-height: 1.6;
- color: #b1b8c6;
 }
+
 /* Плитка использования: рамка и фон на литералах. */
 .cache-usage {
  display: flex;
  align-items: center;
  gap: 16px;
  padding: 16px;
- border: 1px solid var(--surface-border, #e1ebff21);
+ border: 1px solid var(--border);
  border-radius: 10px;
- background: #dce6f908;
 }
+
 .cache-limit {
  display: grid;
  grid-template-columns: 160px minmax(0, 280px);
@@ -28,53 +28,57 @@
  gap: 16px;
  min-height: 44px;
 }
+
 /* Select и подпись лимита — переопределения компонентов вне слоя. */
 .account-modal #account-panel .cache-limit [data-slot='select-trigger'] {
  justify-content: space-between;
 }
+
 .account-modal #account-panel .cache-limit > label {
  display: block;
  font-size: 14px;
 }
+
 /* Очистка: текст-предупреждение и кнопки. */
 .cache-clear > p {
  font-size: 13px;
  line-height: 1.6;
- color: #e6c4c8;
 }
+
 /* Заметки: отбивка линией. */
 .cache-notes {
  padding-top: 16px;
- border-top: 1px solid var(--surface-border, #e1ebff21);
+ border-top: 1px solid var(--border);
 }
+
 .cache-notes ul {
  margin: 0;
  padding-left: 18px;
 }
-/* Цвета состояний поверх общего цвета абзацев. */
-.attachment-cache-settings .cache-notice {
- color: #b4dbbc;
-}
+
 .attachment-cache-settings .cache-error {
- color: #f0a6b0;
  overflow-wrap: anywhere;
 }
+
 @media (max-width: 760px) {
  .cache-limit {
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
  }
 }
+
 /* Общие «утверждённые» правила раздела: перенесены из account-approved.css. */
 .approved-cache-ledger h3 {
  margin: 0;
  font-size: 16px;
  font-weight: 600;
 }
+
 .approved-cache .approved-cache-ledger > h3 {
  padding-block: 12px;
  border-top: 1px solid var(--border);
 }
+
 .approved-cache .approved-cache-row,
 .approved-cache .cache-usage {
  display: grid;
@@ -87,6 +91,7 @@
  border-radius: 0;
  background: transparent;
 }
+
 .approved-cache .approved-cache-actions {
  display: flex;
  align-items: center;
@@ -94,13 +99,16 @@
  flex-wrap: wrap;
  gap: 8px;
 }
+
 .approved-cache .cache-clear {
  justify-self: end;
 }
+
 .approved-cache .cache-limit {
  min-width: 0;
  width: 100%;
 }
+
 @media (max-width: 740px) {
  .approved-cache .approved-cache-row,
  .approved-cache .cache-usage {

@@ -1,28 +1,11 @@
+import type {MusicCommand, MusicSnapshot, MusicTrack} from '@/shared/types';
+export type {MusicCommand, MusicSnapshot} from '@/shared/types';
+
 // Чистые правила музыки комнаты: позиция трека, проверка команд, подписи и очередь.
 // Сети и DOM здесь нет, поэтому правила проверяются тестами.
 export const MAX_PRIVATE_AUDIO = 10 * 1024 * 1024;
 
-export type MusicTrack = {
- id: string;
- title: string;
- url?: string;
- assetId?: string;
- stream?: boolean;
- durationMs: number;
-};
-
-export type MusicSnapshot = {
- room: string;
- revision: number;
- serverTimeMs: number;
- positionMs: number;
- status: 'idle' | 'playing' | 'paused';
- track: MusicTrack | null;
- queue: MusicTrack[];
-};
-
 export type MusicReading = {state: MusicSnapshot; received: number};
-export type MusicCommand = 'add' | 'pause' | 'resume' | 'skip' | 'stop';
 export type PrivateAudio = {room: string; trackId: string; url: string};
 
 /** Время получения снапшота — середина запроса: часы сервера и клиента не совпадают. */
@@ -43,7 +26,9 @@ export function trackPosition(reading: MusicReading, now: number) {
 
 /** Ответ на медленный запрос не должен откатывать уже показанную позицию. */
 export function isFreshSnapshot(previous: MusicReading | null, state: MusicSnapshot) {
- return !previous || previous.state.room !== state.room || previous.state.serverTimeMs <= state.serverTimeMs;
+ if (!previous || previous.state.room !== state.room) return true;
+ if (previous.state.serverTimeMs === state.serverTimeMs) return state.revision >= previous.state.revision;
+ return state.serverTimeMs > previous.state.serverTimeMs;
 }
 
 export type CommandArgs = {room: string | undefined; action: MusicCommand; url?: string; limit?: number};

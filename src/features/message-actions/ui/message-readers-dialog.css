@@ -1,13 +1,10 @@
 /* Здесь только то, что нельзя отдать утилитам: оверлей — класс-хук для размытия
-   из glass.css, поверхность окна и общий с pages/chat индикатор прочтения.
    Раскладка списка читателей собрана утилитами в className. */
 
-/* glass.css вешает размытие подложки на :is(.readers-overlay, …) — класс нужен. */
 .readers-overlay {
  position: fixed;
  inset: 0;
  z-index: 110;
- background: #0009;
 }
 
 /* Поверхность поповера на токенах темы: фон и тень в утилитах дают другой
@@ -15,9 +12,7 @@
 .readers-dialog {
  border: 1px solid var(--border);
  border-radius: 12px;
- background: var(--popover);
  color: var(--popover-foreground);
- box-shadow: 0 16px 48px #0004;
 }
 
 /* Индикатор прочтения рисуется в pages/chat (message-item.tsx) — общий ресурс. */
@@ -33,6 +28,7 @@
  cursor: pointer;
  border-radius: 4px;
 }
+
 .message-read-check:focus-visible {
  outline: 2px solid var(--ring);
  outline-offset: 2px;

@@ -1,6 +1,6 @@
 import {AssistantRuntimeProvider, ComposerPrimitive} from '@assistant-ui/react';
 import '@/shared/ui/menu-material.css';
-import {cn} from '@/shared/lib';
+import {cn, useRenderStorm} from '@/shared/lib';
 import {ComposerToolbar, ComposerActions, paper, composerInputClass} from '@/shared/ui/elements-composer';
 import './assistant-composer.css';
 import {useAssistantComposer, type AssistantComposerProps} from '../model/use-assistant-composer';
@@ -26,6 +26,7 @@ const composerTextareaClass = 'min-w-0 resize-none border-0 border-current py-2.
  * музыкальные команды живут в модели среза.
  */
 export function AssistantComposer(props: AssistantComposerProps) {
+ useRenderStorm('AssistantComposer');
  const model = useAssistantComposer(props);
  const {handlers, runtime} = model;
  return (
@@ -100,7 +101,7 @@ export function AssistantComposer(props: AssistantComposerProps) {
             className={menuItemClass}
             onMouseDown={e => e.preventDefault()}
            >
-            <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-[50%] bg-[var(--accent,#41434e)] text-[16px]">
+            <span className="bg-muted grid size-9 shrink-0 place-items-center overflow-hidden rounded-[50%] text-[16px]">
              {item.metadata?.avatar ? (
               <img className="size-full object-cover" src={String(item.metadata.avatar)} alt="" />
              ) : (

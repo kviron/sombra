@@ -2,14 +2,9 @@
    Многослойный фон, тень и появление остаются здесь: утилитами их не собрать без
    потери читаемости, а @keyframes и media-правки утилиты всё равно не перебьют. */
 .user-profile {
- background:
-  radial-gradient(120% 90% at 0% 0%, #2a2f4a66, transparent 55%),
-  linear-gradient(180deg, rgba(31, 35, 46, 0.97), rgba(17, 20, 27, 0.98));
- box-shadow:
-  0 32px 90px #000000a6,
-  inset 0 1px 0 #ffffff17;
  animation: user-profile-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
 @keyframes user-profile-in {
  from {
   opacity: 0;
@@ -20,91 +15,20 @@
   transform: none;
  }
 }
+
 @media (prefers-reduced-motion: reduce) {
  .user-profile {
   animation: none;
  }
 }
 
-.chat-shell .user-profile-close:hover {
- background: #ffffff1a;
- color: #fff;
-}
-
 /* Аватар в шапке профиля переопределяет общий user-avatar: отрицательный отступ,
    кольцо и размер на узком экране задаёт именно профиль. */
 .user-profile-identity .user-avatar {
  margin-top: -42px;
- box-shadow:
-  0 0 0 4px #171b24,
-  0 12px 26px #00000073,
-  inset 0 0 0 1px #ffffff1f;
-}
-
-.user-profile-status[data-online='true'] .user-profile-status-dot {
- background: #3ecf8e;
- box-shadow: 0 0 8px #3ecf8e73;
-}
-.user-profile-status[data-online='true'] {
- color: #a7e6c8;
-}
-
-/* Кнопки профиля переопределяют общий button чата (flex, gap 7), поэтому
-   раскладку пары задаёт этот файл, а не утилиты слоя. */
-.chat-shell .user-profile-primary,
-.chat-shell .user-profile-secondary {
- display: inline-flex;
- align-items: center;
- justify-content: center;
- gap: 7px;
- min-height: 36px;
- padding: 0 15px;
- border-radius: 9px;
- font-size: 13px;
- font-weight: 600;
-}
-.chat-shell .user-profile-primary {
- border: 1px solid #ffffff26;
- background: linear-gradient(180deg, #7b84ff, #616bf0);
- color: #fff;
- box-shadow: 0 8px 20px #4149d43d;
-}
-.chat-shell .user-profile-primary:hover {
- background: linear-gradient(180deg, #8890ff, #6a74fa);
- color: #fff;
-}
-.chat-shell .user-profile-secondary {
- border: 1px solid #ffffff1f;
- background: #ffffff0a;
- color: #e4e8f1;
-}
-.chat-shell .user-profile-secondary:hover {
- background: #ffffff14;
- color: #fff;
-}
-.chat-shell .user-profile-secondary.is-accept {
- border-color: #3ecf8e40;
- background: #3ecf8e1a;
- color: #a9ebcd;
-}
-.chat-shell .user-profile-secondary:disabled {
- opacity: 0.55;
- cursor: default;
-}
-.chat-shell .user-profile-secondary:disabled:hover {
- background: #ffffff0a;
- color: #e4e8f1;
-}
-
-.user-profile-friend.is-muted {
- color: #98a0b1;
-}
-.user-profile-friend.is-waiting {
- color: #e8c37e;
 }
 
 .user-profile-bio.is-empty {
- color: #7f8798;
  font-style: italic;
 }
 
@@ -121,19 +45,9 @@
  background: transparent;
  text-align: left;
 }
-.chat-shell .user-profile-groups li button:hover {
- background: #ffffff0a;
-}
+
 .chat-shell .user-profile-groups li button:disabled {
  cursor: default;
-}
-
-.user-profile-note textarea::placeholder {
- color: #6c7486;
-}
-.user-profile-note textarea:focus-visible {
- border-color: #8c92ff;
- box-shadow: 0 0 0 3px #8c92ff2b;
 }
 
 @media (max-width: 640px) {
@@ -157,11 +71,8 @@
  .user-profile-facts {
   grid-template-columns: repeat(2, minmax(0, 1fr));
  }
- .chat-shell .user-profile-primary,
- .chat-shell .user-profile-secondary {
-  flex: 1 1 auto;
- }
 }
+
 @media (max-width: 430px) {
  .user-profile-facts {
   grid-template-columns: 1fr;

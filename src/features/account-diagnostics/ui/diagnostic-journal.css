@@ -8,6 +8,7 @@
  margin: 0;
  font-weight: 700;
 }
+
 /* Заголовок и подзаголовок шапки набраны как в общих шапках разделов настроек. */
 .account-modal #account-panel .journal-heading p {
  margin: 2px 0 0;
@@ -16,14 +17,17 @@
  font-weight: 500;
  line-height: 1.5;
 }
+
 .account-modal #account-panel .diagnostic-journal p {
  margin: 0;
  color: var(--muted-foreground);
  line-height: 1.5;
 }
+
 .account-modal #account-panel .diagnostic-journal [role='alert'] {
  color: var(--destructive);
 }
+
 /* Точка на шкале времени. */
 .journal-entries details::before {
  content: '';
@@ -33,40 +37,47 @@
  inline-size: 7px;
  block-size: 7px;
  border-radius: 50%;
- background: var(--ring);
 }
+
 /* Маркер списка <details> убираем системный. */
 .journal-entry-heading::-webkit-details-marker {
  display: none;
 }
+
 /* Раскрытая запись: углы у шапки снизу прямые, стрелка перевёрнута. */
 .journal-entries details[open] > summary {
  border-end-start-radius: 0;
  border-end-end-radius: 0;
 }
+
 .journal-entries details[open] summary > svg {
  transform: rotate(180deg);
 }
+
 .journal-entry-heading > svg {
  position: absolute;
  inset-inline-end: 12px;
  top: 16px;
  color: var(--muted-foreground);
 }
+
 .journal-entry-heading strong,
 .journal-entry-heading code {
  display: block;
  margin-top: 8px;
 }
+
 .journal-entry-heading code,
 .diagnostic-journal footer {
  color: var(--muted-foreground);
  font-size: 12px;
 }
+
 .journal-entry-details pre b {
  color: var(--ring);
  font-weight: 500;
 }
+
 @media (max-width: 600px) {
  .journal-entries li {
   grid-template-columns: 62px minmax(0, 1fr);

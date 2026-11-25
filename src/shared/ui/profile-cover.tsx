@@ -114,7 +114,7 @@ export function ProfileCover({
     'profile-cover',
     'relative aspect-[3/1] w-full shrink-0 overflow-hidden',
     // Декоративный градиент — фон обложки, пока нет картинки.
-    'bg-[radial-gradient(90%_150%_at_12%_0%,#8c92ff4d,transparent_62%),radial-gradient(70%_140%_at_88%_10%,#5c3fa84d,transparent_60%),linear-gradient(120deg,#131a2c,#201a33_55%,#2a1f3d)]',
+    'bg-muted',
     className
    )}
    aria-hidden="true"
@@ -144,7 +144,7 @@ export function ProfileCover({
       />
      ) : (
       <>
-       <span className="profile-cover-glow absolute right-[-10%] bottom-[-70%] left-[30%] h-40 bg-[radial-gradient(closest-side,#8c92ff3d,transparent)]" />
+       <span className="profile-cover-glow bg-muted absolute right-[-10%] bottom-[-70%] left-[30%] h-40" />
        <span className="profile-cover-grid absolute inset-0 [background-image:linear-gradient(#ffffff0d_1px,transparent_1px),linear-gradient(90deg,#ffffff0d_1px,transparent_1px)] [mask-image:linear-gradient(180deg,#0009,transparent_92%)] [background-size:28px_28px]" />
       </>
      )}

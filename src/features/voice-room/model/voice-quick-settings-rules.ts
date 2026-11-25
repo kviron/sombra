@@ -44,12 +44,6 @@ export function quickVolume(
  return kind === 'input' ? voice.micVolume : voice.preferences.volume;
 }
 
-/** Устройства только нужного вида: «default» не показывается отдельной строкой. */
-export function matchingDevices(devices: readonly QuickDevice[], kind: QuickSettingsKind): QuickDevice[] {
- const target = quickDeviceKind(kind);
- return devices.filter(device => device.kind === target && device.deviceId && device.deviceId !== 'default');
-}
-
 /**
  * Пункт «По умолчанию» всегда первый. Сохранённый выбор не исчезает, даже если устройство
  * отключили: он показывается последним с честной подписью.
@@ -68,10 +62,12 @@ export function deviceOptions({
  const labels = quickLabels(kind);
  const options: DeviceOption[] = [
   {value: '', label: 'По умолчанию'},
-  ...matchingDevices(devices, kind).map((device, index) => ({
-   value: device.deviceId,
-   label: device.label || `${labels.fallback} ${index + 1}`
-  }))
+  ...devices
+   .filter(device => device.deviceId && device.deviceId !== 'default')
+   .map((device, index) => ({
+    value: device.deviceId,
+    label: device.label || `${labels.fallback} ${index + 1}`
+   }))
  ];
  if (selected && !options.some(option => option.value === selected))
   options.push({

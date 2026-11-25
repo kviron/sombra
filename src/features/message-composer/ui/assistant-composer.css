@@ -9,65 +9,16 @@
 
 /* Материал и текст меню держим локально: попап читается и без размытия Windows. */
 .sombra-composer-menu[data-slot] {
- --sombra-menu-surface: #1b1d27;
- --sombra-menu-solid: #1b1d27;
- --sombra-menu-text: #edf0f7;
- --sombra-menu-muted: #b8bfce;
- --sombra-menu-border: rgba(255, 255, 255, 0.1);
- --sombra-menu-highlight: rgba(255, 255, 255, 0.12);
- --sombra-menu-highlight-text: #fff;
  --sombra-menu-blur: none;
- --sombra-menu-shadow: 0 12px 32px #0005;
- --muted-foreground: var(--sombra-menu-muted);
- --accent: var(--sombra-menu-highlight);
- --accent-foreground: var(--sombra-menu-highlight-text);
 }
+
 /* Пункт подсказки — слот assistant-ui: подсветку присылают data-highlighted и :hover. */
 .sombra-composer-menu[data-slot] button[role='option']:is([data-highlighted], :hover, :focus-visible) {
- background: var(--sombra-menu-highlight);
- color: var(--sombra-menu-highlight-text);
+ color: var(--accent-foreground);
 }
+
 /* Радиус тут больше общего у .sombra-menu-surface[data-slot]; утилита лежит в слое
    и это нелейерное правило не перебьёт, поэтому значение остаётся здесь. */
 .sombra-assistant-composer .sombra-composer-menu {
  border-radius: 16px;
-}
-/* Плотность поверхности композера: свой оттенок, прозрачность и блюр. Общий
-   .surface-matte сюда не подходит — его --surface-* наследуются в меню и панели
-   внутри композера, а color-mix рисует тот же цвет как color(srgb …) и даёт
-   ±1 единицу на размытии. Поэтому материал композера остаётся своим правилом. */
-.composer-chrome .sombra-assistant-composer {
- background: rgba(20, 22, 30, 0.64);
- border-color: rgba(160, 174, 198, 0.16);
- -webkit-backdrop-filter: blur(20px) saturate(140%);
- backdrop-filter: blur(20px) saturate(140%);
- box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42);
-}
-/* Плейсхолдер: цвет подобран под матовую подложку композера. */
-.composer-chrome .sombra-assistant-composer textarea::placeholder {
- color: #8e94a4;
-}
-/* Палитра отправки: нелейерное правило ядра красит кнопки при наведении само,
-   поэтому фон, наведение и выключенное состояние заданы одной парой токенов. */
-.sombra-assistant-composer [data-slot='composer-send'] {
- --sombra-send-bg: #dce6fa;
- --sombra-send-hover: #c6d6f6;
- --sombra-send-ink: #1b263a;
- background-color: var(--sombra-send-bg);
- color: var(--sombra-send-ink);
-}
-.sombra-assistant-composer [data-slot='composer-send']:hover:not(:disabled) {
- background-color: var(--sombra-send-hover);
-}
-.sombra-assistant-composer [data-slot='composer-send']:disabled:hover {
- background-color: var(--sombra-send-bg);
-}
-/* Системное «уменьшить прозрачность»: плотная подложка без блюра. */
-@media (prefers-reduced-transparency: reduce) {
- .composer-chrome .sombra-assistant-composer {
-  background: #16181f;
-  border-color: #2b2e3a;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
- }
 }

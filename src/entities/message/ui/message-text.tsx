@@ -4,6 +4,7 @@ import {remarkVerifiedMentions, type VerifiedMention} from '../model/message-men
 import './message-mentions.css';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import {Checkbox} from '@/shared/ui/checkbox';
 import {toast} from 'sonner';
 import {isTauri, openExternal} from '@/shared/api';
 import {normalizeLinkUrl} from '@/shared/lib/message-links';
@@ -82,26 +83,20 @@ export const MessageText = memo(
        <span
         className={cn(
          'message-markdown-image',
-         'text-[0.95em] [overflow-wrap:anywhere] whitespace-normal text-[#b9bdc9]'
+         'text-muted-foreground text-[0.95em] [overflow-wrap:anywhere] whitespace-normal'
         )}
        >
         {alt ? `[Изображение: ${alt}]` : '[Изображение скрыто]'}
        </span>
       ),
       input: ({checked}) => (
-       <input
-        type="checkbox"
-        checked={!!checked}
-        disabled
-        readOnly
-        aria-label={checked ? 'Выполнено' : 'Не выполнено'}
-       />
+       <Checkbox checked={!!checked} disabled aria-label={checked ? 'Выполнено' : 'Не выполнено'} />
       ),
       table: ({children}) => (
        <div
         className={cn(
          'message-table-scroll',
-         'my-[0.65em] block max-w-full overflow-x-auto rounded-md border border-[#ffffff18]',
+         'border-border my-[0.65em] block max-w-full overflow-x-auto rounded-md border',
          'focus-visible:rounded-[2px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[currentColor]'
         )}
         tabIndex={0}

@@ -1,20 +1,3 @@
-/* Коллекция стикеров: сетка, карточки и модальное окно набраны утилитами в
-   sticker-library.tsx. Здесь остаётся группа C: локальные токены плотности,
-   правила, которые работают только внутри .sticker-collection (класс приходит и
-   из чужих срезов), теговые правила для Radix/кнопок shared/ui, вендорные
-   псевдоэлементы, чужие классы .sticker-grid и узкий экран. */
-
-/* Плотность модального окна и коллекции в настройках: значения читают утилиты. */
-.sticker-collection-modal,
-.sticker-collection {
- --sticker-muted: #b9c4d8;
- --sticker-border: #485267;
- --sticker-tile: #242a36;
- --sticker-surface: #141821;
- --sticker-selected: #343e51;
- --sticker-focus: #b6c8e8;
-}
-
 /* Заголовок окна приходит из Radix Dialog.Title (h2 без класса). */
 .sticker-collection-modal h2 {
  font-size: 24px;
@@ -22,6 +5,7 @@
  line-height: 1.2;
  margin: 0;
 }
+
 /* Кнопку закрытия рисует shared/ui Button: в окне она крупнее обычной icon-lg. */
 .sticker-collection-modal header button {
  width: 44px;
@@ -35,30 +19,37 @@
  gap: 8px;
  font-size: 14px;
 }
+
 .sticker-collection .sticker-pack-name input {
  width: 100%;
  min-height: 40px;
  padding: 8px;
- border: 1px solid var(--sticker-border);
+ border: 1px solid var(--border);
  border-radius: 8px;
 }
+
 .sticker-collection .sticker-upload {
  min-height: 64px;
  margin: 0;
 }
+
 .sticker-collection .sticker-upload:focus-within {
- outline: 2px solid var(--sticker-focus);
+ outline: 2px solid var(--ring);
  outline-offset: 2px;
 }
+
 .sticker-collection .sticker-pack > .sticker-grid ~ button {
  margin: 4px;
 }
+
 .sticker-collection .sticker-library-item {
  min-width: 0;
 }
+
 .sticker-collection-import label {
  width: 100%;
 }
+
 /* Маркер раскрытия <summary> браузер рисует псевдоэлементом. */
 .sticker-collection-tile::-webkit-details-marker {
  display: none;
@@ -70,9 +61,11 @@
  margin: 0;
  overflow-wrap: anywhere;
 }
+
 .public-sticker-catalog .sticker-grid {
  width: 100%;
 }
+
 .sticker-preview-dialog .sticker-grid img,
 .public-sticker-catalog .sticker-grid img {
  width: 100%;

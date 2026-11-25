@@ -69,7 +69,7 @@ export function DialogListRow({
       </span>
      )}
      {(preferences.pinned || preferences.muted) && (
-      <span className="inline-flex shrink-0 items-center gap-[5px] text-[#b8c4dc] [&_svg]:shrink-0">
+      <span className="text-muted-foreground inline-flex shrink-0 items-center gap-[5px] [&_svg]:shrink-0">
        {preferences.pinned && (
         <span role="img" aria-label="Закреплённый чат" title="Закреплённый чат">
          <Pin size={12} />

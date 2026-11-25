@@ -1,13 +1,14 @@
-import {useEffect, useLayoutEffect, useRef} from 'react';
+import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/shared/ui/resizable';
+import {useLayoutEffect, useRef, type ReactNode} from 'react';
 import {AttachmentDropZone} from '@/features/message-composer';
 import {useDirectMessageNotifications, useNotificationActivation} from '@/features/notifications';
-import {useRoomMusic, useVoice, VoicePlayback} from '@/features/voice-room';
+import {useRoomMusic, useVoice, VoicePlayback, VoiceStageGradient} from '@/features/voice-room';
 import type {ForwardDestination} from '@/features/message-actions';
 import type {MaterialCategory} from '@/entities/message';
 import {useMessageReadState} from '@/entities/message';
+import {useRenderStorm} from '@/shared/lib';
 import {UserActionsProvider} from '@/shared/lib/user-actions';
 import {useScreenGlitch} from '@/shared/ui/use-screen-glitch';
-import {chatScrollKey, useChatScroll} from '../lib/use-chat-scroll';
 import {useModalFocusTrap} from '../lib/use-modal-focus-trap';
 import {useChatState} from '../model/use-chat-state';
 import {useChatNavigation} from '../model/use-chat-navigation';
@@ -16,8 +17,7 @@ import {useChatCalls} from '../model/use-chat-calls';
 import {useChatMessages} from '../model/use-chat-messages';
 import {useChatContacts} from '../model/use-chat-contacts';
 import {musicRoomOf} from '../model/chat-rules';
-import {chatMessagesActions} from '../model/chat-messages';
-import {ChatSidebar} from './chat-sidebar';
+import {ChatSidebar, ChatServerRail, ChatProfileControls} from './chat-sidebar';
 import {ChatHeader} from './chat-header';
 import {ChatWorkspace} from './chat-workspace';
 import {ChatOverlays} from './chat-overlays';
@@ -29,7 +29,8 @@ import './chat.css';
  * Рабочее пространство чата: страница только собирает срезы и раскладывает их по колонкам.
  * Снапшот, навигация, окна, сообщения, звонки и дружба живут в `model/`.
  */
-export function LiveChat() {
+export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) {
+ useRenderStorm('LiveChat');
  const call = useVoice();
  const chat = useChatState();
  const nav = useChatNavigation({state: chat.state, voice: call});
@@ -51,9 +52,7 @@ export function LiveChat() {
    panels.actions.closeModal();
   }
  });
- const roomMusic = useRoomMusic(musicRoomOf(chat.state, call.room), call.deaf, call.preferences.speaker);
- /** Прокрутка создаётся ниже: модель отправки получает её через ref, чтобы порядок хуков остался прежним. */
- const follow = useRef<() => void>(() => {});
+ const roomMusic = useRoomMusic(musicRoomOf(chat.state, call.room), call.deaf, call.speakerOutput);
  const messages = useChatMessages({
   state: chat.state,
   channel: nav.channel,
@@ -65,30 +64,16 @@ export function LiveChat() {
   voice: call,
   panels,
   incomingCall: !!calls.incoming,
-  music: roomMusic,
-  followOnNextUpdate: () => follow.current()
+  music: roomMusic
  });
  const contacts = useChatContacts(chat.state);
 
  const infoTrigger = useRef<HTMLButtonElement>(null);
  const materialsTrigger = useRef<HTMLButtonElement>(null);
  const composerRef = useRef<HTMLDivElement>(null);
- const scrollRef = useRef<HTMLDivElement>(null);
  const forwardCommentRef = useRef<HTMLTextAreaElement>(null);
  const conversationMotion = useScreenGlitch(`${nav.home}:${nav.groupId}:${nav.channelId}`);
  const settingsMotion = useScreenGlitch(`${panels.settings}:${panels.accountSection}`);
-
- const scrollKey =
-  !nav.friends && !messages.search ? chatScrollKey(chat.state?.me.id || '', nav.channel?.id || '') : '';
- const scroll = useChatScroll(
-  scrollRef,
-  scrollKey,
-  messages.revision,
-  messages.jumpTarget,
-  messages.jumpEpoch,
-  messages.messageIds
- );
- follow.current = scroll.followOnNextUpdate;
 
  const activateNotification = useNotificationActivation(chat.state, (next, route) => {
   chat.actions.applyState(next);
@@ -106,65 +91,21 @@ export function LiveChat() {
   onActivate: activateNotification
  });
 
- useMessageReadState(chat.state, nav.channel?.id || '', messages.readsBlocked, scroll.acceptRead);
+ useMessageReadState(chat.state, nav.channel?.id || '', messages.readsBlocked);
 
- // Переход к сообщению: подсветка и мягкая прокрутка к строке, затем цель сбрасывается.
- useEffect(() => {
-  if (!messages.jumpTarget) return;
-  const target = messages.jumpTarget;
-  const frame = requestAnimationFrame(() => {
-   const element = document.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(target)}"]`);
-   element
-    ?.getAnimations({subtree: true})
-    .filter(animation => animation instanceof CSSAnimation && animation.animationName.includes('message-jump'))
-    .forEach(animation => {
-     animation.currentTime = 0;
-     animation.play();
-    });
-   element?.scrollIntoView({
-    block: 'center',
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
-   });
-  });
-  const timer = setTimeout(() => chatMessagesActions.clearJump(), 2500);
-  return () => {
-   cancelAnimationFrame(frame);
-   clearTimeout(timer);
-  };
- }, [messages.jumpTarget, messages.jumpEpoch, messages.search]);
-
- // The composer floats over the transcript, so its measured height becomes the
- // scroll container's bottom padding. A CSS variable keeps LiveChat from re-rendering
- // every time the field grows; the observer is the only source of that number.
  useLayoutEffect(() => {
-  const composer = composerRef.current,
-   scroller = scrollRef.current;
-  if (!composer || !scroller) return;
-  let frame = 0;
-  // The measured panel height is a pure function of the composer, and the scroll jump
-  // is deferred a frame: resizing the pad inside the observer callback is what makes
-  // browsers report "ResizeObserver loop completed with undelivered notifications".
-  const sync = () => {
-   scroller.parentElement?.style.setProperty('--sombra-composer-height', `${composer.offsetHeight}px`);
-   if (!scroll.sticky.current || !scrollKey) return;
-   cancelAnimationFrame(frame);
-   frame = requestAnimationFrame(() => {
-    if (scroll.sticky.current) scroller.scrollTop = scroller.scrollHeight;
-   });
-  };
-  window.addEventListener('resize', sync);
+  const composer = composerRef.current;
+  const main = composer?.closest<HTMLElement>('.chat-main');
+  if (!composer || !main) return;
+  const sync = () => main.style.setProperty('--sombra-composer-height', `${composer.offsetHeight}px`);
   sync();
-  // Apply the first bottom restoration against the actual composer padding, before
-  // its scroll event could turn the temporary padding gap into a history anchor.
-  if (scrollKey && scroll.sticky.current) scroller.scrollTop = scroller.scrollHeight;
   const observer = new ResizeObserver(sync);
   observer.observe(composer);
   return () => {
-   cancelAnimationFrame(frame);
    observer.disconnect();
-   window.removeEventListener('resize', sync);
+   main.style.removeProperty('--sombra-composer-height');
   };
- }, [nav.channel?.id, messages.voiceLayout, nav.friends, scrollKey]);
+ }, [nav.channel?.id, nav.friends, messages.voiceLayout]);
 
  useModalFocusTrap({
   active: (!!panels.modal && panels.modal !== 'dialog' && panels.modal !== 'edit-group') || panels.settings,
@@ -221,56 +162,86 @@ export function LiveChat() {
     removeFriend: id => void contacts.remove(id)
    }}
   >
-   <main className="chat-shell flex min-h-0 flex-1 bg-transparent [font-family:var(--font-sans),Arial,sans-serif] text-[14px] leading-[normal] text-[#dce0e8]">
+   <main className="chat-shell text-foreground relative isolate flex min-h-0 flex-1 bg-transparent [font-family:var(--font-sans),Arial,sans-serif] text-[14px] leading-[normal]">
+    {messages.voiceLayout && (calls.voiceRoom || nav.channel?.id) && <VoiceStageGradient />}
     {/* Playback belongs to the joined session, never Home/DM/channel navigation. */}
     <VoicePlayback voice={call} volumeForUser={calls.volumeForUser} />
-    {roomMusic.audio}
-    <ChatSidebar state={chat.state} nav={nav} panels={panels} calls={calls} call={call} />
-    <AttachmentDropZone
-     channel={nav.channel?.id}
-     disabled={
-      !!messages.forwardDraft ||
-      !!messages.picker ||
-      chat.busy ||
-      messages.readingAttachment ||
-      panels.settings ||
-      !!panels.modal ||
-      !!panels.profileId ||
-      panels.infoOpen ||
-      !!calls.incoming
-     }
-     onFile={file => void messages.actions.selectAttachment(file)}
-    >
-     <ChatHeader
-      chat={chat}
-      nav={nav}
-      panels={panels}
-      messages={messages}
-      calls={calls}
-      call={call}
-      infoTrigger={infoTrigger}
-      materialsTrigger={materialsTrigger}
-     />
-     <ChatWorkspace
-      chat={chat}
-      state={chat.state}
-      nav={nav}
-      panels={panels}
-      messages={messages}
-      call={call}
-      music={!nav.home ? roomMusic : undefined}
-      scroll={scroll}
-      scrollRef={scrollRef}
-      scrollKey={scrollKey}
-      voiceRoom={calls.voiceRoom}
-      composerRef={composerRef}
-      forwardCommentRef={forwardCommentRef}
-      motionRef={conversationMotion}
-      onCloseMaterials={closeMaterials}
-      onJump={jumpToMessage}
-     />
-    </AttachmentDropZone>
-    <ChatSettingsModal chat={chat} state={chat.state} panels={panels} call={call} panelRef={settingsMotion} />
+    <audio ref={roomMusic.engine} src={roomMusic.playbackUrl} preload="metadata" onError={roomMusic.onAudioError} />
+    <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0 flex-1" style={{height: 'auto'}}>
+     <ResizablePanel
+      id="channels"
+      defaultSize="346px"
+      minSize="210px"
+      maxSize="552px"
+      groupResizeBehavior="preserve-pixel-size"
+     >
+      <div
+       className={
+        'flex h-full min-h-0 flex-col overflow-hidden' +
+        (messages.voiceLayout ? ' bg-background/75 backdrop-blur-sm' : '')
+       }
+      >
+       <div className="flex min-h-0 flex-1">
+        <ChatServerRail state={chat.state} nav={nav} panels={panels} />
+        <ChatSidebar state={chat.state} nav={nav} panels={panels} calls={calls} call={call} />
+       </div>
+       <ChatProfileControls state={chat.state} panels={panels} call={call} />
+      </div>
+     </ResizablePanel>
+     <ResizableHandle aria-label="Ширина списка каналов" />
+     <ResizablePanel id="conversation" minSize="55%" className="flex min-h-0 flex-col" style={{overflow: 'hidden'}}>
+      <AttachmentDropZone
+       channel={nav.channel?.id}
+       className={messages.voiceLayout ? 'bg-transparent' : undefined}
+       disabled={
+        !!messages.forwardDraft ||
+        !!messages.picker ||
+        chat.busy ||
+        messages.readingAttachment ||
+        panels.settings ||
+        !!panels.modal ||
+        !!panels.profileId ||
+        panels.infoOpen ||
+        !!calls.incoming
+       }
+       onFile={file => void messages.actions.selectAttachment(file)}
+      >
+       <ChatHeader
+        chat={chat}
+        nav={nav}
+        panels={panels}
+        messages={messages}
+        calls={calls}
+        call={call}
+        infoTrigger={infoTrigger}
+        materialsTrigger={materialsTrigger}
+       />
+       <ChatWorkspace
+        chat={chat}
+        state={chat.state}
+        nav={nav}
+        panels={panels}
+        messages={messages}
+        call={call}
+        music={!nav.home ? roomMusic : undefined}
+        voiceRoom={calls.voiceRoom}
+        composerRef={composerRef}
+        forwardCommentRef={forwardCommentRef}
+        motionRef={conversationMotion}
+        onCloseMaterials={closeMaterials}
+        onJump={jumpToMessage}
+       />
+      </AttachmentDropZone>
+     </ResizablePanel>
+    </ResizablePanelGroup>
+    <ChatSettingsModal
+     chat={chat}
+     state={chat.state}
+     panels={panels}
+     call={call}
+     panelRef={settingsMotion}
+     appearanceSettings={appearanceSettings}
+    />
     <ChatOverlays
      chat={chat}
      state={chat.state}

@@ -7,7 +7,6 @@ import {
  botIdentity,
  earliestUntil,
  expiryDelay,
- followsActivity,
  hasLiveImageActivity,
  imageActivityLabel,
  imageDelivered,
@@ -143,11 +142,4 @@ test('таймер окна взводится только на будущее 
  assert.equal(expiryDelay(100, 100_000), undefined, 'просроченное окно не взводит таймер');
  assert.equal(expiryDelay(Number.NaN, 0), undefined);
  assert.equal(expiryDelay(0.001, 0), 60, 'слишком короткая задержка не крутит часы');
-});
-
-test('транскрипт следует за карточкой, только если читатель был внизу', () => {
- const bottom = {scrollHeight: 1000, scrollTop: 700, clientHeight: 300};
- assert.equal(followsActivity(bottom, 100), true);
- const reading = {scrollHeight: 1000, scrollTop: 100, clientHeight: 300};
- assert.equal(followsActivity(reading, 100), false);
 });

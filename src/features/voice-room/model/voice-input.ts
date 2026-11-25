@@ -43,9 +43,8 @@ export function readMedia(): MediaPreferences {
 function audioConstraints(preferences: MediaPreferences): MediaTrackConstraints {
  return {
   deviceId: preferences.mic ? {exact: preferences.mic} : undefined,
+  // WebView2 can crash when LiveKit reads back advanced echo-cancellation constraints.
   echoCancellation: preferences.echo,
-  // An advanced constraint is skipped if system-wide echo cancellation is unavailable.
-  advanced: preferences.echo ? [{echoCancellation: 'all'}] : undefined,
   noiseSuppression: preferences.noise === 'standard',
   // Automatic gain can amplify the noise left by the browser's audio processing.
   autoGainControl: preferences.noise === 'off'
@@ -54,6 +53,14 @@ function audioConstraints(preferences: MediaPreferences): MediaTrackConstraints 
 
 const processedTracks = new WeakMap<MediaStreamTrack, {input: MediaStreamTrack; dispose: () => void}>();
 let wasmBinary: Promise<ArrayBuffer> | undefined;
+
+// Observe the physical input even when the outgoing track is produced by RNNoise.
+export function watchMicrophoneEnd(track: MediaStreamTrack, onEnd: () => void) {
+ const input = processedTracks.get(track)?.input ?? track;
+ input.addEventListener('ended', onEnd, {once: true});
+ if (input.readyState === 'ended') onEnd();
+ return () => input.removeEventListener('ended', onEnd);
+}
 
 export function setCapturedTrackEnabled(track: MediaStreamTrack, enabled: boolean) {
  track.enabled = enabled;
@@ -98,8 +105,8 @@ export function watchMicrophoneSilence(
     stop();
     return;
    }
-   // Пользователь сам выключил микрофон — это не поломка, отсчёт сбрасываем.
-   if (!track.enabled) {
+   // Не считаем тишиной отключённый микрофон или неработающий анализатор.
+   if (!track.enabled || context?.state !== 'running') {
     quiet = 0;
     return;
    }

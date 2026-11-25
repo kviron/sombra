@@ -4,41 +4,46 @@
 .message-text > :first-child {
  margin-top: 0;
 }
+
 .message-text > :last-child {
  margin-bottom: 0;
 }
+
 .message-text p {
  white-space: pre-wrap;
  margin: 0 0 0.65em;
  line-height: inherit;
 }
+
 /* CommonMark emits a newline after hard <br>; pre-wrap already renders it. */
 .message-text br {
  display: none;
 }
+
 .message-text a {
- color: #a9ccff;
  text-decoration: underline;
  text-underline-offset: 2px;
  overflow-wrap: anywhere;
 }
-.message-text a:hover {
- color: #d2e5ff;
-}
+
 .message-text a:focus-visible {
  outline: 2px solid currentColor;
  outline-offset: 2px;
  border-radius: 2px;
 }
+
 .message-text strong {
  font-weight: 700;
 }
+
 .message-text em {
  font-style: italic;
 }
+
 .message-text del {
  text-decoration: line-through;
 }
+
 .message-text h1,
 .message-text h2,
 .message-text h3,
@@ -50,126 +55,143 @@
  line-height: 1.35;
  overflow-wrap: anywhere;
 }
+
 .message-text h1,
 .message-text h2 {
  font-size: 1.2em;
 }
+
 .message-text h3,
 .message-text h4,
 .message-text h5,
 .message-text h6 {
  font-size: 1.05em;
 }
+
 .message-text ul,
 .message-text ol {
  margin: 0.4em 0 0.75em;
  padding-left: 1.65em;
  list-style-position: outside;
 }
+
 .message-text ul {
  list-style-type: disc;
 }
+
 .message-text ol {
  list-style-type: decimal;
 }
+
 .message-text ul ul {
  list-style-type: circle;
 }
+
 .message-text li {
  white-space: pre-wrap;
  margin: 0.18em 0;
  padding-left: 0.15em;
 }
+
 .message-text li > p {
  margin: 0.3em 0;
 }
+
 .message-text li > ul,
 .message-text li > ol {
  margin: 0.2em 0;
 }
+
 .message-text .contains-task-list {
  list-style: none;
  padding-left: 0.25em;
 }
-.message-text .task-list-item input {
- display: inline-block;
- width: 14px;
- height: 14px;
- min-height: 0;
+
+.message-text .task-list-item [data-slot='checkbox'] {
+ display: inline-flex;
  margin: 0 0.55em 0 0;
  vertical-align: middle;
- accent-color: #a9ccff;
 }
+
 .message-text blockquote {
  margin: 0.6em 0;
  padding: 0.2em 0 0.2em 1em;
- border-left: 3px solid #ffffff38;
- color: #c0c1cc;
+ border-left: 3px solid var(--border);
 }
+
 .message-text blockquote > :last-child {
  margin-bottom: 0;
 }
+
 .message-text code {
  font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
- font-size: 0.9em;
- background: #0003;
- border: 1px solid #ffffff12;
+ font-size: 0.92em;
+}
+
+.message-text :not(pre) > code {
+ background: color-mix(in oklab, currentColor 10%, transparent);
  border-radius: 4px;
  padding: 0.12em 0.35em;
  white-space: break-spaces;
  overflow-wrap: anywhere;
 }
+
 .message-text pre {
  max-width: 100%;
  min-width: 0;
  overflow-x: auto;
  margin: 0.65em 0;
- padding: 12px 16px;
- border: 1px solid #ffffff14;
- border-radius: 10px;
- background: #111217;
- line-height: 1.55;
- white-space: pre-wrap;
- overflow-wrap: anywhere;
+ padding: 8px 12px;
+ /* Use the bubble's text color so the tint works on both light and dark bubbles. */
+ background: color-mix(in oklab, currentColor 10%, transparent);
+ border-radius: 8px;
+ line-height: 1.5;
+ white-space: pre;
+ overflow-wrap: normal;
+ word-break: normal;
  tab-size: 2;
 }
-.message-text pre code {
- display: block;
- padding: 0;
- border: 0;
- border-radius: 0;
- background: none;
- font-size: 12px;
- line-height: inherit;
- white-space: inherit;
- overflow-wrap: inherit;
+
+.message-text pre:focus-visible {
+ outline: 2px solid currentColor;
+ outline-offset: -2px;
 }
+
+.message-text pre > code {
+ display: block;
+ width: max-content;
+ line-height: inherit;
+}
+
 .message-text table {
  width: 100%;
  border-collapse: collapse;
  white-space: normal;
  font-size: 0.95em;
 }
+
 .message-text th,
 .message-text td {
  min-width: 90px;
  max-width: 28rem;
  padding: 8px 12px;
- border: 1px solid #ffffff14;
+ border: 1px solid var(--border);
  text-align: left;
  white-space: pre-wrap;
  overflow-wrap: anywhere;
  vertical-align: top;
 }
+
 .message-text th {
  font-weight: 600;
- background: #ffffff06;
 }
+
 .message-text tr:first-child th {
  border-top: 0;
 }
+
 .message-text hr {
  border: 0;
- border-top: 1px solid #ffffff24;
+ border-top: 1px solid var(--border);
  margin: 1em 0;
 }

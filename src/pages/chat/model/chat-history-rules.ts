@@ -36,12 +36,18 @@ export function prependHistoryPage(loaded: readonly ChatMessage[], page: readonl
 /**
  * История встаёт перед серверными сообщениями, поэтому разделители дней и порядок не меняются.
  * При совпадении id остаётся свежая серверная копия (текст могли отредактировать),
- * а место в списке — первое, из истории.
+ * а место в списке — первое, из истории. Исходящие добавляются в конец, если их id ещё нет.
  */
-export function mergeHistoryMessages(history: readonly ChatMessage[], server: readonly ChatMessage[]) {
+export function mergeHistoryMessages(
+ history: readonly ChatMessage[],
+ server: readonly ChatMessage[],
+ outgoing: readonly ChatMessage[] = []
+) {
  const byId = new Map<string, ChatMessage>();
  for (const message of history) if (message?.id && !byId.has(message.id)) byId.set(message.id, message);
  for (const message of server) if (message?.id) byId.set(message.id, message);
+ // Временные исходящие идут последними и никогда не заменяют подтверждённое сообщение.
+ for (const message of outgoing) if (message?.id && !byId.has(message.id)) byId.set(message.id, message);
  return [...byId.values()];
 }
 

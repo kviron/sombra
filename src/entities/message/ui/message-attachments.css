@@ -12,10 +12,12 @@
  min-width: 0;
  max-width: 100%;
 }
+
 .attachment-composer > span {
  font-size: 12px;
  color: var(--muted-foreground);
 }
+
 .composer-chrome {
  flex-shrink: 0;
  min-width: 0;
@@ -25,9 +27,10 @@
  flex-direction: column;
  gap: 8px;
 }
+
 /* Sombra: the composer floats over the transcript in the normal chat layout, so
    messages being scrolled back stay visible under its frosted surface. The voice
-   layout keeps the composer in the grid flow (and its chat column scrolls above it).
+   layout keeps the composer in normal flow (and its chat column scrolls above it).
    live-chat.tsx measures this element and writes `--sombra-composer-height` on the
    message scroller, so the last message never hides behind the panel. */
 .chat-main:not(.voice-layout) > .composer-chrome {
@@ -35,22 +38,6 @@
  inset: auto 0 0 0;
  margin: 8px;
  z-index: 20;
-}
-.voice-layout > .composer-chrome {
- grid-column: 2;
- grid-row: 2;
-}
-@media (max-width: 1000px) {
- .voice-layout > .composer-chrome {
-  grid-column: 1;
-  grid-row: 3;
- }
-}
-
-/* assistant-ui Elements File: hover принадлежит слоту, который Sombra не размечает. */
-.chat-shell .attachment-file-card [data-slot='file-download']:hover:not(:disabled) {
- background-color: #d2e0fa21;
- color: #eef4ff;
 }
 
 /* Текст под вложением. Глобальное `.message-content p` задаёт font-size, margin и
@@ -65,6 +52,7 @@
  overflow-wrap: anywhere;
  white-space: normal;
 }
+
 .message-attachment .attachment-cache-status {
  margin: 0;
  padding: 0 8px 8px;
@@ -73,6 +61,7 @@
  white-space: normal;
  overflow-wrap: anywhere;
 }
+
 .message-attachment .attachment-copy-status {
  margin: 0;
  padding: 6px 2px 0;
@@ -81,6 +70,7 @@
  white-space: normal;
  overflow-wrap: anywhere;
 }
+
 .attachment-audio-status .attachment-error {
  flex: 1;
  min-width: 0;
@@ -93,25 +83,17 @@
 :root {
  --attachment-image-max-height: 420px;
 }
+
 /* :has() утилитами Tailwind не выражается. */
 .attachment-image-trigger:has(.attachment-image-placeholder) {
  min-height: 180px;
 }
 
-/* glass.css красит фон любой кнопки .chat-shell на :hover, поэтому прозрачность
-   триггера держится более специфичным правилом, чем глобальный hover. */
+/* У кнопки триггера есть свой фон из утилит, поэтому прозрачность держится
+   более специфичным правилом, чем глобальный hover. */
 .chat-shell .attachment-image-trigger,
 .chat-shell .attachment-image-trigger:hover {
  background: transparent;
-}
-
-/* Цвета hover кнопок картинки тоже должны перебивать глобальный hover .chat-shell. */
-.attachment-image-surface .attachment-image-download:hover,
-.attachment-viewer-image .attachment-image-download:hover,
-.attachment-image-surface .attachment-image-retry:hover,
-.attachment-viewer-image .attachment-image-retry:hover {
- background: #1b263def;
- color: #fff;
 }
 
 .attachment-visually-hidden {
@@ -125,6 +107,7 @@
  white-space: nowrap !important;
  border: 0 !important;
 }
+
 /* На сенсорном экране hover-действие показывается всегда. */
 @media (hover: none) {
  .attachment-image-download {
@@ -137,15 +120,17 @@
 .attachment-player [data-slot='audio-player'] {
  max-width: 100%;
 }
+
 /* Reserve the corner for the hover action so it never covers the seek time. */
 .attachment-player [data-slot='audio-player-time'] {
  padding-inline-end: 30px;
  white-space: nowrap;
 }
+
 .chat-shell .attachment-player [data-slot='audio-player'] button:hover:not(:disabled) {
- background-color: #dce7fb;
  color: var(--background);
 }
+
 .message-attachment [data-slot='audio-player'] button {
  border-radius: 50%;
 }
@@ -157,14 +142,7 @@
  inset: -5px;
  border-radius: 12px;
 }
-.chat-shell .attachment-player > .attachment-player-download:hover:not(:disabled) {
- background: #1b263def;
- color: #fff;
-}
-.attachment-audio-retry:hover {
- background: #dce6fa12;
- color: #eef4ff;
-}
+
 @media (hover: none) {
  .attachment-player-download {
   opacity: 1;
@@ -176,18 +154,22 @@
 .attachment-context-menu {
  animation: attachment-context-menu-in 120ms ease-out;
 }
+
 .attachment-context-menu-item {
  font: inherit;
  font-size: 13px;
 }
+
 .attachment-context-menu-item > svg {
  flex: none;
  color: var(--muted-foreground);
 }
+
 .attachment-context-menu-item:not([data-disabled]):hover > svg,
 .attachment-context-menu-item:not([data-disabled]):focus-visible > svg {
  color: inherit;
 }
+
 @keyframes attachment-context-menu-in {
  from {
   opacity: 0;
@@ -198,6 +180,7 @@
   transform: none;
  }
 }
+
 @media (prefers-reduced-motion: reduce) {
  .attachment-context-menu {
   animation: none;

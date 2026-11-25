@@ -2,6 +2,6 @@
    Здесь остаётся только слот чужого среза: превью обложки в настройках. */
 .settings-cover-preview {
  border-radius: 12px;
- border: 1px solid #ffffff24;
+ border: 1px solid var(--border);
  margin-bottom: 12px;
 }

@@ -190,13 +190,14 @@ struct ProfileDto {
 fn token_hash(token: &str) -> String {
     B64.encode(digest::digest(&digest::SHA256, token.as_bytes()).as_ref())
 }
+const TURN_TTL_SECONDS: u64 = 12 * 60 * 60;
 fn voice_ice_servers(
     static_servers: Value,
     turn_urls: Option<&str>,
     secret: Option<&str>,
     subject: &str,
     timestamp: u64,
-) -> Value {
+) -> (Value, Option<u64>) {
     let mut servers = static_servers.as_array().cloned().unwrap_or_default();
     let urls = turn_urls.and_then(|urls| serde_json::from_str::<Vec<String>>(urls).ok());
     if let (Some(urls), Some(secret)) = (urls, secret.filter(|secret| !secret.is_empty())) {
@@ -206,15 +207,16 @@ fn voice_ice_servers(
                 .all(|url| url.starts_with("turn:") || url.starts_with("turns:"))
         {
             // coturn REST credentials use an expiry in the username and HMAC-SHA1.
-            let username = format!("{}:{subject}", timestamp + 12 * 60 * 60);
+            let username = format!("{}:{subject}", timestamp + TURN_TTL_SECONDS);
             let key =
                 ring::hmac::Key::new(ring::hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, secret.as_bytes());
             let mac = ring::hmac::sign(&key, username.as_bytes());
             let credential = base64::engine::general_purpose::STANDARD.encode(mac.as_ref());
             servers.push(json!({"urls":urls,"username":username,"credential":credential}));
+            return (json!(servers), Some(TURN_TTL_SECONDS));
         }
     }
-    json!(servers)
+    (json!(servers), None)
 }
 const YEAR_SECONDS: u64 = 365 * 24 * 60 * 60;
 fn session_lifetime(remember_me: bool) -> u64 {
@@ -233,6 +235,8 @@ fn session_active(session: &Value, timestamp: u64) -> bool {
                 .saturating_add(604800)
                 > timestamp)
 }
+mod livekit;
+
 pub struct Backend {
     db: Value,
     path: PathBuf,
@@ -242,6 +246,7 @@ pub struct Backend {
     music: music::Music,
     signals: Vec<Value>,
     voice_seq: u64,
+    livekit: Option<livekit::Pilot>,
     dialog_calls: Vec<Value>,
     diagnostics: Arc<diagnostics::Diagnostics>,
     presence: std::collections::HashMap<String, u64>,
@@ -275,6 +280,7 @@ impl Backend {
             music,
             signals: Vec::new(),
             voice_seq: 0,
+            livekit: livekit::Pilot::configured()?,
             dialog_calls: Vec::new(),
             diagnostics: Arc::default(),
             presence: Default::default(),
@@ -496,6 +502,14 @@ impl Backend {
         if !authorized {
             return Err("Нет доступа к голосовой комнате".into());
         }
+        let pilot = self.livekit.as_ref().filter(|pilot| call_index.is_none() && pilot.room == room);
+        let ticket = match (op, pilot) {
+            ("voice_join", Some(pilot)) if v["supportsLiveKit"] == true => Some(pilot.ticket(client)),
+            ("voice_join" | "voice_signal", Some(_)) => {
+                return Err("Для пилотной комнаты LiveKit обновите клиент Sombra".into());
+            }
+            _ => None,
+        };
         let owns = self
             .voice
             .iter()
@@ -573,7 +587,8 @@ impl Backend {
             .ok()
             .and_then(|v| serde_json::from_str(&v).ok())
             .unwrap_or(json!([]));
-        let ice = if op == "voice_join" {
+        let refresh_ice = op == "voice_poll" && v["refreshIce"] == true;
+        let (ice, ttl) = if pilot.is_none() && (op == "voice_join" || refresh_ice) {
             voice_ice_servers(
                 ice,
                 std::env::var("MINES_TURN_URLS").ok().as_deref(),
@@ -582,9 +597,16 @@ impl Backend {
                 now(),
             )
         } else {
-            ice
+            (ice, None)
         };
-        Ok(json!({"peers":peers,"signals":signals,"cursor":self.voice_seq,"iceServers":ice}))
+        let mut response = json!({"peers":peers,"signals":signals,"cursor":self.voice_seq,"iceServers":ice});
+        if let Some(seconds) = ttl {
+            response["iceTtlSeconds"] = json!(seconds);
+        }
+        if let Some(ticket) = ticket {
+            response["liveKit"] = ticket;
+        }
+        Ok(response)
     }
     fn voice_presence(&self, groups: &[Value]) -> Value {
         let cutoff = now().saturating_sub(20);
@@ -1137,6 +1159,23 @@ impl Backend {
    "join_group"=>{let g=self.db["groups"].as_array_mut().unwrap().iter_mut().find(|g|g["invite"]==s(&v,"invite")).ok_or("Приглашение не найдено")?;if !arr(&g["members"]).contains(&json!(uid)){g["members"].as_array_mut().unwrap().push(json!(uid));}let joined=g.clone();self.save()?;return Ok(self.group_dto(&joined,uid))},
    "invite_group_member"=>{
     let group_index=self.require_group_permission(s(&v,"group"),uid,"members.invite")?;
+    if let Some(users)=v.get("users") {
+     let users=users.as_array().filter(|users| (1..=9).contains(&users.len()))
+      .ok_or("Выберите от 1 до 9 пользователей")?;
+     for user in users {
+      if !user.is_string()
+       || !arr(&self.db["users"]).iter().any(|record| &record["id"]==user)
+       || arr(&self.db["bots"]).iter().any(|record| &record["id"]==user) {
+       return Err("Один из пользователей недоступен для приглашения".into());
+      }
+     }
+     let members=self.db["groups"][group_index]["members"].as_array_mut().unwrap();
+     for user in users {
+      if !members.contains(user) { members.push(user.clone()); }
+     }
+     self.save()?;
+     return Ok(json!({"ok":true}));
+    }
      let email=s(&v,"email").trim().to_lowercase();
     let (local,domain)=email.split_once('@').ok_or("Введите корректную электронную почту")?;
     if email.len()>254||local.is_empty()||domain.is_empty()||domain.contains('@')||email.chars().any(char::is_whitespace){
@@ -1282,7 +1321,7 @@ mod tests {
         let configured = json!([{"urls":"stun:example.test:3478"}]);
         let relay =
             r#"["turn:example.test:3478?transport=udp","turn:example.test:3478?transport=tcp"]"#;
-        let merged = voice_ice_servers(
+        let (merged, ttl) = voice_ice_servers(
             configured.clone(),
             Some(relay),
             Some("test-secret"),
@@ -1290,6 +1329,7 @@ mod tests {
             1_700_000_000,
         );
         assert_eq!(merged[0], configured[0]);
+        assert_eq!(ttl, Some(43_200));
         assert_eq!(merged[1]["username"], "1700043200:fixture");
         assert_eq!(merged[1]["credential"], "AzZu1XjeI2CBkBqGhUWUMdtthMI=");
         assert_eq!(
@@ -1298,7 +1338,7 @@ mod tests {
         );
         assert_eq!(
             voice_ice_servers(configured.clone(), Some(relay), None, "fixture", 0),
-            configured
+            (configured.clone(), None)
         );
         assert_eq!(
             voice_ice_servers(
@@ -1308,7 +1348,7 @@ mod tests {
                 "fixture",
                 0
             ),
-            configured
+            (configured, None)
         );
     }
 
@@ -1794,6 +1834,17 @@ mod tests {
             backend.request(unknown).unwrap_err(),
             "Аккаунт с этой почтой не найден"
         );
+        let mut by_id = invite.clone();
+        by_id.as_object_mut().unwrap().remove("email");
+        by_id["users"] = json!([guest["user"]["id"], id()]);
+        assert!(backend.request(by_id.clone()).is_err());
+        assert_eq!(backend.request(state.clone()).unwrap()["groups"], json!([]));
+        by_id["users"] = json!([guest["user"]["id"], guest["user"]["id"]]);
+        let mut unauthorized = by_id.clone();
+        unauthorized["token"] = guest_token.clone();
+        assert!(backend.request(unauthorized).is_err());
+        backend.request(by_id.clone()).unwrap();
+        backend.request(by_id).unwrap();
         backend.request(invite.clone()).unwrap();
         backend.request(invite).unwrap();
 
@@ -2432,6 +2483,44 @@ mod diagnostics_tests {
 mod voice_tests {
     use super::*;
     #[test]
+    fn livekit_admission_is_scoped_to_the_configured_voice_room() {
+        let path = std::env::temp_dir().join(id()).join("db.json");
+        let mut b = Backend::open(path.clone()).unwrap();
+        let owner = b.db["users"][0].clone();
+        let token = b.token(&owner, "test", false).unwrap();
+        assert!(b.provision_livekit_room_offline("missing").is_err());
+        let group = s(&b.db["groups"][0], "id").to_string();
+        let room_id = b.provision_livekit_room_offline(&group).unwrap();
+        assert_eq!(b.provision_livekit_room_offline(&group).unwrap(), room_id);
+        let room = room_id.as_str();
+        b.livekit = Some(livekit::Pilot::fixture(room.into()));
+        let outsider = b.request(json!({"op":"register","name":"Other","email":"pilot@test.local","password":"strong-password"})).unwrap();
+        let client = id();
+        assert!(b.request(json!({"op":"voice_join","token":outsider["token"],"room":room,"client":client,"supportsLiveKit":true})).is_err());
+        assert!(b.request(json!({"op":"voice_join","token":token,"room":room,"client":client})).is_err());
+        let joined = b.request(json!({"op":"voice_join","token":token,"room":room,"client":client,"supportsLiveKit":true})).unwrap();
+        let jwt = s(&joined["liveKit"], "token");
+        let (signed, signature) = jwt.rsplit_once('.').unwrap();
+        let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, b"secret");
+        ring::hmac::verify(&key, signed.as_bytes(), &B64.decode(signature).unwrap()).unwrap();
+        let claims: Value = serde_json::from_slice(&B64.decode(signed.split_once('.').unwrap().1).unwrap()).unwrap();
+        assert_eq!(claims["sub"], client);
+        assert_eq!(claims["video"]["room"], room);
+        assert_eq!(claims["video"]["canPublishSources"], json!(["microphone"]));
+        assert_eq!(claims["video"]["canPublishData"], false);
+        assert_eq!(claims["exp"].as_u64().unwrap() - claims["nbf"].as_u64().unwrap(), 120);
+        let heartbeat = b.request(json!({"op":"voice_poll","token":token,"room":room,"client":client,"muted":true,"refreshIce":true})).unwrap();
+        assert!(heartbeat["liveKit"].is_null());
+        assert!(heartbeat["iceTtlSeconds"].is_null());
+        assert_eq!(heartbeat["peers"][0]["muted"], true);
+        assert!(b.request(json!({"op":"voice_signal","token":token,"room":room,"client":client})).is_err());
+        let normal = b.db["groups"][0]["channels"][4]["id"].clone();
+        let p2p = b.request(json!({"op":"voice_join","token":token,"room":normal,"client":id(),"supportsLiveKit":true})).unwrap();
+        assert!(p2p["liveKit"].is_null());
+        drop(b);
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
     fn room_membership_signals_and_cleanup() {
         let path = std::env::temp_dir().join(id()).join("db.json");
         let mut b = Backend::open(path.clone()).unwrap();
@@ -2444,8 +2533,12 @@ mod voice_tests {
         assert!(b
             .request(json!({"op":"voice_join","token":outsider["token"],"room":room,"client":a}))
             .is_err());
-        b.request(json!({"op":"voice_join","token":token,"room":room,"client":a}))
+        let admission = b.request(json!({"op":"voice_join","token":token,"room":room,"client":a}))
             .unwrap();
+        let renewal = b.request(json!({"op":"voice_poll","token":token,"room":room,"client":a,"refreshIce":true})).unwrap();
+        assert_eq!(renewal["iceTtlSeconds"], admission["iceTtlSeconds"]);
+        assert_eq!(arr(&renewal["iceServers"]).len(), arr(&admission["iceServers"]).len());
+        assert!(b.request(json!({"op":"voice_poll","token":outsider["token"],"room":room,"client":a,"refreshIce":true})).is_err());
         b.request(json!({"op":"voice_join","token":token,"room":room,"client":c}))
             .unwrap();
         let roster = b.request(json!({"op":"state","token":token})).unwrap();
@@ -2464,6 +2557,7 @@ mod voice_tests {
             .unwrap();
         assert_eq!(arr(&poll["peers"]).len(), 2);
         assert_eq!(arr(&poll["signals"]).len(), 1);
+        assert!(poll["iceTtlSeconds"].is_null());
         assert!(!poll["peers"].to_string().contains("session"));
         assert!(arr(&b.request(json!({"op":"voice_poll","token":token,"room":room,"client":c,"after":poll["cursor"]})).unwrap()["signals"]).is_empty());
         b.request(json!({"op":"voice_leave","token":token,"room":room,"client":a}))

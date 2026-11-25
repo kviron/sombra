@@ -1,3 +1,4 @@
+import {Slider} from '@/shared/ui/slider';
 // assistant-ui Elements MediaPlayer (MIT). Source commit 076de9eaf1b5f0f1fb6fb359c5e5d68770cae65c.
 // https://github.com/assistant-ui/assistant-ui/blob/076de9eaf1b5f0f1fb6fb359c5e5d68770cae65c/packages/ui/src/components/react/assistant-ui/elements/media-player.tsx
 // Sombra keeps the upstream geometry and behaviour; colours resolve through the Sombra theme tokens.
@@ -142,23 +143,21 @@ export function AudioPlayer({
     <span className="truncate text-[13.5px] font-medium" title={title}>
      {displayTitle}
     </span>
-    <input
-     type="range"
+    <Slider
      min={0}
-     max={duration ?? 0}
+     max={duration || 1}
      step={0.1}
-     value={Math.min(currentTime, duration ?? 0)}
+     value={[Math.min(currentTime, duration ?? 0)]}
      aria-label="Seek"
      aria-valuetext={`${formatDuration(currentTime)} of ${durationLabel}`}
-     disabled={hasError}
-     onChange={event => {
-      const nextTime = Number(event.currentTarget.value);
+     disabled={hasError || !duration}
+     onValueChange={([nextTime]) => {
       if (!Number.isFinite(nextTime)) return;
       const resolvedTime = Math.min(nextTime, duration ?? nextTime);
       if (audioRef.current) audioRef.current.currentTime = resolvedTime;
       update({currentTime: resolvedTime});
      }}
-     className="accent-foreground w-full"
+     className="h-6"
     />
    </div>
    <span data-slot="audio-player-time" className={cn(mono, 'text-muted-foreground tabular-nums')}>

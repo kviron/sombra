@@ -23,7 +23,7 @@ export function DmHeaderIdentity({user, typingUntil = 0}: {user: User; typingUnt
    <span className="dm-header-label flex min-w-0 flex-col items-start justify-center gap-0.5 overflow-hidden">
     <strong className="w-full truncate text-[13px] leading-[17px]">{user.name}</strong>
     <small
-     className={`block max-w-full truncate text-[12px] leading-[15px] ${typing ? 'dm-header-typing text-[#b8bdf1]' : ''}`}
+     className={`block max-w-full truncate text-[12px] leading-[15px] ${typing ? 'dm-header-typing text-primary' : ''}`}
      role="status"
      aria-live="polite"
     >

@@ -1,7 +1,7 @@
-import {ColumnResizer} from '@/shared/ui/column-resizer';
+import {useSyncExternalStore, type RefObject} from 'react';
+import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/shared/ui/resizable';
 import {ConversationMaterials} from '@/features/conversation-details';
-import type {useRoomMusic, Voice} from '@/features/voice-room';
-import type {RefObject} from 'react';
+import {VoiceStage, type RoomMusicModel, type Voice} from '@/features/voice-room';
 import type {useScreenGlitch} from '@/shared/ui/use-screen-glitch';
 import type {ChatState} from '@/shared/types';
 import {MemberList} from './member-list';
@@ -11,7 +11,25 @@ import type {ChatNavigationModel} from '../model/use-chat-navigation';
 import type {ChatPanelsModel} from '../model/use-chat-panels';
 import type {ChatMessagesModel} from '../model/use-chat-messages';
 import type {ChatStateModel} from '../model/use-chat-state';
-import type {useChatScroll} from '../lib/use-chat-scroll';
+
+function subscribeViewport(onChange: () => void) {
+ const voice = window.matchMedia('(max-width: 1000px)');
+ const members = window.matchMedia('(max-width: 760px)');
+ voice.addEventListener('change', onChange);
+ members.addEventListener('change', onChange);
+ return () => {
+  voice.removeEventListener('change', onChange);
+  members.removeEventListener('change', onChange);
+ };
+}
+
+function viewportMode() {
+ return window.matchMedia('(max-width: 760px)').matches
+  ? 'small'
+  : window.matchMedia('(max-width: 1000px)').matches
+    ? 'narrow'
+    : 'wide';
+}
 
 type Props = {
  chat: ChatStateModel;
@@ -20,10 +38,7 @@ type Props = {
  panels: ChatPanelsModel;
  messages: ChatMessagesModel;
  call: Voice;
- music: ReturnType<typeof useRoomMusic> | undefined;
- scroll: ReturnType<typeof useChatScroll>;
- scrollRef: RefObject<HTMLDivElement | null>;
- scrollKey: string;
+ music: RoomMusicModel | undefined;
  voiceRoom: string | undefined;
  composerRef: RefObject<HTMLDivElement | null>;
  forwardCommentRef: RefObject<HTMLTextAreaElement | null>;
@@ -41,9 +56,6 @@ export function ChatWorkspace({
  messages,
  call,
  music,
- scroll,
- scrollRef,
- scrollKey,
  voiceRoom,
  composerRef,
  forwardCommentRef,
@@ -52,58 +64,88 @@ export function ChatWorkspace({
  onJump
 }: Props) {
  const {channel} = nav;
+ const stageRoom = voiceRoom || channel?.id;
+ const mode = useSyncExternalStore(subscribeViewport, viewportMode, () => 'wide');
+ const voiceVertical = mode !== 'wide';
+ const showMembers = mode !== 'small' && !panels.materialsOpen && nav.canShowMembers && panels.members;
+ const conversation = (
+  <div
+   className={
+    messages.voiceLayout
+     ? 'chat-main voice-layout relative flex h-full min-h-0 min-w-0 flex-col'
+     : 'chat-main relative flex h-full min-h-0 min-w-0 flex-col'
+   }
+  >
+   <ChatTranscript chat={chat} state={state} nav={nav} messages={messages} />
+   <ChatComposer
+    chat={chat}
+    state={state}
+    nav={nav}
+    panels={panels}
+    messages={messages}
+    composerRef={composerRef}
+    forwardCommentRef={forwardCommentRef}
+   />
+  </div>
+ );
  return (
   <div className="conversation-body flex min-h-0 flex-1" ref={motionRef}>
-   <div
-    className={
-     messages.voiceLayout
-      ? 'chat-main voice-layout relative flex min-w-0 flex-1 flex-col'
-      : 'chat-main relative flex min-w-0 flex-1 flex-col'
-    }
-   >
-    {messages.voiceLayout && (
-     <ColumnResizer
-      label="Ширина чата канала"
-      side="left"
-      variable="--voice-chat-width"
-      min={260}
-      max={600}
-      target=".voice-messages"
-     />
-    )}
-    <ChatTranscript
-     chat={chat}
-     state={state}
-     nav={nav}
-     panels={panels}
-     messages={messages}
-     call={call}
-     music={music}
-     scroll={scroll}
-     scrollRef={scrollRef}
-     scrollKey={scrollKey}
-     voiceRoom={voiceRoom}
-    />
-    <ChatComposer
-     chat={chat}
-     state={state}
-     nav={nav}
-     panels={panels}
-     messages={messages}
-     composerRef={composerRef}
-     forwardCommentRef={forwardCommentRef}
-    />
-   </div>
-   {!panels.materialsOpen && nav.canShowMembers && panels.members && (
-    <aside className="member-list border-l" aria-label="Участники">
-     <ColumnResizer label="Ширина списка участников" side="left" variable="--member-width" min={180} max={420} />
-     {state && nav.group ? (
-      <MemberList members={nav.group.members} users={state.users} meId={state.me.id} group={nav.group} />
+   <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0 flex-1" style={{height: 'auto'}}>
+    <ResizablePanel id="chat-main" minSize="55%" className="flex min-h-0 flex-col" style={{overflow: 'hidden'}}>
+     {messages.voiceLayout && stageRoom ? (
+      <ResizablePanelGroup orientation={voiceVertical ? 'vertical' : 'horizontal'}>
+       <ResizablePanel id="voice-stage" minSize={voiceVertical ? '45%' : '35%'} className="flex overflow-auto">
+        <VoiceStage
+         music={music}
+         voice={call}
+         id={stageRoom}
+         presence={state?.voicePresence?.[stageRoom]}
+         title={nav.title}
+         userName={nav.userName}
+         me={state?.me.name || 'Вы'}
+         meUser={state?.me}
+         users={state?.users}
+         onSettings={() => panels.actions.openSettings('voice')}
+        />
+       </ResizablePanel>
+       <ResizableHandle aria-label={voiceVertical ? 'Высота чата канала' : 'Ширина чата канала'} />
+       <ResizablePanel
+        id="voice-chat"
+        defaultSize={voiceVertical ? '40%' : '340px'}
+        minSize={voiceVertical ? '25%' : '180px'}
+        maxSize={voiceVertical ? '55%' : '600px'}
+        groupResizeBehavior={voiceVertical ? 'preserve-relative-size' : 'preserve-pixel-size'}
+        className="bg-card/75 flex min-h-0 flex-col backdrop-blur-sm"
+        style={{overflow: 'hidden'}}
+       >
+        {conversation}
+       </ResizablePanel>
+      </ResizablePanelGroup>
      ) : (
-      <p className="member-empty">Загрузка участников…</p>
+      conversation
      )}
-    </aside>
-   )}
+    </ResizablePanel>
+    {showMembers && (
+     <>
+      <ResizableHandle aria-label="Ширина списка участников" />
+      <ResizablePanel
+       id="chat-members"
+       defaultSize="210px"
+       minSize="150px"
+       maxSize="420px"
+       groupResizeBehavior="preserve-pixel-size"
+      >
+       <aside className="member-list h-full" aria-label="Участники">
+        {state && nav.group ? (
+         <MemberList members={nav.group.members} users={state.users} meId={state.me.id} group={nav.group} />
+        ) : (
+         <p className="member-empty">Загрузка участников…</p>
+        )}
+       </aside>
+      </ResizablePanel>
+     </>
+    )}
+   </ResizablePanelGroup>
    {panels.materialsOpen && channel && !nav.friends && state && (
     <ConversationMaterials
      key={`${channel.id}:${panels.materialsEpoch}`}

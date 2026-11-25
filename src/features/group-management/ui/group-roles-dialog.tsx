@@ -1,8 +1,12 @@
-import {Checkbox, Switch, Dialog as RadixDialog} from 'radix-ui';
-import {Check, X} from 'lucide-react';
+import {Button} from '@/shared/ui/button';
+import {Input} from '@/shared/ui/input';
+import {Dialog as RadixDialog} from 'radix-ui';
+import {Checkbox} from '@/shared/ui/checkbox';
+import {Switch} from '@/shared/ui/switch';
+import {X} from 'lucide-react';
 import type {ChatState, Group, GroupPermission} from '@/shared/types';
 import {GROUP_PERMISSION_CATALOG} from '@/entities/group';
-import {Select} from '@/shared/ui/select';
+import {OptionsSelect} from '@/shared/ui/select';
 import {cn} from '@/shared/lib';
 import {useGroupRoles} from '../model/use-group-roles';
 import './group-roles-dialog.css';
@@ -54,59 +58,57 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
 
  return (
   <section className={cn('group-roles-panel', 'flex min-h-0 flex-1 flex-col overflow-hidden')} aria-busy={busy}>
-   <nav
-    className={cn('group-roles-tabs', 'flex gap-2 border-b border-[var(--gr-line)] px-6 pb-3')}
-    aria-label="Разделы ролей"
-   >
-    <button aria-pressed={tab === 'roles'} onClick={() => setTab('roles')}>
+   <nav className={cn('group-roles-tabs', 'border-border flex gap-2 border-b px-6 pb-3')} aria-label="Разделы ролей">
+    <Button
+     type="button"
+     variant={tab === 'roles' ? 'secondary' : 'ghost'}
+     aria-pressed={tab === 'roles'}
+     onClick={() => setTab('roles')}
+    >
      Роли и права
-    </button>
-    <button aria-pressed={tab === 'members'} onClick={() => setTab('members')}>
+    </Button>
+    <Button
+     type="button"
+     variant={tab === 'members' ? 'secondary' : 'ghost'}
+     aria-pressed={tab === 'members'}
+     onClick={() => setTab('members')}
+    >
      Участники · {current.members.length}
-    </button>
+    </Button>
    </nav>
    <div className={cn('group-roles-body', 'min-h-0 overflow-auto overscroll-contain px-6 pt-4 pb-6')}>
-    <section className={cn('gs-policy', 'mt-2 border-t border-[var(--gr-line)] py-5')}>
+    <section className={cn('gs-policy', 'border-border mt-2 border-t py-5')}>
      <div className={cn('gs-policy-row', 'mb-2 flex items-center justify-between gap-5')}>
       <label className="font-semibold" htmlFor="gs-member-invites">
        Разрешить обычным участникам приглашать людей
       </label>
-      <Switch.Root
+      <Switch
        id="gs-member-invites"
-       className="gs-switch"
        checked={current.membersCanInvite === true}
        disabled={busy || !owner || !policySupported}
        onCheckedChange={enabled => {
         if (enabled) policy(true);
         else setConfirmOff(true);
        }}
-      >
-       <Switch.Thumb className="gs-switch-thumb" />
-      </Switch.Root>
+      />
      </div>
      <p className="gr-note">Участники смогут приглашать по email и делиться кодом. Настройку меняет только владелец.</p>
      {!policySupported && (
-      <p
-       role="status"
-       className={cn('gs-upgrade', 'rounded-[8px] border border-[#776542] bg-[#332d22] p-3 text-[#f0d7a2]')}
-      >
+      <p role="status" className={cn('gs-upgrade', 'border-border bg-card rounded-[8px] border p-3 text-amber-500')}>
        Для изменения этой настройки требуется обновление сервера. Сейчас доступен только просмотр.
       </p>
      )}
      {confirmOff && owner && policySupported && (
-      <div
-       className={cn('gs-confirm', 'rounded-[8px] border border-[#776542] bg-[#332d22] p-3 text-[#f0d7a2]')}
-       role="alert"
-      >
+      <div className={cn('gs-confirm', 'border-border bg-card rounded-[8px] border p-3 text-amber-500')} role="alert">
        <p>
         Отключить приглашения для обычных участников? Код приглашения изменится, прежние ссылки перестанут работать.
        </p>
-       <button className="gr-danger" disabled={busy} onClick={() => policy(false)}>
+       <Button type="button" variant="destructive" disabled={busy} onClick={() => policy(false)}>
         Отключить и заменить код
-       </button>
-       <button disabled={busy} onClick={() => setConfirmOff(false)}>
+       </Button>
+       <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmOff(false)}>
         Отмена
-       </button>
+       </Button>
       </div>
      )}
     </section>
@@ -129,7 +131,7 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
       <div className={cn('gr-role-picker', 'mb-4 flex items-end gap-3')}>
        <label>
         Роль
-        <Select
+        <OptionsSelect
          value={selected}
          onValueChange={choose}
          label="Выбрать роль"
@@ -142,16 +144,15 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
         />
        </label>
        {owner && (
-        <button disabled={busy || roles.length >= 32} onClick={create}>
+        <Button type="button" variant="outline" disabled={busy || roles.length >= 32} onClick={create}>
          Создать роль
-        </button>
+        </Button>
        )}
       </div>
       {selected !== 'owner' && selected !== 'member' && (
        <label className={cn('gr-name', 'mb-4 grid gap-1.5')}>
         Название роли
-        <input
-         className="h-10 w-full rounded-[8px] border border-[var(--gr-line)] bg-[#121419] px-3 py-2 text-[var(--gr-text)]"
+        <Input
          value={name}
          maxLength={40}
          disabled={!editable || busy}
@@ -167,7 +168,7 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
        <p className="gr-error">Эта роль удалена. Выберите другую роль; несохранённые изменения остались в форме.</p>
       )}
       <div
-       className={cn('gr-matrix-scroll', 'max-w-full overflow-auto rounded-[10px] border border-[var(--gr-line)]')}
+       className={cn('gr-matrix-scroll', 'border-border max-w-full overflow-auto rounded-[10px] border')}
        tabIndex={0}
        aria-label="Таблица прав с горизонтальной прокруткой"
       >
@@ -204,12 +205,14 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
        </table>
       </div>
       {owner && selected !== 'member' && selected !== 'owner' && role && (
-       <div className={cn('gr-delete', 'mt-4 rounded-[8px] border border-[#624149] bg-[#2b2226] p-3')}>
+       <div className={cn('gr-delete', 'border-border bg-card mt-4 rounded-[8px] border p-3')}>
         {confirmDelete ? (
          <>
           <p>Удалить роль «{role.name}»? Все её участники получат роль «Участник».</p>
-          <button
-           className="gr-danger"
+          <Button
+           type="button"
+           variant="destructive"
+
            disabled={busy}
            onClick={() =>
             void run('delete_group_role', {role: selected}, () => {
@@ -219,15 +222,15 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
            }
           >
            Да, удалить роль
-          </button>
-          <button disabled={busy} onClick={() => setConfirmDelete(false)}>
+          </Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmDelete(false)}>
            Отмена
-          </button>
+          </Button>
          </>
         ) : (
-         <button className="gr-danger" disabled={busy} onClick={() => setConfirmDelete(true)}>
+         <Button type="button" variant="destructive" disabled={busy} onClick={() => setConfirmDelete(true)}>
           Удалить роль
-         </button>
+         </Button>
         )}
        </div>
       )}
@@ -238,10 +241,7 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
        const assigned = current.memberRoles?.[user.id] || 'member';
        const protectedRole = !!roles.find(item => item.id === assigned)?.permissions.length;
        return (
-        <div
-         className={cn('gr-member', 'flex items-center gap-3 rounded-[10px] bg-[var(--gr-surface)] p-3')}
-         key={user.id}
-        >
+        <div className={cn('gr-member', 'bg-muted flex items-center gap-3 rounded-[10px] p-3')} key={user.id}>
          <div>
           <strong>{user.name}</strong>
           <small>
@@ -253,7 +253,7 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
           </small>
          </div>
          {owner && user.id !== current.owner && !user.bot && (
-          <Select
+          <OptionsSelect
            label={`Роль: ${user.name}`}
            value={assigned}
            options={
@@ -266,18 +266,25 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
           />
          )}
          {canKick && user.id !== state.me.id && user.id !== current.owner && !user.bot && (owner || !protectedRole) && (
-          <button className="gr-danger" disabled={busy} onClick={() => setKick({id: user.id, name: user.name})}>
+          <Button
+           type="button"
+           variant="destructive"
+           disabled={busy}
+           onClick={() => setKick({id: user.id, name: user.name})}
+          >
            Исключить
-          </button>
+          </Button>
          )}
         </div>
        );
       })}
       {kick && canKick && (
-       <div className={cn('gr-delete', 'mt-4 rounded-[8px] border border-[#624149] bg-[#2b2226] p-3')}>
+       <div className={cn('gr-delete', 'border-border bg-card mt-4 rounded-[8px] border p-3')}>
         <p>Исключить «{kick.name}» из группы? Для возвращения понадобится приглашение.</p>
-        <button
-         className="gr-danger"
+        <Button
+         type="button"
+         variant="destructive"
+
          disabled={busy}
          onClick={() => {
           const target = state.users.find(user => user.id === kick.id);
@@ -296,18 +303,16 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
          }}
         >
          Да, исключить
-        </button>
-        <button disabled={busy} onClick={() => setKick(null)}>
+        </Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => setKick(null)}>
          Отмена
-        </button>
+        </Button>
        </div>
       )}
      </div>
     )}
    </div>
-   <footer
-    className={cn('group-roles-footer', 'shrink-0 border-t border-[var(--gr-line)] bg-[var(--gr-bg)] px-6 pt-3 pb-4')}
-   >
+   <footer className={cn('group-roles-footer', 'border-border bg-background shrink-0 border-t px-6 pt-3 pb-4')}>
     {error && (
      <p role="alert" className="gr-error">
       {error}
@@ -323,12 +328,14 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
            ? 'Изменения ролей доступны только владельцу'
            : 'Только просмотр'}
      </span>
-     <button disabled={busy} onClick={onClose}>
+     <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
       Закрыть
-     </button>
+     </Button>
      {tab === 'roles' && editable && (
-      <button
-       className="gr-primary"
+      <Button
+       type="button"
+       variant="default"
+
        disabled={busy || !dirty || !name.trim() || name.trim().length > 40}
        onClick={() => {
         if (!owner) return;
@@ -343,7 +350,7 @@ export function GroupRolesPanel({group, state, onClose, refresh, onError, onBusy
        }}
       >
        Сохранить
-      </button>
+      </Button>
      )}
     </div>
    </footer>
@@ -371,7 +378,7 @@ function FragmentRows({
     <tr key={item.key}>
      <th scope="row">
       {index === 0 && (
-       <span className={cn('gr-category', 'mb-1.5 block text-xs leading-[1.5] font-semibold text-[#c0ceef]')}>
+       <span className={cn('gr-category', 'text-primary mb-1.5 block text-xs leading-[1.5] font-semibold')}>
         {section.group}
        </span>
       )}
@@ -388,8 +395,8 @@ function FragmentRows({
       {selected === 'owner' ? (
        'Да'
       ) : (
-       <Checkbox.Root
-        className="gr-checkbox"
+       <Checkbox
+        className="mx-auto"
         aria-label={item.label}
         checked={
          (item.key === 'members.invite' && membersCanInvite) ||
@@ -397,11 +404,7 @@ function FragmentRows({
         }
         disabled={!editable || (item.key === 'members.invite' && membersCanInvite)}
         onCheckedChange={() => onToggle(item.key)}
-       >
-        <Checkbox.Indicator>
-         <Check size={16} />
-        </Checkbox.Indicator>
-       </Checkbox.Root>
+       />
       )}
      </td>
      <td>{item.key === 'members.invite' && membersCanInvite ? 'Да' : '—'}</td>
@@ -434,9 +437,9 @@ export function GroupRolesDialog(props: GroupRolesDialogProps) {
        <RadixDialog.Description>{props.group.name}</RadixDialog.Description>
       </div>
       <RadixDialog.Close asChild>
-       <button className="gr-icon" aria-label="Закрыть">
+       <Button type="button" variant="ghost" size="icon" aria-label="Закрыть">
         <X size={20} />
-       </button>
+       </Button>
       </RadixDialog.Close>
      </header>
      <GroupRolesPanel {...props} />

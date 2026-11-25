@@ -19,7 +19,22 @@ import {
  prependHistoryPage
 } from './chat-history-rules.ts';
 
+import {filterMessages} from './chat-rules.ts';
+
 const message = (id, channel = 'c1', text = id) => ({id, channel, user: 'u1', text, time: 1});
+
+test('история, снапшот и исходящие дают один стабильный ключ на сообщение до поиска', () => {
+ const confirmed = message('m2', 'c1', 'новый текст');
+ const pending = message('local:m3');
+ const merged = mergeHistoryMessages(
+  [message('m1'), message('m2', 'c1', 'устаревший текст')],
+  [message('m2'), confirmed],
+  [message('m2', 'c1', 'устаревший текст'), pending, {...pending}]
+ );
+ assert.deepEqual(merged, [message('m1'), confirmed, pending]);
+ assert.deepEqual(filterMessages({messages: merged, search: 'устаревший', users: []}), []);
+ assert.deepEqual(filterMessages({messages: merged, search: 'новый', users: []}), [confirmed]);
+});
 
 test('страница встаёт перед загруженными сообщениями и не дублирует их', () => {
  const loaded = [message('m3'), message('m4')];

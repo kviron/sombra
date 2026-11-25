@@ -11,12 +11,13 @@
  font-family: 'Geist Variable', 'Segoe UI', sans-serif;
  user-select: none;
 }
+
 .direct-message-popup #notifications {
  display: grid;
  gap: 8px;
  padding: 8px 9px 10px;
 }
+
 .direct-message-popup .direct-message-toast {
  width: 100%;
- box-shadow: 0 3px 8px #0006;
 }

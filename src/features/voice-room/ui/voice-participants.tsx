@@ -1,3 +1,4 @@
+import {selectVoiceChannelMembers} from '../model/voice-selectors';
 import {MicOff, HeadphoneOff, LogOut} from 'lucide-react';
 import type {User, VoicePresence} from '@/shared/types';
 import {Slider} from '@/shared/ui/slider';
@@ -22,33 +23,16 @@ export function VoiceParticipants({voice, room, title, me, users, presence, volu
  const actions = useUserActions();
  if (!me) return null;
  const joined = voice.room === room;
- const participants = joined
-  ? [
-     {key: 'self', id: me.id, user: me, self: true, muted: voice.muted, deaf: voice.deaf},
-     ...voice.peers.map(peer => ({
-      key: peer.client,
-      id: peer.user,
-      user: users.find(user => user.id === peer.user),
-      self: false,
-      muted: peer.muted,
-      deaf: peer.deaf
-     }))
-    ]
-  : (presence ?? []).map(peer => ({
-     key: peer.user,
-     id: peer.user,
-     user: users.find(user => user.id === peer.user),
-     self: false,
-     muted: peer.muted,
-     deaf: peer.deaf
-    }));
+ const participants = selectVoiceChannelMembers(voice, room, me.id, presence);
  if (!participants.length) return null;
  return (
   <ul
    className="voice-channel-participants m-0 mt-0.5 mb-2 ml-7 list-none border-l border-l-[#ffffff16] py-0 pr-1 pl-2.5"
    aria-label={`Участники — ${title}`}
   >
-   {participants.map(({key, id, user, self, muted, deaf}) => {
+   {participants.map(({id, self, muted, deaf}) => {
+    const peer = joined && !self ? voice.peers.find(peer => peer.user === id && voice.streams[peer.client]) : undefined;
+    const user = id === me.id ? me : users.find(user => user.id === id);
     const name = user?.name || 'Участник';
     const canAdjustVolume = self || id !== me.id;
     const volume = self ? voice.micVolume : volumeForUser(id);
@@ -71,7 +55,7 @@ export function VoiceParticipants({voice, room, title, me, users, presence, volu
     );
     return (
      <UserRow
-      key={key}
+      key={id}
       as="li"
       variant="voice"
       className="voice-channel-participant [&_svg]:shrink-0"
@@ -82,7 +66,11 @@ export function VoiceParticipants({voice, room, title, me, users, presence, volu
       actions={actions_}
       adornment={
        joined ? (
-        <VoiceLevel stream={self ? voice.local : voice.streams[key]} muted={!!(muted || deaf)} name={name} />
+        <VoiceLevel
+         stream={self ? voice.local : peer ? voice.streams[peer.client] : undefined}
+         muted={!!(muted || deaf)}
+         name={name}
+        />
        ) : null
       }
       trailing={

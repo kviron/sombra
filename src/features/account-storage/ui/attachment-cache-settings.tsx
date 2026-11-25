@@ -1,6 +1,6 @@
 import {HardDrive, RefreshCw, Trash2, LoaderCircle} from 'lucide-react';
 import {Button} from '@/shared/ui/button';
-import {Select} from '@/shared/ui/select';
+import {OptionsSelect} from '@/shared/ui/select';
 import {useAttachmentCache} from '../model/use-attachment-cache';
 import './attachment-cache-settings.css';
 
@@ -21,8 +21,8 @@ export function AttachmentCacheSettings({ready, onChanged}: {ready: boolean; onC
     <h3>Локальное хранение</h3>
     <div className="cache-usage">
      <div className="grid min-w-0 flex-1 gap-1">
-      <span className="text-[13px] leading-[1.5] text-[#b9c2d2]">Кэш текущего аккаунта</span>
-      <small className="text-xs leading-[1.5] text-[#aeb8c9]">{model.summary}</small>
+      <span className="text-muted-foreground text-[13px] leading-[1.5]">Кэш текущего аккаунта</span>
+      <small className="text-muted-foreground text-xs leading-[1.5]">{model.summary}</small>
      </div>
      <div className="approved-cache-actions">
       <strong>{model.size}</strong>
@@ -49,7 +49,7 @@ export function AttachmentCacheSettings({ready, onChanged}: {ready: boolean; onC
      </div>{' '}
      <div className="cache-limit">
       <label htmlFor="attachment-cache-limit">Лимит кэша</label>
-      <Select
+      <OptionsSelect
        id="attachment-cache-limit"
        label="Лимит кэша вложений"
        value={model.limit}

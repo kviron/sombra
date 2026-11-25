@@ -1,33 +1,9 @@
-/* Portals live under body, outside .app-surface. Keep the same Sombra glass
-   material available there instead of falling back to shadcn's opaque popover.
-
-   Файл остаётся в CSS (группа C): материал навешивают шесть чужих срезов
-   (expression-picker, sticker-suggestions, bot-command-suggestions, композер,
-   голосовая панель), правила читают [data-slot]/[data-highlighted] Radix и
-   состояния portal-ов; утилиты в чужую разметку положить нельзя. */
-:root {
- --sombra-menu-surface: rgba(27, 30, 38, 0.84);
- --sombra-menu-solid: #1b1e26;
- --sombra-menu-border: rgba(225, 235, 255, 0.18);
- --sombra-menu-text: #dce0e8;
- --sombra-menu-muted: #aeb8c9;
- --sombra-menu-highlight: rgba(210, 224, 250, 0.14);
- --sombra-menu-highlight-text: #f5f7fc;
- --sombra-menu-shadow: 0 16px 44px #0006, inset 0 1px 0 #ffffff12;
- /* Меню живут в портале вне темы окна, поэтому плотность и цвет у них свои,
-    а сила матовости — из общей системы поверхностей. */
- --sombra-menu-blur: blur(var(--surface-blur, 24px)) saturate(var(--surface-saturate, 125%));
-}
 .sombra-menu-surface[data-slot] {
- background: var(--sombra-menu-surface);
- color: var(--sombra-menu-text);
- border: 1px solid var(--sombra-menu-border);
+ color: var(--foreground);
+ border: 1px solid var(--border);
  border-radius: 10px;
- box-shadow: var(--sombra-menu-shadow);
- -webkit-backdrop-filter: var(--sombra-menu-blur);
- backdrop-filter: var(--sombra-menu-blur);
- background-clip: padding-box;
 }
+
 .sombra-menu-surface[data-slot]
  :is([data-slot='context-menu-item'], [data-slot='dropdown-menu-item'], [data-slot='select-item']) {
  min-height: 36px;
@@ -35,61 +11,43 @@
  line-height: 20px;
  color: inherit;
 }
+
 .sombra-menu-surface[data-slot]
  :is([role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio'], [data-slot='select-item'])[data-highlighted],
 .sombra-menu-surface[data-slot] :is([role='menuitem'], [data-slot='select-item']):focus-visible {
- background: var(--sombra-menu-highlight);
- color: var(--sombra-menu-highlight-text);
+ color: var(--accent-foreground);
  outline: none;
 }
+
 .sombra-menu-surface[data-slot] [data-disabled] {
  opacity: 0.45;
  pointer-events: none;
 }
-.sombra-menu-surface[data-slot] [role='separator'] {
- background: var(--sombra-menu-border);
-}
+
 .sombra-menu-surface[data-slot] :is([data-slot='context-menu-item'], [data-slot='dropdown-menu-item']) > svg {
  flex-shrink: 0;
- color: var(--sombra-menu-muted);
+ color: var(--muted-foreground);
 }
+
 .sombra-menu-surface[data-slot] [data-highlighted] > svg {
- color: var(--sombra-menu-highlight-text);
+ color: var(--accent-foreground);
 }
-.sombra-menu-surface[data-slot] [data-slot='select-item'][data-state='checked'] {
- color: #c9d9f5;
-}
+
 .sombra-menu-surface[data-slot] button:not(:disabled):hover {
- background: var(--sombra-menu-highlight);
- color: var(--sombra-menu-highlight-text);
+ color: var(--accent-foreground);
 }
+
 .sombra-menu-surface[data-slot] button:focus-visible {
- outline: 2px solid #8fa9d4;
+ outline: 2px solid var(--ring);
  outline-offset: 2px;
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
- .sombra-menu-surface[data-slot] {
-  background: var(--sombra-menu-solid);
- }
-}
-@media (prefers-reduced-transparency: reduce) {
- .sombra-menu-surface[data-slot] {
-  background: var(--sombra-menu-solid);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
- }
-}
+
 @media (forced-colors: active) {
  .sombra-menu-surface[data-slot] {
-  background: Canvas;
   color: CanvasText;
   border-color: ButtonText;
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
  }
  .sombra-menu-surface[data-slot] :is([role='menuitem'], [data-slot='select-item'])[data-highlighted] {
-  background: Highlight;
   color: HighlightText;
  }
 }

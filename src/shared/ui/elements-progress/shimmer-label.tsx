@@ -13,7 +13,7 @@ export function ShimmerLabel({active = true, className, ...props}: ComponentProp
    data-slot="shimmer-label"
    className={cn(
     active && [
-     'elements-shimmer bg-[linear-gradient(100deg,#8f97aa_20%,#eef1f9_50%,#8f97aa_80%)] [background-size:200%_100%]',
+     'elements-shimmer bg-muted [background-size:200%_100%]',
      'bg-clip-text text-transparent [-webkit-text-fill-color:transparent]',
      'animate-[elements-shimmer-sweep_1.9s_linear_infinite] motion-reduce:animate-none'
     ],

@@ -1,9 +1,9 @@
-import type {RefObject} from 'react';
+import type {ReactNode, RefObject} from 'react';
 // Порядок импортов задаёт порядок каскада: стили разделов грузятся до стилей окна.
 import {AccountSecurity} from '@/features/account-security';
 import {ProfileDecorationPicker} from '@/features/profile-decoration';
 import {ProfileMediaDialog} from '@/features/profile-media';
-import {AccountSettingsModal} from './account-settings-modal';
+import {AccountSettingsModal, accountSections} from '@/features/account-settings';
 import {AttachmentCacheSettings} from '@/features/account-storage';
 import {DiagnosticJournal} from '@/features/account-diagnostics';
 import {NotificationSettings} from '@/features/account-notifications';
@@ -12,7 +12,6 @@ import {StickerLibrary} from '@/entities/sticker';
 import {VoiceSettings} from '@/features/voice-room';
 import type {Voice} from '@/features/voice-room';
 import type {ChatState} from '@/shared/types';
-import {accountSections} from './account-sections';
 import type {ChatPanelsModel} from '../model/use-chat-panels';
 import type {ChatStateModel} from '../model/use-chat-state';
 
@@ -22,10 +21,11 @@ type Props = {
  panels: ChatPanelsModel;
  call: Voice;
  panelRef: RefObject<HTMLDivElement | null>;
+ appearanceSettings: ReactNode;
 };
 
 /** Окно настроек аккаунта: раздел выбирается панелью, содержимое — срезами ниже. */
-export function ChatSettingsModal({chat, state, panels, call, panelRef}: Props) {
+export function ChatSettingsModal({chat, state, panels, call, panelRef, appearanceSettings}: Props) {
  if (!panels.settings) return null;
  return (
   <AccountSettingsModal
@@ -38,7 +38,9 @@ export function ChatSettingsModal({chat, state, panels, call, panelRef}: Props) 
    onClose={panels.actions.closeSettings}
    panelRef={panelRef}
   >
-   {panels.accountSection === 'journal' ? (
+   {panels.accountSection === 'appearance' ? (
+    appearanceSettings
+   ) : panels.accountSection === 'journal' ? (
     <DiagnosticJournal />
    ) : panels.accountSection === 'updates' ? (
     <UpdateSettings inCall={!!call.room || call.busy} />

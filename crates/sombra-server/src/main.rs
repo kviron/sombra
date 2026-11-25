@@ -127,6 +127,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if args[0] == "--configure-bot" {
             return configure_bot(&directory, &args);
         }
+        if args[0] == "--provision-livekit-room" {
+            if args.len() != 2 || std::env::var("SOMBRA_OFFLINE_MAINTENANCE").as_deref() != Ok("1") {
+                return Err("Stop Sombra, back up its database, set SOMBRA_OFFLINE_MAINTENANCE=1 and pass the group ID".into());
+            }
+            let group = args[1].to_str().ok_or("Group ID must be UTF-8")?;
+            let database = directory.join("mines-db.json");
+            if !database.is_file() {
+                return Err("Existing Sombra database not found".into());
+            }
+            let mut store = sombra_core::backend::Backend::open(database).map_err(std::io::Error::other)?;
+            println!("{}", store.provision_livekit_room_offline(group).map_err(std::io::Error::other)?);
+            return Ok(());
+        }
         return Err(std::io::Error::other("Unknown server argument").into());
     }
     let store =

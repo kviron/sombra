@@ -1,8 +1,9 @@
 import {useId} from 'react';
-import {Checkbox, Dialog as RadixDialog} from 'radix-ui';
-import {Check, LoaderCircle, Search, X} from 'lucide-react';
+import {Dialog as RadixDialog} from 'radix-ui';
+import {LoaderCircle, Search, X} from 'lucide-react';
 import {type ChatState, type Dialog, type User} from '@/shared/types';
 import {Button} from '@/shared/ui/button';
+import {Checkbox} from '@/shared/ui/checkbox';
 import {Input} from '@/shared/ui/input';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {UserRow} from '@/entities/user';
@@ -50,17 +51,7 @@ function SelectionRow({
      subtitle={user.bot ? 'Бот · только личный диалог' : friend ? 'В друзьях' : 'Общая группа'}
     />
    </button>
-   <Checkbox.Root
-    className="border-input bg-background text-primary-foreground data-[state=checked]:border-primary data-[state=checked]:bg-primary grid size-[22px] shrink-0 cursor-pointer place-items-center rounded-[5px] border p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-50 [&>span]:grid [&>span]:place-items-center"
-    checked={checked}
-    disabled={disabled}
-    onCheckedChange={onChange}
-    aria-label={`Выбрать: ${user.name}`}
-   >
-    <Checkbox.Indicator>
-     <Check size={14} aria-hidden="true" />
-    </Checkbox.Indicator>
-   </Checkbox.Root>
+   <Checkbox checked={checked} disabled={disabled} onCheckedChange={onChange} aria-label={`Выбрать: ${user.name}`} />
   </div>
  );
 }

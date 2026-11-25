@@ -73,6 +73,22 @@ export function insertedMention(offset: number, token: string, text: string) {
 /** Локальная команда поиска убирает пробел, оставшийся после вставки. */
 export const withoutLeadingSpace = (text: string) => (text.startsWith(' ') ? text.slice(1) : text);
 
+type ComposerTextSource = {
+ getState(): {text: string};
+ subscribe(listener: () => void): () => void;
+};
+
+/** Изменение доступности отправки тоже будит подписчиков, но это не ввод текста. */
+export function subscribeComposerText(composer: ComposerTextSource, onText: (text: string) => void) {
+ let observedText = composer.getState().text;
+ return composer.subscribe(() => {
+  const {text} = composer.getState();
+  if (text === observedText) return;
+  observedText = text;
+  onText(text);
+ });
+}
+
 export type LocalCommand = 'clear' | 'search';
 
 export const localCommand = (id: string): LocalCommand | undefined =>

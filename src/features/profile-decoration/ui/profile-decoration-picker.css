@@ -1,14 +1,14 @@
 /* Пикер украшений. Утилитами собраны раскладка, отступы, типографика и состояния,
    которые видит только это окно. Здесь осталось невыразимое:
    - классы .profile-media* — общий ресурс для account-security и settings-mira;
-   - оверлей: glass.css вешает на .profile-effects-overlay размытие подложки;
+   - оверлей: затемнение подложки даёт общее правило из app/styles/index.css;
    - токены меню и всё, что зависит от data-target окна;
    - слоты shared/ui (.profile-cover, .profile-cover-glow) и псевдоэлементы;
-   - цвета на color-mix(), @keyframes нет, медиа-условия и фокус-рамка. */
+   - @keyframes нет, медиа-условия и фокус-рамка. */
 
 /* ---------- .profile-media*: карточка профиля в настройках аккаунта ---------- */
 /* Разметку рисует features/account-security, переопределения — её же таблица
-   стилей и pages/chat/settings-mira.css; срез только держит базовые классы. */
+   стилей и features/account-settings/ui/settings-mira.css; срез только держит базовые классы. */
 .profile-media {
  display: grid;
  grid-template-columns: 148px minmax(0, 348px);
@@ -16,31 +16,36 @@
  gap: 16px;
  margin-bottom: 8px;
 }
+
 .profile-media-item {
  display: grid;
  gap: 8px;
  min-width: 0;
 }
+
 .profile-media-preview {
  position: relative;
  min-width: 0;
 }
+
 .profile-media-item[data-target='avatar'] .profile-media-preview {
  height: 148px;
  display: grid;
  place-items: center;
  border: 1px solid var(--border);
  border-radius: 16px;
- background: radial-gradient(80% 80% at 30% 20%, #2c3140, #171a21 70%);
 }
+
 .profile-media-preview .settings-cover-preview {
  margin: 0;
 }
+
 .profile-media-label {
  color: var(--muted-foreground);
  font-size: 12px;
  line-height: 16px;
 }
+
 .profile-media-controls {
  position: absolute;
  z-index: 2;
@@ -51,29 +56,28 @@
  opacity: 0;
  transition: opacity 150ms ease;
 }
+
 .profile-media-preview:hover .profile-media-controls,
 .profile-media-preview:focus-within .profile-media-controls {
  opacity: 1;
 }
+
 .profile-media-controls button {
  display: grid;
  place-items: center;
  width: 44px;
  height: 44px;
  padding: 0;
- border: 1px solid #ffffff30;
+ border: 1px solid var(--border);
  border-radius: 10px;
- background: #141720ee;
- color: #fff;
  cursor: pointer;
 }
-.profile-media-controls button:hover:not(:disabled) {
- background: #313744;
-}
+
 .profile-media-controls button:disabled {
  opacity: 0.5;
  cursor: default;
 }
+
 .profile-media-controls button:focus-visible,
 .profile-effect-card:focus-visible {
  outline: 2px solid var(--ring);
@@ -81,28 +85,13 @@
 }
 
 /* ---------- Окно пикера ---------- */
-/* Оверлей — hook для :is(...) из glass.css. */
 .profile-effects-overlay {
  position: fixed;
  inset: 0;
- background: color-mix(in srgb, var(--sombra-menu-solid) 80%, transparent);
  z-index: 1400;
 }
+
 /* Токены меню: окно живёт в «менюшной» палитре, а не в теме приложения. */
-.profile-effects-dialog {
- --popover: var(--sombra-menu-solid);
- --popover-foreground: var(--sombra-menu-text);
- --card: color-mix(in srgb, var(--sombra-menu-solid), var(--sombra-menu-text) 5%);
- --card-foreground: var(--sombra-menu-text);
- --muted-foreground: var(--sombra-menu-muted);
- --border: var(--sombra-menu-border);
- --accent: var(--sombra-menu-highlight);
- --accent-foreground: var(--sombra-menu-highlight-text);
- --primary: var(--sombra-menu-text);
- --primary-foreground: var(--sombra-menu-solid);
- --ring: var(--sombra-menu-muted);
- color: var(--popover-foreground);
-}
 /* Кнопки вкладок и подпись видимости остаются в CSS: hover обязан перебивать
    aria-pressed, а порядок одинаковых по весу утилит в слое этого не гарантирует. */
 .profile-effect-tabs button,
@@ -110,68 +99,58 @@
  min-height: 44px;
  padding: 0 8px;
  border: 0;
- background: transparent;
  color: var(--muted-foreground);
  cursor: pointer;
  font: inherit;
  font-size: 14px;
 }
+
 .profile-effect-tabs button {
  min-height: 36px;
  padding: 4px 14px;
  border-radius: 7px;
 }
+
 .profile-effect-tabs button[aria-pressed='true'] {
- background: var(--accent);
  color: var(--primary);
  font-weight: 600;
 }
+
 .profile-effect-tabs button:hover:not(:disabled),
 .profile-effect-visibility button:hover:not(:disabled) {
  color: var(--primary);
- background: var(--accent);
 }
+
 .profile-effect-tabs button:disabled,
 .profile-effect-visibility button:disabled {
  cursor: default;
  opacity: 0.6;
 }
+
 .profile-effect-visibility button {
  font-size: 12px;
  text-decoration: underline;
  text-underline-offset: 3px;
 }
+
 /* Футер формы начинается ниже последнего поля. */
 .profile-effect-form footer {
  margin-top: 8px;
 }
 
-/* Тёмная плашка под превью: цвет на color-mix, утилита его не выразит одинаково. */
-.profile-effect-tabs {
- background: color-mix(in srgb, var(--popover), #000 20%);
-}
-/* Тень ползунка — color-mix от --muted-foreground. */
-.profile-effects-thumb {
- background: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
-}
-.profile-effects-thumb:hover {
- background: var(--muted-foreground);
-}
-/* Превью эффекта: градиент из токенов окна. */
-.profile-effect-sample {
- background: radial-gradient(80% 80% at 30% 20%, var(--accent), var(--popover) 70%);
-}
 .profile-effects-dialog[data-target='avatar'] .profile-effect-sample {
  min-height: 100px;
 }
+
 /* .profile-cover и .profile-cover-glow — слоты shared/ui, классы не наши. */
 .profile-effect-sample .profile-cover {
  border-radius: 6px;
- background: radial-gradient(120% 150% at 12% 0%, var(--accent), var(--popover) 70%);
 }
+
 .profile-effect-sample .profile-cover-glow {
  display: none;
 }
+
 /* Геометрия картинки зависит от data-target всего окна. */
 .profile-effects-dialog[data-target='avatar'] .profile-effect-image {
  inset: 50% auto auto 50%;
@@ -180,24 +159,19 @@
  transform: translate(-50%, -50%);
  border-radius: 50%;
 }
+
 /* Общая фокус-рамка окна перебивает рамки shadcn-кнопок (они в слое). */
-.profile-effects-dialog :is(button, textarea, input):focus-visible {
+.profile-effects-dialog :is(button, textarea, input):not([data-slot]):focus-visible {
  outline: 2px solid var(--ring);
  outline-offset: 2px;
 }
-/* Кнопка закрытия — Button size=icon, размер задаёт окно. */
-.profile-effects-dialog header button {
- width: 44px;
- height: 44px;
- flex-shrink: 0;
-}
+
 /* ::file-selector-button утилитами не задать. */
 .profile-effect-upload input::file-selector-button {
  margin-right: 8px;
  padding: 8px;
  border: 1px solid var(--border);
  border-radius: 8px;
- background: var(--accent);
  color: var(--accent-foreground);
  font: inherit;
  cursor: pointer;
@@ -212,6 +186,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
  }
 }
+
 @media (max-width: 680px) {
  .profile-media {
   grid-template-columns: minmax(0, 348px);
@@ -220,12 +195,14 @@
   width: 148px;
  }
 }
+
 /* На сенсорном экране hover-действия показаны всегда. */
 @media (hover: none) {
  .profile-media-controls {
   opacity: 1;
  }
 }
+
 @media (prefers-reduced-motion: reduce) {
  .profile-media-controls {
   transition: none;

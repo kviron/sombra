@@ -18,6 +18,7 @@ import {
  musicCommandsFor,
  musicEnterPressed,
  roomMusicEnabled,
+ subscribeComposerText,
  withoutLeadingSpace
 } from './assistant-composer-rules';
 import {formatter, suggestionAdapter, threadMessages} from './assistant-composer';
@@ -46,21 +47,27 @@ export type AssistantComposerProps = {
  * Единственное место, где живёт логика поля помощника: синхронизация текста с рантаймом,
  * подсказки, вставка упоминаний и музыкальные команды. Компонент только раскладывает разметку.
  *
- * UI-рантайм внешнего хранилища ничего не отправляет: Sombra владеет черновиками,
- * вложениями и всеми сообщениями. Root перехватывает preventDefault, поэтому
- * оптимистичный сброс поля в runtime.send() не теряет черновик после ошибки сервера.
+ * Отправку ведёт Sombra. Если рантайм попытался отправить сообщение сам,
+ * обработчик onNew сигнализирует об ошибке интеграции.
  */
+async function rejectSubmission(): Promise<never> {
+ throw new Error('Sombra owns message submission');
+}
+
 export function useAssistantComposer(props: AssistantComposerProps) {
  const latest = useRef(props);
  latest.current = props;
- const runtime = useExternalStoreRuntime({
-  messages: threadMessages,
-  isDisabled: props.disabled,
-  isSendDisabled: props.sendDisabled,
-  onNew: async () => {
-   throw new Error('Sombra owns message submission');
-  }
- });
+ // Сохраняем ссылку на адаптер, пока доступность поля и отправки не меняется.
+ const runtimeOptions = useMemo(
+  () => ({
+   messages: threadMessages,
+   isDisabled: props.disabled,
+   isSendDisabled: props.sendDisabled,
+   onNew: rejectSubmission
+  }),
+  [props.disabled, props.sendDisabled]
+ );
+ const runtime = useExternalStoreRuntime(runtimeOptions);
  const syncing = useRef(false);
  const pendingMention = useRef<{start: number; token: string} | null>(null);
  const mentionFormatter = useMemo(
@@ -78,22 +85,23 @@ export function useAssistantComposer(props: AssistantComposerProps) {
  );
 
  // Текст поля — источник правды: черновик приходит сверху, рантайм только отражает его.
+ // Равные значения не толкаем: setText уведомляет подписчиков, и лишний вызов
+ // превращается в цикл «черновик → рантайм → черновик».
  useEffect(() => {
+  const composer = runtime.thread.composer;
+  if (composer.getState().text === props.draft) return;
   syncing.current = true;
-  runtime.thread.composer.setText(props.draft);
+  composer.setText(props.draft);
   syncing.current = false;
  }, [runtime, props.draft]);
 
- // Правка в рантайме возвращается в черновик, но не переписывает его тем же значением.
- useEffect(
-  () =>
-   runtime.thread.composer.subscribe(() => {
-    if (syncing.current) return;
-    const text = runtime.thread.composer.getState().text;
-    if (text !== latest.current.draft) latest.current.setDraft(text);
-   }),
-  [runtime]
- );
+ // Изменение isSendDisabled тоже уведомляет подписчиков. При очистке черновика
+ // это происходит до setText: старый текст нельзя принять за новый ввод.
+ useEffect(() => {
+  return subscribeComposerText(runtime.thread.composer, text => {
+   if (!syncing.current && text !== latest.current.draft) latest.current.setDraft(text);
+  });
+ }, [runtime]);
 
  const mentions = useMemo(
   () => mentionCandidates(props.state, props.channel, props.group),

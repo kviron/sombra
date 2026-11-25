@@ -1,29 +1,33 @@
 /* Чат: раскладка живёт в className компонентов, здесь остаются нелейерные правила,
    которые утилиты Tailwind не перебивают (общие кнопки чата, hover/focus, @media,
    :has(), ::-webkit-scrollbar, переопределения общих компонентов и токены). */
-.chat-shell button:not(.sombra-assistant-composer button) {
+.chat-shell button:not([data-slot], .sombra-assistant-composer button) {
  display: flex;
  align-items: center;
  gap: 7px;
-} /* Centering is only a default; component layout wins regardless of import order. */
-.chat-shell :where(button:not(.sombra-assistant-composer button)) {
+}
+
+/* Centering is only a default; component layout wins regardless of import order. */
+.chat-shell :where(button:not([data-slot], .sombra-assistant-composer button)) {
  justify-content: center;
 }
-.chat-shell button:focus-visible,
-.chat-shell input:focus-visible,
+
+.chat-shell button:not([data-slot]):focus-visible,
+.chat-shell input:not([data-slot]):focus-visible,
 .chat-shell a:focus-visible {
- outline: 2px solid #8c92ff;
+ outline: 2px solid var(--ring);
  outline-offset: 2px;
 }
+
 .server.active:before {
  content: '';
  position: absolute;
  left: -17px;
  width: 4px;
  height: 34px;
- background: #ddd;
  border-radius: 4px;
 }
+
 /* Клик по каналу: общий .chat-shell button задаёт justify-content и gap, поэтому
    начало строки и зазор держим здесь с !important, как было до миграции. */
 .channel {
@@ -31,65 +35,69 @@
  gap: 10px !important;
  text-align: left;
 }
-.channel-sidebar > header button {
+
+.chat-shell {
+ --chat-header-height: 50px;
+}
+
+.chat-header {
+ height: var(--chat-header-height);
+}
+
+.sidebar-header {
+ /* The sidebar's top border sits above its header. */
+ height: calc(var(--chat-header-height) - 1px);
+}
+
+.dialog-search-header .new-dialog {
  margin-left: auto;
 }
-/* Общая кнопка профиля: общий .chat-shell button задаёт display и gap, а цвет
-   поверхности приходит из glass.css — правило остаётся нелейерным. */
+
+/* Общая кнопка профиля: общий .chat-shell button задаёт display и gap, цвет — тема. */
 .profile button {
- color: #92929b;
  padding: 3px;
 }
+
 .avatar {
  width: 32px;
  height: 32px;
  border-radius: 50%;
- background: linear-gradient(135deg, #748caf, #282137);
  display: grid;
  place-items: center;
  position: relative;
 }
+
 .avatar span {
  position: absolute;
  bottom: -1px;
  right: 0;
  width: 11px;
  height: 11px;
- border: 2px solid #09090a;
+ border: 2px solid var(--border);
  border-radius: 50%;
- background: #43ad70;
 }
+
 /* Обёртка области переписки приходит из features/message-composer
    (.conversation в AttachmentDropZone): размеры задаём здесь, утилит в чужом срезе нет. */
 .conversation {
+ min-height: 0;
  min-width: 0;
  flex: 1;
  display: flex;
  flex-direction: column;
 }
-.header-actions {
- color: #86868e;
-}
-/* Поиск: glass.css переопределяет фон, рамку и радиус нелейерным правилом,
-   поэтому утилиты слоя здесь проиграли бы — значения остаются в CSS. */
-.chat-search {
- display: flex;
- align-items: center;
- border: 1px solid #28282c;
- border-radius: 8px;
- height: 32px;
- padding: 0 8px;
-}
+
+/* Поиск: рамка и радиус нелейерные, утилиты слоя здесь проиграли бы — значения в CSS. */
 .small-button {
  display: inline-flex !important;
  align-items: center;
  gap: 6px;
- background: #121214;
- border: 1px solid #2a2a2e;
+ border: 1px solid var(--border);
  border-radius: 7px;
  padding: 8px 12px;
  font-size: 13px;
 }
+
 .composer {
  display: flex;
  align-items: center;
@@ -98,59 +106,69 @@
  min-height: 58px;
  margin: 8px 8px 8px;
  padding: 12px 18px;
- border: 1px solid #303034;
- background: #101012;
+ border: 1px solid var(--border);
  border-radius: 8px;
- color: #909098;
 }
+
 .composer input {
  flex: 1;
  min-width: 0;
  background: none;
  outline: none;
- color: #ddd;
 }
-.composer input::placeholder {
- color: #6e6e78;
-}
+
 .composer button:disabled {
  opacity: 0.65;
  cursor: default;
 }
+
 .voice-stage {
  flex: 1;
- min-height: 250px;
  display: flex;
  flex-direction: column;
  align-items: center;
  justify-content: center;
- background: radial-gradient(ellipse at 50% 120%, #8796ef 0, #424ac1 35%, #1d1c53 70%, #0e0d17 100%);
 }
+
+@media (hover: hover) and (pointer: fine) {
+ .voice-stage-region:not(:hover) .voice-controls[data-auto-hide]:not(:focus-within) {
+  opacity: 0;
+  pointer-events: none;
+ }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+ .voice-stage-region:not(:hover) .voice-controls[data-auto-hide]:not(:focus-within) {
+  transform: translateY(100%);
+ }
+}
+
 .voice-stage h1 {
  font-size: 32px;
  font-weight: bold;
 }
+
 .voice-stage p {
  margin: 14px 0 26px;
 }
+
 .voice-stage button {
  padding: 12px 17px;
- background: white;
- color: #111;
  border-radius: 7px;
 }
-/* Подложка модалок — общий хук: glass.css добавляет отступ сверху, фон и блюр,
-   а утилиты слоя эти нелейерные значения не перебивают. */
+
+/* Подложка модалок: отступ сверху от полосы заголовка и затемнение —
+   общее правило из app/styles/index.css. */
 .modal-backdrop {
  position: fixed;
  inset: 0;
- background: #000b;
  z-index: 50;
  display: flex;
  align-items: center;
  justify-content: center;
  padding: 40px;
 }
+
 .account-modal {
  width: 1400px;
  max-width: 100%;
@@ -159,87 +177,89 @@
  border-radius: 12px;
  overflow: hidden;
 }
+
 .account-modal > aside {
  width: 270px;
  padding: 28px 18px;
- border-right: 1px solid #222;
+ border-right: 1px solid var(--border);
  flex-shrink: 0;
 }
+
 .account-modal p {
- color: #929299;
  line-height: 1.5;
  margin: 18px 0;
 }
+
 .account-modal aside button {
  width: 100%;
  justify-content: flex-start;
  padding: 12px;
  border-radius: 8px;
- background: #222;
 }
+
 .account-modal hr {
  margin: 40px 0;
- border-color: #222;
 }
+
 .account-modal article {
  flex: 1;
  min-width: 0;
  overflow: auto;
 }
+
 .account-modal article header {
  display: flex;
  justify-content: space-between;
  padding: 16px;
- border-bottom: 1px solid #222;
+ border-bottom: 1px solid var(--border);
 }
+
 .account-modal article > div {
  max-width: 750px;
  margin: auto;
  padding: 60px 28px;
 }
+
 .account-modal h2,
 .group-modal h2 {
  font-size: 24px;
  font-weight: 600;
  margin-bottom: 32px;
 }
+
 .account-modal label {
  display: flex;
  justify-content: space-between;
  gap: 20px;
  margin: 36px 0;
 }
+
 .account-modal a {
  display: inline-flex;
  gap: 8px;
  align-items: center;
 }
+
 .group-modal {
+ background: var(--background);
  max-width: 440px;
  padding: 28px;
  border-radius: 12px;
 }
+
 .group-modal p {
- color: #aaa;
  line-height: 1.5;
 }
-.group-modal input {
+
+.group-modal input:not([data-slot]) {
  width: 100%;
- background: #000;
  padding: 12px;
- border: 1px solid #333;
+ border: 1px solid var(--border);
  border-radius: 6px;
  margin: 22px 0;
 }
-.group-modal > div {
- display: flex;
- justify-content: flex-end;
- gap: 18px;
-}
+
 @media (max-width: 1100px) {
- .channel-sidebar {
-  width: 240px;
- }
  .server-rail {
   width: 60px;
   padding: 0 10px;
@@ -254,10 +274,8 @@
   width: 220px;
  }
 }
+
 @media (max-width: 760px) {
- .channel-sidebar {
-  width: 190px;
- }
  .header-actions > button {
   display: none;
  }
@@ -273,9 +291,6 @@
  .profile-name {
   font-size: 12px;
  }
- .account-modal > aside {
-  display: none;
- }
  .modal-backdrop {
   padding: 16px;
  }
@@ -284,26 +299,16 @@
 /* Заголовок окна приложения: общий title bar переопределяется только в чате. */
 .chat-window > header {
  height: 32px;
- background: #000;
- color: #c9c9ce;
  border: 0;
  font-family: Arial, sans-serif;
 }
-.chat-window > header > div:first-child {
- position: static;
- transform: none;
-}
-.chat-window > header > div:first-child [data-slot='badge'] {
- display: none;
-}
+
 .chat-window > header > div:last-child {
  margin-left: auto;
 }
+
 .chat-window > header > div:last-child > button {
  display: none;
-}
-.chat-window > header button {
- color: #94949d;
 }
 
 .composer textarea {
@@ -311,83 +316,30 @@
  min-width: 0;
  background: none;
  outline: none;
- color: #ddd;
  resize: none;
  max-height: 140px;
  line-height: 22px;
 }
+
 .channel-kind {
  display: flex;
  flex-direction: column;
  gap: 10px;
  margin-bottom: 24px;
 }
+
 .channel-kind select {
  padding: 12px;
- background: #09090a;
- color: #ddd;
- border: 1px solid #333;
+ border: 1px solid var(--border);
  border-radius: 6px;
 }
-.voice-layout {
- display: grid;
- grid-template-columns: minmax(0, 1fr) 340px;
- grid-template-rows: 1fr auto;
-}
-.voice-layout .voice-stage {
- grid-column: 1;
- grid-row: 1 / 3;
- text-align: center;
- padding: 24px;
-}
-.voice-layout .voice-messages {
- grid-column: 2;
- grid-row: 1;
- overflow: auto;
- padding: 16px;
- border-left: 1px solid #222;
-}
+
 .voice-messages h3 {
  padding-bottom: 18px;
- border-bottom: 1px solid #222;
+ border-bottom: 1px solid var(--border);
 }
-.voice-layout .composer {
- grid-column: 2;
- grid-row: 2;
-}
-.voice-layout > div:empty {
- display: none;
-}
-@media (max-width: 1000px) {
- .voice-layout {
-  grid-template-columns: 1fr;
-  grid-template-rows: minmax(180px, 1fr) auto auto;
- }
- .voice-layout .voice-stage {
-  grid-row: 1;
- }
- .voice-layout .voice-messages {
-  grid-column: 1;
-  grid-row: 2;
-  max-height: 160px;
- }
- .voice-layout .composer {
-  grid-column: 1;
-  grid-row: 3;
- }
-}
-
-/* Compact channel introduction and history. */
-.message-scroll {
- min-height: 0;
- padding: 16px;
- justify-content: flex-start;
-}
-/* The composer (and the activity rows above it) float over the transcript. The
-   variable is written by the ResizeObserver in live-chat.tsx from the measured
-   composer height, so the last message, its time and its attachment always clear
-   the panel at one or five lines, with an attachment chip, and at 720x520. */
-.chat-main:not(.voice-layout) > .message-scroll {
+/* The floating composer is outside the viewport; reserve room inside its transcript. */
+.chat-message-scroller [data-slot='message-scroller-content'] {
  padding-bottom: calc(var(--sombra-composer-height, 0px) + 24px);
 }
 .chat-main > .composer {
@@ -395,150 +347,44 @@
  padding: 9px 14px;
  gap: 14px;
 }
+
 .account-modal .login-input {
  max-width: 340px;
  width: 55%;
 }
+
 .account-modal .login-input {
- background: #111217;
- color: #e4e4e7;
- border: 1px solid #34353b;
+ border: 1px solid var(--border);
  border-radius: 8px;
  padding: 10px 12px;
  outline-offset: 3px;
 }
+
 .account-modal .login-input:focus-visible {
- outline: 2px solid #8c90ff;
+ outline: 2px solid var(--ring);
 }
 
-/* Drag the existing column boundaries without adding visual chrome. */
-.channel-sidebar {
- position: relative;
- width: min(var(--channel-width, 274px), calc(100vw - 420px));
-}
 .member-list {
- position: relative;
- flex-shrink: 0;
- width: var(--member-width, 210px);
- max-width: 45%;
  overflow-wrap: anywhere;
- /* user.css задаёт списку участников свой отступ; чат перекрывает его, потому
-    значение живёт здесь, а не в утилите: утилита слоя проиграла бы user.css. */
- padding: 24px 15px;
-}
-.voice-layout {
- position: relative;
- --voice-panel-size: min(var(--voice-chat-width, clamp(340px, 23.5vw, 450px)), 60%);
- grid-template-columns: minmax(0, 1fr) var(--voice-panel-size);
-}
-.column-resizer {
- position: absolute;
- top: 0;
- bottom: 0;
- width: 8px;
- z-index: 10;
- cursor: col-resize;
- touch-action: none;
- user-select: none;
-}
-.column-resizer-right {
- right: -4px;
-}
-.column-resizer-left {
- left: -4px;
-}
-.column-resizer::after {
- content: '';
- position: absolute;
- inset: 0 3px;
- background: transparent;
- transition: background 0.15s;
-}
-.column-resizer:hover::after,
-.column-resizer.is-dragging::after,
-.column-resizer:focus-visible::after {
- background: #8c92ff;
-}
-.column-resizer:focus-visible {
- outline: 1px solid #8c92ff;
- outline-offset: -1px;
-}
-.voice-layout > .column-resizer {
- left: auto;
- right: calc(var(--voice-panel-size) - 4px);
-}
-@media (max-width: 1100px) {
- .channel-sidebar {
-  width: min(var(--channel-width, 240px), calc(100vw - 420px));
- }
-}
-@media (max-width: 1000px) {
- .voice-layout {
-  grid-template-columns: 1fr;
- }
- .voice-layout > .column-resizer {
-  display: none;
- }
-}
-@media (max-width: 760px) {
- .channel-sidebar {
-  width: min(var(--channel-width, 190px), calc(100vw - 420px));
- }
-}
-
-@media (min-width: 1001px) {
- .voice-layout > .column-resizer:empty {
-  display: block;
- }
-}
-
-/* Channel controls are siblings so settings never select or join a room. */
-/* Строка канала и её кнопка настройки: общий .chat-shell button задаёт display и
-   gap, а фон строки перекрашивают hover-правила ниже — раскладка остаётся здесь. */
-.chat-shell .channel-row:hover {
- background: #d2e0fa21;
 }
 .chat-shell .channel-row .channel {
  flex: 1;
  min-width: 0;
  width: auto;
  margin-bottom: 0;
- background: transparent;
 }
-/* The row owns the highlight; the generic button hover must not paint a second surface. */
-.chat-shell .channel-row > button.channel:hover {
- background-color: transparent;
-}
+
 .chat-shell .channel-row .channel-settings {
- background: transparent;
  opacity: 0;
  pointer-events: none;
 }
+
 .chat-shell .channel-row:hover .channel-settings,
-.chat-shell .channel-row .channel-settings:focus-visible {
+.chat-shell .channel-row:focus-within .channel-settings {
  opacity: 1;
  pointer-events: auto;
 }
-.chat-shell .channel-row .channel-settings:hover,
-.chat-shell .channel-row .channel-settings:focus-visible {
- color: #fff;
- background: transparent;
-}
 
-.chat-shell .channel-row.selected {
- background: rgba(255, 255, 255, 0.1);
- box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-}
-.chat-shell .channel-row .channel.selected {
- background: transparent;
- box-shadow: none;
- border-color: transparent;
-}
-
-/* Home: searchable conversation list, following the supplied Telegram reference. */
-.dialog-search:focus-within {
- border-color: #8c92ff;
-}
 /* Строка переписки — общий UserRow: user.css задаёт min-height и отступы,
    поэтому строка списка остаётся нелейерным переопределением. */
 .chat-shell .dialog-row {
@@ -550,53 +396,17 @@
  justify-content: flex-start;
  border-radius: 8px;
 }
-.chat-shell .dialog-row.selected {
- background: rgba(125, 145, 180, 0.22);
- color: #f2f3f7;
-}
 
-/* The account panel spreads over the whole left area (server rail + channel sidebar)
-   and stays pinned to the window bottom. It is still rendered inside the sidebar, so
-   the column resizer keeps measuring the shell; the extra width overflows to the left
-   over the rail. Lists reserve the panel height, so nothing ends behind it. */
-.chat-shell {
- --sombra-rail-width: 72px;
-}
-@media (max-width: 1100px) {
- .chat-shell {
-  --sombra-rail-width: 60px;
- }
-}
 .profile {
- position: absolute;
- left: calc(-1 * var(--sombra-rail-width, 72px) - 1px);
- right: -1px;
- bottom: 0;
- z-index: 3;
- height: 58px;
+ flex: 0 0 58px;
  min-width: 0;
  overflow: hidden;
 }
-.chat-shell .channel-sidebar .channel-list {
- padding-bottom: 66px;
+
+.chat-message-scroller .chat-transcript-scroll-button[data-direction='end'] {
+ bottom: calc(var(--sombra-composer-height, 0px) + 16px);
 }
-.server-rail {
- padding-bottom: 66px;
-}
-/* Positioning context for the floating composer and its activity rows. */
-.chat-shell .chat-scroll-down {
- position: absolute;
- z-index: 2;
- right: 22px;
- bottom: calc(var(--sombra-composer-height, 0px) + 20px);
- width: 42px;
- height: 42px;
- border: 1px solid #36363d;
- border-radius: 50%;
- color: #eee;
- background: #202024;
- box-shadow: 0 3px 12px #0008;
-}
+
 .chat-scroll-unread {
  position: absolute;
  top: -9px;
@@ -605,13 +415,13 @@
  min-width: 22px;
  padding: 2px 4px;
  border-radius: 999px;
- background: var(--primary);
  color: var(--primary-foreground);
  font-size: 11px;
  line-height: 16px;
  text-align: center;
  font-variant-numeric: tabular-nums;
 }
+
 @media (max-width: 760px) {
  .profile {
   padding: 6px 8px;

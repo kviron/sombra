@@ -1,4 +1,4 @@
-import {useEffect, useRef} from 'react';
+import {useEffect, useMemo, useRef} from 'react';
 import type {ChatState} from '@/shared/types';
 import {messageService} from './services/message-service';
 
@@ -45,7 +45,7 @@ export function observeMessageReads({
   batch = undefined;
  }
  function dwell(id: string) {
-  if (!allowed() || completed.has(id) || queued.has(id) || timers.has(id)) return;
+  if (completed.has(id) || queued.has(id) || timers.has(id) || !allowed()) return;
   timers.set(
    id,
    setTimeout(() => {
@@ -96,7 +96,7 @@ export function observeMessageReads({
   entries => {
    for (const entry of entries) {
     const id = (entry.target as HTMLElement).dataset.readMessageId;
-    if (!id) continue;
+    if (!id || !root.contains(entry.target)) continue;
     const viewport = entry.rootBounds?.height || window.innerHeight;
     if (
      entry.isIntersecting &&
@@ -115,25 +115,44 @@ export function observeMessageReads({
   },
   {root, threshold: Array.from({length: 101}, (_, i) => i / 100)}
  );
- const observed = new Set<Element>();
- function scan() {
-  for (const element of root.querySelectorAll<HTMLElement>('[data-read-message-id]')) {
-   if (eligible.has(element.dataset.readMessageId || '') && !observed.has(element)) {
-    observed.add(element);
-    observer.observe(element);
-   }
-  }
-  if (!allowed()) stop();
-  else for (const id of visible) dwell(id);
+ const observed = new Set<HTMLElement>();
+ const rowSelector = '[data-read-message-id]';
+ function observeRow(element: HTMLElement) {
+  if (!root.contains(element) || !eligible.has(element.dataset.readMessageId || '') || observed.has(element)) return;
+  observed.add(element);
+  observer.observe(element);
  }
- const mutation = new MutationObserver(scan);
+ function unobserveRow(element: HTMLElement) {
+  if (root.contains(element) || !observed.delete(element)) return;
+  observer.unobserve(element);
+  const id = element.dataset.readMessageId;
+  if (!id) return;
+  visible.delete(id);
+  queued.delete(id);
+  const timer = timers.get(id);
+  if (timer) clearTimeout(timer);
+  timers.delete(id);
+ }
+ function visitRows(node: Node, visit: (element: HTMLElement) => void) {
+  if (!(node instanceof HTMLElement)) return;
+  if (node.matches(rowSelector)) visit(node);
+  node.querySelectorAll<HTMLElement>(rowSelector).forEach(visit);
+ }
+ // Changes elsewhere (menus, panels, typing) can pause reads but must not rescan the transcript.
+ const mutation = new MutationObserver(records => {
+  const inTranscript = records.filter(record => record.type === 'childList' && root.contains(record.target));
+  for (const record of inTranscript) record.removedNodes.forEach(node => visitRows(node, unobserveRow));
+  for (const record of inTranscript) record.addedNodes.forEach(node => visitRows(node, observeRow));
+  attention();
+ });
  mutation.observe(document.body, {
   childList: true,
   subtree: true,
   attributes: true,
   attributeFilter: ['role', 'data-state']
  });
- scan();
+ root.querySelectorAll<HTMLElement>(rowSelector).forEach(observeRow);
+ attention();
  function attention() {
   if (!allowed()) stop();
   else for (const id of visible) dwell(id);
@@ -142,6 +161,7 @@ export function observeMessageReads({
   disposed = true;
   stop();
   observer.disconnect();
+  mutation.disconnect();
  };
  window.addEventListener('authchange', auth);
  document.addEventListener('visibilitychange', attention);
@@ -170,23 +190,19 @@ export function useMessageReadState(
  const accepted = useRef(onRead);
  accepted.current = onRead;
  const actor = state?.me.id || '';
- const ids =
-  state?.messages
-   .filter(m => m.channel === channel && m.user !== actor)
-   .map(m => m.id)
-   .join('\n') || '';
+ const canRead = state?.readReceiptsSupported && !state.me.bot;
+ const messages = state?.messages;
+ const ids = useMemo(
+  () =>
+   messages
+    ?.filter(m => m.channel === channel && m.user !== actor)
+    .map(m => m.id)
+    .join('\n') || '',
+  [messages, actor, channel]
+ );
  useEffect(() => {
-  if (
-   !state?.readReceiptsSupported ||
-   state.me.bot ||
-   !actor ||
-   !channel ||
-   blocked ||
-   typeof IntersectionObserver === 'undefined'
-  )
-   return;
-  const root =
-   document.querySelector<HTMLElement>('.voice-messages') || document.querySelector<HTMLElement>('.message-scroll');
+  if (!canRead || !actor || !channel || blocked || typeof IntersectionObserver === 'undefined') return;
+  const root = document.querySelector<HTMLElement>('[data-slot="message-scroller-viewport"]');
   if (!root) return;
   return observeMessageReads({
    root,
@@ -196,5 +212,5 @@ export function useMessageReadState(
    send: messages => messageService.markRead({channel, messages}),
    onRead: ids => accepted.current?.(ids)
   });
- }, [actor, channel, blocked, state?.readReceiptsSupported, ids]);
+ }, [actor, channel, blocked, canRead, ids]);
 }

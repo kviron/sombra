@@ -1,10 +1,15 @@
 import {tauri} from '@/shared/api';
-import '@fontsource-variable/geist';
+import '@/app/styles/index.css';
 import {flushSync} from 'react-dom';
 import {createRoot} from 'react-dom/client';
-import {DirectMessageToast, type DirectMessage} from '@/features/notifications/index.popup';
-import {validNotificationTarget} from '@/features/notifications/index.popup';
+import {
+ DirectMessageToast,
+ MESSAGE_NOTIFICATION_DURATION_MS,
+ validNotificationTarget,
+ type DirectMessage
+} from '@/features/notifications/index.popup';
 import {ErrorBoundary} from '@/app/providers/ErrorBoundary';
+import {applyTheme} from '@/app/providers/ThemeProvider';
 
 const container = document.getElementById('notifications')!;
 const root = createRoot(container);
@@ -12,6 +17,7 @@ const messages = new Map<number, {message: DirectMessage; timer: number}>();
 let nextId = 0;
 
 function render() {
+ applyTheme();
  flushSync(() => {
   root.render(
    [...messages].map(([id, {message}]) => (
@@ -57,7 +63,7 @@ await tauri.events.listenCurrentWindow<DirectMessage>('direct-message-popup', pa
  const timer = window.setTimeout(() => {
   remove(id);
   render();
- }, 5500);
+ }, MESSAGE_NOTIFICATION_DURATION_MS);
  messages.set(id, {message: payload, timer});
  render();
 });

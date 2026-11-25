@@ -30,6 +30,10 @@ const MAX_URL_BYTES: usize = 2048;
 #[serde(rename_all = "camelCase")]
 struct Source {
     title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    artist: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cover_url: Option<String>,
     url: String,
     duration_ms: u64,
 }
@@ -226,6 +230,8 @@ impl Catalog {
                 entry.url.clone(),
                 Source {
                     title: entry.title,
+                    artist: None,
+                    cover_url: None,
                     url: entry.url,
                     duration_ms: entry.duration_ms,
                 },
@@ -343,7 +349,19 @@ impl Playback {
                 self.queue.clear();
                 self.start(None, at);
             }
-            "pause" | "resume" | "skip" | "stop" => (),
+            "shuffle" if self.queue.len() > 1 => {
+                use ring::rand::SecureRandom;
+                let mut random = vec![0; 4 * (self.queue.len() - 1)];
+                ring::rand::SystemRandom::new()
+                    .fill(&mut random)
+                    .map_err(|_| "MUSIC_SHUFFLE_FAILED")?;
+                for (index, bytes) in (1..self.queue.len()).rev().zip(random.chunks_exact(4)) {
+                    let choice = u32::from_le_bytes(bytes.try_into().unwrap()) as usize % (index + 1);
+                    self.queue.swap(index, choice);
+                }
+                self.revision += 1;
+            }
+            "pause" | "resume" | "skip" | "stop" | "shuffle" => (),
             _ => return Err("MUSIC_INVALID_ACTION".into()),
         }
         Ok(())
@@ -544,6 +562,21 @@ struct ResolvedTrack {
     id: String,
     title: String,
     duration_ms: u64,
+    artist: Option<String>,
+    cover_url: Option<String>,
+}
+
+fn music_cover_url(value: &str) -> bool {
+    value.len() <= 450 && Url::parse(value).is_ok_and(|url| {
+        url.scheme() == "https"
+            && matches!(url.host_str(), Some("avatars.yandex.net" | "avatars.mds.yandex.net"))
+            && url.username().is_empty()
+            && url.password().is_none()
+            && url.port().is_none()
+            && url.query().is_none()
+            && url.fragment().is_none()
+            && url.path().bytes().all(|c| c.is_ascii_alphanumeric() || b"/-._".contains(&c))
+    })
 }
 
 impl ResolvedTrack {
@@ -565,6 +598,9 @@ impl ResolvedTrack {
             id,
             source: Source {
                 title: title.into(),
+                artist: self.artist.filter(|value| !value.trim().is_empty()
+                    && value.chars().count() <= 120 && !value.chars().any(char::is_control)),
+                cover_url: self.cover_url.filter(|value| music_cover_url(value)),
                 url: String::new(),
                 duration_ms: self.duration_ms,
             },
@@ -670,6 +706,8 @@ impl PrivateTrack {
             key,
             source: Source {
                 title: config.title,
+                artist: None,
+                cover_url: None,
                 url: String::new(),
                 duration_ms: config.duration_ms,
             },
@@ -1442,6 +1480,43 @@ mod tests {
         assert_eq!(p.position(after(at, 100)), 0);
         p.command("stop", None, after(at, 200)).unwrap();
         assert!(p.track.is_none() && p.queue.is_empty());
+    }
+
+    #[test]
+    fn shuffle_preserves_current_track_position_and_queue_membership() {
+        let mut playback = Playback::default();
+        let at = Instant::now();
+        let catalog = catalog();
+        for _ in 0..5 {
+            playback.command("add", Some(catalog.resolve(FIXTURE_URL).unwrap()), at).unwrap();
+        }
+        let current = playback.track.as_ref().unwrap().id.clone();
+        let mut before: Vec<_> = playback.queue.iter().map(|track| track.id.clone()).collect();
+        let revision = playback.revision;
+        playback.command("shuffle", None, after(at, 350)).unwrap();
+        let mut after_shuffle: Vec<_> = playback.queue.iter().map(|track| track.id.clone()).collect();
+        before.sort();
+        after_shuffle.sort();
+        assert_eq!(before, after_shuffle);
+        assert_eq!(playback.track.as_ref().unwrap().id, current);
+        assert_eq!(playback.position(after(at, 350)), 350);
+        assert_eq!(playback.revision, revision + 1);
+    }
+
+    #[test]
+    fn provider_metadata_only_exposes_approved_cover_urls() {
+        for (cover, expected) in [
+            ("https://avatars.yandex.net/get-music-content/42/200x200", true),
+            ("https://avatars.yandex.net.example.org/200x200", false),
+            ("http://avatars.yandex.net/200x200", false),
+        ] {
+            let resolved: ResolvedTrack = serde_json::from_value(json!({
+                "id":"123","title":"Track","artist":"Artist","durationMs":1000,"coverUrl":cover
+            })).unwrap();
+            let track = json!(resolved.into_track().unwrap());
+            assert_eq!(track["artist"], "Artist");
+            assert_eq!(track["coverUrl"].as_str().is_some(), expected);
+        }
     }
 
     const PRIVATE_AUDIO: &[u8] = b"ID3\x04\x00\x00\x00\x00\x00\x00";

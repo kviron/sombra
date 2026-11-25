@@ -13,7 +13,6 @@
  border: 0;
  border-radius: 3px;
  background: transparent;
- color: var(--mention-accent, #a9ccff);
  font: inherit;
  line-height: inherit;
  text-align: inherit;
@@ -21,17 +20,18 @@
  cursor: pointer;
  overflow-wrap: anywhere;
 }
+
 .message-text .message-mention:hover,
 .chat-shell .message-text .message-mention:hover {
- background: #a9ccff18;
- color: #d6e6ff;
  text-decoration: underline;
 }
+
 .message-text .message-mention:focus-visible,
 .chat-shell .message-text .message-mention:focus-visible {
  outline: 2px solid currentColor;
  outline-offset: 2px;
 }
+
 .unread-mention-badge {
  display: inline-flex;
  align-items: center;
@@ -42,8 +42,6 @@
  margin-inline-start: 4px;
  padding: 0 3px;
  border-radius: 4px;
- color: var(--mention-accent, #a9ccff);
- background: #a9ccff18;
  font-size: 11px;
  font-weight: 650;
  line-height: 16px;

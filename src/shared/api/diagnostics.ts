@@ -16,7 +16,7 @@ export type VoiceTransportCategory =
  | 'audio_receive_silent'
  | 'audio_receive_silent_recovered';
 type Categories = {
- webview: 'js_error' | 'unhandled_rejection' | 'render_error';
+ webview: 'js_error' | 'unhandled_rejection' | 'render_error' | 'ui_freeze';
  voice_microphone: 'device_error' | 'device_permission';
  voice_camera: 'device_error' | 'device_permission';
  voice_speaker: 'device_error' | 'device_permission';

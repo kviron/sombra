@@ -2,6 +2,8 @@ import type {RefObject} from 'react';
 import {AlertDialog, Dialog} from 'radix-ui';
 import {type ChatMessage} from '@/shared/types';
 import {Button} from '@/shared/ui/button';
+import {Checkbox} from '@/shared/ui/checkbox';
+import {Textarea} from '@/shared/ui/textarea';
 import {useMessageAction} from '../model/use-message-action';
 
 type Props = {
@@ -58,11 +60,9 @@ export function MessageActionDialog({
       >
        {model.mayDeleteEveryone && (
         <label className="mt-4 flex w-fit cursor-pointer items-center gap-2 text-sm">
-         <input
-          type="checkbox"
-          className="accent-primary size-4"
+         <Checkbox
           checked={model.removeForEveryone}
-          onChange={event => model.actions.setForEveryone(event.target.checked)}
+          onCheckedChange={checked => model.actions.setForEveryone(checked === true)}
           disabled={model.busy}
          />
          Удалить для всех
@@ -97,10 +97,10 @@ export function MessageActionDialog({
        model.actions.submit();
       }}
      >
-      <textarea
+      <Textarea
        aria-label="Текст сообщения"
        aria-invalid={model.tooLong}
-       className="border-input bg-background focus-visible:ring-ring mt-3 block max-h-60 min-h-24 w-full resize-y rounded-md border p-2 text-sm outline-none focus-visible:ring-2"
+       className="mt-3 max-h-60 min-h-24 resize-y"
        rows={4}
        value={model.text}
        disabled={model.busy}

@@ -1,5 +1,8 @@
 ﻿import {useEffect, useState} from 'react';
 
+const meterFloor = 0.005;
+const meterFullScale = 0.2;
+
 // Observe the call stream without opening another microphone or playing it back.
 export function VoiceLevel({
  stream,
@@ -33,7 +36,9 @@ export function VoiceLevel({
     }
     analyser.getFloatTimeDomainData(samples);
     const rms = Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
-    setLevel(rms < 0.005 ? 0 : Math.min(100, Math.round(rms * 400)));
+    // A logarithmic display gives quiet speech more room on the short sidebar meter.
+    const displayed = Math.log(Math.max(rms, meterFloor) / meterFloor) / Math.log(meterFullScale / meterFloor);
+    setLevel(Math.min(100, Math.round(displayed * 100)));
    }, 100);
   } catch {
    /* A missing audio analyser must not interrupt the call. */

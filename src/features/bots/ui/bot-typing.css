@@ -15,64 +15,46 @@
 .bot-typing .user-avatar {
  --avatar-size: 28px;
 }
+
 /* Раскрытая строка прогресса растягивает скругление под панель подробностей. */
 .bot-typing [data-slot='job-progress']:has(button[aria-expanded='true']) {
  border-radius: 14px;
 }
+
 .bot-typing [data-slot='job-progress'] {
  margin-inline-start: 36px;
  max-width: calc(100% - 36px);
- background: rgba(20, 22, 30, 0.68);
- border-color: rgba(160, 174, 198, 0.16);
- -webkit-backdrop-filter: blur(18px) saturate(135%);
- backdrop-filter: blur(18px) saturate(135%);
- box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
 }
-/* Точки «печатает» рисует Elements своими span. */
-.bot-typing [data-slot='typing-indicator'] span {
- background: #a9ccff;
-}
+
 .bot-typing [data-slot='typing-indicator'] {
  padding: 9px 13px;
  border-radius: 16px 16px 16px 5px;
- background: rgba(20, 22, 30, 0.68);
- border-color: rgba(160, 174, 198, 0.16);
- -webkit-backdrop-filter: blur(18px) saturate(135%);
- backdrop-filter: blur(18px) saturate(135%);
- box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
 }
+
 /* Служебная строка прогресса: её внутренние узлы размечены Elements, не срезом. */
 .bot-typing [data-slot='job-progress'] time {
- color: #a9b0c2;
  font-size: 11px;
  font-variant-numeric: tabular-nums;
 }
+
 .bot-typing [data-slot='job-progress'] p {
- color: #a9b0c2;
  font-size: 11.5px;
  line-height: 1.4;
  overflow-wrap: anywhere;
 }
+
 .bot-typing [data-slot='job-progress'] button:focus-visible {
- outline: 2px solid #8c92ff;
+ outline: 2px solid var(--ring);
  outline-offset: 1px;
 }
-/* Непрозрачная подложка вместо размытия. */
-@media (prefers-reduced-transparency: reduce) {
- .bot-typing [data-slot='typing-indicator'],
- .bot-typing [data-slot='job-progress'] {
-  background: #1b1d27;
-  border-color: #2c2f3a;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
- }
-}
+
 @media (prefers-reduced-motion: reduce) {
  .bot-typing [data-slot='typing-indicator'] span,
  .bot-typing [data-slot='job-progress'] svg {
   animation: none;
  }
 }
+
 @media (max-width: 760px) {
  .bot-typing [data-slot='job-progress'] p {
   max-width: min(60vw, 240px);
@@ -84,12 +66,15 @@
 .bot-image-activity .bot-image-message {
  margin: 6px 0 0;
 }
+
 .bot-image-activity .bot-image-message .message-meta {
  padding-right: 0;
 }
+
 .bot-image-activity [data-slot='image-generation'] {
  max-width: 100%;
 }
+
 @media (max-width: 760px) {
  .bot-image-activity [data-slot='image-generation'] {
   width: min(52vw, 208px);

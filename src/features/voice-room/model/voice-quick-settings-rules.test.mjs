@@ -3,7 +3,6 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
  deviceOptions,
- matchingDevices,
  quickDeviceKind,
  quickLabels,
  quickPreferenceKey,
@@ -15,8 +14,7 @@ const devices = [
  {kind: 'audioinput', deviceId: 'mic-1', label: 'Настольный микрофон'},
  {kind: 'audioinput', deviceId: 'mic-2', label: ''},
  {kind: 'audioinput', deviceId: 'default', label: 'По умолчанию'},
- {kind: 'audioinput', deviceId: '', label: 'Без идентификатора'},
- {kind: 'audiooutput', deviceId: 'spk-1', label: 'Наушники'}
+ {kind: 'audioinput', deviceId: '', label: 'Без идентификатора'}
 ];
 
 test('у микрофона и наушников свои подписи, ключи и пределы громкости', () => {
@@ -34,15 +32,7 @@ test('у микрофона и наушников свои подписи, кл�
  assert.equal(quickVolumeMax('output'), 100);
 });
 
-test('список устройств фильтруется по виду и пропускает «default» без идентификатора', () => {
- assert.deepEqual(
-  matchingDevices(devices, 'input').map(device => device.deviceId),
-  ['mic-1', 'mic-2']
- );
- assert.deepEqual(
-  matchingDevices(devices, 'output').map(device => device.deviceId),
-  ['spk-1']
- );
+test('быстрые настройки используют тип устройства своего поля', () => {
  assert.equal(quickDeviceKind('input'), 'audioinput');
  assert.equal(quickDeviceKind('output'), 'audiooutput');
 });

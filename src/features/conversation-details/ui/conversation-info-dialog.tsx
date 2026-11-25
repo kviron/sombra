@@ -1,3 +1,4 @@
+import {Input} from '@/shared/ui/input';
 import {useEffect, useRef} from 'react';
 import {Dialog as DialogPrimitive} from 'radix-ui';
 import {Camera, ChevronRight, File, Headphones, Image, Link2, Pencil, Settings, Video, X} from 'lucide-react';
@@ -33,26 +34,26 @@ export function ConversationMaterialRows({messages, channel, onOpen}: ProfileCon
  if (!items.length) return null;
  return (
   <section className="conversation-info-materials" aria-label="Материалы этой переписки">
-   <h3 className="mt-4 mb-2 text-[13px] leading-[1.5] font-semibold text-[#b9b9c3]">Материалы переписки</h3>
+   <h3 className="text-muted-foreground mt-4 mb-2 text-[13px] leading-[1.5] font-semibold">Материалы переписки</h3>
    {categories
     .filter(({id}) => items.some(item => item.category === id))
     .map(({id, label, icon: Icon}) => (
      <button
       type="button"
       key={id}
-      className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-[8px] border-0 bg-transparent px-2 py-2.5 text-left text-sm leading-[1.5] text-inherit hover:bg-[#ffffff08] [&>svg]:shrink-0 [&>svg]:text-[#adadb7]"
+      className="[&>svg]:text-muted-foreground flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-[8px] border-0 bg-transparent px-2 py-2.5 text-left text-sm leading-[1.5] text-inherit [&>svg]:shrink-0"
       data-material-category={id}
       onClick={() => onOpen(id)}
      >
       <Icon size={19} />
       <span className="flex-1">{label}</span>
-      <small className="text-[13px] leading-[1.5] text-[#adadb7]">
+      <small className="text-muted-foreground text-[13px] leading-[1.5]">
        {items.filter(item => item.category === id).length}
       </small>
       <ChevronRight size={16} />
      </button>
     ))}
-   <p className="m-2 text-xs leading-[1.5] text-[#a5a5af]">
+   <p className="text-muted-foreground m-2 text-xs leading-[1.5]">
     По сообщениям этой переписки. Недоступные вложения учитываются, если сохранились их метаданные.
    </p>
   </section>
@@ -149,12 +150,12 @@ export function ConversationInfoDialog({
       if (busy || crop || editing) event.preventDefault();
      }}
     >
-     <header className="flex items-center justify-between border-b border-[#ffffff0c] px-4 py-3 text-sm leading-[1.5] font-semibold">
+     <header className="border-border flex items-center justify-between border-b px-4 py-3 text-sm leading-[1.5] font-semibold">
       <span>Информация о чате</span>
       <button
        ref={close}
        type="button"
-       className="grid size-11 place-items-center rounded-[8px] border-0 bg-transparent hover:bg-[#ffffff08]"
+       className="grid size-11 place-items-center rounded-[8px] border-0 bg-transparent"
        disabled={busy}
        aria-label="Закрыть информацию о чате"
        title="Закрыть"
@@ -166,7 +167,7 @@ export function ConversationInfoDialog({
      <div className="conversation-info-scroll overflow-auto px-5 pb-5">
       <div className="conversation-info-identity py-6 text-center">
        <span
-        className="conversation-info-avatar mx-auto mb-3 grid size-20 place-items-center overflow-hidden rounded-[24px] bg-[#37373f] text-[28px] leading-[1.5] font-semibold"
+        className="conversation-info-avatar bg-card mx-auto mb-3 grid size-20 place-items-center overflow-hidden rounded-[24px] text-[28px] leading-[1.5] font-semibold"
         aria-hidden="true"
        >
         {previewAvatar ? (
@@ -186,9 +187,9 @@ export function ConversationInfoDialog({
          {previewName || 'Название чата'}
         </h2>
        </DialogPrimitive.Title>
-       <p className="mt-1.5 mb-0 text-sm leading-[1.5] text-[#adadb7]">{participantCount(memberIds.length)}</p>
+       <p className="text-muted-foreground mt-1.5 mb-0 text-sm leading-[1.5]">{participantCount(memberIds.length)}</p>
        {channelLabel && (
-        <p className="conversation-info-channel mt-3 text-xs leading-[1.5] text-[#adadb7]">
+        <p className="conversation-info-channel text-muted-foreground mt-3 text-xs leading-[1.5]">
          Канал: {channelLabel} · материалы только этого канала
         </p>
        )}
@@ -209,7 +210,7 @@ export function ConversationInfoDialog({
       </div>
       {editing && model.editable && (
        <section
-        className={cn('conversation-info-editor', 'rounded-[12px] border border-[#ffffff16] bg-[#ffffff04] p-4')}
+        className={cn('conversation-info-editor', 'border-border rounded-[12px] border p-4')}
         data-dialog-metadata-editor
         aria-label="Редактировать чат"
        >
@@ -243,15 +244,15 @@ export function ConversationInfoDialog({
           }}
          />
         </div>
-        <p className="conversation-info-edit-hint mt-3 mb-4 text-xs leading-[1.5] text-[#b9b9c3]">
+        <p className="conversation-info-edit-hint text-muted-foreground mt-3 mb-4 text-xs leading-[1.5]">
          PNG, JPEG или WebP. Квадратный аватар до 256 КБ. Изменения увидят все участники после сохранения.
         </p>
         <label className="flex flex-col gap-2 text-sm leading-[1.5]" htmlFor="dialog-metadata-name">
          Название чата
-         <input
+         <Input
           ref={nameInput}
           id="dialog-metadata-name"
-          className="min-h-10 w-full rounded-[8px] border border-[#ffffff26] bg-[#161619] px-3 py-2 [color:inherit]"
+          className="h-10"
           value={name}
           maxLength={60}
           disabled={busy}
@@ -259,7 +260,7 @@ export function ConversationInfoDialog({
          />
         </label>
         {error && (
-         <p role="alert" className="conversation-info-edit-error mt-3 text-[13px] leading-[1.5] text-[#ffb4ab]">
+         <p role="alert" className="conversation-info-edit-error text-destructive mt-3 text-[13px] leading-[1.5]">
           {error} Черновик не потерян.
          </p>
         )}
@@ -281,7 +282,7 @@ export function ConversationInfoDialog({
       )}
       {onSettings && (
        <button
-        className="conversation-info-settings flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-[8px] border-0 bg-transparent px-2 py-2.5 text-left text-sm leading-[1.5] text-inherit hover:bg-[#ffffff08] [&>svg]:shrink-0 [&>svg]:text-[#adadb7] [&>svg:last-child]:ml-auto"
+        className="conversation-info-settings [&>svg]:text-muted-foreground flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-[8px] border-0 bg-transparent px-2 py-2.5 text-left text-sm leading-[1.5] text-inherit [&>svg]:shrink-0 [&>svg:last-child]:ml-auto"
         type="button"
         onClick={onSettings}
        >
@@ -292,19 +293,19 @@ export function ConversationInfoDialog({
       )}
       <ConversationMaterialRows messages={state.messages} channel={channel} onOpen={onMaterials} />
       <section className="conversation-info-members" aria-label="Участники чата">
-       <h3 className="mt-4 mb-2 text-[13px] leading-[1.5] font-semibold text-[#b9b9c3]">
-        Участники <span className="ml-1.5 text-[#aaaab4]">{memberIds.length}</span>
+       <h3 className="text-muted-foreground mt-4 mb-2 text-[13px] leading-[1.5] font-semibold">
+        Участники <span className="text-muted-foreground ml-1.5">{memberIds.length}</span>
        </h3>
        <label
         className={cn(
          'conversation-info-member-search',
-         'mt-3 flex flex-col gap-2 text-[13px] leading-[1.5] text-[#b9b9c3]'
+         'text-muted-foreground mt-3 flex flex-col gap-2 text-[13px] leading-[1.5]'
         )}
        >
         Найти участника
-        <input
+        <Input
          type="search"
-         className="min-h-10 w-full rounded-[8px] border border-[#ffffff26] bg-[#161619] px-3 py-2 text-[#eeeef0]"
+         className="h-10"
          aria-label="Поиск участников по имени, логину или email"
          placeholder="Имя, логин или полный email"
          value={memberQuery}
@@ -313,7 +314,7 @@ export function ConversationInfoDialog({
         />
        </label>
        <p
-        className="conversation-info-search-status my-2 min-h-[18px] text-xs leading-[1.5] text-[#b9b9c3]"
+        className="conversation-info-search-status text-muted-foreground my-2 min-h-[18px] text-xs leading-[1.5]"
         role="status"
         aria-live="polite"
        >
@@ -328,7 +329,7 @@ export function ConversationInfoDialog({
          <button
           key={id}
           type="button"
-          className="conversation-info-member flex min-h-16 w-full items-center gap-3 rounded-[8px] border-0 bg-transparent px-2 py-2 text-left hover:bg-[#ffffff08] [&>svg]:shrink-0 [&>svg]:text-[#aaaab4]"
+          className="conversation-info-member [&>svg]:text-muted-foreground flex min-h-16 w-full items-center gap-3 rounded-[8px] border-0 bg-transparent px-2 py-2 text-left [&>svg]:shrink-0"
           onClick={() => onProfile(id)}
          >
           <UserAvatar user={user} decorative decoration={user.decorations?.avatar} />
@@ -336,11 +337,11 @@ export function ConversationInfoDialog({
            <strong className="text-sm leading-[1.5] font-medium [overflow-wrap:anywhere]">
             {user.name}
             {id === state.me.id && (
-             <small className="text-xs leading-[1.5] font-normal text-[#aaaab4]"> · это вы</small>
+             <small className="text-muted-foreground text-xs leading-[1.5] font-normal"> · это вы</small>
             )}
            </strong>
            <small
-            className="text-xs leading-[1.5] font-normal text-[#aaaab4] data-[online]:text-[#7ac79c]"
+            className="text-muted-foreground text-xs leading-[1.5] font-normal data-[online]:text-emerald-500"
             data-online={user.online || undefined}
            >
             {peerStatus(user)}

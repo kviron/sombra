@@ -1,3 +1,4 @@
+import {Input} from '@/shared/ui/input';
 import {Dialog} from 'radix-ui';
 import {Forward, Hash, MessageCircle, Reply, Search, Volume2, X} from 'lucide-react';
 import type {ChatMessage, MessageReply} from '@/shared/types';
@@ -98,7 +99,7 @@ export function ForwardPicker({
   >
    <Dialog.Portal>
     <Dialog.Overlay className="modal-backdrop" />
-    <Dialog.Content className="group-modal forward-picker dark surface-matte">
+    <Dialog.Content className="group-modal forward-picker bg-background border">
      <header className="text-foreground flex items-center gap-2">
       <Dialog.Title>Переслать сообщение</Dialog.Title>
       <Dialog.Close asChild>
@@ -118,7 +119,7 @@ export function ForwardPicker({
      </Dialog.Description>
      <label className="dialog-search w-full">
       <Search size={17} aria-hidden="true" />
-      <input
+      <Input
        autoFocus
        placeholder="Поиск чата или канала"
        aria-label="Поиск чата или канала"

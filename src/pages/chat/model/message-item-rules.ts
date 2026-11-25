@@ -13,17 +13,29 @@ export type MessageAction = {id: MessageActionId; label: string; disabled?: bool
 
 export type ReactionView = {emoji: string; count: number; pressed: boolean};
 
-/** Соседние сообщения одного автора склеиваются, пока идут подряд без паузы. */
+/** Соседние сообщения одного автора склеиваются, в пределах одного дня. */
 export function isGrouped(previous: ChatMessage | undefined, message: ChatMessage) {
  return (
   !!previous &&
   message.time - previous.time >= 0 &&
-  message.time - previous.time <= 300 &&
   previous.channel === message.channel &&
   previous.user === message.user &&
   previous.bot_name === message.bot_name &&
   new Date(previous.time * 1000).toDateString() === new Date(message.time * 1000).toDateString()
  );
+}
+
+export function groupMessages(messages: readonly ChatMessage[]): ChatMessage[][] {
+ const groups: ChatMessage[][] = [];
+ let current: ChatMessage[] | undefined;
+ for (const message of messages) {
+  if (!current || !isGrouped(current.at(-1), message)) {
+   current = [];
+   groups.push(current);
+  }
+  current.push(message);
+ }
+ return groups;
 }
 
 export const isAuthor = (message: ChatMessage, me: string) => message.user === me && !message.bot_name;

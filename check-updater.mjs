@@ -36,6 +36,22 @@ test('checking and downloading never install without an explicit action', async 
  assert.equal(f.installed(), 1);
  assert.equal(f.restarted(), 1);
 });
+test('download progress only publishes changes to the displayed percent', async () => {
+ const f = fixture();
+ f.update.download = async report => {
+  report({event: 'Started', data: {contentLength: 1000}});
+  for (const chunkLength of [2, 3, 4, 1]) report({event: 'Progress', data: {chunkLength}});
+ };
+ await f.controller.check();
+ const percentages = [];
+ f.controller.subscribe(() => {
+  const state = f.controller.snapshot();
+  if (state.phase === 'downloading') percentages.push(state.percent);
+ });
+ await f.controller.download();
+ assert.deepEqual(percentages, [undefined, 0, 1]);
+});
+
 test('an offline check is retryable and is not reported as up to date', async () => {
  let offline = true;
  const f = fixture(async () => {

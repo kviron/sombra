@@ -46,7 +46,7 @@ export function ProfileMediaDialog({
     <Dialog.Overlay className="profile-media-overlay" />
     <Dialog.Content
      className={cn(
-      'profile-media-dialog dark surface-matte',
+      'profile-media-dialog bg-background border',
       'text-foreground fixed top-1/2 left-1/2 z-[1401] grid max-h-[calc(100vh_-_48px)] w-[min(560px,calc(100vw_-_32px))] [transform:translate(-50%,-50%)] gap-3.5 overflow-auto rounded-[var(--radius)] p-5'
      )}
      data-target={target}
@@ -177,7 +177,7 @@ export function ProfileMediaDialog({
        className={cn(
         model.error ? 'profile-media-error' : 'profile-media-notice',
         'm-0',
-        model.error ? 'text-[13px] text-[#ff9aa2]' : 'text-muted-foreground text-xs leading-[1.5]'
+        model.error ? 'text-destructive text-[13px]' : 'text-muted-foreground text-xs leading-[1.5]'
        )}
        role={model.error ? 'alert' : 'status'}
       >

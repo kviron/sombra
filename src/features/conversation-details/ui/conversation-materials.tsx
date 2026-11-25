@@ -1,3 +1,5 @@
+import {Button} from '@/shared/ui/button';
+import {Input} from '@/shared/ui/input';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {ArrowLeft, ArrowUpRight, ChevronRight, File, Headphones, Image, Link2, Search, Video, X} from 'lucide-react';
 import type {ChatMessage} from '@/shared/types';
@@ -109,9 +111,12 @@ export function ConversationMaterials({
      <X size={18} />
     </button>
    </header>
-   <label className="materials-search">
-    <Search size={16} />
-    <input
+   <div className="relative mx-3 mb-3 shrink-0">
+    <Search
+     aria-hidden="true"
+     className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
+    />
+    <Input
      aria-label="Поиск материалов переписки"
      placeholder="Название, ссылка или автор"
      value={query}
@@ -121,11 +126,18 @@ export function ConversationMaterials({
      }}
     />
     {query && (
-     <button type="button" aria-label="Очистить поиск материалов" onClick={() => setQuery('')}>
-      <X size={14} />
-     </button>
+     <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      className="absolute top-1/2 right-1 -translate-y-1/2"
+      aria-label="Очистить поиск материалов"
+      onClick={() => setQuery('')}
+     >
+      <X />
+     </Button>
     )}
-   </label>
+   </div>
    <div className="materials-content min-h-0 flex-1 overflow-auto overscroll-contain px-3 pb-5">
     {overview ? (
      <>
@@ -146,7 +158,7 @@ export function ConversationMaterials({
         </button>
        ))}
       </nav>
-      <div className="materials-summary px-3 py-7 text-center text-[var(--materials-muted)] [&>svg]:mx-auto [&>svg]:mb-3 [&>svg]:opacity-80">
+      <div className="materials-summary text-muted-foreground px-3 py-7 text-center [&>svg]:mx-auto [&>svg]:mb-3 [&>svg]:opacity-80">
        <Link2 size={24} />
        <p className="m-0 mb-2 text-[13px] leading-[1.5]">Вложения и ссылки этой переписки — в одном месте.</p>
        <span className="block text-xs leading-[1.5]">
@@ -158,12 +170,12 @@ export function ConversationMaterials({
      </>
     ) : (
      <>
-      <p className="materials-results mx-0 mt-1 mb-3 text-xs leading-[1.5] text-[var(--materials-muted)]" role="status">
+      <p className="materials-results text-muted-foreground mx-0 mt-1 mb-3 text-xs leading-[1.5]" role="status">
        {filtered.length ? `Найдено: ${filtered.length}` : query ? 'Ничего не найдено' : 'В этой категории пока пусто'}
       </p>
       {[...grouped].map(([monthLabel, entries]) => (
        <section className="materials-month-group" key={monthLabel}>
-        <h3 className="materials-month mt-4 mb-2 text-xs leading-[1.5] font-semibold text-[#c2ccdc] capitalize">
+        <h3 className="materials-month text-muted-foreground mt-4 mb-2 text-xs leading-[1.5] font-semibold capitalize">
          {monthLabel}
         </h3>
         <div className={category === 'photos' ? 'materials-photo-grid' : 'materials-list grid gap-2'}>
@@ -172,7 +184,7 @@ export function ConversationMaterials({
            key={item.id}
            className={cn(
             'material-card',
-            'relative min-w-0 overflow-hidden rounded-[9px] border border-[var(--materials-line)] bg-[#c0d0ef06]',
+            'border-border relative min-w-0 overflow-hidden rounded-[9px] border',
             'data-[category=photos]:border-transparent data-[category=photos]:bg-transparent'
            )}
            data-material-id={item.id}
@@ -181,12 +193,12 @@ export function ConversationMaterials({
           >
            {item.href ? (
             <div className="material-link flex min-w-0 items-start gap-2.5 px-3 pt-3 pb-1">
-             <div className="material-link-symbol grid size-9 shrink-0 place-items-center rounded-[8px] bg-[#9abaf01c] text-[#aacbff]">
+             <div className="material-link-symbol text-primary grid size-9 shrink-0 place-items-center rounded-[8px]">
               <Link2 size={19} />
              </div>
              <div className="min-w-0 flex-1">
               <a
-               className="line-clamp-2 block text-[13px] leading-[1.45] font-semibold [overflow-wrap:anywhere] text-[#b3d2ff] hover:underline"
+               className="text-primary line-clamp-2 block text-[13px] leading-[1.45] font-semibold [overflow-wrap:anywhere] hover:underline"
                href={item.href}
                target="_blank"
                rel="noopener noreferrer"
@@ -195,10 +207,10 @@ export function ConversationMaterials({
               >
                {item.title}
               </a>
-              <span className="mt-1 block text-[11px] [overflow-wrap:anywhere] text-[var(--materials-muted)]">
+              <span className="text-muted-foreground mt-1 block text-[11px] [overflow-wrap:anywhere]">
                {new URL(item.href).hostname}
               </span>
-              <p className="mt-[5px] mb-0 overflow-hidden text-xs leading-[1.4] text-ellipsis whitespace-nowrap text-[#9ab6e3]">
+              <p className="text-primary mt-[5px] mb-0 overflow-hidden text-xs leading-[1.4] text-ellipsis whitespace-nowrap">
                {item.href}
               </p>
              </div>
@@ -210,7 +222,7 @@ export function ConversationMaterials({
              </>
             )
            )}
-           <footer className="material-caption flex min-w-0 items-center gap-2 px-2 pt-1 pb-1 pl-3 text-[11px] text-[var(--materials-muted)]">
+           <footer className="material-caption text-muted-foreground flex min-w-0 items-center gap-2 px-2 pt-1 pb-1 pl-3 text-[11px]">
             <span
              className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
              title={userName(item.message.user)}

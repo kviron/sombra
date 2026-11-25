@@ -11,41 +11,50 @@
  border-bottom: 1px solid var(--border);
  min-width: 0;
 }
+
 .bot-installation-heading {
  display: flex;
  align-items: center;
  gap: 12px;
 }
+
 .bot-installation-heading > div {
  min-width: 0;
  overflow-wrap: anywhere;
 }
+
 .bot-installation-heading p {
  margin: 4px 0;
 }
+
 .bot-installation ul {
  padding-left: 20px;
  overflow-wrap: anywhere;
 }
+
 .bot-installation-actions {
  display: flex;
  flex-wrap: wrap;
  gap: 8px;
 }
+
 .bot-installation-actions button,
 .bot-token button {
  min-height: 40px;
  padding: 8px 12px;
 }
+
 .bot-settings label {
  display: grid;
  gap: 8px;
  margin: 16px 0;
 }
+
 .bot-settings input {
  max-width: 100%;
  min-width: 0;
 }
+
 .bot-token {
  margin-top: 16px;
  padding: 16px;
@@ -55,10 +64,12 @@
  flex-wrap: wrap;
  gap: 8px;
 }
+
 .bot-token p {
  flex-basis: 100%;
  overflow-wrap: anywhere;
 }
+
 .bot-token input {
  flex: 1 1 160px;
 }
@@ -67,9 +78,9 @@
    поэтому состояния остаются здесь. */
 .bot-command-suggestions button:hover,
 .bot-command-suggestions button:focus-visible {
- background: var(--accent);
  color: var(--accent-foreground);
 }
+
 .bot-command-suggestions button:focus-visible {
  outline: 2px solid var(--ring);
  outline-offset: -2px;

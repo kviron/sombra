@@ -1,22 +1,23 @@
+import {selectRoomParticipants} from '../model/voice-selectors';
+import type {RoomMusicModel} from '../model/use-room-music';
 import {MotionIcon} from '@/shared/ui/motion-icon';
 import {Button} from '@/shared/ui/button';
 import {Switch} from '@/shared/ui/switch';
 import {Slider} from '@/shared/ui/slider';
-import {Select} from '@/shared/ui/select';
+import {OptionsSelect} from '@/shared/ui/select';
 import {AudioDeviceAccess} from './audio-device-access';
 import {useLevelRail} from '../model/use-level-rail';
 import {Label} from '@/shared/ui/label';
 import {Progress} from '@/shared/ui/progress';
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {Mic, MicOff, Headphones, HeadphoneOff, Video, VideoOff, PhoneOff, Settings} from 'lucide-react';
 import type {Voice} from '../model/use-voice';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {UserContextMenu} from '@/entities/user';
 import {useUserActions} from '@/shared/lib/user-actions';
-import type {User} from '@/shared/types';
-import './voice.css';
+import type {User, VoicePresence} from '@/shared/types';
 import '@/shared/ui/account-media-settings.css';
-import {RoomMusic, type useRoomMusic} from './room-music';
+import {RoomMusic} from './room-music';
 import {useMediaPlayback} from '../model/use-media-playback';
 import {useVoiceSettings, type VoiceSettingsModel} from '../model/use-voice-settings';
 
@@ -69,7 +70,7 @@ export function VoicePlayback({voice, volumeForUser}: {voice: Voice; volumeForUs
       stream={stream}
       muted={voice.deaf}
       volume={volume}
-      speaker={voice.preferences.speaker}
+      speaker={voice.speakerOutput}
       audioOnly
      />
     );
@@ -80,6 +81,53 @@ export function VoicePlayback({voice, volumeForUser}: {voice: Voice; volumeForUs
 export function hasVisibleVideo(stream?: MediaStream): boolean {
  return !!stream?.getVideoTracks().some(track => track.readyState === 'live' && track.enabled && !track.muted);
 }
+
+function VoiceTileVideo({stream}: {stream: MediaStream}) {
+ const playback = useMediaPlayback({stream, volume: 0, audioOnly: false});
+ const video = useRef<HTMLVideoElement>(null);
+
+ useEffect(() => {
+  const element = video.current;
+  if (!element || typeof element.requestVideoFrameCallback !== 'function') return;
+  let frame = 0;
+  let timeout: ReturnType<typeof setTimeout>;
+  function hide() {
+   if (element) delete element.dataset.receiving;
+  }
+  function onFrame() {
+   if (!element) return;
+   if (!element.dataset.receiving) element.dataset.receiving = 'true';
+   clearTimeout(timeout);
+   timeout = setTimeout(hide, 2000);
+   frame = element.requestVideoFrameCallback(onFrame);
+  }
+  hide();
+  frame = element.requestVideoFrameCallback(onFrame);
+  element.addEventListener('emptied', hide);
+  element.addEventListener('error', hide);
+  return () => {
+   element.cancelVideoFrameCallback(frame);
+   clearTimeout(timeout);
+   element.removeEventListener('emptied', hide);
+   element.removeEventListener('error', hide);
+  };
+ }, [stream]);
+
+ return (
+  <video
+   ref={element => {
+    video.current = element;
+    playback.attach(element);
+   }}
+   className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 data-[receiving=true]:opacity-100"
+   autoPlay
+   playsInline
+   muted
+   onError={playback.onError}
+  />
+ );
+}
+
 export function VoicePeerVisual({
  stream,
  user,
@@ -119,13 +167,10 @@ export function VoicePeerVisual({
    <div className="voice-tile-rail" ref={rail} aria-hidden="true">
     <i />
    </div>
-   {hasVisibleVideo(stream) ? (
-    <Media stream={stream!} muted volume={0} />
-   ) : (
-    <button type="button" className="voice-tile-avatar" title={`Профиль ${user.name}`} onClick={onOpen}>
-     <UserAvatar user={user} size="xl" decoration={user.decorations?.avatar} />
-    </button>
-   )}
+   <button type="button" className="voice-tile-avatar" title={`Профиль ${user.name}`} onClick={onOpen}>
+    <UserAvatar user={user} size="xl" decoration={user.decorations?.avatar} />
+   </button>
+   {stream && hasVisibleVideo(stream) && <VoiceTileVideo stream={stream} />}
   </>
  );
 }
@@ -136,6 +181,7 @@ export function VoiceStage({
  userName,
  me,
  meUser,
+ presence,
  users,
  onSettings,
  music
@@ -146,17 +192,22 @@ export function VoiceStage({
  userName: (id: string) => string;
  me: string;
  meUser?: User;
+ presence?: VoicePresence[];
  users?: User[];
  onSettings: () => void;
- music?: ReturnType<typeof useRoomMusic>;
+ music?: RoomMusicModel;
 }) {
  const joined = v.room === id;
+ const participants = selectRoomParticipants(v, id, meUser?.id ?? '', presence);
  const actions = useUserActions();
  const microphoneOff = v.muted || v.deaf;
- const selfRail = useLevelRail(v.local, !microphoneOff);
+ const selfRail = useLevelRail(v.local, joined && !microphoneOff);
  const selfIdentity: User = meUser ?? {id: '', name: me, bio: '', created_at: 0, online: true};
  const selfTile = (
-  <div className="voice-tile relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-[12px] border border-[#ffffff26] bg-[#131329] [&>video]:h-[200px] [&>video]:w-full [&>video]:object-cover">
+  <div
+   key="self"
+   className="voice-tile border-border relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-[12px] border bg-black/55 backdrop-blur-md [&>video]:h-[200px] [&>video]:w-full [&>video]:object-cover"
+  >
    <div className="voice-tile-rail" ref={selfRail} aria-hidden="true">
     <i />
    </div>
@@ -172,71 +223,98 @@ export function VoiceStage({
      <UserAvatar user={selfIdentity} size="xl" decoration={selfIdentity.decorations?.avatar} />
     </button>
    )}
-   <span className="absolute bottom-2 left-2 rounded-[5px] bg-[#090912cc] px-2.5 py-1.5 text-[12px]">
+   <span className="bg-card absolute bottom-2 left-2 rounded-[5px] px-2.5 py-1.5 text-[12px]">
     {me} · Вы {microphoneOff ? '· микрофон выключен' : ''}
    </span>
   </div>
  );
  return (
-  <div className="voice-stage overflow-auto">
-   <h1 className="shrink-0">{title}</h1>
-   <p>
-    {joined
-     ? v.peers.length
-       ? 'Вы в голосовой комнате'
-       : 'Вы в комнате. Пригласите друзей, чтобы начать общение.'
-     : 'Присоединитесь, чтобы общаться голосом и видео'}
-   </p>
-   {joined && (
-    <div className="voice-grid mx-0 my-2 mb-6 grid max-h-[60%] w-full max-w-[800px] grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 overflow-auto">
-     {meUser ? <UserContextMenu user={meUser}>{selfTile}</UserContextMenu> : selfTile}
-     {v.peers.map(p => {
-      const identity: User = users?.find(user => user.id === p.user) ?? {
-       id: p.user,
-       name: userName(p.user),
-       bio: '',
-       created_at: 0,
-       online: true
-      };
-      const tile = (
-       <div className="voice-tile relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-[12px] border border-[#ffffff26] bg-[#131329] [&>video]:h-[200px] [&>video]:w-full [&>video]:object-cover">
-        {
-         <VoicePeerVisual
-          stream={v.streams[p.client]}
-          user={identity}
-          deaf={v.deaf}
-          onOpen={() => actions?.openProfile(identity.id)}
-         />
-        }
-        <span className="absolute bottom-2 left-2 rounded-[5px] bg-[#090912cc] px-2.5 py-1.5 text-[12px]">
-         {identity.name} ·{' '}
-         {v.connections[p.client] === 'connected'
-          ? 'На связи'
-          : v.connections[p.client] === 'failed'
-            ? 'Переподключаюсь…'
-            : 'Подключение…'}
-        </span>
-       </div>
-      );
-      return (
-       <UserContextMenu key={p.client} user={identity}>
-        {tile}
-       </UserContextMenu>
-      );
-     })}
+  <div className="voice-stage-region relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+   <div className="min-h-0 flex-1 overflow-auto">
+    <div className="voice-stage min-h-full">
+     <h1 className="shrink-0">{title}</h1>
+     <p>
+      {joined
+       ? v.peers.length
+         ? 'Вы в голосовой комнате'
+         : 'Вы в комнате. Пригласите друзей, чтобы начать общение.'
+       : 'Присоединитесь, чтобы общаться голосом и видео'}
+     </p>
+     {participants.length > 0 && (
+      <div className="voice-grid mx-0 my-2 mb-6 grid max-h-[60%] w-full max-w-[800px] grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 overflow-auto">
+       {participants.map(p => {
+        if (p.self)
+         return meUser ? (
+          <UserContextMenu key={p.key} user={meUser}>
+           {selfTile}
+          </UserContextMenu>
+         ) : (
+          selfTile
+         );
+        const identity: User = (p.id === meUser?.id ? meUser : users?.find(user => user.id === p.id)) ?? {
+         id: p.id,
+         name: userName(p.id),
+         bio: '',
+         created_at: 0,
+         online: true
+        };
+        const tile = (
+         <div className="voice-tile border-border relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-[12px] border bg-black/55 backdrop-blur-md">
+          {
+           <VoicePeerVisual
+            stream={joined ? v.streams[p.key] : undefined}
+            user={identity}
+            deaf={v.deaf}
+            onOpen={() => actions?.openProfile(identity.id)}
+           />
+          }
+          <span className="bg-card absolute bottom-2 left-2 rounded-[5px] px-2.5 py-1.5 text-[12px]">
+           {identity.name} ·{' '}
+           {!joined
+            ? 'В комнате'
+            : v.connections[p.key] === 'connected'
+              ? 'На связи'
+              : v.connections[p.key] === 'failed'
+                ? 'Переподключаюсь…'
+                : 'Подключение…'}
+          </span>
+         </div>
+        );
+        return (
+         <UserContextMenu key={p.key} user={identity}>
+          {tile}
+         </UserContextMenu>
+        );
+       })}
+      </div>
+     )}
+     {joined && v.microphoneLost && (
+      <p role="alert">
+       Микрофон отключён.{' '}
+       <Button variant="secondary" onClick={onSettings}>
+        Выбрать микрофон
+       </Button>
+      </p>
+     )}
+     {v.error && (
+      <p className="voice-error bg-primary text-foreground max-w-[550px] rounded-[8px] p-3.5" role="alert">
+       {v.error}
+      </p>
+     )}
+     {music && <RoomMusic key={id} music={music} joined={joined} />}
     </div>
-   )}
-   {v.error && (
-    <p className="voice-error max-w-[550px] rounded-[8px] bg-[#3c162e] p-3.5 text-[#ffe0e0]" role="alert">
-     {v.error}
-    </p>
-   )}
-   <div className="voice-controls flex flex-wrap justify-center gap-2.5">
+   </div>
+   <div
+    className="voice-controls bg-card/70 mx-3 mb-3 flex shrink-0 flex-wrap justify-center gap-1 self-center rounded-xl border p-1.5 shadow-sm backdrop-blur-md motion-safe:transition-[opacity,transform] motion-safe:duration-200 motion-safe:ease-out"
+    data-auto-hide={joined || undefined}
+    role="group"
+    aria-label="Управление звонком"
+   >
     {joined ? (
      <>
       <Button
-       variant="secondary"
-       className="min-h-10"
+       variant="ghost"
+       size="icon-lg"
        title={microphoneOff ? 'Включить микрофон' : 'Выключить микрофон'}
        aria-label="Микрофон"
        aria-pressed={microphoneOff}
@@ -245,8 +323,8 @@ export function VoiceStage({
        {microphoneOff ? <MotionIcon icon={MicOff} kind="device" /> : <MotionIcon icon={Mic} kind="device" />}
       </Button>
       <Button
-       variant="secondary"
-       className="min-h-10"
+       variant="ghost"
+       size="icon-lg"
        title={v.deaf ? 'Включить звук' : 'Отключить звук'}
        aria-label="Наушники"
        aria-pressed={v.deaf}
@@ -255,16 +333,23 @@ export function VoiceStage({
        {v.deaf ? <MotionIcon icon={HeadphoneOff} kind="device" /> : <MotionIcon icon={Headphones} kind="device" />}
       </Button>
       <Button
-       variant="secondary"
-       className="min-h-10"
-       disabled={v.busy}
-       title={v.camera ? 'Выключить камеру' : 'Включить камеру'}
+       variant="ghost"
+       size="icon-lg"
+       disabled={v.busy || v.audioOnly}
+       title={
+        v.audioOnly
+         ? 'Пилотная комната LiveKit поддерживает только звук'
+         : v.camera
+           ? 'Выключить камеру'
+           : 'Включить камеру'
+       }
+       aria-label={v.camera ? 'Выключить камеру' : 'Включить камеру'}
        onClick={() => void v.toggleCamera()}
       >
-       {v.camera ? <Video /> : <VideoOff />}
+       <MotionIcon icon={v.camera ? Video : VideoOff} />
       </Button>
-      <Button variant="secondary" className="voice-hangup min-h-10" title="Отключиться" onClick={v.leave}>
-       <PhoneOff />
+      <Button variant="ghost" size="icon-lg" title="Отключиться" aria-label="Отключиться" onClick={v.leave}>
+       <MotionIcon icon={PhoneOff} />
       </Button>
      </>
     ) : (
@@ -272,11 +357,16 @@ export function VoiceStage({
       {v.busy ? 'Подключение…' : 'Присоединиться к голосовому каналу'}
      </Button>
     )}
-    <Button variant="secondary" className="min-h-10" title="Настройки голоса и видео" onClick={onSettings}>
+    <Button
+     variant="ghost"
+     size="icon-lg"
+     title="Настройки голоса и видео"
+     aria-label="Настройки голоса и видео"
+     onClick={onSettings}
+    >
      <MotionIcon icon={Settings} kind="settings" />
     </Button>
    </div>
-   {music && <RoomMusic key={id} music={music} joined={joined} />}
   </div>
  );
 }
@@ -285,7 +375,7 @@ function DeviceField({field}: {field: VoiceSettingsModel['fields'][number]}) {
  return (
   <div className="voice-field">
    <Label htmlFor={`voice-${field.key}`}>{field.label}</Label>
-   <Select
+   <OptionsSelect
     id={`voice-${field.key}`}
     label={field.label}
     value={field.value}
@@ -295,8 +385,10 @@ function DeviceField({field}: {field: VoiceSettingsModel['fields'][number]}) {
    />
    {field.missing && (
     <div className="audio-device-missing mt-1.5 min-w-0">
-     <p className="my-1.5 text-[12px] leading-[1.5] text-[#b1b8c6]" role="status">
-      Выбранное устройство недоступно. Настройка сохранена.
+     <p className="text-muted-foreground my-1.5 text-[12px] leading-[1.5]" role="status">
+      {field.key === 'speaker'
+       ? 'Выбранные динамики недоступны. Пока используется системный выход.'
+       : 'Выбранное устройство недоступно. Настройка сохранена.'}
      </p>
      <Button
       type="button"
@@ -354,7 +446,7 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
      </div>
      <div className="voice-field">
       <Label htmlFor="voice-noise">Шумоподавление</Label>
-      <Select
+      <OptionsSelect
        id="voice-noise"
        label="Шумоподавление"
        value={p.noise}
@@ -378,9 +470,8 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
       />
      </div>
      <p className="settings-hint">
-      Звук идёт через сервер Sombra, как в Discord. Включайте, если прямое соединение с собеседником блокируется: «слышу
-      его, а он меня нет». По умолчанию выключено — прямой путь быстрее и не нагружает сервер, а TURN остаётся запасным
-      маршрутом автоматически. Новые участники подключаются с этой настройкой сразу.
+      Включите, если звук между участниками пропадает при прямом соединении. При наличии TURN новые соединения пойдут
+      через него. По умолчанию маршрут выбирается автоматически. В комнате LiveKit звук всегда идёт через сервер.
      </p>
     </div>
    </section>
@@ -393,7 +484,7 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
      </Button>
     </div>
     {settings.preview?.getVideoTracks().length ? (
-     <Media stream={settings.preview} muted volume={0} className="mt-4 max-h-[280px] w-full rounded-[8px] bg-[#111]" />
+     <Media stream={settings.preview} muted volume={0} className="bg-card mt-4 max-h-[280px] w-full rounded-[8px]" />
     ) : null}
    </section>
    {settings.preview && (

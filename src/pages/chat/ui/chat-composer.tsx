@@ -1,7 +1,8 @@
 import type {RefObject} from 'react';
-import {Send} from 'lucide-react';
+import {ArrowUp} from 'lucide-react';
 import {ComposerSendButton} from '@/shared/ui/elements-composer';
 import {MotionIcon} from '@/shared/ui/motion-icon';
+import {Textarea} from '@/shared/ui/textarea';
 import {BotTyping} from '@/features/bots';
 import {ReferenceDraft} from '@/features/message-actions';
 import {
@@ -38,7 +39,7 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
 
  return (
   channel && (
-   <div className="composer-chrome dark" ref={composerRef}>
+   <div className="composer-chrome" ref={composerRef}>
     {state && !messages.voiceLayout && !messages.imageActivityVisible && (
      <BotTyping state={state} channel={channel.id} />
     )}
@@ -61,7 +62,7 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
         void messages.actions.sendForward();
        }}
       >
-       <textarea
+       <Textarea
         ref={forwardCommentRef}
         aria-label="Комментарий к пересылке"
         placeholder="Добавить комментарий (необязательно)"
@@ -78,7 +79,7 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
         }}
        />
        <ComposerSendButton type="submit" disabled={busy} title="Отправить пересылку" aria-label="Отправить пересылку">
-        <MotionIcon icon={Send} kind="send" size={16} />
+        <MotionIcon icon={ArrowUp} kind="send" size={16} />
        </ComposerSendButton>
       </form>
      </>
@@ -126,7 +127,7 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
        }}
        sendButton={
         <ComposerSendButton type="submit" title="Отправить сообщение" disabled={messages.sendDisabled}>
-         <MotionIcon icon={Send} kind="send" size={16} />
+         <MotionIcon icon={ArrowUp} kind="send" size={16} />
         </ComposerSendButton>
        }
       >
@@ -138,7 +139,6 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
        />
        {state && (
         <StickerSuggestions
-         key={channel.id}
          draft={draft}
          stickers={state.stickers}
          user={state.me.id}
@@ -149,7 +149,6 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
        )}
        {state && (
         <ExpressionPicker
-         key={channel.id}
          state={state}
          refresh={chat.actions.refresh}
          onError={chat.actions.setError}

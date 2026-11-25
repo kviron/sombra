@@ -107,8 +107,7 @@ export function useMessageLink({
    }}
   >
    <RadixDialog.Portal>
-    {/* .message-link-overlay — хук размытия подложки из app/styles/glass.css. */}
-    <RadixDialog.Overlay className="message-link-overlay fixed inset-0 z-[170] bg-[#0009]" />
+    <RadixDialog.Overlay className="message-link-overlay bg-muted fixed inset-0 z-[170]" />
     <RadixDialog.Content
      className={dialogClass}
      onCloseAutoFocus={event => {
@@ -168,7 +167,7 @@ export function useMessageLink({
        />
       </label>
       {error && (
-       <p role="alert" className="text-[13px] leading-[1.5] [overflow-wrap:anywhere] text-[#f5a4ac]">
+       <p role="alert" className="text-destructive text-[13px] leading-[1.5] [overflow-wrap:anywhere]">
         {error}
        </p>
       )}

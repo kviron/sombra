@@ -30,7 +30,7 @@ POST /api JSON `{op,...fields}`; HTTP authentication uses its cookie; Tauri IPC 
 - logout: current session only. logout_all: all account sessions.
 - change_password: current_password, password; verifies old password and revokes all sessions.
 - create_group, join_group, create_channel, create_dialog, message: existing membership/ownership checks apply.
-- invite_group_member: `group` and the email of an existing Sombra account. The group owner can add the account immediately. Repeating the invitation succeeds without duplicating membership. The new member receives the group's text and voice permissions on the next request.
+- invite_group_member: `group` and either `email` of an existing account or `users`, an array of 1–9 human account IDs. Requires `members.invite`. User IDs are validated before any are added. Repeated invitations succeed without duplicating membership.
 - update_group: `group` and at least one of `name` or `avatar`. The owner can set a name of 1–60 characters after trimming and set an avatar using a PNG, JPEG or WebP data URL. An empty avatar removes it. Returns the saved group.
 - `delete_channel` takes `group` and `channel`. The owner can remove the channel and its messages and bots. Connected users leave that voice room.
 - `update_message {message,text}` changes the text of a message sent by the authenticated author. `delete_message {message,for_everyone?}` hides a message for the current account by default. Only the author can remove it for everyone.
@@ -83,7 +83,27 @@ Open a voice channel and choose Join. Camera starts with its button. Settings �
 
 `voice_join` and `voice_poll` accept optional `muted` and `deaf` booleans for the caller's connection and return these flags with each peer. Deafen suppresses both incoming audio and the local microphone. The `muted` flag records the separate microphone toggle.
 
+For P2P rooms the server returns `iceTtlSeconds` whenever it issues temporary TURN credentials. The client requests fresh credentials at 80% of that lifetime by adding `refreshIce: true` to its next authenticated `voice_poll`. Ordinary presence polls retain the static ICE list. New connections and ICE restarts use the most recent credentials. A server that omits the TTL keeps the original join-only behavior.
+
+P2P clients advertise `iceVersion: 2` on SDP offers and answers. Each offer carries a fresh `connectionId`; its answer and candidates echo it. After a peer advertises v2, candidates may arrive as an ordered `candidates` array of up to 16 items. Older peers receive individual `candidate` messages. An in-place restart offer includes `restartOf`, the preceding exchange ID. Only the original offerer initiates it. The answering peer can request recovery with `restart` and request a replacement connection with `replace: true` if the restart fails. The API forwards these payloads through the existing signaling mailbox.
+
 `state` includes `voicePresence`, a map from voice channel IDs to live members of each room. Each entry exposes a user ID and mute/deafen flags. Only rooms in groups the requester belongs to are included. Presence expires after 20 seconds without polling.
+
+### Room music
+
+`music_state` and `music_command` return the current track and the upcoming queue. Tracks may include `artist` and `coverUrl` when the provider supplies metadata. Cover URLs use HTTPS on the Yandex artwork hosts.
+
+`music_command` with `action: "shuffle"` permutes the upcoming queue for the room. The current track, playback state and position are preserved. Like the other music commands, it requires an active voice session in the room.
+
+### LiveKit pilot
+
+Create a regular voice channel called `LiveKit` and set `MINES_LIVEKIT_ROOM` to its channel ID on the Sombra server. Set `MINES_LIVEKIT_URL` to the client-facing `wss://` URL and put the matching `MINES_LIVEKIT_KEY` and `MINES_LIVEKIT_SECRET` in the private server environment. Local smoke tests also accept loopback `ws://`. With the room variable absent, ordinary voice signaling applies to every channel.
+
+For the configured room, `voice_join` requires `supportsLiveKit: true` and returns `liveKit: {url, token}` after the usual membership and capacity checks. The signed token expires in two minutes and grants room access and microphone publishing. The client connects directly to LiveKit for audio and signaling and uses `voice_poll` every five seconds for Sombra presence. The pilot supports audio only. Other rooms and dialog calls retain P2P.
+
+For a private Windows pilot over Tailscale, terminate WSS through Tailscale Serve and point it at LiveKit's local HTTP port. Configure LiveKit to advertise the Windows Tailscale IP for ICE and allow its ICE/UDP and ICE/TCP ports through the Windows firewall and tailnet policy. Test clients need access to the tailnet. Check signaling and media from a second device before setting the VPS environment.
+
+Local smoke test: build the Rust server with `cargo build --locked -p sombra-server`, set `SOMBRA_LIVEKIT_BIN` to the local LiveKit server binary, and run `node scripts/check-livekit.mjs`. It creates a temporary group, starts both servers and verifies bidirectional audio using two Chromium clients.
 
 For multiple computers all clients must use the SAME backend/database. Deploy only `mines-server` and the HTTPS API gateway as described in DEPLOY.md; installed clients use a native HTTP cookie jar against that shared `/api`. The deployment does not serve a browser build. Separate desktop instances currently keep independent embedded databases; they do not discover each other. Do not run two writers against the same database.
 

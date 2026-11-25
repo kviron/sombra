@@ -4,6 +4,10 @@ import {X} from 'lucide-react';
 import {type Bot, type BotReasoning, type ChatState} from '@/shared/types';
 import {SettingsPanel} from '@/shared/ui/elements-settings';
 import {ImageCropDialog} from '@/shared/ui/image-crop-dialog';
+import {Checkbox} from '@/shared/ui/checkbox';
+import {Input} from '@/shared/ui/input';
+import {RadioGroup, RadioGroupItem} from '@/shared/ui/radio-group';
+import {Textarea} from '@/shared/ui/textarea';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {BotToolAccess} from './bot-tool-access';
 import {useBotSettings} from '../model/use-bot-settings';
@@ -57,8 +61,7 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
    }}
   >
    <Dialog.Portal>
-    {/* .bot-management-overlay — хук размытия подложки из app/styles/glass.css. */}
-    <Dialog.Overlay className="bot-management-overlay fixed inset-0 z-[80] bg-[#0009]" />
+    <Dialog.Overlay className="bot-management-overlay bg-muted fixed inset-0 z-[80]" />
     <Dialog.Content
      className="bot-management-dialog border-border bg-background text-foreground fixed top-1/2 left-1/2 z-[81] flex max-h-[calc(100dvh-48px)] w-[min(760px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border"
      data-bot-settings-dialog
@@ -129,7 +132,7 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
         <p>Статичное изображение · квадратный PNG 256 × 256. Изменения отправятся только после сохранения.</p>
         <label>
          Имя бота
-         <input
+         <Input
           value={loaded ? name : bot.name}
           maxLength={32}
           disabled={disabled}
@@ -138,7 +141,7 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
         </label>
         <label>
          О боте
-         <textarea
+         <Textarea
           value={bio}
           maxLength={512}
           disabled={disabled}
@@ -156,23 +159,25 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
        <>
         <fieldset disabled={disabled}>
          <legend>Как обращаться к боту в группе</legend>
-         {[
-          ['addressed', 'Только команды и @упоминания'],
-          ['name_dialog', 'Обращение по имени и диалог']
-         ].map(([mode, label]) => (
-          <label className="bot-management-choice" key={mode}>
-           <input
-            type="radio"
-            name="bot-conversation-mode"
-            checked={conversation?.mode === mode}
-            onChange={() => actions.updateConversation({mode: mode as BotConversation['mode']})}
-           />
-           {label}
+         <RadioGroup
+          aria-label="Как обращаться к боту в группе"
+          name="bot-conversation-mode"
+          value={conversation?.mode ?? ''}
+          disabled={disabled}
+          onValueChange={mode => actions.updateConversation({mode: mode as BotConversation['mode']})}
+         >
+          <label className="bot-management-choice">
+           <RadioGroupItem value="addressed" />
+           Только команды и @упоминания
           </label>
-         ))}
+          <label className="bot-management-choice">
+           <RadioGroupItem value="name_dialog" />
+           Обращение по имени и диалог
+          </label>
+         </RadioGroup>
          <label>
           Имена для обращения
-          <textarea value={aliases} onChange={event => actions.setAliases(event.target.value)} />
+          <Textarea value={aliases} onChange={event => actions.setAliases(event.target.value)} />
          </label>
          <p>
           Через запятую или с новой строки: до 8 имён, каждое от 2 до 32 символов. Общие обращения «all», «everyone»,
@@ -180,7 +185,7 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
          </p>
          <label>
           Окно продолжения, секунд
-          <input
+          <Input
            type="number"
            min={0}
            max={600}
@@ -194,7 +199,7 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
          </label>
          <label>
           Сообщений в продолжении
-          <input
+          <Input
            type="number"
            min={0}
            max={20}
@@ -211,10 +216,10 @@ function SettingsContent({bot, state, refresh, onClose}: Props) {
           захватываются. 0 отключает продолжение.
          </p>
          <label className="bot-management-choice">
-          <input
-           type="checkbox"
+          <Checkbox
            checked={conversation?.reactions ?? false}
-           onChange={event => actions.updateConversation({reactions: event.target.checked})}
+           disabled={disabled}
+           onCheckedChange={checked => actions.updateConversation({reactions: checked === true})}
           />
           Реакции бота
          </label>

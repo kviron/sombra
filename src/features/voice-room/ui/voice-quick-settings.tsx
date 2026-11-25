@@ -1,12 +1,34 @@
-import {Popover} from 'radix-ui';
 import {ChevronUp, Settings} from 'lucide-react';
 import {AudioDeviceAccess} from './audio-device-access';
-import {useVoiceQuickSettings} from '../model/use-voice-quick-settings';
+import {useState} from 'react';
+import {selectMicrophones, selectSpeakers} from '@/shared/lib/media-devices';
+import {useAudioDevices, isDeviceSelectionMissing} from '../model/use-audio-devices';
+import {
+ quickLabels,
+ quickPreferenceKey,
+ quickDeviceKind,
+ quickVolume,
+ quickVolumeMax,
+ deviceOptions
+} from '../model/voice-quick-settings-rules';
 import {Button} from '@/shared/ui/button';
-import {Select} from '@/shared/ui/select';
+import {
+ DropdownMenu,
+ DropdownMenuTrigger,
+ DropdownMenuContent,
+ DropdownMenuGroup,
+ DropdownMenuItem,
+ DropdownMenuPortal,
+ DropdownMenuSub,
+ DropdownMenuSubTrigger,
+ DropdownMenuSubContent,
+ DropdownMenuRadioGroup,
+ DropdownMenuRadioItem,
+ DropdownMenuSeparator
+} from '@/shared/ui/dropdown-menu';
 import {Slider} from '@/shared/ui/slider';
-import {Separator} from '@/shared/ui/separator';
 import type {Voice} from '../model/use-voice';
+import '@/shared/ui/menu-material.css';
 import './voice-quick-settings.css';
 
 export function VoiceQuickSettings({
@@ -18,80 +40,149 @@ export function VoiceQuickSettings({
  kind: 'input' | 'output';
  onSettings: () => void;
 }) {
- const model = useVoiceQuickSettings({voice, kind, onSettings});
+ const [open, setOpen] = useState(false);
+ const audioDevices = useAudioDevices(open, kind === 'input' ? selectMicrophones : selectSpeakers);
+ const labels = quickLabels(kind);
+ const deviceKind = quickDeviceKind(kind);
+ const preference = quickPreferenceKey(kind);
+ const preferred = voice.preferences[preference];
+ const selected = kind === 'output' ? voice.speakerOutput : preferred;
+ const missing =
+  kind === 'output'
+   ? selected !== preferred
+   : isDeviceSelectionMissing(audioDevices.devices, audioDevices.loaded, deviceKind, preferred);
+ const disabled = voice.busy || audioDevices.requesting;
+ const volume = quickVolume(kind, voice);
+ const options = deviceOptions({devices: audioDevices.devices, kind, selected, missing: kind === 'input' && missing});
+ const selectedLabel = options.find(option => option.value === selected)?.label;
+ const setDevice = (value: string) => voice.savePreferences(preference, value);
+
  return (
-  <Popover.Root open={model.open} onOpenChange={model.setOpen}>
-   <Popover.Trigger asChild>
+  <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
+   <DropdownMenuTrigger asChild>
     <Button
      type="button"
      variant="ghost"
      size="icon-xs"
      className="voice-quick-trigger"
-     aria-label={model.labels.aria}
-     title={model.labels.title}
+     aria-label={labels.aria}
+     title={labels.title}
     >
-     <ChevronUp size={12} />
+     <ChevronUp className="size-3" />
     </Button>
-   </Popover.Trigger>
-   <Popover.Portal>
-    <Popover.Content
-     side="top"
-     align="end"
-     sideOffset={10}
-     collisionPadding={12}
-     className="voice-quick-panel sombra-menu-surface dark"
-     data-slot="popover-content"
-     aria-label={model.labels.aria}
-    >
-     <label className="voice-quick-label mb-[9px] block font-semibold" htmlFor={`quick-${kind}-device`}>
-      {model.labels.device}
-     </label>
-     <Select
-      id={`quick-${kind}-device`}
-      label={model.labels.device}
-      value={model.selected}
-      disabled={model.disabled}
-      options={model.options}
-      onValueChange={model.setDevice}
-     />
-     {model.missing && (
-      <div className="audio-device-missing mt-1.5 min-w-0">
-       <p className="my-1.5 text-[12px] leading-[1.5] text-[#b1b8c6]" role="status">
-        Выбранное устройство недоступно. Настройка сохранена.
-       </p>
-       <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="audio-device-reset"
-        data-device-kind={kind === 'input' ? 'audioinput' : 'audiooutput'}
-        disabled={model.disabled}
-        onClick={() => model.resetDevice()}
+   </DropdownMenuTrigger>
+   <DropdownMenuContent
+    side="top"
+    align="end"
+    sideOffset={10}
+    collisionPadding={12}
+    className="voice-quick-panel sombra-menu-surface"
+    data-slot="dropdown-menu-content"
+    aria-label={labels.aria}
+    onKeyDown={event => {
+     if (event.key !== 'Tab') return;
+     const controls = [
+      ...event.currentTarget.querySelectorAll<HTMLElement>(
+       '[role="menuitem"]:not([data-disabled]), [role="slider"], button:not(:disabled)'
+      )
+     ];
+     const current = controls.indexOf(document.activeElement as HTMLElement);
+     const next = (current + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+     event.preventDefault();
+     controls[next]?.focus();
+    }}
+   >
+    <DropdownMenuGroup>
+     <DropdownMenuSub>
+      <DropdownMenuSubTrigger disabled={disabled} className="min-h-14">
+       <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span>{labels.device}</span>
+        <span className="text-muted-foreground truncate text-xs">{selectedLabel}</span>
+       </span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuPortal>
+       <DropdownMenuSubContent
+        className="voice-quick-devices sombra-menu-surface w-72 max-w-[calc(100vw-24px)]"
+        data-slot="dropdown-menu-content"
+        sideOffset={6}
+        collisionPadding={12}
+        aria-label={labels.device}
        >
-        {model.labels.reset}
-       </Button>
-      </div>
-     )}
-     <AudioDeviceAccess devices={model.audioDevices} disabled={voice.busy} />
-     <Separator className="my-4" />
-     <div className="voice-quick-volume mb-[9px] flex items-center justify-between gap-3 font-semibold">
-      <label id={`quick-${kind}-volume`}>{model.labels.volume}</label>
-      <output className="text-[#aeb7ca] tabular-nums">{model.volume}%</output>
+        <DropdownMenuRadioGroup value={selected} onValueChange={setDevice}>
+         {options.map(option => (
+          <DropdownMenuRadioItem
+           key={option.value}
+           value={option.value}
+           disabled={disabled}
+           textValue={option.label}
+           onSelect={event => event.preventDefault()}
+           className="min-h-11 py-2 pr-10 pl-2 [&>span:first-child]:right-2 [&>span:first-child]:left-auto [&>span:first-child]:size-4 [&>span:first-child]:rounded-full [&>span:first-child]:border"
+          >
+           <span className="min-w-0 [overflow-wrap:anywhere]">{option.label}</span>
+          </DropdownMenuRadioItem>
+         ))}
+        </DropdownMenuRadioGroup>
+       </DropdownMenuSubContent>
+      </DropdownMenuPortal>
+     </DropdownMenuSub>
+    </DropdownMenuGroup>
+    {missing && (
+     <div className="audio-device-missing mt-1.5 min-w-0">
+      <p className="text-muted-foreground my-1.5 text-[12px] leading-[1.5]" role="status">
+       {kind === 'output'
+        ? 'Выбранные динамики недоступны. Пока используется системный выход.'
+        : 'Выбранное устройство недоступно. Настройка сохранена.'}
+      </p>
+      <Button
+       type="button"
+       variant="secondary"
+       size="sm"
+       className="audio-device-reset"
+       data-device-kind={deviceKind}
+       disabled={disabled}
+       onClick={() => setDevice('')}
+      >
+       {labels.reset}
+      </Button>
+     </div>
+    )}
+    <AudioDeviceAccess devices={audioDevices} disabled={voice.busy} />
+    <DropdownMenuSeparator className="my-2" />
+    <div
+     className="px-2 py-1"
+     onKeyDown={event => {
+      if (event.key !== 'Escape' && event.key !== 'Tab') event.stopPropagation();
+     }}
+    >
+     <div className="voice-quick-volume mb-[9px] flex items-center justify-between gap-3 text-sm font-medium">
+      <label id={`quick-${kind}-volume`}>{labels.volume}</label>
+      <output className="text-muted-foreground tabular-nums">{volume}%</output>
      </div>
      <Slider
+      aria-label={labels.volume}
       aria-labelledby={`quick-${kind}-volume`}
       min={0}
-      max={model.volumeMax}
-      value={[model.volume]}
-      onValueChange={([value]) => model.setVolume(value)}
+      max={quickVolumeMax(kind)}
+      value={[volume]}
+      onValueChange={([value]) =>
+       kind === 'input' ? voice.setMicVolume(value) : voice.savePreferences('volume', value)
+      }
      />
-     <Separator className="my-4" />
-     <Button type="button" variant="ghost" className="voice-quick-settings-link" onClick={model.openSettings}>
+    </div>
+    <DropdownMenuSeparator className="my-2" />
+    <DropdownMenuGroup>
+     <DropdownMenuItem
+      className="voice-quick-settings-link"
+      onSelect={() => {
+       setOpen(false);
+       onSettings();
+      }}
+     >
       <Settings size={16} />
       Настройки голоса
-     </Button>
-    </Popover.Content>
-   </Popover.Portal>
-  </Popover.Root>
+     </DropdownMenuItem>
+    </DropdownMenuGroup>
+   </DropdownMenuContent>
+  </DropdownMenu>
  );
 }

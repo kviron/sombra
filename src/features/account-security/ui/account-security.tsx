@@ -126,7 +126,7 @@ export function AccountSecurity({
           type="button"
           variant="secondary"
           size="sm"
-          className="surface-matte"
+          className="bg-card"
           aria-haspopup="dialog"
           disabled={busy || state.me.bot || !coverSupported}
           onClick={() => actions.openMedia('cover')}
@@ -139,7 +139,7 @@ export function AccountSecurity({
            type="button"
            variant="secondary"
            size="icon-lg"
-           className="surface-matte"
+           className="bg-card"
            aria-label="Удалить обложку"
            title="Удалить обложку"
            disabled={busy}
@@ -157,7 +157,7 @@ export function AccountSecurity({
           type="button"
           variant="secondary"
           size="sm"
-          className="surface-matte"
+          className="bg-card"
           aria-haspopup="dialog"
           disabled={busy || state.me.bot}
           onClick={() => actions.openMedia('avatar')}
@@ -170,7 +170,7 @@ export function AccountSecurity({
            type="button"
            variant="secondary"
            size="icon-lg"
-           className="surface-matte"
+           className="bg-card"
            aria-label="Удалить аватар"
            title="Удалить аватар"
            disabled={busy}
@@ -183,7 +183,7 @@ export function AccountSecurity({
        </div>
        <div className="approved-profile-identity grid gap-1 px-6 pt-14 pb-4 [overflow-wrap:anywhere]">
         <div className="profile-identity-field group flex min-w-0 items-center gap-2">
-         <input
+         <Input
           id="account-name"
           className="profile-identity-input text-xl leading-[1.3] font-semibold"
           autoComplete="nickname"
@@ -207,7 +207,7 @@ export function AccountSecurity({
          </Button>
         </div>
         <div className="profile-identity-field group flex min-w-0 items-center gap-2">
-         <input
+         <Input
           id="account-bio"
           className="profile-identity-input text-[14px]"
           aria-label="О себе"

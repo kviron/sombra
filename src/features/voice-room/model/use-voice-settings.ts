@@ -71,7 +71,10 @@ export function useVoiceSettings({voice}: Options) {
  const fields = deviceKinds.map((kind, index) => {
   const key = devicePreferenceKeys[index],
    value = preferences[key],
-   missing = isDeviceSelectionMissing(audioDevices.devices, audioDevices.loaded, kind, value);
+   missing =
+    key === 'speaker'
+     ? voice.speakerOutput !== value
+     : isDeviceSelectionMissing(audioDevices.devices, audioDevices.loaded, kind, value);
   return {
    kind,
    key,

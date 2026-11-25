@@ -6,9 +6,9 @@
    позиция нужны под индикатор. Цвет с фолбэком сохранён как был. */
 .voice-channel-participant {
  position: relative;
- color: var(--muted-foreground, #aeb4c0);
  border-radius: 6px;
 }
+
 .voice-channel-level {
  display: block;
  position: absolute;
@@ -21,6 +21,7 @@
  background: #ffffff14;
  box-shadow: inset 0 0 0 1px #ffffff12;
 }
+
 .voice-channel-level > span {
  display: block;
  width: 100%;
@@ -30,13 +31,7 @@
  transform-origin: bottom;
  transition: transform 0.1s linear;
 }
-/* Класс приглушённого вида: voice-level.tsx склеивает его без пробела
-   («voice-channel-levelis-muted»), поэтому правило пока не срабатывает.
-   Разметку не трогаем — это отдельная правка поведения. */
-.voice-channel-level.is-muted {
- background: #ed424526;
- box-shadow: inset 0 0 0 1px #ed424566;
-}
+
 @media (prefers-reduced-motion: reduce) {
  .voice-channel-level > span {
   transition: none;

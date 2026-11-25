@@ -137,7 +137,7 @@ export function AttachmentContextMenu({
        '[&:not([data-disabled])]:hover:bg-accent [&:not([data-disabled])]:hover:text-accent-foreground',
        '[&:not([data-disabled])]:focus-visible:bg-accent [&:not([data-disabled])]:focus-visible:text-accent-foreground',
        'data-[disabled]:cursor-default data-[disabled]:opacity-50',
-       'focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#abc7ff]'
+       'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-[-2px]'
       )}
       data-disabled={item.disabled ? '' : undefined}
       aria-disabled={item.disabled || undefined}

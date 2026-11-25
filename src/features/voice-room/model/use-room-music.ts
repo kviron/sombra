@@ -1,4 +1,4 @@
-import {useEffect, useRef, type RefObject} from 'react';
+import {useEffect, useRef} from 'react';
 import {useStore} from 'zustand';
 import {musicService} from './services/music-service';
 import {openRoomMusicStream} from './room-music-stream';
@@ -18,14 +18,10 @@ import {
 
 /**
  * Музыка в комнате: опрос снапшота, загрузка приватного аудио, команды и синхронизация
- * проигрывателя. Элемент audio создаёт компонент и передаёт сюда ссылкой: DOM не хранится в модели.
+ * проигрывателя. Компонент привязывает engine к своему элементу audio.
  */
-export function useRoomMusic(
- room: string | undefined,
- deaf: boolean,
- speaker: string,
- engine: RefObject<HTMLAudioElement | null>
-) {
+export function useRoomMusic(room: string | undefined, deaf: boolean, speaker: string) {
+ const engine = useRef<HTMLAudioElement>(null);
  const state = useStore(roomMusicStore);
  const epoch = useRef(0),
   lastTrack = useRef<string | undefined>(undefined);
@@ -185,6 +181,7 @@ export function useRoomMusic(
   privateFailure: state.privateFailure,
   retryAudio: roomMusicActions.retryAudio,
   loadingPrivate: !!assetId && !playbackUrl && !state.privateFailure,
+  engine,
   playbackUrl,
   onAudioError: () => {
    if (playbackUrl) roomMusicActions.setBlocked(true);

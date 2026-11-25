@@ -42,6 +42,7 @@ test('медленный ответ не откатывает уже показ�
  assert.equal(isFreshSnapshot({state: {...snapshot, serverTimeMs: 2000}, received: 0}, snapshot), false);
  assert.equal(isFreshSnapshot({state: {...snapshot, serverTimeMs: 1000}, received: 0}, snapshot), true);
  assert.equal(isFreshSnapshot({state: {...snapshot, room: 'room-2'}, received: 0}, snapshot), true);
+ assert.equal(isFreshSnapshot({state: {...snapshot, revision: snapshot.revision + 1}, received: 0}, snapshot), false);
 });
 
 test('команда проверяет аргументы до запроса', () => {

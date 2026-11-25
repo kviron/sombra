@@ -18,6 +18,7 @@
  font-size: 0.8125rem;
  text-align: left;
 }
+
 .message-reference {
  max-width: 100%;
  width: fit-content;
@@ -25,20 +26,21 @@
  padding: 4px 8px;
  border-inline-start: 2px solid var(--muted-foreground);
  border-radius: 4px;
- background: var(--muted);
 }
+
 button.message-reference:hover,
 .reference-draft button:hover,
 .forward-picker button:hover {
- background: var(--accent);
  color: var(--accent-foreground);
 }
+
 .message-reference span,
 .reference-draft span,
 .forward-picker li span {
  min-width: 0;
  display: grid;
 }
+
 .message-reference strong,
 .message-reference small,
 .reference-draft strong,
@@ -49,17 +51,20 @@ button.message-reference:hover,
  text-overflow: ellipsis;
  white-space: nowrap;
 }
+
 .message-reference strong,
 .reference-draft strong,
 .forward-picker strong {
  color: var(--foreground);
  font-size: inherit;
 }
+
 .message-reference svg,
 .reference-draft svg,
 .forward-picker svg {
  flex: none;
 }
+
 .message-forwarded {
  display: flex;
  align-items: center;
@@ -68,12 +73,13 @@ button.message-reference:hover,
  color: var(--muted-foreground);
  font-size: 0.75rem;
 }
+
 .reference-draft {
  padding: 4px 8px 4px 12px;
- background: var(--muted);
  border-radius: 8px;
  margin-bottom: 4px;
 }
+
 .reference-draft button,
 .forward-picker header button {
  display: grid;
@@ -84,15 +90,16 @@ button.message-reference:hover,
  margin-inline-start: auto;
  border-radius: 6px;
 }
+
 .forward-composer {
  display: flex;
  gap: 8px;
  align-items: end;
  padding: 8px;
- background: var(--background);
  border: 1px solid var(--border);
  border-radius: 8px;
 }
+
 .forward-composer textarea {
  flex: 1;
  min-width: 0;
@@ -102,6 +109,7 @@ button.message-reference:hover,
  padding: 8px;
  background: transparent;
 }
+
 /* Окно пикера: перебивает .group-modal из chat.css. */
 .forward-picker.group-modal {
  position: fixed;
@@ -115,13 +123,15 @@ button.message-reference:hover,
  padding: 16px;
  overflow: auto;
 }
+
 .forward-picker h2 {
  margin: 0;
 }
+
 .forward-picker button:focus-visible,
 .reference-draft button:focus-visible,
 .message-reference:focus-visible,
-.forward-composer textarea:focus-visible {
+.forward-composer textarea:not([data-slot]):focus-visible {
  outline: 2px solid var(--ring);
  outline-offset: -2px;
 }

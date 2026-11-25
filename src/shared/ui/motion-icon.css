@@ -4,24 +4,27 @@
 button:not(:disabled):is(:hover, :focus-visible) .motion-icon__echo--cyan {
  animation: sombra-icon-tear 240ms steps(1, end) both;
 }
+
 button:not(:disabled):is(:hover, :focus-visible) .motion-icon__echo--violet {
  animation: sombra-icon-tear 240ms steps(1, end) reverse both;
 }
+
 button:not(:disabled):is(:hover, :focus-visible) .motion-icon--settings .motion-icon__base {
  transform: rotate(30deg);
 }
+
 button:not(:disabled):active .motion-icon {
  transform: scale(0.88);
 }
+
 button:not(:disabled):active .motion-icon--send {
  transform: translate(2px, -2px) scale(0.92);
 }
-button[aria-pressed='true'] .motion-icon--device {
- color: #f87171;
-}
+
 .motion-icon--device .motion-icon__base {
  animation: sombra-device-state 160ms ease-out;
 }
+
 @keyframes sombra-icon-tear {
  0%,
  100% {
@@ -47,6 +50,7 @@ button[aria-pressed='true'] .motion-icon--device {
   opacity: 0;
  }
 }
+
 @keyframes sombra-device-state {
  from {
   opacity: 0.55;
@@ -57,6 +61,7 @@ button[aria-pressed='true'] .motion-icon--device {
   transform: scale(1);
  }
 }
+
 @media (prefers-reduced-motion: reduce) {
  .motion-icon,
  .motion-icon__base {

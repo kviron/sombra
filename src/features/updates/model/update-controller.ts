@@ -59,7 +59,8 @@ export function createUpdater(adapter: {check: () => Promise<Update | null>; rel
      }
      if (event.event === 'Progress') {
       received += event.data.chunkLength;
-      set({...state, percent: total ? Math.min(100, Math.floor((received / total) * 100)) : undefined});
+      const percent = total ? Math.min(100, Math.floor((received / total) * 100)) : undefined;
+      if (percent !== state.percent) set({...state, percent});
      }
     });
     set({...state, phase: 'ready', percent: 100});

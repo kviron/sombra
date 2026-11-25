@@ -1,3 +1,4 @@
+import {Input} from '@/shared/ui/input';
 import {Bot as BotIcon, Copy} from 'lucide-react';
 import {type ChatState} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
@@ -41,7 +42,7 @@ export function Bots({
       <UserAvatar user={row.user} size="sm" presence={false} />
       <div>
        <strong>{row.bot.name}</strong>{' '}
-       <small className="bot-badge rounded-[4px] bg-[#7278ed25] px-[5px] py-px text-[9px] text-[#b1b8ff]">БОТ</small>
+       <small className="bot-badge text-primary rounded-[4px] px-[5px] py-px text-[9px]">БОТ</small>
        {row.bot.username && <p>@{row.bot.username}</p>}
       </div>
      </div>
@@ -84,7 +85,7 @@ export function Bots({
     <>
      <label>
       Имя бота
-      <input
+      <Input
        aria-label="Имя бота"
        maxLength={32}
        value={name}
@@ -95,7 +96,7 @@ export function Bots({
      {group && (
       <label>
        Уникальное имя
-       <input
+       <Input
         aria-label="Уникальное имя бота"
         maxLength={32}
         value={username}
@@ -114,7 +115,7 @@ export function Bots({
    {token && (
     <div className="bot-token">
      <p>Новый ключ показан только сейчас. Сохраните его на машине сервиса бота. Не отправляйте в чат.</p>
-     <input type="password" aria-label="Новый ключ бота" readOnly value={token} autoComplete="off" />
+     <Input type="password" aria-label="Новый ключ бота" readOnly value={token} autoComplete="off" />
      <button type="button" className="small-button" onClick={actions.copyToken}>
       <Copy size={16} />
       {copied ? 'Скопировано' : 'Скопировать ключ'}

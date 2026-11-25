@@ -13,48 +13,32 @@
    а strong/small/time/meta — из слотов чужой разметки, утилиты туда не положить. */
 .user-row[data-offline='true'] .user-avatar {
  opacity: 0.72;
- filter: saturate(0.65);
 }
-.user-row[data-offline='true'] .user-row-title strong {
- color: #bcc3d0;
-}
+
 .user-row[data-variant='voice'] .user-row-title strong {
  color: inherit;
  font-size: 13px;
  font-weight: 500;
 }
+
 .user-row-title > :not(strong) {
  flex-shrink: 0;
- color: #98a2b5;
  font-size: 11px;
  line-height: 1;
 }
+
 .user-row[data-variant='dialog'] .user-row-title time {
  margin-left: auto;
- color: #98a5b8;
  font-size: 10px;
 }
+
 .user-row[data-variant='voice'] small {
  font-size: 10px;
  opacity: 0.7;
 }
 
-/* Наведение строки задаёт чат: правило цепляется за .chat-shell и остаётся
-   нелейерным, иначе утилиты проиграют общим кнопкам чата. */
-.chat-shell .user-row[data-variant='member']:hover {
- background: #ffffff0a;
- color: #fff;
-}
 .chat-shell .dialog-row[data-variant='dialog']:is(:hover, :focus-visible) {
- background: var(--surface-border);
  color: var(--accent-foreground);
-}
-.chat-shell .user-row[data-variant='dialog'][data-selected='true'] {
- background: rgba(125, 145, 180, 0.22);
-}
-.chat-shell .user-row[data-variant='voice']:hover {
- background: #ffffff08;
- color: #eee;
 }
 
 /* Members panel: grouped by presence, one row per account. Разметка панели живёт
@@ -63,6 +47,7 @@
  padding: 14px 10px 20px;
  overflow: auto;
 }
+
 .member-list ul {
  display: flex;
  flex-direction: column;
@@ -71,24 +56,25 @@
  padding: 0;
  list-style: none;
 }
+
 .member-list .member-section + .member-section {
  margin-top: 22px;
 }
+
 .member-list .member-section h3 {
  margin: 0 8px 8px;
- color: #8d94a5;
  font-size: 11px;
  font-weight: 600;
  letter-spacing: 0.07em;
  text-transform: uppercase;
 }
+
 .member-list .member-section h3 span {
- color: #6c7484;
  font-weight: 500;
 }
+
 .member-list .member-empty {
  margin: 0 8px;
- color: #7d8494;
  font-size: 12px;
  line-height: 1.5;
 }
@@ -103,19 +89,20 @@
  background: transparent;
  text-align: left;
 }
+
 .chat-shell .profile-self:hover {
  background: transparent;
 }
+
 .profile-self .avatar {
  flex: 0 0 32px;
 }
-.profile-self .avatar span[data-online='false'] {
- background: #5d6472;
-}
+
 /* The account chip uses the shared avatar component so a profile decoration shows here too. */
 .profile-self .user-avatar {
  flex: 0 0 32px;
 }
+
 @media (max-width: 760px) {
  .chat-shell .profile .user-avatar {
   display: none;
@@ -137,10 +124,11 @@
  color: inherit;
  font: inherit;
 }
+
 .chat-shell .message-avatar .avatar-trigger:hover {
  background: transparent;
- box-shadow: inset 0 0 0 1px #ffffff3d;
 }
+
 .chat-shell .message-author {
  padding: 0;
  border: 0;
@@ -149,6 +137,7 @@
  font: inherit;
  font-weight: 600;
 }
+
 .chat-shell .message-author:hover {
  background: transparent;
  text-decoration: underline;
@@ -164,8 +153,8 @@
  font: inherit;
  font-weight: inherit;
 }
+
 .chat-shell .chat-header-user:hover {
  background: transparent;
- color: #fff;
  text-decoration: underline;
 }

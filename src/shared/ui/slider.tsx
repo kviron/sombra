@@ -6,6 +6,7 @@ export function Slider({
  value,
  defaultValue = [0],
  'aria-label': label,
+ 'aria-valuetext': valueText,
  ...props
 }: React.ComponentProps<typeof Primitive.Root>) {
  return (
@@ -26,6 +27,7 @@ export function Slider({
     <Primitive.Thumb
      key={i}
      aria-label={label}
+     aria-valuetext={valueText}
      data-slot="slider-thumb"
      className="border-primary bg-background focus-visible:ring-ring/50 block size-4 shrink-0 rounded-full border shadow-sm focus-visible:ring-4 focus-visible:outline-none"
     />

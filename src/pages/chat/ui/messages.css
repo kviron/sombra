@@ -4,7 +4,6 @@
    chat-extras.css, а утилиты Tailwind лежат в слое и всегда им проигрывают. */
 .chat-message[data-slot='message'] {
  display: flex;
- flex-direction: row;
  align-items: flex-end;
  justify-content: flex-start;
  gap: 8px;
@@ -13,11 +12,13 @@
  background: none;
  max-width: 100%;
 }
+
 .chat-message[data-slot='message'] .message-content {
  flex: 0 1 auto;
  min-width: 0;
  max-width: min(76%, 620px);
 }
+
 .chat-message[data-slot='message'] .message-avatar {
  width: 28px;
  height: 28px;
@@ -28,27 +29,21 @@
  justify-content: center;
  margin-bottom: 2px;
 }
-[data-own='true'] .message-bubble {
- background: #303d62;
- border-color: #798dc22b;
-}
+
 .chat-message .message-bubble[data-sticker-only='true'],
 .chat-message .message-bubble[data-image-message='true'] {
  background: transparent;
  border-color: transparent;
 }
-[data-own='true'] .message-image-caption {
- background: #303d62;
- border-color: #798dc22b;
-}
+
 .chat-message .message-meta {
  gap: 8px;
  min-height: 18px;
  margin-bottom: 1px;
  padding-right: 8px;
- color: #b6c8e7;
  font-size: 12px;
 }
+
 .chat-message .message-meta button {
  opacity: 1;
  display: flex;
@@ -57,25 +52,67 @@
  min-width: 24px;
  min-height: 24px;
 }
+
 .chat-message .message-meta .message-author {
  min-height: 18px;
 }
+
 .chat-message .message-content .message-text {
  font-size: 14px;
  line-height: 1.4;
 }
-[data-own='true'] .message-footer {
- color: #c0cdec;
+
+.chat-message [data-slot='bubble']:has(> [data-slot='bubble-reactions']) {
+ margin-bottom: 20px;
 }
-.chat-message .reactions:empty {
- display: none;
+
+.chat-message
+ [data-slot='bubble'][data-variant='default']
+ > [data-slot='bubble-reactions']
+ > button:hover:not(:disabled) {
+ background-color: color-mix(in oklab, currentColor 10%, transparent);
+ color: inherit;
 }
-.chat-message .reactions:not(:empty) {
- margin-top: 5px;
+
+.chat-message
+ [data-slot='bubble'][data-variant='default']
+ > [data-slot='bubble-reactions']
+ > button[aria-pressed='true'] {
+ border-color: color-mix(in oklab, currentColor 35%, transparent);
 }
+
+.message-delivery-meta {
+ position: relative;
+ inset-block-start: 4px;
+ display: flex;
+ align-items: center;
+ justify-content: flex-end;
+ gap: 4px;
+ font-size: 11px;
+ line-height: 1.2;
+ white-space: nowrap;
+ opacity: 0.75;
+}
+
+/* Keep delivery metadata at the right edge, sharing the last text line if it fits. */
+[data-inline-meta='true']:has(> .message-delivery-meta) > .message-text:has(> p:last-child) {
+ display: contents;
+}
+
+[data-inline-meta='true']:has(> .message-delivery-meta) > .message-text > p:last-child {
+ display: inline;
+}
+
+[data-inline-meta='true']:has(> .message-text > p:last-child) > .message-delivery-meta {
+ float: right;
+ margin-block-start: 0.35em;
+ margin-inline-start: 6px;
+}
+
 .voice-messages .chat-message .message-content {
  max-width: 85%;
 }
+
 @media (max-width: 760px) {
  .chat-message[data-slot='message'] .message-content {
   max-width: 90%;
@@ -89,65 +126,29 @@
 .chat-message[data-slot='message'][data-grouped='true'] {
  margin-top: 2px;
 }
-.chat-message[data-slot='message'][data-grouped='true'] .message-avatar {
+
+.chat-message[data-slot='message'] .message-avatar[data-avatar-placeholder] {
  height: 0;
  margin-bottom: 0;
  visibility: hidden;
 }
+
 /* Media starts on the same outer grid as a text bubble, not inside a second padded bubble. */
 .chat-message .message-bubble[data-image-message='true'] {
  padding: 0;
  border: 0;
  border-radius: 0;
 }
-.chat-message .message-bubble[data-image-message='true'] > .message-meta {
- padding: 7px 21px 0 11px;
-}
-/* A single paragraph can share its last line with an atomic footer; keep
-   lists, separate paragraphs, code blocks, tables and media in normal flow. */
-.chat-message .message-bubble[data-inline-time='true']:has(> .bubble-content > .message-text > p:only-child) {
- line-height: 1.4;
-}
-.chat-message
- .message-bubble[data-inline-time='true']:has(> .bubble-content > .message-text > p:only-child)
- .message-text,
-.chat-message .message-bubble[data-inline-time='true'] .message-text > p:only-child {
- display: inline;
- line-height: inherit;
-}
-.chat-message
- .message-bubble[data-inline-time='true']:has(> .bubble-content > .message-text > p:only-child)
- > .message-bottom-inline
- > .message-footer {
- display: inline-flex;
- margin: 0 0 0 7px;
- vertical-align: baseline;
-}
+
 .chat-message .sent-sticker {
  display: block;
-}
-.chat-message .message-bottom-row .message-footer {
- flex-shrink: 0;
- margin: 0 0 1px;
-}
-.chat-message .message-bottom-row .reactions {
- margin: 0;
- gap: 4px;
- min-width: 0;
-}
-.chat-message .reactions > button {
- display: inline-flex;
- align-items: center;
- gap: 3px;
- min-height: 22px;
- padding: 1px 7px;
- border-radius: 12px;
 }
 
 /* A decorated avatar paints a thin ring just outside its own circle: let it show instead of clipping it away. */
 .chat-message .message-avatar:has(.avatar-fx) {
  overflow: visible;
 }
+
 .chat-message .message-avatar:has(.avatar-fx) .avatar-trigger {
  overflow: visible;
 }
@@ -164,31 +165,24 @@
  border-radius: 50%;
  animation: message-pending-spin 0.7s linear infinite;
 }
+
 @keyframes message-pending-spin {
  to {
   transform: rotate(1turn);
  }
 }
-.message-retry:focus-visible {
- outline: 2px solid var(--ring);
- outline-offset: 2px;
-}
+
 @media (prefers-reduced-motion: reduce) {
  .message-pending {
   animation: none;
  }
 }
 
-/* История канала: кнопка догрузки над первым сообщением и невидимый маркер автодогрузки.
-   Высота строки постоянна, чтобы подмена «кнопка → загрузка» не сдвигала прокрутку. */
-.chat-history-button:hover {
- background: #ffffff14;
- color: #e3e7ef;
-}
 .chat-history-button:focus-visible {
  outline: 2px solid var(--ring);
  outline-offset: 2px;
 }
+
 @media (prefers-reduced-motion: reduce) {
  .chat-history-button {
   transition: none;

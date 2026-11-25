@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::time::{Duration, Instant};
 use tauri::{ipc::Channel, AppHandle, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 use tokio::sync::Mutex;
@@ -35,10 +36,14 @@ pub async fn download_update(state: State<'_, UpdateStore>, progress: Channel<Pr
     let update = pending.update.as_mut().ok_or("Check for an update first")?;
     update.timeout = Some(std::time::Duration::from_secs(600));
     let mut received = 0u64;
+    let mut last_progress: Option<Instant> = None;
     // The official plugin verifies the signature before returning bytes.
     let bytes = update.download(|chunk, total| {
         received += chunk as u64;
-        let _ = progress.send(Progress { received, total });
+        if last_progress.is_none_or(|last| last.elapsed() >= Duration::from_millis(100)) {
+            let _ = progress.send(Progress { received, total });
+            last_progress = Some(Instant::now());
+        }
     }, || {}).await.map_err(|e| e.to_string())?;
     pending.verified_bytes = Some(bytes);
     Ok(())

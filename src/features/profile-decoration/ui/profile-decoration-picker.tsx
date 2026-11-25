@@ -1,3 +1,4 @@
+import {Input} from '@/shared/ui/input';
 import {useRef} from 'react';
 import {Dialog, ScrollArea} from 'radix-ui';
 import {Check, Plus, Upload, X} from 'lucide-react';
@@ -6,6 +7,7 @@ import {UserAvatar} from '@/shared/ui/user-avatar';
 import {ProfileEffectImage} from '@/shared/ui/profile-effect-image';
 import {ProfileCover} from '@/shared/ui/profile-cover';
 import {Button} from '@/shared/ui/button';
+import {Textarea} from '@/shared/ui/textarea';
 import {cn} from '@/shared/lib';
 import {useProfileDecorationPicker} from '../model/use-profile-decoration-picker';
 import type {DecorationChoice, MediaTarget} from '../model/profile-decoration';
@@ -173,7 +175,7 @@ export function ProfileDecorationPicker({
     <Dialog.Overlay className="profile-effects-overlay" />
     <Dialog.Content
      className={cn(
-      'profile-effects-dialog dark surface-matte',
+      'profile-effects-dialog bg-background text-foreground border',
       'fixed inset-[50%_auto_auto_50%] z-[1401] w-[min(820px,calc(100vw_-_32px))] [transform:translate(-50%,-50%)] overflow-hidden rounded-[16px]'
      )}
      data-target={target}
@@ -278,7 +280,7 @@ export function ProfileDecorationPicker({
            >
             <Upload size={22} aria-hidden="true" />
             <label htmlFor="profile-effect-file">Файл анимации</label>
-            <input
+            <Input
              id="profile-effect-file"
              type="file"
              accept="image/gif,.gif"
@@ -299,7 +301,7 @@ export function ProfileDecorationPicker({
              </div>
             )}
             <label htmlFor="profile-effect-name">Название</label>
-            <input
+            <Input
              id="profile-effect-name"
              type="text"
              required
@@ -336,7 +338,7 @@ export function ProfileDecorationPicker({
           }}
          >
           <label htmlFor="profile-effect-prompt">Как должен выглядеть эффект?</label>
-          <textarea
+          <Textarea
            id="profile-effect-prompt"
            rows={3}
            required
@@ -347,7 +349,7 @@ export function ProfileDecorationPicker({
            placeholder={
             target === 'avatar' ? 'Например, тёплые искры по краю аватара' : 'Например, звёзды над ночным городом'
            }
-           className="border-border bg-card text-card-foreground min-h-[88px] w-full resize-y rounded-[8px] border px-3 py-2 [font:inherit]"
+           className="min-h-22 resize-y"
           />
           <p className={note}>
            Сначала появится превью. Сохранённый черновик будет личным, пока вы не опубликуете его сами.

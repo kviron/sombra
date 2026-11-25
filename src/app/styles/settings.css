@@ -3,90 +3,116 @@
 .app-surface .account-modal {
  font-family: var(--font-sans);
 }
+
 .account-modal > aside.settings-sidebar {
  display: flex;
- background: transparent;
+ padding: 8px;
  border-color: var(--border);
 }
+
+.account-settings-compact {
+ display: none;
+}
+
+@media (max-width: 760px) {
+ .account-modal > aside.settings-sidebar {
+  display: none;
+ }
+
+ .account-settings-compact {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 0 12px 8px;
+ }
+}
+
 .account-modal [data-sidebar='header'] {
  flex-shrink: 0;
- padding-inline: 0;
+ padding: 0 0 8px;
 }
-.chat-shell .account-modal button.settings-identity {
+
+.chat-shell .account-modal aside [data-sidebar='menu-button'].settings-identity {
  display: flex;
  align-items: center;
  justify-content: flex-start;
- gap: 12px;
+ gap: 8px;
  min-width: 0;
  width: 100%;
- padding: 4px 8px;
+ padding: 8px;
  text-align: left;
  border-radius: var(--radius-md);
- background: transparent;
 }
+
 .chat-shell .account-modal button.settings-identity:is(:hover, :focus-visible) {
- background: var(--sidebar-accent);
  color: var(--sidebar-accent-foreground);
 }
+
 .account-modal .settings-identity-text {
  display: flex;
  flex-direction: column;
- gap: 4px;
+ gap: 0;
+ flex: 1;
  min-width: 0;
 }
+
 .account-modal .settings-edit-profile {
- display: flex;
- align-items: center;
- gap: 4px;
+ overflow: hidden;
+ text-overflow: ellipsis;
  color: var(--muted-foreground);
  font-size: 11px;
  line-height: 16px;
  white-space: nowrap;
 }
-.account-modal .settings-edit-profile svg {
- flex-shrink: 0;
-}
+
 .account-modal .settings-identity strong {
  overflow: hidden;
  text-overflow: ellipsis;
  white-space: nowrap;
  font-size: 13px;
 }
-.account-modal .settings-identity .avatar {
- flex-shrink: 0;
- width: 40px;
- height: 40px;
+
+.account-modal [data-sidebar='content'] [data-sidebar='menu'] {
+ gap: 2px;
 }
+
 .chat-shell .account-modal aside [data-sidebar='menu-button'] {
  justify-content: flex-start;
- min-height: 36px;
- padding: 8px;
+ min-height: 32px;
+ padding: 6px 8px;
  border-radius: var(--radius-md);
- background: transparent;
  font-size: 13px;
  line-height: 18px;
  color: var(--muted-foreground);
 }
+
 .chat-shell .account-modal aside [data-sidebar='menu-button'][data-active='true'],
 .chat-shell .account-modal aside [data-sidebar='menu-button']:hover {
  color: var(--sidebar-accent-foreground);
- background: var(--sidebar-accent);
 }
+
 .account-modal [data-sidebar='footer'] {
- gap: 12px;
+ gap: 8px;
+ padding: 8px 0 0;
 }
+
 .account-modal article {
  display: flex;
  flex-direction: column;
  overflow: hidden;
 }
+
 .account-modal article header {
  flex-shrink: 0;
  align-items: center;
+ justify-content: space-between;
+ padding: 8px 12px;
  border-color: var(--border);
  font-size: 13px;
  font-weight: 500;
 }
+
 .account-modal article > div {
  width: 100%;
  max-width: none;
@@ -94,38 +120,43 @@
  overflow: auto;
  overscroll-behavior: contain;
 }
+
 .account-modal h2 {
  font-weight: 600;
 }
+
 .account-modal .settings-form {
  display: grid;
 }
+
 .account-modal .settings-actions {
  display: flex;
 }
+
 .account-modal .settings-field {
  display: grid;
  align-items: center;
 }
+
 .account-modal [data-slot='button']:not([data-size='icon-xs']) {
  min-height: 32px;
  font-size: 13px;
 }
+
 .account-modal [data-slot='button'][data-variant='secondary'] {
- background: var(--secondary);
  color: var(--secondary-foreground);
 }
-.account-modal [data-slot='button'][data-variant='secondary']:hover {
- background: var(--accent);
-}
+
 .account-modal [role='alert'] {
  color: var(--destructive);
  font-size: 13px;
 }
+
 .account-modal [role='status'] {
  color: var(--foreground);
  font-size: 13px;
 }
+
 @media (max-width: 480px) {
  .app-surface .account-modal {
   flex-direction: column;
@@ -152,7 +183,7 @@
   height: 100%;
  }
  .account-modal [data-sidebar='footer'] {
-  padding: 4px 8px 0;
+  padding: 4px 0 0;
  }
  .account-modal [data-sidebar='footer'] [data-slot='separator'] {
   display: none;
@@ -163,17 +194,12 @@
  min-width: 0;
  min-height: 0;
 }
-.account-modal [data-slot='input'][readonly] {
- color: #b6bac4;
-}
-/* Акцент остаётся за окном настроек: остальные роли перекрывают settings-mira и chat-extras. */
-.app-surface .account-modal {
- --accent: #414651;
-}
+
 /* Голос: раскладка целиком задаётся блоком «Голос и уведомления» в конце файла. */
 .account-modal .voice-test-actions {
  margin-bottom: 12px;
 }
+
 @media (max-width: 480px) {
  .account-modal [data-sidebar='content'] [data-sidebar='menu'] {
   display: grid;
@@ -191,32 +217,29 @@
  object-fit: cover;
  border-radius: inherit;
 }
+
 .account-modal .email-form {
  border-top: 1px solid var(--border);
 }
+
 /* Responsive layout around the shared shadcn controls. */
 .account-modal .voice-settings [data-slot='label'] {
  margin: 0;
  font-size: 13px;
  line-height: 20px;
 }
+
 .account-modal .voice-settings [data-slot='select-trigger'] {
  justify-content: space-between;
 }
+
 .account-modal .voice-settings [data-slot='switch'] {
  min-height: 0;
-}
-.account-modal .voice-settings [data-slot='progress'] {
- --primary: #7278ed;
 }
 
 .account-modal .voice-settings [data-slot='switch'] {
  justify-content: flex-start;
  padding: 0;
- --primary: #7278ed;
- --input: #34343b;
- --background: #eee;
- --ring: #7278ed;
 }
 
 /* Одна шкала: расстояния и радиусы берутся отсюда, а не подбираются на глаз по файлам.
@@ -239,9 +262,11 @@
 .app-surface .account-modal {
  font-size: 14px;
 }
+
 .app-surface .account-modal article > #account-panel {
  min-height: 0;
 }
+
 .account-modal #account-panel > section:not([hidden]) {
  display: block;
  min-width: 0;
@@ -249,9 +274,11 @@
  margin: 0;
  padding: 0;
 }
+
 .account-modal #account-panel > section[hidden] {
  display: none;
 }
+
 .account-modal #account-panel label {
  margin: 0;
  padding: 0;
@@ -259,26 +286,32 @@
  font-size: 14px;
  line-height: 20px;
 }
+
 .account-modal #account-panel h2 {
  font-size: 18px;
  line-height: 24px;
  margin: 0 0 16px;
 }
+
 .account-modal #account-panel p {
  margin: 8px 0 16px;
 }
+
 .account-modal #account-panel .settings-form {
  gap: 8px;
  max-width: 800px;
 }
+
 .account-modal #account-panel .settings-field {
  grid-template-columns: 160px minmax(0, 1fr);
  gap: 16px;
  min-height: 44px;
 }
+
 .account-modal #account-panel .settings-field > label {
  display: block;
 }
+
 .account-modal #account-panel [data-slot='input'],
 .account-modal #account-panel [data-slot='select-trigger'] {
  width: 100%;
@@ -288,69 +321,68 @@
  padding: 0 12px;
  font-size: 14px;
 }
+
 .account-modal #account-panel [data-slot='input'][type='file'] {
  padding: 6px 8px;
  height: auto;
  min-height: 36px;
 }
+
 .account-modal #account-panel .settings-actions {
  min-height: 44px;
  align-items: center;
  margin: 0;
  padding-left: 176px;
 }
+
 .account-modal #account-panel [data-slot='button']:not([data-size^='icon']) {
  min-height: 36px;
  font-size: 14px;
 }
+
 .account-modal #account-panel .email-form {
  margin-top: 24px;
  padding-top: 24px;
 }
+
 .account-modal #account-panel .settings-hint {
  font-size: 12px;
  line-height: 18px;
  margin: 4px 0 8px;
 }
+
 .account-modal #account-panel .sticker-library > label {
  display: grid;
  grid-template-columns: minmax(0, 1fr);
  gap: 8px;
  margin: 16px 0;
 }
+
 .account-modal #account-panel [data-slot='switch'] {
- display: inline-flex;
- flex: 0 0 auto;
- width: 44px;
- min-width: 44px;
- height: 24px;
- min-height: 24px;
  padding: 0;
- gap: 0;
  justify-content: flex-start;
 }
-.account-modal #account-panel [data-slot='switch-thumb'] {
- flex: 0 0 auto;
- width: 20px;
- height: 20px;
-}
+
 .account-modal #account-panel .sticker-library input {
  height: 36px;
  min-height: 36px;
  padding: 6px 8px;
  font-size: 14px;
 }
+
 .app-surface .group-modal:has(.bot-settings),
 .app-surface .group-modal:has(.sticker-library) {
  width: min(640px, 100%);
  max-height: min(720px, 100%);
  padding: 24px;
 }
+
 .group-modal .bot-settings,
 .group-modal .sticker-library {
  min-width: 0;
  font-size: 14px;
 }
+
 .group-modal .bot-settings label,
 .group-modal .sticker-library > label {
  display: grid;
@@ -358,6 +390,7 @@
  gap: 8px;
  margin: 16px 0;
 }
+
 .group-modal .bot-settings input,
 .group-modal .sticker-library input {
  width: 100%;
@@ -368,10 +401,12 @@
  padding: 6px 8px;
  font-size: 14px;
 }
+
 .group-modal .bot-settings p {
  line-height: 1.5;
  margin: 8px 0 16px;
 }
+
 @media (max-width: 760px) {
  .account-modal #account-panel .settings-field {
   grid-template-columns: minmax(0, 1fr);
@@ -400,12 +435,15 @@
  border-radius: 0;
  background: none;
 }
+
 .account-modal #account-panel .account-media-voice > .media-settings-panel:first-of-type {
  padding-top: var(--s1);
 }
+
 .account-modal #account-panel .account-media-voice > .media-settings-panel + .media-settings-panel {
  border-top: 1px solid var(--border);
 }
+
 .account-modal #account-panel .account-media-voice .media-settings-panel h2 {
  font-size: 15px;
  line-height: 22px;
@@ -422,6 +460,7 @@
  min-height: var(--row);
  margin: 0;
 }
+
 .account-modal #account-panel .account-media-voice .voice-field > label {
  display: block;
  margin: 0;
@@ -429,14 +468,17 @@
  line-height: 20px;
  color: var(--muted-foreground);
 }
+
 .account-modal #account-panel .account-media-voice .voice-field > .audio-device-missing {
  grid-column: 1 / -1;
  margin: 0 0 var(--s2);
 }
+
 .account-modal #account-panel .account-media-voice .voice-volume {
  grid-column: 1 / -1;
  align-items: start;
 }
+
 .account-modal #account-panel .account-media-voice .voice-volume > label {
  color: var(--foreground);
  margin-bottom: var(--s2);
@@ -447,6 +489,7 @@
  grid-template-columns: minmax(0, 1fr);
  gap: var(--s2);
 }
+
 .account-modal #account-panel .account-media-voice .voice-switch {
  display: grid;
  grid-template-columns: minmax(0, var(--label-col)) minmax(0, 1fr);
@@ -455,14 +498,17 @@
  min-height: var(--row);
  margin: 0;
 }
+
 .account-modal #account-panel .account-media-voice .voice-switch > [data-slot='switch'] {
  justify-self: start;
 }
+
 .account-modal #account-panel .account-media-voice .voice-switch > label {
  font-size: 13px;
  line-height: 20px;
  color: var(--foreground);
 }
+
 .account-modal #account-panel .account-media-voice .voice-processing .settings-hint {
  grid-column: 1 / -1;
  margin: 0 0 var(--s1);
@@ -475,12 +521,14 @@
  align-items: stretch;
  margin-top: var(--s1);
 }
+
 .account-modal #account-panel .account-media-voice .voice-test-actions {
  display: flex;
  flex-wrap: wrap;
  gap: var(--s2);
  align-items: center;
 }
+
 .account-modal #account-panel .account-media-voice .voice-test-actions [role='progressbar'] {
  flex: 1 1 160px;
  min-width: 0;
@@ -491,8 +539,8 @@
  padding: var(--s3);
  border: 1px solid var(--border);
  border-radius: var(--r-control);
- background: color-mix(in srgb, var(--foreground) 3%, transparent);
 }
+
 .account-modal #account-panel .account-media-voice > .audio-device-access p {
  margin: 0 0 var(--s2);
 }
@@ -507,18 +555,20 @@
  border: 0;
  border-bottom: 1px solid var(--border);
  border-radius: 0;
- background: transparent;
 }
+
 .account-modal #account-panel .account-media-notifications .notification-option label {
  display: grid;
  gap: var(--s1);
  min-width: 0;
  cursor: pointer;
 }
+
 .account-modal #account-panel .account-media-notifications .notification-option label span,
 .account-modal #account-panel .account-media-notifications .notification-help p {
  color: var(--muted-foreground);
 }
+
 .account-modal #account-panel .account-media-notifications .notification-help {
  display: grid;
  gap: var(--s2);

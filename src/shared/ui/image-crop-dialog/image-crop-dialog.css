@@ -2,12 +2,14 @@
    Здесь остаётся невыразимое: общее правило фокуса на всех потомках, вендорный
    класс react-easy-crop, узкий экран и reduced-motion. */
 .image-crop-dialog :focus-visible {
- outline: 2px solid var(--accent, #b4aaff);
+ outline: 2px solid var(--ring);
  outline-offset: 3px;
 }
+
 .image-crop-stage .reactEasyCrop_Container:focus-visible {
  outline-offset: -4px;
 }
+
 @media (max-width: 520px) {
  .image-crop-dialog {
   padding: 16px;
@@ -29,6 +31,7 @@
   margin-top: 16px;
  }
 }
+
 @media (prefers-reduced-motion: reduce) {
  .image-crop-dialog * {
   transition: none !important;

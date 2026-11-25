@@ -26,7 +26,7 @@ const imageAttachmentShell = cn(attachmentShell, 'w-fit overflow-visible border-
 const cardAttachmentShell = cn(attachmentShell, 'w-80 overflow-visible border-0 bg-transparent');
 /** Действие над картинкой: цель 44×44, тёмная плашка, светлая иконка. */
 const imageActionButton =
- 'flex size-11 min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border-0 bg-[#111725d9] p-1 text-[#eef4ff] focus-visible:outline-2 focus-visible:outline-[#abc7ff] focus-visible:outline-offset-[3px]';
+ 'flex size-11 min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border-0 bg-primary p-1 text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-[3px]';
 const imageDownloadButton = cn(
  'attachment-image-download',
  imageActionButton,
@@ -43,10 +43,10 @@ const viewerCloseButton = cn(
 /** Кнопка скачивания аудио: появляется при наведении на плеер. */
 const audioDownloadButton = cn(
  'attachment-player-download',
- 'absolute top-1.5 right-1.5 z-1 flex size-[30px] min-h-[30px] cursor-pointer items-center justify-center rounded-md border-0 bg-[#111725d9] p-0 text-[#eef4ff]',
+ 'absolute top-1.5 right-1.5 z-1 flex size-[30px] min-h-[30px] cursor-pointer items-center justify-center rounded-md border-0 bg-primary p-0 text-foreground',
  'pointer-events-none opacity-0 transition-opacity duration-150 ease-[ease]',
  'group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
- 'disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-[#abc7ff] focus-visible:outline-offset-[2px] motion-reduce:transition-none'
+ 'disabled:cursor-wait focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-[2px] motion-reduce:transition-none'
 );
 const audioRetryButton = cn(
  'attachment-audio-retry',
@@ -196,12 +196,12 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
     )}
     <Dialog.Root open={open && available} onOpenChange={actions.setOpen}>
      <Dialog.Portal>
-      <Dialog.Overlay className={cn('attachment-viewer-overlay', 'fixed inset-0 z-[140] bg-[#080b12e6]')} />
+      <Dialog.Overlay className={cn('attachment-viewer-overlay', 'bg-card fixed inset-0 z-[140]')} />
       <Dialog.Content
        className={cn(
         'attachment-viewer material-viewer',
         'fixed top-1/2 left-1/2 z-[141] grid max-h-[90dvh] w-fit max-w-[90vw] -translate-x-1/2 -translate-y-1/2 place-items-center',
-        'overflow-visible rounded-none border-0 bg-transparent p-0 text-[#eef4ff] shadow-none'
+        'text-foreground overflow-visible rounded-none border-0 bg-transparent p-0 shadow-none'
        )}
        onCloseAutoFocus={event => {
         event.preventDefault();

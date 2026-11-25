@@ -1,6 +1,13 @@
 import {Fragment, type KeyboardEvent, type ReactElement, type ReactNode} from 'react';
-import {ContextMenu} from 'radix-ui';
 import type {LucideIcon} from 'lucide-react';
+import {
+ ContextMenu,
+ ContextMenuContent,
+ ContextMenuGroup,
+ ContextMenuItem,
+ ContextMenuSeparator,
+ ContextMenuTrigger
+} from './context-menu';
 import './menu-material.css';
 
 type Action = {
@@ -33,38 +40,34 @@ export function EntityContextMenu({children, actions = [], controls}: EntityCont
  }
 
  return (
-  <ContextMenu.Root modal={false}>
-   <ContextMenu.Trigger asChild aria-haspopup="menu">
+  <ContextMenu modal={false}>
+   <ContextMenuTrigger asChild aria-haspopup="menu">
     {children}
-   </ContextMenu.Trigger>
-   <ContextMenu.Portal>
-    <ContextMenu.Content
-     data-slot="context-menu-content"
-     collisionPadding={8}
-     onKeyDown={controls ? focusNextControl : undefined}
-     onCloseAutoFocus={event => {
-      if (document.activeElement !== document.body) event.preventDefault();
-     }}
-     className="sombra-menu-surface border-border bg-popover text-popover-foreground z-[100] max-w-[calc(100vw-16px)] min-w-44 rounded-md border p-1 text-sm shadow-md"
-    >
-     {controls}
-     {controls && actions.length > 0 && <ContextMenu.Separator className="bg-border mx-1 my-1 h-px" />}
-     {actions.map(({label, icon: Icon, onSelect, disabled, separator}) => (
-      <Fragment key={label}>
-       {separator && <ContextMenu.Separator className="bg-border mx-1 my-1 h-px" />}
-       <ContextMenu.Item
-        data-slot="context-menu-item"
-        disabled={disabled}
-        onSelect={onSelect}
-        className="data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 outline-none select-none data-[disabled]:opacity-45"
-       >
-        {Icon && <Icon size={16} aria-hidden="true" />}
-        {label}
-       </ContextMenu.Item>
-      </Fragment>
-     ))}
-    </ContextMenu.Content>
-   </ContextMenu.Portal>
-  </ContextMenu.Root>
+   </ContextMenuTrigger>
+   <ContextMenuContent
+    collisionPadding={8}
+    onKeyDown={controls ? focusNextControl : undefined}
+    onCloseAutoFocus={event => {
+     if (document.activeElement !== document.body) event.preventDefault();
+    }}
+    className="sombra-menu-surface"
+   >
+    {controls}
+    {controls && actions.length > 0 && <ContextMenuSeparator />}
+    {actions.length > 0 && (
+     <ContextMenuGroup>
+      {actions.map(({label, icon: Icon, onSelect, disabled, separator}) => (
+       <Fragment key={label}>
+        {separator && <ContextMenuSeparator />}
+        <ContextMenuItem disabled={disabled} onSelect={onSelect}>
+         {Icon && <Icon size={16} aria-hidden="true" />}
+         {label}
+        </ContextMenuItem>
+       </Fragment>
+      ))}
+     </ContextMenuGroup>
+    )}
+   </ContextMenuContent>
+  </ContextMenu>
  );
 }

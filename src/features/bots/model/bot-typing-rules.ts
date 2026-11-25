@@ -178,13 +178,3 @@ export const typingAnnouncement = (name: string, stage: string) =>
 
 /** Подпись карточки генерации: только готовый статус работника или нейтральная фраза. */
 export const imageActivityLabel = (activity: BotActivity) => activity.status || IMAGE_ACTIVITY_FALLBACK;
-
-type ScrollMetrics = {scrollHeight: number; scrollTop: number; clientHeight: number};
-
-/**
- * Карточка уже вставлена, поэтому «был внизу» — это остаток пути в пределах её высоты.
- * Дальше наверх сидит человек, читающий историю: его не тянем вниз.
- */
-export function followsActivity(metrics: ScrollMetrics, height: number) {
- return metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= height + 24;
-}

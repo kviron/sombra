@@ -27,6 +27,15 @@ RESOLVE_TIMEOUT = 16
 URL_IN_TEXT = re.compile(r'https?://[^\s"\']+')
 
 
+def track_metadata(track):
+    artists = getattr(track, 'artists', None) or []
+    artist = ' '.join(', '.join(a.name for a in artists if a.name).split())[:120]
+    cover = (getattr(track, 'cover_uri', None) or '').removeprefix('https://').replace('%%', '200x200')
+    if not re.fullmatch(r'avatars\.(?:mds\.)?yandex\.net/[\w./-]{1,400}', cover, re.ASCII):
+        cover = ''
+    return {**({'artist': artist} if artist else {}), **({'coverUrl': 'https://' + cover} if cover else {})}
+
+
 def diagnostic(reason, error):
     """One bounded line per failure: the operator needs the cause, never a URL or token."""
     text = URL_IN_TEXT.sub('<url>', str(error))[:160].replace('\n', ' ')
@@ -76,7 +85,7 @@ class Provider:
             if not TRACK_ID.fullmatch(tid) or not isinstance(duration, int) or not 0 < duration <= 86400000 or not t.available:
                 continue
             title = ' '.join((t.title or '').split())[:120] or 'Яндекс Музыка'
-            result.append(dict(id=tid,title=title,durationMs=duration))
+            result.append(dict(id=tid, title=title, durationMs=duration, **track_metadata(t)))
         return result
 
     def url(self, track, refresh=False):

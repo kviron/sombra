@@ -2,19 +2,19 @@
 import {useEffect, useState} from 'react';
 import {UpdateNotice, UpdateSettings} from '@/features/updates';
 import {userService} from '@/entities/user';
+import {useChatRouteHistory} from '@/pages/chat';
 import {isTauri} from '@/shared/api';
 import {Toaster} from '@/shared/ui';
-import {AuthAmbient} from '@/shared/ui/auth-ambient';
 import {MainLayout, TitleBar, WindowResizeHandles} from '@/shared/layouts';
 import {AppRouter, type AuthState} from '@/app/providers/router';
-import {useTheme, withTheme} from '@/app/providers/ThemeProvider';
+import {AppearanceSettings, useTheme, withTheme} from '@/app/providers/ThemeProvider';
 import {useWindowMaximized} from '@/app/lib/use-window-maximized';
 
-import './styles/surfaces.css';
-import './styles/glass.css';
 import './styles/settings.css';
 import './styles/chat-extras.css';
-import './styles/hologram.css';
+import './styles/logo.css';
+import './styles/themes.css';
+import './styles/accents.css';
 
 function AppContent() {
  const [showUpdates, setShowUpdates] = useState(false);
@@ -58,14 +58,32 @@ function AppContent() {
  const {theme, toggleTheme} = useTheme();
  const inTauri = isTauri();
  const isMaximized = useWindowMaximized(inTauri);
+ const history = useChatRouteHistory();
 
  return (
   <>
    <MainLayout
-    className={`${auth === 'ready' ? 'chat-window' : 'auth-window mira-auth'}`}
-    ambient={auth !== 'ready' ? <AuthAmbient /> : undefined}
-    titleBar={<TitleBar inTauri={inTauri} isMaximized={isMaximized} theme={theme} onToggleTheme={toggleTheme} />}
-    content={<AppRouter auth={auth} route={route} onRetry={() => setAttempt(n => n + 1)} />}
+    className={`${auth === 'ready' ? 'chat-window' : 'auth-window'}`}
+    titleBar={
+     <TitleBar
+      inTauri={inTauri}
+      isMaximized={isMaximized}
+      canGoBack={auth === 'ready' && history.canGoBack}
+      canGoForward={auth === 'ready' && history.canGoForward}
+      onBack={history.back}
+      onForward={history.forward}
+      theme={theme}
+      onToggleTheme={toggleTheme}
+     />
+    }
+    content={
+     <AppRouter
+      auth={auth}
+      route={route}
+      onRetry={() => setAttempt(n => n + 1)}
+      appearanceSettings={<AppearanceSettings />}
+     />
+    }
     resizeHandles={<WindowResizeHandles inTauri={inTauri} isMaximized={isMaximized} />}
    />
    <UpdateNotice />

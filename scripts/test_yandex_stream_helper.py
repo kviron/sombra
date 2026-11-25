@@ -5,10 +5,23 @@ from types import SimpleNamespace
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
-from yandex_stream_helper import CHUNK, Provider, server
+from yandex_stream_helper import CHUNK, Provider, server, track_metadata
 
 
 class ResolverTests(unittest.TestCase):
+    def test_track_metadata_accepts_yandex_artwork_and_optional_artist(self):
+        track = SimpleNamespace(
+            artists=[SimpleNamespace(name='First'), SimpleNamespace(name='Second')],
+            cover_uri='avatars.yandex.net/get-music-content/42/%%',
+        )
+        self.assertEqual(track_metadata(track), {
+            'artist': 'First, Second',
+            'coverUrl': 'https://avatars.yandex.net/get-music-content/42/200x200',
+        })
+        track.cover_uri = 'avatars.yandex.net.example.org/%%'
+        self.assertNotIn('coverUrl', track_metadata(track))
+        self.assertEqual(track_metadata(SimpleNamespace()), {})
+
     def test_playlist_order_and_duplicates_survive_metadata_lookup(self):
         provider = Provider.__new__(Provider)
         provider.client = SimpleNamespace(

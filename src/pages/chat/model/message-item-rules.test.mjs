@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
  authorName,
  canDeleteEveryone,
+ groupMessages,
  hasText,
  isAuthor,
  isGrouped,
@@ -19,10 +20,14 @@ import {
 const base = {id: 'm1', channel: 'c1', user: 'me', text: 'Привет', time: 1000};
 const bot = {...base, id: 'm2', user: 'bot', bot_name: 'Бот'};
 
-test('сообщения склеиваются, пока идут подряд без паузы', () => {
+test('сообщения склеиваются, если идут подряд в один день', () => {
  assert.equal(isGrouped(undefined, base), false);
  assert.equal(isGrouped({...base, id: 'm0'}, base), true);
- assert.equal(isGrouped({...base, id: 'm0', time: 1000 - 301}, base), false, 'пауза больше пяти минут');
+ assert.equal(
+  isGrouped({...base, id: 'm0', time: 1000 - 301}, base),
+  true,
+  'пауза больше пяти минут не разрывает группу'
+ );
  assert.equal(isGrouped({...base, id: 'm0', channel: 'c2'}, base), false, 'другой канал');
  assert.equal(isGrouped({...base, id: 'm0', user: 'u2'}, base), false, 'другой автор');
  assert.equal(isGrouped({...base, id: 'm0', time: 1000 + 5}, base), false, 'время пошло назад');
@@ -37,6 +42,19 @@ test('сообщения склеиваются, пока идут подряд 
   false,
   'разные дни'
  );
+});
+
+test('транскрипт группирует только соседние сообщения по правилам карточки', () => {
+ const first = {...base, time: new Date('2024-01-02T23:40:00').getTime() / 1000};
+ const second = {...first, id: 'm2', time: first.time + 300};
+ const third = {...second, id: 'm3', user: 'other'};
+ const fourth = {...third, id: 'm4', time: third.time + 301};
+ const fifth = {...fourth, id: 'm5', time: fourth.time + 1};
+ assert.deepEqual(groupMessages([]), []);
+ assert.deepEqual(groupMessages([first, second, third, fourth, fifth]), [
+  [first, second],
+  [third, fourth, fifth]
+ ]);
 });
 
 test('автор и право удалить для всех', () => {

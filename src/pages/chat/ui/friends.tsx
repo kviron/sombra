@@ -1,3 +1,4 @@
+import {Input} from '@/shared/ui/input';
 import {Check, MessageCircle, UserPlus, X} from 'lucide-react';
 import {type ChatState} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
@@ -29,14 +30,14 @@ export function Friends({
      </button>
     ))}
    </nav>
-   <input
-    className="friend-search mt-6 w-full rounded-[10px] border border-[#dce6fa20] bg-[#dce6fa06] px-4 py-3 text-[13px]"
+   <Input
+    className="mt-6"
     aria-label="Найти человека"
     placeholder="Поиск по имени"
     value={query}
     onChange={event => actions.setQuery(event.target.value)}
    />
-   <p className="friends-count mt-6 mb-3 text-[11px] text-[#97a3b6]">
+   <p className="friends-count text-muted-foreground mt-6 mb-3 text-[11px]">
     {count} · {rows.length}
    </p>
    {rows.map(row => (
@@ -76,7 +77,7 @@ export function Friends({
     </div>
    ))}
    {empty && (
-    <div className="friends-empty flex min-h-[300px] flex-col items-center justify-center gap-4 text-center text-[#97a3b6]">
+    <div className="friends-empty text-muted-foreground flex min-h-[300px] flex-col items-center justify-center gap-4 text-center">
      <UserPlus size={36} />
      <h2>{empty.title}</h2>
      <p>{empty.note}</p>

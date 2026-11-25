@@ -21,6 +21,29 @@ let mediaGeneration = 0;
 let polling = false;
 /** Поколение страницы: ответ, пришедший после размонтирования, не должен оживить снапшот. */
 let pageGeneration = 0;
+/**
+ * Сериализация последнего применённого ответа сервера. Опрос идёт каждые 2 секунды,
+ * и обычно в нём ничего не меняется: без этой проверки каждый тик и каждая отправка
+ * заново рендерили всё дерево чата. Сравнение точное, порядок ключей у сервера
+ * стабильный (serde_json сохраняет порядок вставки).
+ */
+let lastApplied = '';
+/**
+ * Списки снапшота — по одному элементу на id. Сервер в редких случаях присылает
+ * одну и ту же сущность дважды (например, диалог и в списке, и среди каналов),
+ * и тогда каждый список с `key={id}` печатает предупреждение на каждом рендере.
+ */
+function uniqueById<T extends {id: string}>(items: T[]): T[] {
+ if (!Array.isArray(items) || items.length < 2) return items;
+ const seen = new Set<string>();
+ const unique = items.filter(item => {
+  if (!item?.id || seen.has(item.id)) return false;
+  seen.add(item.id);
+  return true;
+ });
+ return unique.length === items.length ? items : unique;
+}
+
 const patchSnapshot = (update: (state: ChatState) => ChatState) => {
  chatSnapshotStore.setState(current => ({
   ...current,
@@ -28,13 +51,15 @@ const patchSnapshot = (update: (state: ChatState) => ChatState) => {
  }));
 };
 
-const mergeDialogs = (previous: Dialog[], next: Dialog[]) =>
- next.map(dialog => {
-  const old = previous.find(item => item.id === dialog.id);
+const mergeDialogs = (previous: Dialog[], next: Dialog[]) => {
+ const previousById = new Map(previous.map(dialog => [dialog.id, dialog]));
+ return uniqueById(next).map(dialog => {
+  const old = previousById.get(dialog.id);
   return old && (old.revision || 0) > (dialog.revision || 0)
    ? {...dialog, name: old.name, avatar: old.avatar, revision: old.revision}
    : dialog;
  });
+};
 
 export const chatSnapshotActions = {
  reset() {
@@ -42,6 +67,7 @@ export const chatSnapshotActions = {
   mediaGeneration = 0;
   polling = false;
   pageGeneration++;
+  lastApplied = '';
  },
  setError(error: string) {
   chatSnapshotStore.setState({error});
@@ -53,7 +79,17 @@ export const chatSnapshotActions = {
   chatSnapshotStore.setState({busy});
  },
  /** Свежий снапшот заменяет старый, но опубликованные изменения группы и переписки остаются. */
- applyState(next: ChatState) {
+ applyState(incoming: ChatState) {
+  const next: ChatState = {
+   ...incoming,
+   messages: uniqueById(incoming.messages),
+   dialogs: uniqueById(incoming.dialogs),
+   users: uniqueById(incoming.users),
+   groups: uniqueById(incoming.groups)
+  };
+  const serialized = JSON.stringify(next);
+  if (serialized === lastApplied) return;
+  lastApplied = serialized;
   chatSnapshotStore.setState(current => {
    const previous = current.snapshot;
    if (!previous || previous.me.id !== next.me.id) return {...current, snapshot: next};

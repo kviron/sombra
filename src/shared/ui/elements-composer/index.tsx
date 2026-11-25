@@ -10,7 +10,8 @@ export {
 export {paper, ghostButton, inkButton} from './surfaces';
 import type {ComponentProps} from 'react';
 import {cn} from '@/shared/lib/utils';
-import {ghostButton, inkButton} from './surfaces';
+import {ghostButton} from './surfaces';
+import {Button} from '@/shared/ui/button';
 /** Native Sombra actions use the same upstream ComposerAttachButton surface. */
 export function ComposerIconButton({className, ...props}: ComponentProps<'button'>) {
  return (
@@ -23,12 +24,7 @@ export function ComposerIconButton({className, ...props}: ComponentProps<'button
 }
 export function ComposerSendButton({className, ...props}: ComponentProps<'button'>) {
  return (
-  <button
-   type="submit"
-   data-slot="composer-send"
-   className={cn('grid size-8 place-items-center rounded-full', inkButton, className)}
-   {...props}
-  />
+  <Button type="submit" size="icon" data-slot="composer-send" className={cn('rounded-full', className)} {...props} />
  );
 }
 export const composerInputClass =

@@ -20,15 +20,15 @@ export function DialogCallBanner({
 }) {
  return (
   <div
-   className="dialog-call-banner flex items-center gap-3 border-b border-b-[#71c8a32b] bg-[#163d3038] px-4 py-3 text-[#d8efe5]"
+   className="dialog-call-banner flex items-center gap-3 border-b border-b-[#71c8a32b] px-4 py-3 text-emerald-500"
    role="status"
   >
-   <span className="dialog-call-banner-icon grid size-[34px] place-items-center rounded-[50%] bg-[#60d49d20] text-[#77dcb0]">
+   <span className="dialog-call-banner-icon grid size-[34px] place-items-center rounded-[50%] text-emerald-500">
     {call.video ? <Video size={18} /> : <Phone size={18} />}
    </span>
    <div className="min-w-0 flex-1">
     <strong className="block text-[13px]">{joined ? 'Вы в звонке' : 'В диалоге идёт звонок'}</strong>
-    <small className="mt-[3px] block text-[12px] text-[#a1bcaf]">
+    <small className="text-muted-foreground mt-[3px] block text-[12px]">
      {call.participants.length ? `На связи: ${call.participants.length}` : 'Ожидание участников'} ·{' '}
      {call.video ? 'Видео' : 'Аудио'}
     </small>
@@ -78,7 +78,7 @@ export function IncomingDialogCall({
   >
    <DialogPrimitive.Portal>
     <DialogPrimitive.Content
-     className="incoming-dialog-call fixed right-4 bottom-4 z-[131] flex max-h-[calc(100vh-64px)] w-[min(420px,calc(100vw-32px))] flex-col items-center gap-3.5 overflow-auto rounded-[18px] border border-[#ffffff26] bg-[#191e29] px-6 py-8 text-center text-[#edf1f8] [box-shadow:0_24px_80px_#0009]"
+     className="incoming-dialog-call border-border bg-card text-foreground fixed right-4 bottom-4 z-[131] flex max-h-[calc(100vh-64px)] w-[min(420px,calc(100vw-32px))] flex-col items-center gap-3.5 overflow-auto rounded-[18px] border px-6 py-8 text-center [box-shadow:0_24px_80px_#0009]"
      data-call-id={call.id}
      aria-busy={busy}
      onOpenAutoFocus={event => event.preventDefault()}
@@ -91,7 +91,7 @@ export function IncomingDialogCall({
     >
      <button
       type="button"
-      className="incoming-call-close absolute top-2 right-2 grid size-11 place-items-center rounded-[8px] bg-transparent text-[25px] text-[#c2ccdf] [border:0] hover:bg-[#ffffff12] focus-visible:outline-2 focus-visible:outline-[#77dcb0] disabled:cursor-wait disabled:opacity-50"
+      className="incoming-call-close text-muted-foreground focus-visible:outline-ring absolute top-2 right-2 grid size-11 place-items-center rounded-[8px] bg-transparent text-[25px] [border:0] focus-visible:outline-2 disabled:cursor-wait disabled:opacity-50"
       aria-label="Отклонить звонок"
       onClick={onDecline}
      >
@@ -101,23 +101,23 @@ export function IncomingDialogCall({
      <DialogPrimitive.Title className="max-w-full text-[23px] [font-weight:650] [overflow-wrap:anywhere]">
       {caller?.name || 'Участник Sombra'}
      </DialogPrimitive.Title>
-     <DialogPrimitive.Description className="text-[14px] leading-[1.5] text-[#aeb8cb]">
+     <DialogPrimitive.Description className="text-muted-foreground text-[14px] leading-[1.5]">
       {group ? 'Входящий групповой ' : 'Входящий '}
       {call.video ? 'видеозвонок' : 'аудиозвонок'}
       {group && dialog?.name ? ` · ${dialog.name}` : ''}
      </DialogPrimitive.Description>
      {group && (
-      <p className="incoming-call-members text-[12px] leading-[1.5] text-[#aeb8cb]">
+      <p className="incoming-call-members text-muted-foreground text-[12px] leading-[1.5]">
        Приглашены все участники диалога · {dialog.members.length} человек
       </p>
      )}
      {hasOtherVoice && (
-      <p className="incoming-call-switch max-w-[32ch] text-[14px] leading-[1.5] text-[#aeb8cb]">
+      <p className="incoming-call-switch text-muted-foreground max-w-[32ch] text-[14px] leading-[1.5]">
        Ответ завершит текущее голосовое подключение. Отклонение оставит его без изменений.
       </p>
      )}
      {error && (
-      <p role="alert" className="incoming-call-error text-[12px] leading-[1.5] text-[#ffb8bb]">
+      <p role="alert" className="incoming-call-error text-destructive text-[12px] leading-[1.5]">
        {error}
       </p>
      )}

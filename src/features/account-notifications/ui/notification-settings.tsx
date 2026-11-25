@@ -22,9 +22,9 @@ export function NotificationSettings({
    aria-busy={model.busy}
   >
    <p>Выберите, откуда получать новые сообщения. Настройки сохраняются в вашем аккаунте.</p>
-   <div className="notification-option [&>svg]:shrink-0 [&>svg]:text-[#aeb8c9]">
+   <div className="notification-option [&>svg]:text-muted-foreground [&>svg]:shrink-0">
     <label htmlFor="notify-direct">
-     <strong className="text-[15px] leading-[1.5] font-semibold text-[#e4e8f0]">Личные сообщения</strong>
+     <strong className="text-foreground text-[15px] leading-[1.5] font-semibold">Личные сообщения</strong>
      <span>Личные и групповые диалоги из списка переписок.</span>
     </label>
     <Switch
@@ -35,9 +35,9 @@ export function NotificationSettings({
      onCheckedChange={value => void model.change('direct', value)}
     />
    </div>
-   <div className="notification-option [&>svg]:shrink-0 [&>svg]:text-[#aeb8c9]">
+   <div className="notification-option [&>svg]:text-muted-foreground [&>svg]:shrink-0">
     <label htmlFor="notify-groups">
-     <strong className="text-[15px] leading-[1.5] font-semibold text-[#e4e8f0]">Сообщения в группах</strong>
+     <strong className="text-foreground text-[15px] leading-[1.5] font-semibold">Сообщения в группах</strong>
      <span>Все текстовые каналы и чаты голосовых каналов ваших групп.</span>
     </label>
     <Switch

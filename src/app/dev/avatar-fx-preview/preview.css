@@ -158,9 +158,8 @@ body {
  font-size: 12px;
 }
 
-.range input {
+.range [data-slot='slider'] {
  width: 130px;
- accent-color: var(--accent);
 }
 
 .covers {

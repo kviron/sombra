@@ -19,3 +19,7 @@
 - Tauri только через оболочку: импортов из `@tauri-apps/*` вне `src/shared/api/tauri/` быть не должно. Новая команда Rust добавляется методом в `tauri.commands`, действие с окном — в `tauri.window`, подписка на событие — в `tauri.events`.
 - Фронтенд разложен по Feature-Sliced Design: `app → pages → features → entities → shared`. Новый модуль кладут в срез своего слоя, импортируют только вниз и только через `index.ts` среза. Карта слоёв, правила и таблица «куда класть код» — в [docs/FRONTEND-STRUCTURE.md](docs/FRONTEND-STRUCTURE.md); границы проверяет `npm run check:fsd`, модульные тесты — `npm run test:src`.
 - Сборка сервера и деплой описаны в `docs/DEPLOY.md`; изменения на живом сервере фиксируются в `docs/SOMBRA-SERVER.md`.
+
+## Ponytail
+
+Для задач с кодом используй [Ponytail](.agents/skills/ponytail/SKILL.md), если этот локальный навык установлен. Режим по умолчанию — `full`; указания пользователя и правила Sombra имеют приоритет. Остальные навыки: `ponytail-review`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`.

@@ -8,10 +8,11 @@ import {authService} from '@/entities/user';
 import {conversationService} from '@/entities/conversation';
 import type {Channel, ChatState, Dialog, Group, GroupPermission, User} from '@/shared/types';
 import type {Voice} from '@/features/voice-room';
-import {chatPanelsActions, chatPanelsStore, type AccountSection} from './chat-panels';
+import type {AccountSection} from '@/features/account-settings';
+import {chatPanelsActions, chatPanelsStore} from './chat-panels';
 import {chatNavigationActions} from './chat-navigation';
 import {chatSnapshotActions, chatSnapshotStore} from './chat-state';
-import {canEditGroup, defaultChannelKind} from './chat-rules';
+import {canEditGroup, defaultChannelKind, groupInviteCandidates} from './chat-rules';
 
 type Options = {
  state: ChatState | null;
@@ -204,9 +205,13 @@ export function useChatPanels({state, home, channel, peer, group, voice}: Option
     try {
      if (modal === 'invite') {
       if (!group || !permits(group, 'members.invite')) return;
-      await groupService.invite({group: group.id, email: name.trim()});
+      const candidates = groupInviteCandidates(state?.users ?? [], group.members);
+      const users = selected.filter(id => candidates.some(user => user.id === id));
+      if (!users.length && !name.trim()) return;
+      await groupService.invite({group: group.id, ...(users.length ? {users} : {email: name.trim()})});
       chatPanelsActions.closeModal();
-      toast.success('Участник добавлен в группу');
+      toast.success(users.length > 1 ? 'Участники добавлены в группу' : 'Участник добавлен в группу');
+      await chatSnapshotActions.refresh();
       return;
      }
      if (modal === 'edit-channel' && editingChannel) {

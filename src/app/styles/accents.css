@@ -1,0 +1,30 @@
+:root[data-accent='blue'] {
+ --sombra-accent-color: light-dark(#1d4ed8, #93b9ff);
+}
+
+:root[data-accent='violet'] {
+ --sombra-accent-color: light-dark(#6d28d9, #c4a5ff);
+}
+
+:root[data-accent='green'] {
+ --sombra-accent-color: light-dark(#047857, #6ee7b7);
+}
+
+:root[data-accent='rose'] {
+ --sombra-accent-color: light-dark(#be185d, #f9a8d4);
+}
+
+:root[data-accent='orange'] {
+ --sombra-accent-color: light-dark(#9a3412, #fdba74);
+}
+
+:root[data-accent]:not([data-accent='default']) {
+ --primary: var(--sombra-accent-color);
+ --primary-foreground: light-dark(#fff, #171717);
+ --ring: var(--sombra-accent-color);
+ --accent: color-mix(in oklab, var(--sombra-accent-color) 14%, var(--background));
+ --accent-foreground: var(--foreground);
+ --sidebar-primary: var(--primary);
+ --sidebar-primary-foreground: var(--primary-foreground);
+ --sidebar-ring: var(--ring);
+}

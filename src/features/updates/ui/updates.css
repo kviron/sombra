@@ -2,7 +2,6 @@
    и в гостевом окне (app/App.tsx). Раскладка секции и панели версии собрана
    утилитами в updates.tsx. Здесь остались правила, которые утилита не заменяет:
    - оболочка гостевого окна .update-guest-overlay / .update-guest-dialog: её
-     разметка живёт в app/App.tsx, а .update-guest-overlay ещё и хук размытия glass.css;
    - правила .account-modal … и .update-guest-dialog …: они перебивают нелейерные
      `.account-modal p` / `.account-modal h2` из pages/chat и app/styles;
    - полоса уведомления: её видно только в состоянии «доступно обновление», которое
@@ -12,32 +11,33 @@
 .update-notice {
  position: fixed;
  z-index: 60;
- bottom: 24px;
- right: 24px;
+ top: calc(var(--title-bar-height) + 12px);
+ left: 50%;
+ translate: -50% 0;
+ width: max-content;
  max-width: min(460px, calc(100vw - 48px));
  display: flex;
- flex-wrap: wrap;
  align-items: center;
- gap: 12px;
- padding: 14px 16px;
- background: #111114;
- color: #ddd;
- border: 1px solid #34343b;
+ gap: 8px;
+ padding: 8px 12px;
+ border: 1px solid var(--border);
  border-radius: 8px;
  font-size: 13px;
- box-shadow: 0 8px 24px #0008;
 }
+
 .update-notice > span {
- flex: 1 1 180px;
+ min-width: 0;
 }
+
 .account-modal .update-settings p {
  margin: 16px 0;
  line-height: 1.6;
 }
+
 .update-settings progress {
  width: 100%;
- accent-color: var(--primary);
 }
+
 /* Панель версии: .account-modal h2 задаёт margin-bottom, здесь он снят. */
 .update-version-panel h2 {
  display: flex;
@@ -45,28 +45,29 @@
  gap: 8px;
  margin: 0;
 }
+
 .update-guest-overlay {
  position: fixed;
  inset: 0;
  z-index: 70;
  display: grid;
  place-items: center;
- background: #0009;
  padding: 24px;
 }
+
 .update-guest-dialog {
  width: min(520px, 100%);
  max-height: 90vh;
  overflow: auto;
  padding: 24px;
- background: #191c25;
- color: #ddd;
- border: 1px solid #34343b;
+ border: 1px solid var(--border);
  border-radius: 12px;
 }
+
 .update-guest-dialog > button {
  float: right;
 }
+
 .account-modal .update-version-panel p,
 .update-guest-dialog .update-version-panel p {
  display: flex;
@@ -75,42 +76,51 @@
  margin: 4px 0 0;
  color: var(--muted-foreground);
 }
+
 .update-version-panel p svg {
  flex: none;
  color: var(--ring);
 }
+
 .update-version-panel [data-slot='button'] {
  min-height: 44px;
  max-width: 100%;
  white-space: normal;
 }
+
 .update-settings-body {
  display: grid;
  gap: 12px;
 }
+
 .account-modal .update-settings-body p,
 .update-guest-dialog .update-settings-body p {
  margin: 0;
 }
+
 .update-notes {
  white-space: pre-wrap;
  overflow-wrap: anywhere;
 }
+
 .update-release h3 {
  font-size: 24px;
  line-height: 1.4;
  margin: 0 0 16px;
 }
+
 .update-release ul {
  list-style: none;
  margin: 0 0 0 6px;
  padding-inline-start: 20px;
  border-inline-start: 1px solid var(--border);
 }
+
 .update-release li {
  position: relative;
  padding: 8px 0 16px;
 }
+
 .update-release li::before {
  content: '';
  position: absolute;
@@ -119,5 +129,4 @@
  width: 7px;
  height: 7px;
  border-radius: 50%;
- background: var(--ring);
 }

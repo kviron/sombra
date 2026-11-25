@@ -47,7 +47,7 @@ export function RegisterPage() {
        minLength={2}
        maxLength={32}
        pattern=".*\S.*"
-       className="login-input h-11"
+       className="h-11"
       />
      </div>
      <div className="grid gap-1.5">
@@ -60,7 +60,7 @@ export function RegisterPage() {
        placeholder="you@example.com"
        required
        maxLength={254}
-       className="login-input h-11"
+       className="h-11"
       />
      </div>
      <div className="grid gap-1.5">
@@ -74,17 +74,19 @@ export function RegisterPage() {
         placeholder="Не менее 8 символов"
         required
         minLength={8}
-        className="login-input login-password h-11 pr-12"
+        className="h-11 pr-12"
        />
-       <button
+       <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={() => setVisible(!visible)}
         aria-label={visible ? 'Скрыть пароль' : 'Показать пароль'}
         aria-pressed={visible}
-        className="text-muted-foreground hover:text-foreground focus-visible:outline-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg focus-visible:outline-2"
+        className="absolute top-1/2 right-1 -translate-y-1/2"
        >
-        {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
-       </button>
+        {visible ? <EyeOffIcon /> : <EyeIcon />}
+       </Button>
       </div>
      </div>
      <div className="grid gap-1.5">
@@ -97,7 +99,7 @@ export function RegisterPage() {
        placeholder="Повторите пароль"
        required
        minLength={8}
-       className="login-input h-11"
+       className="h-11"
       />
      </div>
      {error && (

@@ -1,23 +1,18 @@
-import {Check, CheckCheck, CircleAlert, Eye, Forward, Pencil, Copy, Trash2, Reply} from 'lucide-react';
+import {Check, CheckCheck, Eye, Forward, Pencil, Copy, RefreshCw, Trash2, Reply} from 'lucide-react';
 import {ContextMenu} from 'radix-ui';
 import type {ChatMessage, ChatState} from '@/shared/types';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
-import {
- Message,
- MessageAvatar,
- MessageContent,
- MessageHeader,
- MessageFooter,
- Bubble,
- BubbleContent
-} from '@/shared/ui/message';
+import {Message, MessageAvatar, MessageContent, MessageHeader, MessageFooter} from '@/shared/ui/message';
+import {Bubble, BubbleContent, BubbleReactions} from '@/shared/ui/bubble';
+import {Button} from '@/shared/ui/button';
 import {UserAvatar} from '@/shared/ui/user-avatar';
-import {cn} from '@/shared/lib';
 import {MessageActionDialog} from '@/features/message-actions';
 import {MessageReadersDialog} from '@/features/message-actions';
 import {MessageQuote} from '@/features/message-actions';
 import {SentSticker} from '@/entities/sticker';
 import {MessageAttachment, MessageText} from '@/entities/message';
+import {readVoiceInvitation} from '@/features/voice-room';
+import {chatNavigationActions} from '../model/chat-navigation';
 import {useMessageItem} from '../model/use-message-item';
 import {reactionEmojis} from '../model/message-item-rules';
 import type {MessageActionId} from '../model/message-item-rules';
@@ -39,6 +34,7 @@ const menuIcons: Record<MessageActionId, typeof Reply> = {
 export function MessageItem({
  message: m,
  previous,
+ showAvatar = true,
  state,
  refresh,
  onError,
@@ -52,6 +48,7 @@ export function MessageItem({
 }: {
  message: ChatMessage;
  previous?: ChatMessage;
+ showAvatar?: boolean;
  userName: (id: string) => string;
  onReply?: (message: ChatMessage) => void;
  onForward?: (message: ChatMessage) => void;
@@ -76,6 +73,11 @@ export function MessageItem({
   onRetry
  });
  const {grouped, sticker, author, localOnly, busy, reactions, actions} = model;
+ const invitation = m.text ? readVoiceInvitation(m.text) : null;
+ const invitedGroup = invitation && state.groups.find(group => group.id === invitation.group);
+ const invitedChannel =
+  invitedGroup && invitedGroup.channels.find(channel => channel.kind === 'voice' && channel.id === invitation.channel);
+ const bubbleVariant = model.hasImage || (sticker && !model.hasText) ? 'ghost' : author ? 'default' : 'muted';
  const menuActions = localOnly
   ? []
   : model.menu.map(item => ({
@@ -111,73 +113,82 @@ export function MessageItem({
      aria-label={model.name}
      align="start"
      tabIndex={0}
-     className="focus-visible:outline-ring rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+     className="chat-message focus-visible:outline-ring static w-auto shrink-0 rounded-sm text-inherit focus-visible:outline-2 focus-visible:outline-offset-2"
     >
-     <MessageAvatar>
-      {model.canOpenProfile ? (
-       <button type="button" className="avatar-trigger" title={`Профиль ${model.name}`} onClick={model.openProfile}>
-        {model.identity ? (
-         <UserAvatar
-          user={model.identity}
-          size="md"
-          presence={false}
-          decorative
-          decoration={grouped ? undefined : model.identity.decorations?.avatar}
-         />
+     <MessageAvatar
+      data-avatar-placeholder={!showAvatar || undefined}
+      className="message-avatar text-primary min-w-0 place-items-center bg-transparent text-[12px]"
+     >
+      {showAvatar && (
+       <>
+        {' '}
+        {model.canOpenProfile ? (
+         <button type="button" className="avatar-trigger" title={`Профиль ${model.name}`} onClick={model.openProfile}>
+          {model.identity ? (
+           <UserAvatar
+            user={model.identity}
+            size="md"
+            presence={false}
+            decorative
+            decoration={model.identity.decorations?.avatar}
+           />
+          ) : model.avatar ? (
+           <img src={model.avatar} alt="" />
+          ) : (
+           model.name[0]
+          )}
+         </button>
         ) : model.avatar ? (
          <img src={model.avatar} alt="" />
         ) : (
          model.name[0]
         )}
-       </button>
-      ) : model.avatar ? (
-       <img src={model.avatar} alt="" />
-      ) : (
-       model.name[0]
+       </>
       )}
      </MessageAvatar>
-     <MessageContent>
-      <Bubble
-       className={cn(
-        'relative flow-root rounded-[14px_14px_14px_4px] border border-[#ffffff12] bg-[#202630] px-2 py-1 text-[#e3e7ef]'
-       )}
-       data-inline-time={model.hasText && !m.attachment && !sticker && reactions.length === 0}
-       data-sticker-only={!!sticker && !model.hasText}
-       data-image-only={model.hasImage && !model.hasText}
-       data-image-message={model.hasImage}
-      >
-       {!grouped && (
-        <MessageHeader>
-         <strong>
-          {model.canOpenProfile ? (
-           <button type="button" className="message-author" title={`Профиль ${model.name}`} onClick={model.openProfile}>
-            {model.name}
-           </button>
-          ) : (
-           model.name
-          )}
-         </strong>
-         {(m.bot_name || model.identity?.bot) && (
-          <small className="bot-badge rounded-[4px] bg-[#7278ed25] px-[5px] py-px text-[9px] text-[#b1b8ff]">БОТ</small>
-         )}
-        </MessageHeader>
-       )}
-       {m.replyTo && <MessageQuote reply={m.replyTo} userName={userName} onJump={model.replyOpen} />}
-       {m.forwardedFrom && (
-        <div className="message-forwarded">
-         <Forward size={14} aria-hidden="true" />
-         Переслано от {userName(m.forwardedFrom.author)}
-        </div>
-       )}
-       <BubbleContent className="contents">
-        {m.text &&
-         (model.hasImage ? (
-          <div className="message-image-caption rounded-[12px] border border-[#ffffff12] bg-[#202630] px-[10px] pt-[7px] pb-[5px]">
-           <MessageText text={m.text} mentions={m.mentions} />
-          </div>
+     <MessageContent className="message-content w-fit gap-0">
+      {!grouped && (
+       <MessageHeader className="message-meta">
+        <strong>
+         {model.canOpenProfile ? (
+          <button type="button" className="message-author" title={`Профиль ${model.name}`} onClick={model.openProfile}>
+           {model.name}
+          </button>
          ) : (
-          <MessageText text={m.text} mentions={m.mentions} />
-         ))}
+          model.name
+         )}
+        </strong>
+        {(m.bot_name || model.identity?.bot) && (
+         <small className="bot-badge text-primary rounded-[4px] px-[5px] py-px text-[9px]">БОТ</small>
+        )}
+       </MessageHeader>
+      )}
+      <Bubble variant={bubbleVariant} className="max-w-full">
+       <BubbleContent data-inline-meta={!!m.text && !m.attachment && !sticker}>
+        {m.replyTo && <MessageQuote reply={m.replyTo} userName={userName} onJump={model.replyOpen} />}
+        {m.forwardedFrom && (
+         <div className="message-forwarded">
+          <Forward size={14} aria-hidden="true" />
+          Переслано от {userName(m.forwardedFrom.author)}
+         </div>
+        )}
+        {invitedGroup && invitedChannel ? (
+         <div className="grid justify-items-start gap-1.5">
+          <span>Голосовой канал «{invitedChannel.name}»</span>
+          <Button
+           type="button"
+           size="sm"
+           variant={bubbleVariant === 'default' ? 'secondary' : 'default'}
+           onClick={() => chatNavigationActions.openGroup(invitedGroup.id, invitedChannel.id)}
+          >
+           Открыть канал
+          </Button>
+         </div>
+        ) : invitation ? (
+         <span>Голосовой канал недоступен</span>
+        ) : (
+         m.text && <MessageText text={m.text} mentions={m.mentions} />
+        )}
         {sticker && (
          <SentSticker
           key={sticker.id}
@@ -188,61 +199,66 @@ export function MessageItem({
          />
         )}
         {m.attachment && <MessageAttachment messageId={m.id} attachment={m.attachment} />}
-       </BubbleContent>
-       <div
-        className={
-         reactions.length
-          ? 'message-bottom-row mt-1 flex items-end justify-between gap-2'
-          : 'message-bottom-inline contents'
-        }
-       >
-        {reactions.length > 0 && (
-         <div className="reactions flex flex-wrap gap-[6px]">
-          {reactions.map(reaction => (
-           <button
-            type="button"
-            disabled={busy}
-            aria-label={`Реакция ${reaction.emoji}`}
-            aria-pressed={reaction.pressed}
-            key={reaction.emoji}
-            onClick={() => actions.react(reaction.emoji)}
-           >
-            {reaction.emoji} {reaction.count}
-           </button>
-          ))}
-         </div>
+        {pending !== 'failed' && (
+         <span className="message-delivery-meta">
+          <time dateTime={model.dateTime}>{model.time}</time>
+          {author &&
+           (pending === 'sending' ? (
+            <span className="message-pending" role="status" aria-label="Отправляется" />
+           ) : model.read ? (
+            <button
+             type="button"
+             className="message-read-check"
+             aria-label="Просмотрено"
+             title={model.readTitle}
+             onClick={actions.openReaders}
+            >
+             <CheckCheck size={13} />
+            </button>
+           ) : (
+            <Check size={13} aria-label="Отправлено" />
+           ))}
+         </span>
         )}
-        <MessageFooter className="mt-[3px] flex items-center justify-end gap-1 text-[10px] leading-[15px] whitespace-nowrap text-[#adb8ca]">
-         <time dateTime={model.dateTime}>{model.time}</time>
-         {author &&
-          (pending === 'sending' ? (
-           <span className="message-pending" role="status" aria-label="Отправляется" />
-          ) : pending === 'failed' ? (
-           <button
-            type="button"
-            className="message-retry inline-flex size-[15px] flex-none cursor-pointer items-center justify-center rounded border-0 p-0 text-[#f87171] [background:none]"
-            aria-label={model.pendingHint}
-            title={model.pendingHint}
-            onClick={actions.retry}
-           >
-            <CircleAlert size={13} aria-hidden="true" />
-           </button>
-          ) : model.read ? (
-           <button
-            type="button"
-            className="message-read-check"
-            aria-label="Просмотрено"
-            title={model.readTitle}
-            onClick={actions.openReaders}
-           >
-            <CheckCheck size={13} />
-           </button>
-          ) : (
-           <Check size={13} aria-label="Отправлено" />
-          ))}
-        </MessageFooter>
-       </div>
+       </BubbleContent>
+       {reactions.length > 0 && (
+        <BubbleReactions align="start">
+         {reactions.map(reaction => (
+          <Button
+           type="button"
+           size={reaction.count > 1 ? 'xs' : 'icon-xs'}
+           variant={reaction.pressed && bubbleVariant !== 'default' ? 'secondary' : 'ghost'}
+
+           disabled={busy}
+           aria-label={`Реакция ${reaction.emoji}, ${reaction.count}`}
+           aria-pressed={reaction.pressed}
+           key={reaction.emoji}
+           onClick={() => actions.react(reaction.emoji)}
+          >
+           {reaction.emoji}
+           {reaction.count > 1 && <span>{reaction.count}</span>}
+          </Button>
+         ))}
+        </BubbleReactions>
+       )}
       </Bubble>
+      {pending === 'failed' && (
+       <MessageFooter className="gap-1">
+        <span className="text-destructive" role="status">
+         Ошибка отправки
+        </span>
+        <Button
+         type="button"
+         variant="ghost"
+         size="icon-xs"
+         aria-label="Повторить отправку"
+         title={model.pendingHint}
+         onClick={actions.retry}
+        >
+         <RefreshCw aria-hidden="true" />
+        </Button>
+       </MessageFooter>
+      )}
      </MessageContent>
     </Message>
    </EntityContextMenu>

@@ -11,6 +11,7 @@ import {
 } from '@/entities/conversation';
 import type {ChatNotification, ChatNotificationCursor} from '@/entities/conversation';
 import type {NotificationTarget} from '../model/notification-target';
+import {MESSAGE_NOTIFICATION_DURATION_MS} from '../model/notification-duration';
 
 export function useDirectMessageNotifications(
  state: ChatState | null,
@@ -86,7 +87,7 @@ export function useDirectMessageNotifications(
         onClose={() => toast.dismiss(toastId)}
        />
       ),
-      {id: `chat-${account}-${id}`, duration: 5500}
+      {id: `chat-${account}-${id}`, duration: MESSAGE_NOTIFICATION_DURATION_MS}
      );
     }
     if (audible) playSound();

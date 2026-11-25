@@ -1,10 +1,12 @@
+import {Slider} from '@/shared/ui/slider';
+import {Input} from '@/shared/ui/input';
 // Upstream assistant-ui Elements, MIT. Commit 076de9eaf1b5f0f1fb6fb359c5e5d68770cae65c.
 // https://github.com/assistant-ui/assistant-ui/blob/076de9eaf1b5f0f1fb6fb359c5e5d68770cae65c/packages/ui/src/components/react/assistant-ui/elements/settings-panel.tsx
 //
 // Sombra adaptation (colours and sizes only, plus the documented trims/extensions below):
 //  * `systemPrompt`, `temperature` and `toggles` are optional. Hermes owns the system
 //    prompt, the bot transport has no temperature and there are no per-bot extras, so the
-//    upstream sections stay in the file byte-for-byte but render only when passed.
+//    optional sections render only when passed.
 //  * An empty `models` list renders no pill row (an empty rounded field would otherwise
 //    look like a broken control); the current model plus `modelInput` carries that case.
 //  * `reasoning` is the one new section: the bot contract stores a reasoning level next
@@ -19,6 +21,8 @@
 import {useId} from 'react';
 import type {ComponentProps, ReactNode} from 'react';
 import {cn} from '@/shared/lib/utils';
+import {Switch} from '../switch';
+import {Textarea} from '../textarea';
 import {field, mono, paper} from './surfaces';
 import {clamp} from './range';
 
@@ -175,7 +179,7 @@ export function SettingsPanel({
      <label htmlFor={inputId} className={cn(mono, 'text-muted-foreground')}>
       идентификатор модели
      </label>
-     <input
+     <Input
       id={inputId}
       value={modelInput.value}
       disabled={disabled}
@@ -205,15 +209,12 @@ export function SettingsPanel({
    {systemPrompt !== undefined ? (
     <div className="flex flex-col gap-1.5">
      <span className={cn(mono, 'text-muted-foreground')}>system prompt</span>
-     <textarea
+     <Textarea
       value={systemPrompt}
       onChange={event => onSystemPromptChange?.(event.target.value)}
       rows={3}
       aria-label="System prompt"
-      className={cn(
-       field,
-       'text-foreground/80 focus-visible:ring-foreground/20 resize-none rounded-xl px-3 py-2 text-xs leading-relaxed outline-none focus-visible:ring-1'
-      )}
+      className="resize-none"
      />
     </div>
    ) : null}
@@ -224,15 +225,14 @@ export function SettingsPanel({
       <span className={cn(mono, 'text-muted-foreground')}>temperature</span>
       <span className={cn(mono, 'text-muted-foreground tabular-nums')}>{clamp(temperature, 0, 2).toFixed(1)}</span>
      </span>
-     <input
-      type="range"
+     <Slider
       min={0}
       max={2}
       step={0.1}
-      value={clamp(temperature, 0, 2)}
+      value={[clamp(temperature, 0, 2)]}
       aria-label="Temperature"
-      onChange={event => onTemperatureChange?.(Number(event.target.value))}
-      className="accent-foreground/80 h-1 w-full"
+      onValueChange={([value]) => onTemperatureChange?.(value)}
+      className="h-6"
      />
     </div>
    ) : null}
@@ -245,40 +245,12 @@ export function SettingsPanel({
         <span className="truncate text-[13px]">{toggle.label}</span>
         <span className="text-muted-foreground truncate text-xs">{toggle.detail}</span>
        </span>
-       {onToggle ? (
-        <button
-         type="button"
-         role="switch"
-         aria-checked={toggle.on}
-         aria-label={toggle.label}
-         disabled={disabled}
-         onClick={() => onToggle(toggle.key)}
-         className={cn(
-          'flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200',
-          toggle.on ? 'bg-foreground/80' : 'bg-foreground/15'
-         )}
-        >
-         <span
-          className={cn(
-           'bg-background size-4 rounded-full transition-transform duration-200 motion-reduce:transition-none',
-           toggle.on && 'translate-x-4'
-          )}
-         />
-        </button>
-       ) : (
-        <span
-         role="switch"
-         aria-checked={toggle.on}
-         aria-disabled="true"
-         aria-label={toggle.label}
-         className={cn(
-          'flex h-5 w-9 shrink-0 items-center rounded-full p-0.5',
-          toggle.on ? 'bg-foreground/80' : 'bg-foreground/15'
-         )}
-        >
-         <span className={cn('bg-background size-4 rounded-full', toggle.on && 'translate-x-4')} />
-        </span>
-       )}
+       <Switch
+        checked={toggle.on}
+        aria-label={toggle.label}
+        disabled={disabled || !onToggle}
+        onCheckedChange={() => onToggle?.(toggle.key)}
+       />{' '}
       </div>
      ))}
     </div>

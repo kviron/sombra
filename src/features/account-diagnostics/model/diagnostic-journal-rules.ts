@@ -14,6 +14,7 @@ const CATEGORIES: Record<string, string> = {
  transport: 'Ошибка соединения',
  timeout: 'Время ожидания истекло',
  invalid_response: 'Некорректный ответ',
+ ui_freeze: 'Зависание интерфейса',
  session_storage: 'Ошибка хранения сеанса',
  http_error: 'Ошибка HTTP',
  js_error: 'Ошибка интерфейса',

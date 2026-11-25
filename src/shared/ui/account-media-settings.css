@@ -21,12 +21,15 @@
  border-radius: 0;
  background: none;
 }
+
 .account-media-voice .media-settings-panel:first-of-type {
  padding-top: var(--s1);
 }
+
 .account-media-voice .media-settings-panel + .media-settings-panel {
  border-top: 1px solid var(--border);
 }
+
 .account-media-voice .media-settings-panel h2,
 .account-media-notifications .notification-help h2 {
  font-size: 15px;
@@ -45,6 +48,7 @@
  gap: var(--s4);
  min-height: var(--row);
 }
+
 .account-media-voice .voice-field > label {
  display: block;
  margin: 0;
@@ -52,13 +56,16 @@
  line-height: 20px;
  color: var(--muted-foreground);
 }
+
 .account-media-voice .voice-field > .audio-device-missing {
  grid-column: 1/-1;
  margin: 0 0 var(--s2);
 }
+
 .account-media-voice .voice-volume {
  grid-column: 1/-1;
 }
+
 .account-media-voice .voice-volume > label {
  color: var(--foreground);
 }
@@ -68,6 +75,7 @@
  grid-template-columns: minmax(0, 1fr);
  gap: var(--s2);
 }
+
 .account-media-voice .voice-switch {
  display: grid;
  grid-template-columns: minmax(0, var(--label-col)) minmax(0, 1fr);
@@ -76,14 +84,17 @@
  min-height: var(--row);
  margin: 0;
 }
+
 .account-media-voice .voice-switch > [data-slot='switch'] {
  justify-self: start;
 }
+
 .account-media-voice .voice-switch > label {
  font-size: 13px;
  line-height: 20px;
  color: var(--foreground);
 }
+
 .account-media-voice .voice-processing .settings-hint {
  grid-column: 1/-1;
  margin: 0 0 var(--s1);
@@ -96,12 +107,14 @@
  align-items: stretch;
  margin-top: var(--s1);
 }
+
 .account-media-voice .voice-test-actions {
  display: flex;
  flex-wrap: wrap;
  gap: var(--s2);
  align-items: center;
 }
+
 .account-media-voice .voice-test-actions [role='progressbar'] {
  flex: 1 1 160px;
  min-width: 0;
@@ -124,17 +137,20 @@
  background: transparent;
  min-height: var(--row);
 }
+
 .account-media-notifications .notification-option label {
  display: grid;
  gap: var(--s1);
  min-width: 0;
  cursor: pointer;
 }
+
 .account-media-notifications .notification-option label span,
 .account-media-notifications > p:not([role]),
 .account-media-notifications .notification-help p {
  color: var(--muted-foreground);
 }
+
 .account-media-notifications .notification-help {
  display: grid;
  gap: var(--s2);

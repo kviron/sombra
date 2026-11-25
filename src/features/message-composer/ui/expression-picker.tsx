@@ -1,7 +1,8 @@
+import {Input} from '@/shared/ui/input';
 import {Smile, Sticker as StickerIcon, X} from 'lucide-react';
 import type {ChatState, Group} from '@/shared/types';
 import {ComposerIconButton} from '@/shared/ui/elements-composer';
-import {Select} from '@/shared/ui/select';
+import {OptionsSelect} from '@/shared/ui/select';
 import {StickerImage} from '@/entities/sticker';
 import {useExpressionPicker} from '../model/use-expression-picker';
 
@@ -67,7 +68,7 @@ export function ExpressionPicker({
      {panel === 'emoji' ? (
       <>
        <div className="expression-filters mb-2 grid grid-cols-[minmax(0,1fr)_auto] gap-[6px]">
-        <input
+        <Input
          aria-label="Поиск эмодзи"
          placeholder="Поиск эмодзи"
          value={query}
@@ -76,7 +77,7 @@ export function ExpressionPicker({
          }}
          onChange={event => actions.setQuery(event.target.value)}
         />
-        <Select
+        <OptionsSelect
          label="Категория эмодзи"
          value={category}
          onValueChange={actions.chooseCategory}
@@ -105,7 +106,12 @@ export function ExpressionPicker({
         </nav>
        )}
        {model.packsCount > 1 && (
-        <Select label="Набор стикеров" value={activePack} onValueChange={actions.setPack} options={model.packOptions} />
+        <OptionsSelect
+         label="Набор стикеров"
+         value={activePack}
+         onValueChange={actions.setPack}
+         options={model.packOptions}
+        />
        )}
        {filtered.length ? (
         <div className="sticker-grid grid max-h-[220px] grid-cols-[repeat(3,1fr)] gap-2 overflow-auto">

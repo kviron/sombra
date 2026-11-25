@@ -9,8 +9,38 @@ import {
  musicCommandsFor,
  musicEnterPressed,
  roomMusicEnabled,
+ subscribeComposerText,
  withoutLeadingSpace
 } from './assistant-composer-rules.ts';
+
+test('уведомление о статусе отправки не возвращает очищенный черновик', () => {
+ let text = 'отправленное сообщение';
+ const listeners = new Set();
+ const composer = {
+  getState: () => ({text}),
+  subscribe(listener) {
+   listeners.add(listener);
+   return () => listeners.delete(listener);
+  }
+ };
+ const notify = () => listeners.forEach(listener => listener());
+ const changes = [];
+ const unsubscribe = subscribeComposerText(composer, value => changes.push(value));
+
+ // Адаптер снимает доступность Send до того, как React синхронизирует очищенный черновик.
+ notify();
+ assert.deepEqual(changes, []);
+ text = '';
+ notify();
+ notify();
+ text = 'следующее сообщение';
+ notify();
+ assert.deepEqual(changes, ['', 'следующее сообщение']);
+ unsubscribe();
+ text = 'после закрытия чата';
+ notify();
+ assert.equal(changes.length, 2);
+});
 
 const suggestion = (id, search, label = id) => ({
  id,

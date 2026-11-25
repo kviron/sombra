@@ -1,3 +1,4 @@
+import {Input} from '@/shared/ui/input';
 import {Bot, MessageCircle, PanelRight, Phone, Search, Settings, Users, Video, Volume2, X} from 'lucide-react';
 import type {RefObject} from 'react';
 import {DmHeaderIdentity} from '@/entities/conversation';
@@ -27,16 +28,16 @@ export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigge
  const {home, channel, title, friends, peer, dmBot, typingUntil} = nav;
  return (
   <>
-   <header className="chat-header flex h-[50px] shrink-0 items-center gap-2.5 border-b px-4">
+   <header className="chat-header flex shrink-0 items-center gap-2.5 border-b px-4">
     {!peer &&
      (home && channel && 'members' in channel && channel.members.length > 2 && channel.avatar ? (
       <img className="dialog-header-avatar" src={channel.avatar} alt="" />
      ) : home ? (
-      <MessageCircle className="text-[#808089]" />
+      <MessageCircle className="text-muted-foreground" />
      ) : messages.voiceLayout ? (
-      <Volume2 className="text-[#808089]" />
+      <Volume2 className="text-muted-foreground" />
      ) : (
-      <MessageCircle className="text-[#808089]" />
+      <MessageCircle className="text-muted-foreground" />
      ))}
     {channel && !friends ? (
      <button
@@ -108,16 +109,19 @@ export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigge
        <Users />
       </button>
      )}
-     <label className="chat-search">
-      <input
-       className="w-[210px] text-[13px] outline-none [background:none]"
+     <div className="chat-search relative">
+      <Input
+       className="w-[210px] pr-8"
        aria-label="Поиск сообщений"
        placeholder="Поиск сообщений"
        value={messages.search}
        onChange={event => messages.actions.setSearch(event.target.value)}
       />
-      <Search size={17} />
-     </label>
+      <Search
+       aria-hidden="true"
+       className="text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2"
+      />
+     </div>
      {channel && !friends && (
       <button
        ref={materialsTrigger}

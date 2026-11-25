@@ -34,10 +34,10 @@ function avatarHue(seed: string) {
  */
 const avatarClass = cn(
  'user-avatar',
- 'group relative inline-grid shrink-0 place-items-center rounded-[50%] text-[#eef1f8]',
+ 'group relative inline-grid shrink-0 place-items-center rounded-[50%] text-foreground',
  'size-[var(--avatar-size)] [--avatar-size:32px] text-[length:calc(var(--avatar-size)*0.4)]',
  'leading-none font-semibold tracking-[0.01em] [box-shadow:inset_0_0_0_1px_#ffffff1a] select-none',
- 'bg-[linear-gradient(145deg,hsl(var(--avatar-hue,232)_36%_42%),hsl(calc(var(--avatar-hue,232)_+_28)_32%_27%))]',
+ 'bg-muted',
  'data-[size=xs]:[--avatar-size:20px] data-[size=sm]:[--avatar-size:24px] data-[size=md]:[--avatar-size:32px]',
  'data-[size=lg]:[--avatar-size:40px] data-[size=xl]:[--avatar-size:88px]'
 );
@@ -46,8 +46,8 @@ const avatarClass = cn(
 const presenceClass = cn(
  'user-presence',
  'absolute -right-px -bottom-px box-content size-[10px] rounded-[50%] border-2',
- 'border-[var(--presence-ring,#0c0f15)] bg-[#747c8c] [transition:background-color_180ms_ease,box-shadow_180ms_ease]',
- 'data-[online=true]:bg-[#3ecf8e] data-[online=true]:[box-shadow:0_0_9px_#3ecf8e66]',
+ 'border-border bg-muted [transition:background-color_180ms_ease,box-shadow_180ms_ease]',
+ 'data-[online=true]:bg-emerald-500 data-[online=true]:[box-shadow:0_0_9px_#3ecf8e66]',
  'group-data-[size=xs]:size-[7px] group-data-[size=sm]:size-[8px]',
  'group-data-[size=xl]:right-[4px] group-data-[size=xl]:bottom-[4px] group-data-[size=xl]:size-[13px]',
  'group-data-[size=xl]:border-[3px]'

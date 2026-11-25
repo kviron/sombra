@@ -2,7 +2,7 @@ import {useEffect, useState, useSyncExternalStore} from 'react';
 import {tauri, Channel} from '@/shared/api';
 import {Button} from '@/shared/ui/button';
 import {Badge} from '@/shared/ui/badge';
-import {Check, RefreshCw} from 'lucide-react';
+import {Check, RefreshCw, X} from 'lucide-react';
 import {createUpdater} from '../model/update-controller';
 
 import './updates.css';
@@ -61,7 +61,10 @@ export function UpdateNotice() {
  }, []);
  if (dismissed || state.phase !== 'available') return null;
  return (
-  <aside className="update-notice dark" aria-label="Обновление Sombra">
+  <aside
+   className="update-notice bg-card/80 text-card-foreground shadow-lg backdrop-blur-md"
+   aria-label="Обновление Sombra"
+  >
    <span role="status">Доступна Sombra {state.version}.</span>
    <Button
     variant="secondary"
@@ -73,8 +76,13 @@ export function UpdateNotice() {
    >
     Обновить
    </Button>
-   <Button variant="ghost" size="sm" onClick={() => setDismissed(true)}>
-    Позже
+   <Button
+    variant="ghost"
+    size="icon-sm"
+    aria-label="Скрыть уведомление об обновлении"
+    onClick={() => setDismissed(true)}
+   >
+    <X />
    </Button>
   </aside>
  );

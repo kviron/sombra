@@ -3,13 +3,11 @@
    чужой срез user-row, анимация спиннера и узкий экран, который перебивает
    отступы утилит. */
 
-/* Оверлей остаётся классом-хуком: glass.css вешает на него размытие подложки
-   в :is(.new-dialog-overlay, …), а нелейерное правило утилиты не заменит. */
+/* Оверлей — класс-хук: затемнение подложки даёт общее правило из app/styles/index.css. */
 .new-dialog-overlay {
  position: fixed;
  inset: 0;
  z-index: 110;
- background: rgb(0 0 0 / 65%);
 }
 
 /* Поверхность берётся из токенов темы (--popover/--border), как и раньше:
@@ -19,7 +17,6 @@
  color: var(--popover-foreground);
  border: 1px solid var(--border);
  border-radius: 16px;
- box-shadow: 0 24px 80px rgb(0 0 0 / 40%);
 }
 
 /* Чип выбранного участника — кнопка из shared/ui: утилиты Tailwind лежат в слое,
@@ -31,6 +28,7 @@
  padding: 4px 8px;
  border-radius: 20px;
 }
+
 .new-dialog-chip > span:not(.user-avatar) {
  min-width: 0;
  overflow: hidden;
@@ -54,6 +52,7 @@
 .new-dialog-dialog .user-row-title strong {
  color: var(--popover-foreground);
 }
+
 .new-dialog-dialog .user-row-subtitle {
  color: var(--muted-foreground);
 }
@@ -61,11 +60,13 @@
 .new-dialog-spinner {
  animation: new-dialog-spin 1s linear infinite;
 }
+
 @keyframes new-dialog-spin {
  to {
   transform: rotate(360deg);
  }
 }
+
 @media (prefers-reduced-motion: reduce) {
  .new-dialog-spinner {
   animation: none;

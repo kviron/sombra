@@ -1,13 +1,17 @@
 import {toast} from 'sonner';
+import {useState} from 'react';
 import {StickerLibrary} from '@/entities/sticker';
-import {Select} from '@/shared/ui/select';
+import {UserRow} from '@/entities/user';
+import {Checkbox} from '@/shared/ui/checkbox';
+import {Input} from '@/shared/ui/input';
+import {OptionsSelect} from '@/shared/ui/select';
 import {Button} from '@/shared/ui/button';
 import type {ChatState} from '@/shared/types';
 import {Bots} from './bots';
 import type {ChatNavigationModel} from '../model/use-chat-navigation';
 import type {ChatPanelsModel} from '../model/use-chat-panels';
 import type {ChatStateModel} from '../model/use-chat-state';
-import {modalDoneDisabled, modalTitle, selectionFull} from '../model/chat-rules';
+import {groupInviteCandidates, modalDoneDisabled, modalTitle, selectionFull} from '../model/chat-rules';
 
 type Props = {
  chat: ChatStateModel;
@@ -15,6 +19,57 @@ type Props = {
  nav: ChatNavigationModel;
  panels: ChatPanelsModel;
 };
+
+function InvitePeople({
+ candidates,
+ selected,
+ disabled,
+ toggle
+}: {
+ candidates: ReturnType<typeof groupInviteCandidates>;
+ selected: string[];
+ disabled: boolean;
+ toggle: (id: string, checked: boolean) => void;
+}) {
+ const [query, setQuery] = useState('');
+ const search = query.trim().toLocaleLowerCase('ru');
+ const visible = candidates
+  .filter(user => user.name.toLocaleLowerCase('ru').includes(search))
+  .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+ return (
+  <section aria-label="Выбор участников">
+   {candidates.length > 0 && (
+    <Input
+     type="search"
+     aria-label="Поиск пользователей"
+     placeholder="Поиск по имени"
+     className="mb-2"
+     value={query}
+     onChange={event => setQuery(event.target.value)}
+    />
+   )}
+   {visible.length ? (
+    <ul className="m-0 grid max-h-56 list-none gap-1 overflow-auto p-0">
+     {visible.map(user => (
+      <li key={user.id} className="hover:bg-accent flex items-center justify-between gap-2 rounded-lg pr-3">
+       <UserRow identity={user} menu={false} />
+       <Checkbox
+        aria-label={`Выбрать ${user.name}`}
+        checked={selected.includes(user.id)}
+        disabled={disabled || selectionFull(selected, user.id)}
+        onCheckedChange={checked => toggle(user.id, checked === true)}
+       />
+      </li>
+     ))}
+    </ul>
+   ) : (
+    <p className="text-muted-foreground text-sm">
+     {candidates.length ? 'По этому имени никого не нашли.' : 'Все доступные пользователи уже в группе.'}
+    </p>
+   )}
+  </section>
+ );
+}
 
 /** Общее окно действий: группа, канал, диалог, приглашение, боты и стикеры группы. */
 export function ChatGroupModal({chat, state, nav, panels}: Props) {
@@ -25,15 +80,15 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
  const permits = panels.permissions;
  const canCreateText = permits(group, 'channels.create_text');
  const canCreateVoice = permits(group, 'channels.create_voice');
+ const inviteCandidates = modal === 'invite' && group && state ? groupInviteCandidates(state.users, group.members) : [];
+ const inviteSelection = selected.filter(id => inviteCandidates.some(user => user.id === id));
  return (
   <div className="modal-backdrop">
    <form
-    className="group-modal surface-matte max-h-[85vh] w-[440px] overflow-auto"
+    className="group-modal max-h-[85dvh] w-full overflow-auto border"
     role="dialog"
     aria-modal="true"
-    aria-label={
-     modal === 'delete-channel' ? 'Удалить канал' : modal === 'edit-group' ? 'Настройки группы' : 'Управление чатами'
-    }
+    aria-label={modalTitle(modal)}
     onSubmit={event => {
      event.preventDefault();
      void panels.actions.submit();
@@ -64,15 +119,22 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
      <>
       {permits(group, 'members.invite') && (
        <>
-        <label htmlFor="invite-email">Email аккаунта Sombra</label>
-        <input
+        <InvitePeople
+         candidates={inviteCandidates}
+         selected={inviteSelection}
+         disabled={chat.busy}
+         toggle={panels.actions.toggleSelected}
+        />
+        <label className="mt-3 block" htmlFor="invite-email">
+         Или пригласите по email
+        </label>
+        <Input
          id="invite-email"
          type="email"
          autoComplete="off"
-         autoFocus
-         required
-         disabled={chat.busy}
+         disabled={chat.busy || inviteSelection.length > 0}
          maxLength={254}
+         className="my-2"
          value={name}
          onChange={event => {
           panels.actions.setName(event.target.value);
@@ -84,10 +146,11 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
       {permits(group, 'members.invite') && !!group?.invite && (
        <>
         <p>Код приглашения</p>
-        <input readOnly aria-label="Код приглашения" value={group?.invite || ''} />
-        <button
+        <Input readOnly aria-label="Код приглашения" className="my-2" value={group?.invite || ''} />
+        <Button
          type="button"
-         className="small-button"
+         size="sm"
+         variant="outline"
          onClick={() => {
           if (!permits(group, 'members.invite') || !group?.invite) return;
           void navigator.clipboard
@@ -97,7 +160,7 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
          }}
         >
          Скопировать приглашение
-        </button>
+        </Button>
        </>
       )}
       {group?.rolesRevision !== undefined && permits(group, 'invite.rotate') && (
@@ -111,11 +174,12 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
     ) : (
      <>
       {modal === 'edit-channel' && <label htmlFor="channel-edit-name">Название канала</label>}
-      <input
+      <Input
        id={modal === 'edit-channel' ? 'channel-edit-name' : undefined}
        autoFocus
        disabled={chat.busy || (modal === 'edit-channel' && !permits(editingChannelGroup, 'channels.rename'))}
-       required={modal !== 'dialog'}
+       required
+       className="my-2"
        aria-label={modal === 'join' ? 'Код приглашения' : 'Название'}
        placeholder={modal === 'join' ? 'Код приглашения' : 'Название'}
        value={name}
@@ -125,7 +189,7 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
       {modal === 'channel' && (
        <label className="channel-kind">
         Тип канала
-        <Select
+        <OptionsSelect
          label="Тип канала"
          value={channelKind}
          onValueChange={panels.actions.setChannelKind}
@@ -136,30 +200,10 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
         />
        </label>
       )}
-      {modal === 'dialog' && (
-       <div style={{display: 'block', maxHeight: 220, overflow: 'auto'}}>
-        {state &&
-         state.users
-          .filter(user => user.id !== state.me.id)
-          .map(user => (
-           <label key={user.id} style={{display: 'flex', alignItems: 'center', gap: 10}}>
-            <input
-             style={{width: 18, margin: 8}}
-             type="checkbox"
-             disabled={selectionFull(selected, user.id)}
-             checked={selected.includes(user.id)}
-             onChange={event => panels.actions.toggleSelected(user.id, event.target.checked)}
-            />
-            {user.name}
-           </label>
-          ))}
-        {state?.users.length === 1 && <p>Пока вы первый пользователь. Создайте второй аккаунт, чтобы начать диалог.</p>}
-       </div>
-      )}
      </>
     )}
     {chat.error && <p role="alert">{chat.error}</p>}
-    <div className={modal === 'edit-channel' ? 'channel-settings-actions' : undefined}>
+    <div className={modal === 'edit-channel' ? 'channel-settings-actions' : 'mt-4 flex flex-wrap justify-end gap-2'}>
      {modal === 'edit-channel' && permits(editingChannelGroup, 'channels.delete') && (
       <Button
        type="button"
@@ -171,8 +215,10 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
        Удалить канал
       </Button>
      )}
-     <button
+     <Button
       type="button"
+      variant="outline"
+      size="sm"
       disabled={chat.busy}
       onClick={() => {
        chat.actions.clearError();
@@ -181,7 +227,7 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
       }}
      >
       {modal === 'delete-channel' ? 'Отмена' : 'Закрыть'}
-     </button>
+     </Button>
      {modal === 'delete-channel' && (
       <Button
        type="submit"
@@ -193,17 +239,18 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
       </Button>
      )}
      {modal === 'invite' && permits(group, 'members.invite') && (
-      <button type="submit" className="small-button" disabled={chat.busy || !name.trim()}>
+      <Button type="submit" size="sm" disabled={chat.busy || (!name.trim() && inviteSelection.length === 0)}>
        {chat.busy ? 'Добавление…' : 'Пригласить'}
-      </button>
+      </Button>
      )}
      {modal !== 'invite' &&
       modal !== 'bots' &&
       modal !== 'delete-channel' &&
       modal !== 'group-stickers' &&
       (modal !== 'edit-channel' || permits(editingChannelGroup, 'channels.rename')) && (
-       <button
-        className="small-button"
+       <Button
+        type="submit"
+        size="sm"
         disabled={modalDoneDisabled({
          mode: modal,
          busy: chat.busy,
@@ -216,7 +263,7 @@ export function ChatGroupModal({chat, state, nav, panels}: Props) {
         })}
        >
         {modal === 'edit-channel' ? (chat.busy ? 'Сохранение…' : 'Сохранить') : 'Готово'}
-       </button>
+       </Button>
       )}
     </div>
    </form>

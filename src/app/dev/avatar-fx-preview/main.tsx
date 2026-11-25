@@ -3,13 +3,13 @@ import {createRoot} from 'react-dom/client';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {AvatarFrame, DECORATION_PRESETS, fxSchedulerState} from '@/shared/ui/avatar-fx';
 import type {DecorationInput, PaletteName} from '@/shared/ui/avatar-fx';
+import {Slider} from '@/shared/ui/slider';
 import {ProfileDecorationPicker} from '@/features/profile-decoration'; // The local QA page exercises the real app modal.
 import {UserProfile} from '@/pages/chat';
 import type {User} from '@/shared/types';
 import '@/shared/ui/profile-cover.css';
 import '@/entities/user/ui/user.css';
 import '@/pages/chat/ui/chat.css';
-import '@/app/styles/glass.css';
 import './preview.css';
 
 const AVATAR =
@@ -204,18 +204,18 @@ function App() {
        {name}
       </button>
      ))}
-     <label className="range">
+     <div className="range">
       интенсивность
-      <input
-       type="range"
+      <Slider
+       aria-label="Интенсивность"
        min={0}
        max={1}
        step={0.05}
-       value={intensity}
-       onChange={event => setIntensity(Number(event.target.value))}
+       value={[intensity]}
+       onValueChange={([value]) => setIntensity(value)}
       />
       <span>{intensity.toFixed(2)}</span>
-     </label>
+     </div>
     </div>
    </section>
 

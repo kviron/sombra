@@ -1,4 +1,4 @@
-import {useEffect, useRef} from 'react';
+import {useEffect, useMemo, useRef} from 'react';
 import {useStore} from 'zustand';
 import {toast} from 'sonner';
 import {readAttachment, mentionCandidates, useChatDraft, useMessageLink} from '@/features/message-composer';
@@ -24,7 +24,6 @@ import {
  readsBlocked,
  referenceDraftKey,
  referencesSupported,
- scrollRevision,
  sendDisabled
 } from './chat-rules';
 import type {ChatPanelsModel} from './use-chat-panels';
@@ -46,7 +45,6 @@ type Options = {
  panels: ChatPanelsModel;
  incomingCall: boolean;
  music: Music;
- followOnNextUpdate: () => void;
 };
 
 /**
@@ -64,8 +62,7 @@ export function useChatMessages({
  voice,
  panels,
  incomingCall,
- music,
- followOnNextUpdate
+ music
 }: Options) {
  const messages = useStore(chatMessagesStore);
  const destination = channel?.id || '';
@@ -91,18 +88,21 @@ export function useChatMessages({
  const voiceLayout = isVoiceView({channel, voiceRoom, room: voice.room});
  const musicRoom = musicRoomOf(state, voice.room);
  const imageActivity = !!state && !!channel && hasLiveImageActivity(state, channel.id);
- const serverMessages = state?.messages.filter(message => message.channel === destination) || [];
- const chatMessages = mergeHistoryMessages(history.messages, serverMessages);
- const outgoing = outgoingEntries(messages.outbox, destination);
- const visibleMessages = [
-  ...filterMessages({messages: chatMessages, search: messages.search, users: state?.users || []}),
-  ...filterMessages({
-   messages: outgoing.map(item => item.message),
-   search: messages.search,
-   users: state?.users || []
-  })
- ];
- const messageIds = [...chatMessages.map(message => message.id), ...outgoing.map(item => item.id)];
+ const {messages: serverMessages, users} = state ?? {};
+ const {outbox, search} = messages;
+ const chatMessages = useMemo(
+  () =>
+   mergeHistoryMessages(
+    history.messages,
+    serverMessages?.filter(message => message.channel === destination) ?? [],
+    outgoingEntries(outbox, destination).map(item => item.message)
+   ),
+  [history.messages, serverMessages, outbox, destination]
+ );
+ const visibleMessages = useMemo(
+  () => filterMessages({messages: chatMessages, search, users: users ?? []}),
+  [chatMessages, search, users]
+ );
 
  const humanTyping = useHumanTyping(
   state,
@@ -247,7 +247,6 @@ export function useChatMessages({
   const id = localMessageId(crypto.randomUUID());
   chatMessagesActions.beginOutgoing(id, draftMessage);
   clearSent(destination, sent);
-  followOnNextUpdate();
   try {
    const message = await messageService.send<ChatMessage>(outgoingPayload(draftMessage));
    chatMessagesActions.discardOutgoing(id);
@@ -255,7 +254,6 @@ export function useChatMessages({
    if (replyDraft) chatMessagesActions.cancelReply(referenceKey, replyDraft);
    if (mentionDrafts.current[destination]?.text === sent) delete mentionDrafts.current[destination];
    if (sentAttachment) chatMessagesActions.clearSentAttachment(destination, sentAttachment);
-   followOnNextUpdate();
    // Опрос мог ещё не увидеть новое сообщение: держим его в переписке до следующего снапшота.
    await chatSnapshotActions.refresh().catch(reason => chatSnapshotActions.setError((reason as Error).message));
    if (!chatSnapshotStore.getState().snapshot?.messages.some(item => item.id === message.id))
@@ -275,7 +273,6 @@ export function useChatMessages({
    chatMessagesActions.discardOutgoing(id);
    if (message?.id) chatSnapshotActions.appendMessage(message);
    if (entry.draft.attachment) chatMessagesActions.clearSentAttachment(entry.draft.channel, entry.draft.attachment);
-   followOnNextUpdate();
    await chatSnapshotActions.refresh().catch(reason => chatSnapshotActions.setError((reason as Error).message));
    if (!chatSnapshotStore.getState().snapshot?.messages.some(item => item.id === message.id))
     chatSnapshotActions.appendMessage(message);
@@ -297,7 +294,6 @@ export function useChatMessages({
     ...(comment ? {comment} : {})
    });
    chatMessagesActions.clearForwardDraft(referenceKey, sent);
-   followOnNextUpdate();
    void chatSnapshotActions.refresh().catch(reason => chatSnapshotActions.setError((reason as Error).message));
   } catch (reason) {
    chatSnapshotActions.setError((reason as Error).message);
@@ -317,7 +313,6 @@ export function useChatMessages({
    if (replyDraft) chatMessagesActions.cancelReply(referenceKey, replyDraft);
    if (replaceDraft) clearSent(destination, sent);
    if (replaceDraft && mentionDrafts.current[destination]?.text === sent) delete mentionDrafts.current[destination];
-   followOnNextUpdate();
    void chatSnapshotActions.refresh().catch(error => chatSnapshotActions.setError((error as Error).message));
    return true;
   } catch (error) {
@@ -404,7 +399,6 @@ export function useChatMessages({
   jumpTarget,
   jumpEpoch: messages.jumpEpoch,
   visibleMessages,
-  messageIds,
   /** Исходящие до ответа сервера: по ним транскрипт рисует крутилку или «!». */
   outbox: messages.outbox,
   /** Догрузка истории канала: кнопка, автодогрузка и сохранение прокрутки — в транскрипте. */
@@ -414,7 +408,6 @@ export function useChatMessages({
    error: history.error,
    loadOlder: history.loadOlder
   },
-  revision: scrollRevision(messageIds, imageActivity),
   imageActivityVisible: imageActivity,
   voiceLayout,
   sendDisabled: sendDisabled({

@@ -26,6 +26,7 @@ import {
  forwardDestinations,
  friendStatus,
  friendsOpen,
+ groupInviteCandidates,
  humanTypingEnabled,
  incomingFriendRequests,
  isVoiceChannel,
@@ -57,6 +58,11 @@ import {
 const me = {id: 'me', name: 'Я', bio: '', created_at: 0, online: true};
 const friendUser = {id: 'u2', name: 'Друг', username: 'friend', bio: '', created_at: 0};
 const botUser = {id: 'b1', name: 'Бот', username: 'bot', bio: '', created_at: 0, bot: true};
+
+test('приглашение предлагает только людей вне текущей группы', () => {
+ assert.deepEqual(groupInviteCandidates([me, friendUser, botUser], [me.id]), [friendUser]);
+ assert.deepEqual(groupInviteCandidates([me, friendUser, botUser], [me.id, friendUser.id]), []);
+});
 const dialog = {id: 'd1', name: 'Сохранённое имя', members: ['me', 'u2'], revision: 1};
 const groupDialog = {id: 'd2', name: 'Команда', members: ['me', 'u2', 'b1']};
 const gameChannel = {id: 'c2', name: 'games', kind: 'text'};
