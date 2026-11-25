@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import type {ReactNode, Ref} from 'react';
 import {LogOut, X} from 'lucide-react';
 import {Button} from '@/shared/ui/button';
@@ -55,9 +56,11 @@ export function AccountSettingsModal({
     <article>
      <header>
       <h1 id="account-settings-title">{sections.find(item => item.id === section)?.label}</h1>
-      <Button variant="ghost" size="icon-sm" title="Закрыть настройки" aria-label="Закрыть настройки" onClick={onClose}>
-       <X />
-      </Button>
+      <TooltipLabel content="Закрыть настройки">
+       <Button variant="ghost" size="icon-sm" aria-label="Закрыть настройки" onClick={onClose}>
+        <X />
+       </Button>
+      </TooltipLabel>
      </header>
      <nav className="account-settings-compact" aria-label="Разделы настроек">
       <OptionsSelect

@@ -1,8 +1,10 @@
-﻿import {Button} from '@/shared/ui/button';
+import {TooltipLabel} from '@/shared/ui/tooltip';
+import {Button} from '@/shared/ui/button';
 import {Card} from '@/shared/ui/card';
 import {Input} from '@/shared/ui/input';
+import {MotionIcon} from '@/shared/ui/motion-icon';
 import {Slider} from '@/shared/ui/slider';
-import {useEffect, useId, useState} from 'react';
+import {useEffect, useId, useRef, useState} from 'react';
 import {ListMusic, Music2, Pause, Play, Plus, Shuffle, SkipForward, Square, Volume2} from 'lucide-react';
 import type {MusicTrack} from '@/shared/types';
 import type {RoomMusicModel} from '../model/use-room-music';
@@ -27,12 +29,14 @@ function TrackDetails({track, description}: {track?: MusicTrack | null; descript
     )}
    </span>
    <div className="min-w-0">
-    <strong className="block truncate text-sm" title={track?.title}>
-     {track?.title ?? 'Сейчас ничего не играет'}
-    </strong>
-    <span className="text-muted-foreground block truncate text-xs" title={track?.artist}>
-     {track?.artist ?? description ?? 'Исполнитель неизвестен'}
-    </span>
+    <TooltipLabel content={track?.title}>
+     <strong className="block truncate text-sm">{track?.title ?? 'Сейчас ничего не играет'}</strong>
+    </TooltipLabel>
+    <TooltipLabel content={track?.artist}>
+     <span className="text-muted-foreground block truncate text-xs">
+      {track?.artist ?? description ?? 'Исполнитель неизвестен'}
+     </span>
+    </TooltipLabel>
    </div>
   </div>
  );
@@ -60,69 +64,132 @@ function TrackProgress({music, duration}: {music: RoomMusicModel; duration: numb
  );
 }
 
-export function RoomMusic({music, joined}: {music: RoomMusicModel; joined: boolean}) {
+export function RoomMusicControl({music, joined}: {music: RoomMusicModel; joined: boolean}) {
+ const [open, setOpen] = useState<'hover' | 'pinned' | null>(null);
+ const panelId = useId();
+ const root = useRef<HTMLDivElement>(null);
+ const trigger = useRef<HTMLButtonElement>(null);
+ const resetDraft = music.resetDraft;
+ useEffect(() => resetDraft(), [resetDraft]);
+
+ useEffect(() => {
+  if (!open) return;
+  function dismissOutside(event: PointerEvent) {
+   if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(null);
+  }
+  function dismissOnEscape(event: KeyboardEvent) {
+   if (event.key !== 'Escape' || event.defaultPrevented) return;
+   if (root.current?.contains(document.activeElement)) trigger.current?.focus();
+   setOpen(null);
+  }
+  document.addEventListener('pointerdown', dismissOutside);
+  document.addEventListener('keydown', dismissOnEscape);
+  return () => {
+   document.removeEventListener('pointerdown', dismissOutside);
+   document.removeEventListener('keydown', dismissOnEscape);
+  };
+ }, [open]);
+
+ return (
+  <div
+   ref={root}
+   data-music-open={open || undefined}
+   onPointerLeave={() => setOpen(current => (current === 'hover' ? null : current))}
+  >
+   <TooltipLabel content="Музыка в комнате">
+    <Button
+     ref={trigger}
+     type="button"
+     variant="ghost"
+     size="icon-lg"
+     aria-label="Музыка в комнате"
+     aria-expanded={open !== null}
+     aria-controls={panelId}
+     onPointerEnter={event => {
+      if (event.pointerType === 'mouse') setOpen(current => current ?? 'hover');
+     }}
+     onClick={() => setOpen(current => (current === 'pinned' ? null : 'pinned'))}
+    >
+     <MotionIcon icon={Music2} />
+    </Button>
+   </TooltipLabel>
+   <div
+    id={panelId}
+    hidden={!open}
+    className="absolute bottom-[calc(100%-7px)] left-1/2 w-[min(28rem,calc(100cqw-1.5rem))] -translate-x-1/2 pb-[15px]"
+    onPointerDown={() => setOpen('pinned')}
+   >
+    <RoomMusic music={music} joined={joined} visible={open !== null} />
+   </div>
+  </div>
+ );
+}
+
+function RoomMusic({music, joined, visible}: {music: RoomMusicModel; joined: boolean; visible: boolean}) {
  const [expanded, setExpanded] = useState(true);
  const [pageSize, setPageSize] = useState(40);
  const queueId = useId();
  const track = joined ? music.track : null;
  const queue = joined ? music.queue : [];
- const resetDraft = music.resetDraft;
- useEffect(() => resetDraft(), [resetDraft]);
 
  return (
   <Card
    size="sm"
-   className="bg-card/80 mx-auto mt-4 w-full max-w-md shrink-0 gap-3 p-3.5 text-start shadow-sm backdrop-blur-md"
+   className="bg-card/80 max-h-[min(28rem,calc(100cqh-5rem))] w-full gap-3 overflow-y-auto p-3.5 text-start shadow-sm backdrop-blur-md"
    aria-label="Музыка в комнате"
   >
    <TrackDetails track={track} description={track ? undefined : music.statusText(joined)} />
    {track && (
     <>
-     <TrackProgress music={music} duration={track.durationMs} />
+     {visible && <TrackProgress music={music} duration={track.durationMs} />}
      <div className="flex flex-wrap items-center gap-1">
-      <Button
-       type="button"
-       size="icon-sm"
-       aria-label={music.playing ? 'Пауза' : 'Продолжить'}
-       title={music.playing ? 'Пауза' : 'Продолжить'}
-       disabled={music.pending}
-       onClick={() => void music.run(music.playing ? 'pause' : 'resume')}
-      >
-       {music.playing ? <Pause /> : <Play />}
-      </Button>
-      <Button
-       type="button"
-       variant="ghost"
-       size="icon-sm"
-       aria-label="Следующий трек"
-       title="Следующий трек"
-       disabled={music.pending}
-       onClick={() => void music.run('skip')}
-      >
-       <SkipForward />
-      </Button>
-      <Button
-       type="button"
-       variant="ghost"
-       size="icon-sm"
-       aria-label="Перемешать очередь"
-       title="Перемешать очередь"
-       disabled={music.pending || queue.length < 2}
-       onClick={() => void music.run('shuffle')}
-      >
-       <Shuffle />
-      </Button>
-      <Button
-       type="button"
-       variant="ghost"
-       size="icon-sm"
-       aria-label="Остановить и очистить очередь"
-       title="Остановить и очистить очередь"
-       disabled={music.pending}
-       onClick={() => void music.run('stop')}
-      >
-       <Square />
-      </Button>
+      <TooltipLabel content={music.playing ? 'Пауза' : 'Продолжить'}>
+       <Button
+        type="button"
+        size="icon-sm"
+        aria-label={music.playing ? 'Пауза' : 'Продолжить'}
+        disabled={music.pending}
+        onClick={() => void music.run(music.playing ? 'pause' : 'resume')}
+       >
+        {music.playing ? <Pause /> : <Play />}
+       </Button>
+      </TooltipLabel>
+      <TooltipLabel content="Следующий трек">
+       <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Следующий трек"
+        disabled={music.pending}
+        onClick={() => void music.run('skip')}
+       >
+        <SkipForward />
+       </Button>
+      </TooltipLabel>
+      <TooltipLabel content="Перемешать очередь">
+       <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Перемешать очередь"
+        disabled={music.pending || queue.length < 2}
+        onClick={() => void music.run('shuffle')}
+       >
+        <Shuffle />
+       </Button>
+      </TooltipLabel>
+      <TooltipLabel content="Остановить и очистить очередь">
+       <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Остановить и очистить очередь"
+        disabled={music.pending}
+        onClick={() => void music.run('stop')}
+       >
+        <Square />
+       </Button>
+      </TooltipLabel>
       <div className="text-muted-foreground ml-2 flex min-w-20 flex-1 items-center gap-2">
        <Volume2 className="size-4 shrink-0" aria-hidden="true" />
        <Slider
@@ -212,16 +279,17 @@ export function RoomMusic({music, joined}: {music: RoomMusicModel; joined: boole
       disabled={music.pending}
      />
     </label>
-    <Button
-     type="submit"
-     variant="secondary"
-     size="icon"
-     aria-label="Добавить в очередь"
-     title="Добавить в очередь"
-     disabled={music.addDisabled(joined)}
-    >
-     <Plus />
-    </Button>
+    <TooltipLabel content="Добавить в очередь">
+     <Button
+      type="submit"
+      variant="secondary"
+      size="icon"
+      aria-label="Добавить в очередь"
+      disabled={music.addDisabled(joined)}
+     >
+      <Plus />
+     </Button>
+    </TooltipLabel>
    </form>
    {music.error && (
     <span role="alert" className="text-destructive text-xs">

@@ -1,12 +1,13 @@
 import {Input} from '@/shared/ui/input';
 import {cn} from '@/shared/lib/utils';
 import {useRef, useState} from 'react';
-import {Dialog, ScrollArea, Tabs} from 'radix-ui';
+import {Dialog, Tabs} from 'radix-ui';
+import {ScrollArea} from '@/shared/ui/scroll-area';
 import {ArrowLeft, Plus, Sticker as StickerIcon, Upload, X} from 'lucide-react';
 import './sticker-catalog.css';
 import {Button} from '@/shared/ui/button';
 import type {Sticker} from '@/shared/types';
-import {useStickerImage} from '../model/use-sticker-image';
+import {StickerImage} from './sticker-image';
 import {useStickerLibrary} from '../model/use-sticker-library';
 import {useStickerCatalog} from '../model/use-sticker-catalog';
 import {useStickerPackPreview} from '../model/use-sticker-pack-preview';
@@ -26,12 +27,6 @@ const tabClass = cn(
  'data-[state=active]:bg-accent data-[state=active]:text-foreground',
  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 );
-
-export function StickerImage({sticker, className}: {sticker: Sticker; className?: string}) {
- const ref = useRef<HTMLImageElement>(null);
- const image = useStickerImage({sticker, target: ref});
- return <img ref={ref} className={className} src={image} alt={sticker.name} draggable={false} />;
-}
 
 function StickerPackPreview({
  id,
@@ -114,7 +109,7 @@ export function SentSticker({
   trigger = useRef<HTMLButtonElement>(null);
  const id = sticker.packId;
  if (!id || !shouldPreviewSentSticker(sticker, user, catalog))
-  return <StickerImage className="sent-sticker my-2 size-[144px] object-contain" sticker={sticker} />;
+  return <StickerImage className="sent-sticker my-2 size-[144px]" sticker={sticker} original />;
  return (
   <>
    <button
@@ -124,7 +119,7 @@ export function SentSticker({
     aria-label={`Открыть набор «${sticker.pack}»`}
     onClick={() => setOpen(true)}
    >
-    <StickerImage className="sent-sticker my-2 size-[144px] object-contain" sticker={sticker} />
+    <StickerImage className="sent-sticker my-2 size-[144px]" sticker={sticker} original />
    </button>
    {open && (
     <StickerPackPreview
@@ -147,9 +142,7 @@ function PackArt({stickers}: {stickers: Sticker[]}) {
    aria-hidden="true"
   >
    {stickers.length ? (
-    stickers
-     .slice(0, 4)
-     .map(sticker => <StickerImage className="h-14 w-full object-contain" key={sticker.id} sticker={sticker} />)
+    stickers.slice(0, 4).map(sticker => <StickerImage className="h-14 w-full" key={sticker.id} sticker={sticker} />)
    ) : (
     <StickerIcon />
    )}
@@ -451,32 +444,24 @@ export function StickerCollectionModal({
       }
      }}
     >
-     <ScrollArea.Root className="sticker-collection-scroll relative overflow-hidden">
-      <ScrollArea.Viewport className="sticker-collection-viewport max-h-[calc(100dvh_-_var(--sticker-modal-inset)_-_2px)] w-full [overscroll-behavior:contain]">
-       <div className="sticker-collection-frame grid gap-5 p-6">
-        <header className="flex items-center justify-between gap-3">
-         <div>
-          <Dialog.Title>Коллекция стикеров</Dialog.Title>
-          <Dialog.Description className="text-muted-foreground mt-1.5 mb-0 text-sm">
-           Управляйте личными наборами и находите новые в общем каталоге.
-          </Dialog.Description>
-         </div>
-         <Dialog.Close asChild>
-          <Button type="button" variant="ghost" size="icon-lg" aria-label="Закрыть коллекцию стикеров">
-           <X />
-          </Button>
-         </Dialog.Close>
-        </header>
-        <StickerLibrary key={props.user} {...props} />
-       </div>
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar
-       orientation="vertical"
-       className="sticker-collection-scrollbar flex w-[9px] [touch-action:none] p-0.5 select-none"
-      >
-       <ScrollArea.Thumb className="sticker-collection-thumb bg-muted hover:bg-muted relative flex-1 rounded-[999px]" />
-      </ScrollArea.Scrollbar>
-     </ScrollArea.Root>
+     <ScrollArea viewportClassName="max-h-[calc(100dvh_-_var(--sticker-modal-inset)_-_2px)] overscroll-contain">
+      <div className="sticker-collection-frame grid gap-5 p-6">
+       <header className="flex items-center justify-between gap-3">
+        <div>
+         <Dialog.Title>Коллекция стикеров</Dialog.Title>
+         <Dialog.Description className="text-muted-foreground mt-1.5 mb-0 text-sm">
+          Управляйте личными наборами и находите новые в общем каталоге.
+         </Dialog.Description>
+        </div>
+        <Dialog.Close asChild>
+         <Button type="button" variant="ghost" size="icon-lg" aria-label="Закрыть коллекцию стикеров">
+          <X />
+         </Button>
+        </Dialog.Close>
+       </header>
+       <StickerLibrary key={props.user} {...props} />
+      </div>
+     </ScrollArea>
     </Dialog.Content>
    </Dialog.Portal>
   </Dialog.Root>

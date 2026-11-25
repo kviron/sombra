@@ -1,17 +1,11 @@
-import {Headphones, HeadphoneOff, Mic, MicOff, PhoneOff, Radio, Settings, Video, VideoOff} from 'lucide-react';
+import {TooltipLabel} from '@/shared/ui/tooltip';
+import {Headphones, HeadphoneOff, Mic, MicOff, PhoneOff, Radio, Video, VideoOff} from 'lucide-react';
 import {Button} from '@/shared/ui/button';
 import {MotionIcon} from '@/shared/ui/motion-icon';
 import type {Voice} from '../model/use-voice';
+import {PresentationControl} from './presentation-control';
 
-export function VoiceConnectionPanel({
- voice,
- roomName,
- onSettings
-}: {
- voice: Voice;
- roomName: string;
- onSettings: () => void;
-}) {
+export function VoiceConnectionPanel({voice, roomName}: {voice: Voice; roomName: string}) {
  const micOff = voice.muted || voice.deaf;
 
  return (
@@ -22,68 +16,65 @@ export function VoiceConnectionPanel({
     </span>
     <div className="min-w-0 flex-1">
      <p className="text-primary text-xs font-semibold">Голосовая связь</p>
-     <p className="text-muted-foreground truncate text-xs" title={roomName}>
-      {roomName}
-     </p>
+     <TooltipLabel content={roomName}>
+      <p className="text-muted-foreground truncate text-xs">{roomName}</p>
+     </TooltipLabel>
     </div>
-    <Button
-     type="button"
-     variant="destructive"
-     size="icon-sm"
-     aria-label="Отключиться от голосовой комнаты"
-     title="Отключиться"
-     onClick={voice.leave}
-    >
-     <MotionIcon icon={PhoneOff} size={16} />
-    </Button>
+    <TooltipLabel content="Отключиться">
+     <Button
+      type="button"
+      variant="destructive"
+      size="icon-sm"
+      aria-label="Отключиться от голосовой комнаты"
+      onClick={voice.leave}
+     >
+      <MotionIcon icon={PhoneOff} size={16} />
+     </Button>
+    </TooltipLabel>
    </div>
    <div className="grid grid-cols-4 gap-1.5 [&>button]:min-w-0 [&>button]:px-0">
-    <Button
-     type="button"
-     variant="secondary"
-     size="sm"
-     aria-label="Микрофон"
-     aria-pressed={micOff}
-     title={micOff ? 'Включить микрофон' : 'Выключить микрофон'}
-     onClick={voice.toggleMic}
-    >
-     <MotionIcon icon={micOff ? MicOff : Mic} size={16} />
-    </Button>
-    <Button
-     type="button"
-     variant="secondary"
-     size="sm"
-     aria-label="Наушники"
-     aria-pressed={voice.deaf}
-     title={voice.deaf ? 'Включить звук' : 'Отключить звук'}
-     onClick={voice.toggleDeaf}
-    >
-     <MotionIcon icon={voice.deaf ? HeadphoneOff : Headphones} size={16} />
-    </Button>
-    <Button
-     type="button"
-     variant="secondary"
-     size="sm"
-     disabled={voice.busy || voice.audioOnly}
-     aria-label="Камера"
-     aria-pressed={voice.camera}
-     title={
+    <TooltipLabel content={micOff ? 'Включить микрофон' : 'Выключить микрофон'}>
+     <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      aria-label="Микрофон"
+      aria-pressed={micOff}
+      onClick={voice.toggleMic}
+     >
+      <MotionIcon icon={micOff ? MicOff : Mic} size={16} />
+     </Button>
+    </TooltipLabel>
+    <TooltipLabel content={voice.deaf ? 'Включить звук' : 'Отключить звук'}>
+     <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      aria-label="Наушники"
+      aria-pressed={voice.deaf}
+      onClick={voice.toggleDeaf}
+     >
+      <MotionIcon icon={voice.deaf ? HeadphoneOff : Headphones} size={16} />
+     </Button>
+    </TooltipLabel>
+    <TooltipLabel
+     content={
       voice.audioOnly ? 'В этой комнате доступен только звук' : voice.camera ? 'Выключить камеру' : 'Включить камеру'
      }
-     onClick={() => void voice.toggleCamera()}
     >
-     <MotionIcon icon={voice.camera ? Video : VideoOff} size={16} />
-    </Button>
-    <Button
-     type="button"
-     variant="secondary"
-     size="sm"
-     aria-label="Настройки голоса и видео"
-     title="Настройки голоса и видео"
-     onClick={onSettings}
-    >
-     <MotionIcon icon={Settings} kind="settings" size={16} />
-    </Button>
+     <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      disabled={voice.busy || voice.audioOnly || voice.presenting}
+      aria-label="Камера"
+      aria-pressed={voice.camera}
+      onClick={() => void voice.toggleCamera()}
+     >
+      <MotionIcon icon={voice.camera ? Video : VideoOff} size={16} />
+     </Button>
+    </TooltipLabel>
+    <PresentationControl voice={voice} compact />
    </div>
   </section>
  );

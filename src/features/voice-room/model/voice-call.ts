@@ -14,6 +14,7 @@ export type Call = {
  replaceTransportTrack?: (kind: TrackKind, track: MediaStreamTrack | null) => Promise<void>;
  setTransportMuted?: (muted: boolean) => void;
  audioOnly?: boolean;
+ presentation?: {track: MediaStreamTrack; restoreCamera: boolean};
  microphone: MediaStreamTrack;
  micGain?: MicrophoneGain;
  members?: Set<string>;
@@ -58,11 +59,14 @@ export async function replaceLocalTrack(
  } catch (error) {
   if (!c.stop) {
    if (track) c.stream.removeTrack(track);
-   if (previous) {
+   if (previous?.readyState === 'live') {
     if (track) setCapturedTrackEnabled(previous, track.enabled);
     c.stream.addTrack(previous);
+    await c.replaceTransportTrack?.(kind, previous).catch(() => {});
+   } else {
+    await c.replaceTransportTrack?.(kind, null).catch(() => {});
+    if (!c.stop) onLocal(new MediaStream(c.stream.getTracks()));
    }
-   await c.replaceTransportTrack?.(kind, previous ?? null).catch(() => {});
   }
   if (track) stopCapturedTrack(track);
   if (c.stop && !keepPrevious && previous) stopCapturedTrack(previous);

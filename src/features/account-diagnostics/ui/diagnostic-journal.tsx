@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {ChevronDown, Copy, Download, RefreshCw, Trash2} from 'lucide-react';
 import {Badge} from '@/shared/ui/badge';
 import {Button} from '@/shared/ui/button';
@@ -30,39 +31,42 @@ export function DiagnosticJournal({
       <RefreshCw />
       Обновить
      </Button>
-     <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      title="Скачать журнал"
-      aria-label="Скачать журнал"
-      disabled={!entries?.length}
-      onClick={model.download}
-     >
-      <Download />
-     </Button>
-     <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      title="Копировать журнал"
-      aria-label="Копировать журнал"
-      disabled={!entries?.length}
-      onClick={model.copy}
-     >
-      <Copy />
-     </Button>
-     <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      title="Очистить журнал"
-      aria-label="Очистить журнал"
-      disabled={!model.available || !entries?.length}
-      onClick={model.clearJournal}
-     >
-      <Trash2 />
-     </Button>
+     <TooltipLabel content="Скачать журнал">
+      <Button
+       type="button"
+       variant="ghost"
+       size="icon"
+       aria-label="Скачать журнал"
+       disabled={!entries?.length}
+       onClick={model.download}
+      >
+       <Download />
+      </Button>
+     </TooltipLabel>
+     <TooltipLabel content="Копировать журнал">
+      <Button
+       type="button"
+       variant="ghost"
+       size="icon"
+       aria-label="Копировать журнал"
+       disabled={!entries?.length}
+       onClick={model.copy}
+      >
+       <Copy />
+      </Button>
+     </TooltipLabel>
+     <TooltipLabel content="Очистить журнал">
+      <Button
+       type="button"
+       variant="ghost"
+       size="icon"
+       aria-label="Очистить журнал"
+       disabled={!model.available || !entries?.length}
+       onClick={model.clearJournal}
+      >
+       <Trash2 />
+      </Button>
+     </TooltipLabel>
     </div>
    </div>
    {feedback && <p role="status">{feedback}</p>}
@@ -103,14 +107,15 @@ export function DiagnosticJournal({
         className="grid grid-cols-[72px_minmax(0,1fr)] items-start gap-4 [overflow-wrap:anywhere]"
        >
         {valid ? (
-         <time
-          className="text-muted-foreground pt-3.5 tabular-nums"
-          dateTime={date.toISOString()}
-          title={model.fullDate(date)}
-          aria-label={model.fullDate(date)}
-         >
-          {model.clock(date)}
-         </time>
+         <TooltipLabel content={model.fullDate(date)}>
+          <time
+           className="text-muted-foreground pt-3.5 tabular-nums"
+           dateTime={date.toISOString()}
+           aria-label={model.fullDate(date)}
+          >
+           {model.clock(date)}
+          </time>
+         </TooltipLabel>
         ) : (
          <span className="text-muted-foreground pt-3.5 tabular-nums">—</span>
         )}

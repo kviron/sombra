@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Input} from '@/shared/ui/input';
 import {Check, MessageCircle, UserPlus, X} from 'lucide-react';
 import {type ChatState} from '@/shared/types';
@@ -49,28 +50,42 @@ export function Friends({
      </div>
      <div className="friend-actions ml-auto flex gap-[10px]">
       {row.kind === 'add' ? (
-       <button disabled={busy} title="Отправить заявку" onClick={() => actions.request(row.user.id)}>
-        <UserPlus size={19} />
-       </button>
+       <TooltipLabel content="Отправить заявку">
+        <button disabled={busy} aria-label="Отправить заявку" onClick={() => actions.request(row.user.id)}>
+         <UserPlus size={19} />
+        </button>
+       </TooltipLabel>
       ) : row.kind === 'friend' ? (
        <>
-        <button disabled={busy} title="Написать" onClick={() => actions.startDialog(row.user)}>
-         <MessageCircle size={19} />
-        </button>
-        <button disabled={busy} title="Удалить из друзей" onClick={() => actions.remove(row.friendId)}>
-         <X size={16} />
-        </button>
+        <TooltipLabel content="Написать">
+         <button disabled={busy} aria-label="Написать" onClick={() => actions.startDialog(row.user)}>
+          <MessageCircle size={19} />
+         </button>
+        </TooltipLabel>
+        <TooltipLabel content="Удалить из друзей">
+         <button disabled={busy} aria-label="Удалить из друзей" onClick={() => actions.remove(row.friendId)}>
+          <X size={16} />
+         </button>
+        </TooltipLabel>
        </>
       ) : (
        <>
         {row.accept && (
-         <button title="Принять заявку" disabled={busy} onClick={() => actions.accept(row.friendId)}>
-          <Check size={19} />
-         </button>
+         <TooltipLabel content="Принять заявку">
+          <button aria-label="Принять заявку" disabled={busy} onClick={() => actions.accept(row.friendId)}>
+           <Check size={19} />
+          </button>
+         </TooltipLabel>
         )}
-        <button title="Отклонить или отменить заявку" disabled={busy} onClick={() => actions.decline(row.friendId)}>
-         <X size={19} />
-        </button>
+        <TooltipLabel content="Отклонить или отменить заявку">
+         <button
+          aria-label="Отклонить или отменить заявку"
+          disabled={busy}
+          onClick={() => actions.decline(row.friendId)}
+         >
+          <X size={19} />
+         </button>
+        </TooltipLabel>
        </>
       )}
      </div>

@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {HardDrive, RefreshCw, Trash2, LoaderCircle} from 'lucide-react';
 import {Button} from '@/shared/ui/button';
 import {OptionsSelect} from '@/shared/ui/select';
@@ -26,17 +27,18 @@ export function AttachmentCacheSettings({ready, onChanged}: {ready: boolean; onC
      </div>
      <div className="approved-cache-actions">
       <strong>{model.size}</strong>
-      <Button
-       type="button"
-       variant="outline"
-       title="Обновить сведения о кэше"
-       aria-label="Обновить сведения о кэше"
-       disabled={model.disabled}
-       onClick={() => void model.refresh()}
-      >
-       <RefreshCw size={17} />
-       Обновить сведения
-      </Button>
+      <TooltipLabel content="Обновить сведения о кэше">
+       <Button
+        type="button"
+        variant="outline"
+        aria-label="Обновить сведения о кэше"
+        disabled={model.disabled}
+        onClick={() => void model.refresh()}
+       >
+        <RefreshCw size={17} />
+        Обновить сведения
+       </Button>
+      </TooltipLabel>
      </div>
     </div>
     <div className="approved-cache-row">

@@ -1,4 +1,5 @@
-﻿import {useEffect, useState} from 'react';
+import {TooltipLabel} from '@/shared/ui/tooltip';
+import {useEffect, useState} from 'react';
 
 const meterFloor = 0.005;
 const meterFullScale = 0.2;
@@ -52,17 +53,18 @@ export function VoiceLevel({
  const value = muted ? 0 : level;
  const label = `Уровень микрофона — ${name}`;
  return (
-  <span
-   className={`voice-channel-level${muted ? 'is-muted' : ''}`}
-   role="meter"
-   aria-label={label}
-   aria-valuemin={0}
-   aria-valuemax={100}
-   aria-valuenow={value}
-   aria-valuetext={muted ? 'Микрофон выключен' : `${value}%`}
-   title={muted ? 'Микрофон выключен' : `${label}: ${value}%`}
-  >
-   <span aria-hidden="true" style={{transform: `scaleY(${value / 100})`}} />
-  </span>
+  <TooltipLabel content={muted ? 'Микрофон выключен' : `${label}: ${value}%`}>
+   <span
+    className={`voice-channel-level${muted ? 'is-muted' : ''}`}
+    role="meter"
+    aria-label={label}
+    aria-valuemin={0}
+    aria-valuemax={100}
+    aria-valuenow={value}
+    aria-valuetext={muted ? 'Микрофон выключен' : `${value}%`}
+   >
+    <span aria-hidden="true" style={{transform: `scaleY(${value / 100})`}} />
+   </span>
+  </TooltipLabel>
  );
 }

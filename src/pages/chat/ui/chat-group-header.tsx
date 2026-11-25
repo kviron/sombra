@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {ChevronDown, LogOut, MessageCircle, Plus, Settings, ShieldCheck, UserPlus} from 'lucide-react';
 import {Button} from '@/shared/ui/button';
 import {
@@ -31,17 +32,18 @@ export function ChatGroupHeader({
    {group ? (
     <DropdownMenu modal={false}>
      <DropdownMenuTrigger asChild>
-      <Button
-       type="button"
-       variant="ghost"
-       size="sm"
-       className="group mr-auto min-w-0 justify-start"
-       aria-label={`Меню группы «${group.name}»`}
-       title={group.name}
-      >
-       <span className="truncate">{group.name}</span>
-       <ChevronDown data-icon="inline-end" className="transition-transform group-data-[state=open]:rotate-180" />
-      </Button>
+      <TooltipLabel content={group.name}>
+       <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="group mr-auto min-w-0 justify-start"
+        aria-label={`Меню группы «${group.name}»`}
+       >
+        <span className="truncate">{group.name}</span>
+        <ChevronDown data-icon="inline-end" className="transition-transform group-data-[state=open]:rotate-180" />
+       </Button>
+      </TooltipLabel>
      </DropdownMenuTrigger>
      <DropdownMenuContent align="start" sideOffset={6} className="w-56 max-w-[calc(100vw-24px)]">
       <DropdownMenuGroup>

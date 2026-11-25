@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {useEffect, useState} from 'react';
 import type {Sticker} from '@/shared/types';
 import {findStickerSuggestions} from '@/entities/sticker';
@@ -44,15 +45,16 @@ export function StickerSuggestions({
    }}
   >
    {matches.map(({sticker, replaceDraft}) => (
-    <button
-     key={sticker.id}
-     type="button"
-     title={sticker.name}
-     disabled={busy || pending}
-     onClick={() => void select(sticker.id, replaceDraft)}
-    >
-     <StickerImage sticker={sticker} />
-    </button>
+    <TooltipLabel content={sticker.name} key={sticker.id}>
+     <button
+      type="button"
+      aria-label={sticker.name}
+      disabled={busy || pending}
+      onClick={() => void select(sticker.id, replaceDraft)}
+     >
+      <StickerImage sticker={sticker} />
+     </button>
+    </TooltipLabel>
    ))}
   </div>
  );

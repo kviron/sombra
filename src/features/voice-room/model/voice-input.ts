@@ -2,6 +2,7 @@ import rnnoiseWorkletUrl from '@sapphi-red/web-noise-suppressor/rnnoiseWorklet.j
 import rnnoiseWasmUrl from '@sapphi-red/web-noise-suppressor/rnnoise.wasm?url';
 import rnnoiseSimdUrl from '@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url';
 import {recordDesktopDiagnostic} from '@/shared/api/diagnostics';
+import {defaultPresentationQuality, readPresentationQuality, type PresentationQuality} from './presentation-quality';
 
 export type NoiseSuppression = 'off' | 'standard' | 'enhanced';
 export type MediaPreferences = {
@@ -12,6 +13,7 @@ export type MediaPreferences = {
  echo: boolean;
  noise: NoiseSuppression;
  relay: boolean;
+ presentationQuality: PresentationQuality;
 };
 export const defaultMedia: MediaPreferences = {
  mic: '',
@@ -20,7 +22,8 @@ export const defaultMedia: MediaPreferences = {
  volume: 100,
  echo: true,
  noise: 'standard',
- relay: false
+ relay: false,
+ presentationQuality: defaultPresentationQuality
 };
 
 export function readMedia(): MediaPreferences {
@@ -33,7 +36,8 @@ export function readMedia(): MediaPreferences {
    ...defaultMedia,
    ...stored,
    noise: noise === false || noise === 'off' ? 'off' : noise === 'enhanced' ? 'enhanced' : 'standard',
-   relay: stored.relay === true
+   relay: stored.relay === true,
+   presentationQuality: readPresentationQuality(stored.presentationQuality)
   };
  } catch {
   return defaultMedia;

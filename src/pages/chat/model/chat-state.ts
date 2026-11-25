@@ -2,7 +2,8 @@
 // Здесь же ревизии: более свежие группа, название переписки и предпочтения не перетираются опросом.
 import {createStore} from 'zustand/vanilla';
 import {accountService} from '@/entities/account';
-import {sessionService, stateService} from '@/shared/api';
+import {acceptStickerImageSnapshot, clearStickerImages} from '@/entities/sticker';
+import {sessionService, stateService, StaleChatState} from '@/shared/api';
 import type {ChatMessage, ChatPreferences, ChatState, Dialog, ProfileEffectTarget, User} from '@/shared/types';
 
 export type ChatSnapshotState = {
@@ -63,6 +64,7 @@ const mergeDialogs = (previous: Dialog[], next: Dialog[]) => {
 
 export const chatSnapshotActions = {
  reset() {
+  clearStickerImages();
   chatSnapshotStore.setState(initialState, true);
   mediaGeneration = 0;
   polling = false;
@@ -88,6 +90,7 @@ export const chatSnapshotActions = {
    groups: uniqueById(incoming.groups)
   };
   const serialized = JSON.stringify(next);
+  acceptStickerImageSnapshot(next);
   if (serialized === lastApplied) return;
   lastApplied = serialized;
   chatSnapshotStore.setState(current => {
@@ -113,22 +116,31 @@ export const chatSnapshotActions = {
   if (polling || document.visibilityState === 'hidden') return;
   polling = true;
   const generation = mediaGeneration;
+  const page = pageGeneration;
   try {
    const next = await stateService.load<ChatState>({sticker_assets: true});
-   if (isAlive() && generation === mediaGeneration) chatSnapshotActions.applyState(next);
+   if (isAlive() && generation === mediaGeneration && page === pageGeneration) chatSnapshotActions.applyState(next);
   } catch (reason) {
-   if (isAlive()) chatSnapshotActions.setError((reason as Error).message);
+   if (isAlive() && page === pageGeneration && !(reason instanceof StaleChatState))
+    chatSnapshotActions.setError((reason as Error).message);
   } finally {
-   polling = false;
+   if (page === pageGeneration) polling = false;
   }
  },
  /** Загрузка по требованию: возвращает снапшот, чтобы вызывающий сам решил, что с ним делать. */
  async refresh() {
   const generation = mediaGeneration;
   const page = pageGeneration;
-  const next = await stateService.load<ChatState>({sticker_assets: true});
-  if (generation === mediaGeneration && page === pageGeneration) chatSnapshotActions.applyState(next);
-  return next;
+  try {
+   const next = await stateService.load<ChatState>({sticker_assets: true});
+   if (generation === mediaGeneration && page === pageGeneration) chatSnapshotActions.applyState(next);
+   return next;
+  } catch (reason) {
+   const current = chatSnapshotStore.getState().snapshot;
+   if (reason instanceof StaleChatState && reason.kind === 'order' && page === pageGeneration && current)
+    return current;
+   throw reason;
+  }
  },
  /** Ответ на отправку приходит раньше опроса: сообщение сразу в переписке, но только один раз. */
  appendMessage(message: ChatMessage) {

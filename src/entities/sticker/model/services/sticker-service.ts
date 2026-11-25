@@ -1,8 +1,10 @@
 import {api} from '@/shared/api';
+import type {StickerImageResponse} from '@/shared/types';
 
 /** Стикеры: картинки, публичные наборы и их установка. */
 export const stickerService = {
- image: <T = {image: string}>(payload: Record<string, unknown>) => api.sticker.image<T>(payload),
+ image: (payload: {sticker: string}) => api.sticker.image<StickerImageResponse>(payload),
+ thumbnail: (payload: {sticker: string}) => api.sticker.thumbnail<StickerImageResponse>(payload),
  listPublicPacks: <T = unknown>(payload: Record<string, unknown> = {}) => api.sticker.listPublicPacks<T>(payload),
  installPublicPack: (payload: Record<string, unknown>) => api.sticker.installPublicPack(payload),
  importPack: (payload: Record<string, unknown>) => api.sticker.importPack(payload),

@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject} from 'react';
 import {createPortal} from 'react-dom';
 import {Copy, Download} from 'lucide-react';
@@ -126,28 +127,28 @@ export function AttachmentContextMenu({
    {items.map(item => {
     const Icon = actionIcons[item.id];
     return (
-     <button
-      key={item.id}
-      type="button"
-      role="menuitem"
-      tabIndex={-1}
-      className={cn(
-       'attachment-context-menu-item',
-       'flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-[calc(var(--radius-md,10px)_-_4px)] border-0 bg-transparent px-2 text-left text-inherit',
-       '[&:not([data-disabled])]:hover:bg-accent [&:not([data-disabled])]:hover:text-accent-foreground',
-       '[&:not([data-disabled])]:focus-visible:bg-accent [&:not([data-disabled])]:focus-visible:text-accent-foreground',
-       'data-[disabled]:cursor-default data-[disabled]:opacity-50',
-       'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-[-2px]'
-      )}
-      data-disabled={item.disabled ? '' : undefined}
-      aria-disabled={item.disabled || undefined}
-      aria-label={item.disabled ? `${item.label}. ${item.title}` : undefined}
-      title={item.title}
-      onClick={() => run(item)}
-     >
-      <Icon size={16} aria-hidden="true" />
-      {item.label}
-     </button>
+     <TooltipLabel content={item.title} key={item.id}>
+      <button
+       type="button"
+       role="menuitem"
+       tabIndex={-1}
+       className={cn(
+        'attachment-context-menu-item',
+        'flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-[calc(var(--radius-md,10px)_-_4px)] border-0 bg-transparent px-2 text-left text-inherit',
+        '[&:not([data-disabled])]:hover:bg-accent [&:not([data-disabled])]:hover:text-accent-foreground',
+        '[&:not([data-disabled])]:focus-visible:bg-accent [&:not([data-disabled])]:focus-visible:text-accent-foreground',
+        'data-[disabled]:cursor-default data-[disabled]:opacity-50',
+        'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-[-2px]'
+       )}
+       data-disabled={item.disabled ? '' : undefined}
+       aria-disabled={item.disabled || undefined}
+       aria-label={item.disabled ? `${item.label}. ${item.title}` : undefined}
+       onClick={() => run(item)}
+      >
+       <Icon size={16} aria-hidden="true" />
+       {item.label}
+      </button>
+     </TooltipLabel>
     );
    })}
   </div>,

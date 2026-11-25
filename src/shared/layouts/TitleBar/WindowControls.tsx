@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import type {ReactNode} from 'react';
 import {tauri} from '@/shared/api';
 import {cn} from '@/shared/lib';
@@ -42,20 +43,21 @@ function ControlButton({
  children: ReactNode;
 }) {
  return (
-  <button
-   type="button"
-   aria-label={label}
-   title={label}
-   onClick={onClick}
-   className={cn(
-    'text-foreground/75 flex h-full w-11 items-center justify-center transition-colors outline-none',
-    'hover:bg-muted hover:text-foreground active:bg-muted/70',
-    'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset',
-    close && 'hover:bg-destructive hover:text-destructive-foreground active:bg-destructive/90'
-   )}
-  >
-   {children}
-  </button>
+  <TooltipLabel content={label}>
+   <button
+    type="button"
+    aria-label={label}
+    onClick={onClick}
+    className={cn(
+     'text-foreground/75 flex h-full w-11 items-center justify-center transition-colors outline-none',
+     'hover:bg-muted hover:text-foreground active:bg-muted/70',
+     'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset',
+     close && 'hover:bg-destructive hover:text-destructive-foreground active:bg-destructive/90'
+    )}
+   >
+    {children}
+   </button>
+  </TooltipLabel>
  );
 }
 

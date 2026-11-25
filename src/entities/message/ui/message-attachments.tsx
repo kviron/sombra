@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {useRef, useState} from 'react';
 import {Download, FileWarning, RotateCw, X} from 'lucide-react';
 import {Dialog} from 'radix-ui';
@@ -101,19 +102,20 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
    </span>
   );
   const downloadButton = (
-   <button
-    type="button"
-    className={imageDownloadButton}
-    disabled={busy}
-    aria-label={`Скачать ${attachment.name}`}
-    title="Скачать изображение"
-    onClick={event => {
-     event.stopPropagation();
-     actions.download();
-    }}
-   >
-    <Download size={18} />
-   </button>
+   <TooltipLabel content="Скачать изображение">
+    <button
+     type="button"
+     className={imageDownloadButton}
+     disabled={busy}
+     aria-label={`Скачать ${attachment.name}`}
+     onClick={event => {
+      event.stopPropagation();
+      actions.download();
+     }}
+    >
+     <Download size={18} />
+    </button>
+   </TooltipLabel>
   );
   return (
    <div
@@ -130,37 +132,38 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
       setMenuAt({x: event.clientX, y: event.clientY});
      }}
     >
-     <button
-      ref={trigger}
-      type="button"
-      className={cn(
-       'attachment-preview attachment-image-trigger',
-       'grid h-auto max-h-[var(--attachment-image-max-height)] min-h-[120px] w-[min(320px,100%)] max-w-full min-w-[min(160px,100%)]',
-       'text-muted-foreground cursor-zoom-in place-items-center content-center justify-center overflow-hidden rounded-md border-0 bg-transparent p-0 text-center text-xs leading-[normal]',
-       'disabled:cursor-default'
-      )}
-      disabled={!available}
-      aria-label={`Открыть фото ${attachment.name}`}
-      title="Открыть фото"
-      onClick={() => actions.setOpen(true)}
-      onKeyDown={event => {
-       if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
-       event.preventDefault();
-       const bounds = event.currentTarget.getBoundingClientRect();
-       setMenuAt({x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2});
-      }}
-     >
-      {available && preview && !error ? (
-       <img
-        className={cn('block h-auto max-h-[var(--attachment-image-max-height)] w-auto max-w-full object-contain')}
-        src={preview}
-        alt="Изображение из переписки"
-        onError={() => actions.setError('Не удалось показать изображение.')}
-       />
-      ) : (
-       placeholder
-      )}
-     </button>
+     <TooltipLabel content="Открыть фото">
+      <button
+       ref={trigger}
+       type="button"
+       className={cn(
+        'attachment-preview attachment-image-trigger',
+        'grid h-auto max-h-[var(--attachment-image-max-height)] min-h-[120px] w-[min(320px,100%)] max-w-full min-w-[min(160px,100%)]',
+        'text-muted-foreground cursor-zoom-in place-items-center content-center justify-center overflow-hidden rounded-md border-0 bg-transparent p-0 text-center text-xs leading-[normal]',
+        'disabled:cursor-default'
+       )}
+       disabled={!available}
+       aria-label={`Открыть фото ${attachment.name}`}
+       onClick={() => actions.setOpen(true)}
+       onKeyDown={event => {
+        if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+        event.preventDefault();
+        const bounds = event.currentTarget.getBoundingClientRect();
+        setMenuAt({x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2});
+       }}
+      >
+       {available && preview && !error ? (
+        <img
+         className={cn('block h-auto max-h-[var(--attachment-image-max-height)] w-auto max-w-full object-contain')}
+         src={preview}
+         alt="Изображение из переписки"
+         onError={() => actions.setError('Не удалось показать изображение.')}
+        />
+       ) : (
+        placeholder
+       )}
+      </button>
+     </TooltipLabel>
      {available && downloadButton}
      {available && error && (
       <button
@@ -302,7 +305,9 @@ function FileCard({mime, name, size, available, note, busy, onDownload}: FileCar
     </FileIconDisplay>
    )}
    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-    <FileName title={name}>{name || fileLabel(mime)}</FileName>
+    <TooltipLabel content={name}>
+     <FileName>{name || fileLabel(mime)}</FileName>
+    </TooltipLabel>
     <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
      <FileSize bytes={size} className="text-xs" />
      {note && <span className="text-muted-foreground text-xs">{note}</span>}
@@ -331,19 +336,20 @@ function AttachmentAudio({messageId, attachment}: MessageAttachmentProps) {
        onPlaybackStateChange={actions.setPlaying}
        onPlaybackError={actions.playbackFailed}
       />
-      <button
-       type="button"
-       className={audioDownloadButton}
-       disabled={busy}
-       aria-label={`Скачать ${attachment.name}`}
-       title="Скачать аудиофайл"
-       onClick={event => {
-        event.stopPropagation();
-        actions.download();
-       }}
-      >
-       <Download size={16} />
-      </button>
+      <TooltipLabel content="Скачать аудиофайл">
+       <button
+        type="button"
+        className={audioDownloadButton}
+        disabled={busy}
+        aria-label={`Скачать ${attachment.name}`}
+        onClick={event => {
+         event.stopPropagation();
+         actions.download();
+        }}
+       >
+        <Download size={16} />
+       </button>
+      </TooltipLabel>
      </div>
      <div
       className={cn(
@@ -374,15 +380,11 @@ function AttachmentAudio({messageId, attachment}: MessageAttachmentProps) {
       {error}
      </p>
      {!player && !failed && (
-      <button
-       type="button"
-       className={audioRetryButton}
-       aria-label="Повторить загрузку аудио"
-       title="Повторить загрузку"
-       onClick={actions.retry}
-      >
-       <RotateCw size={16} />
-      </button>
+      <TooltipLabel content="Повторить загрузку">
+       <button type="button" className={audioRetryButton} aria-label="Повторить загрузку аудио" onClick={actions.retry}>
+        <RotateCw size={16} />
+       </button>
+      </TooltipLabel>
      )}
     </div>
    )}

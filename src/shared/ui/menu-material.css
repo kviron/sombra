@@ -51,3 +51,8 @@
   color: HighlightText;
  }
 }
+.sombra-picker-material {
+ color: var(--popover-foreground);
+ background-color: color-mix(in oklab, var(--popover) 95%, transparent);
+ backdrop-filter: blur(var(--blur-md));
+}

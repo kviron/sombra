@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import type {ReactNode} from 'react';
 import {cn} from '@/shared/lib/utils';
 import {UserAvatar, type UserAvatarSize, type UserIdentity} from '@/shared/ui/user-avatar';
@@ -83,64 +84,67 @@ export function UserRow({
  const offline = identity.online === false ? 'true' : undefined;
  const row =
   as === 'button' ? (
-   <button
-    type="button"
-    className={rowClassNames}
-    data-variant={variant}
-    data-offline={offline}
-    data-selected={selected || undefined}
-    title={title}
-    aria-pressed={selected || undefined}
-    onClick={onClick}
-   >
-    {content}
-   </button>
+   <TooltipLabel content={title}>
+    <button
+     type="button"
+     className={rowClassNames}
+     data-variant={variant}
+     data-offline={offline}
+     data-selected={selected || undefined}
+     aria-pressed={selected || undefined}
+     onClick={onClick}
+    >
+     {content}
+    </button>
+   </TooltipLabel>
   ) : as === 'li' ? (
-   <li
-    className={rowClassNames}
-    data-variant={variant}
-    data-offline={offline}
-    data-selected={selected || undefined}
-    title={title}
-    role={onClick ? 'button' : undefined}
-    onClick={onClick}
-    tabIndex={onClick ? 0 : undefined}
-    onKeyDown={
-     onClick
-      ? event => {
-         if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onClick();
+   <TooltipLabel content={title}>
+    <li
+     className={rowClassNames}
+     data-variant={variant}
+     data-offline={offline}
+     data-selected={selected || undefined}
+     role={onClick ? 'button' : undefined}
+     onClick={onClick}
+     tabIndex={onClick ? 0 : undefined}
+     onKeyDown={
+      onClick
+       ? event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+           event.preventDefault();
+           onClick();
+          }
          }
-        }
-      : undefined
-    }
-   >
-    {content}
-   </li>
+       : undefined
+     }
+    >
+     {content}
+    </li>
+   </TooltipLabel>
   ) : (
-   <div
-    className={rowClassNames}
-    data-variant={variant}
-    data-offline={offline}
-    data-selected={selected || undefined}
-    title={title}
-    role={onClick ? 'button' : undefined}
-    tabIndex={onClick ? 0 : undefined}
-    onClick={onClick}
-    onKeyDown={
-     onClick
-      ? event => {
-         if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onClick();
+   <TooltipLabel content={title}>
+    <div
+     className={rowClassNames}
+     data-variant={variant}
+     data-offline={offline}
+     data-selected={selected || undefined}
+     role={onClick ? 'button' : undefined}
+     tabIndex={onClick ? 0 : undefined}
+     onClick={onClick}
+     onKeyDown={
+      onClick
+       ? event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+           event.preventDefault();
+           onClick();
+          }
          }
-        }
-      : undefined
-    }
-   >
-    {content}
-   </div>
+       : undefined
+     }
+    >
+     {content}
+    </div>
+   </TooltipLabel>
   );
  if (!menu) return row;
  return (

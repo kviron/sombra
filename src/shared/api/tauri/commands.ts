@@ -1,4 +1,5 @@
 import {invoke, Channel} from '@tauri-apps/api/core';
+import type {DesktopPresentationSource, PresentationCaptureQuality} from '@/shared/types/presentation';
 
 export {Channel};
 
@@ -24,6 +25,14 @@ export type DownloadProgress = {received: number; total?: number};
  * поэтому набор команд и их аргументы видно в одном месте.
  */
 export const commands = {
+ presentation: {
+  sources: () => invoke<DesktopPresentationSource[]>('presentation_sources'),
+  preview: (sourceId: string) => invoke<ArrayBuffer>('presentation_preview', {sourceId}),
+  start: (sourceId: string, quality: PresentationCaptureQuality) =>
+   invoke<string>('start_presentation_capture', {sourceId, quality}),
+  frame: (id: string) => invoke<ArrayBuffer>('read_presentation_frame', {id}),
+  stop: (id: string) => invoke<void>('stop_presentation_capture', {id})
+ },
  /** Единственный канал к серверу: остальное — вспомогательные команды оболочки. */
  remote: <T>(request: {op: string; token: string} & Record<string, unknown>) => invoke<T>('remote_api', {request}),
 

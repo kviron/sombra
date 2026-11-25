@@ -9,4 +9,4 @@ export {sessionService} from './services/session-service';
 export {attachmentCacheService} from './services/attachment-cache-service';
 export type {CacheInfo} from './services/attachment-cache-service';
 export {diagnosticsService} from './services/diagnostics-service';
-export {ApiConnectionError} from './transport';
+export {ApiConnectionError, StaleChatState} from './transport';

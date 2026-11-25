@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Input} from '@/shared/ui/input';
 import {Dialog} from 'radix-ui';
 import {Forward, Hash, MessageCircle, Reply, Search, Volume2, X} from 'lucide-react';
@@ -34,9 +35,11 @@ export function MessageQuote({
   </>
  );
  return onJump ? (
-  <button type="button" className="message-reference" title="Перейти к исходному сообщению" onClick={onJump}>
-   {content}
-  </button>
+  <TooltipLabel content="Перейти к исходному сообщению">
+   <button type="button" className="message-reference" onClick={onJump}>
+    {content}
+   </button>
+  </TooltipLabel>
  ) : (
   <div className="message-reference">{content}</div>
  );
@@ -64,15 +67,16 @@ export function ReferenceDraft({
     </strong>
     <small>{messagePreview(message)}</small>
    </span>
-   <button
-    type="button"
-    title="Отменить"
-    aria-label={kind === 'reply' ? 'Отменить ответ' : 'Отменить пересылку'}
-    onClick={onCancel}
-    disabled={disabled}
-   >
-    <X size={17} />
-   </button>
+   <TooltipLabel content="Отменить">
+    <button
+     type="button"
+     aria-label={kind === 'reply' ? 'Отменить ответ' : 'Отменить пересылку'}
+     onClick={onCancel}
+     disabled={disabled}
+    >
+     <X size={17} />
+    </button>
+   </TooltipLabel>
   </div>
  );
 }

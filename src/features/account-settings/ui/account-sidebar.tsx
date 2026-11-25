@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {useState} from 'react';
 import {LogOut, Pencil, Search} from 'lucide-react';
 import {
@@ -58,7 +59,9 @@ export function AccountSidebar<T extends string>({
         decoration={me?.decorations?.avatar}
        />
        <span className="settings-identity-text">
-        <strong title={name}>{name}</strong>
+        <TooltipLabel content={name}>
+         <strong>{name}</strong>
+        </TooltipLabel>
         <span className="settings-edit-profile">Редактировать профиль</span>
        </span>
        <Pencil aria-hidden="true" className="ml-auto" />

@@ -1,5 +1,5 @@
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/shared/ui/resizable';
-import {useLayoutEffect, useRef, type ReactNode} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState, type ReactNode} from 'react';
 import {AttachmentDropZone} from '@/features/message-composer';
 import {useDirectMessageNotifications, useNotificationActivation} from '@/features/notifications';
 import {useRoomMusic, useVoice, VoicePlayback, VoiceStageGradient} from '@/features/voice-room';
@@ -67,6 +67,36 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
   music: roomMusic
  });
  const contacts = useChatContacts(chat.state);
+ const stageRoom = messages.voiceLayout ? calls.voiceRoom || nav.channel?.id : undefined;
+ const [expandedRoom, setExpandedRoom] = useState<string>();
+ const [expandedChatOpen, setExpandedChatOpen] = useState(false);
+ const [hiddenVoiceChatRoom, setHiddenVoiceChatRoom] = useState<string>();
+ const expandedVoice = !!stageRoom && expandedRoom === stageRoom && call.room === stageRoom;
+ const voiceChatOpen = expandedVoice ? expandedChatOpen : !stageRoom || hiddenVoiceChatRoom !== stageRoom;
+ function toggleVoiceChat() {
+  if (expandedVoice) setExpandedChatOpen(open => !open);
+  else setHiddenVoiceChatRoom(voiceChatOpen ? stageRoom : undefined);
+ }
+ if (expandedRoom && !expandedVoice) {
+  setExpandedRoom(undefined);
+  setExpandedChatOpen(false);
+ }
+ const voiceExpandButton = useRef<HTMLButtonElement>(null);
+ const voiceOverlayOpen =
+  panels.settings || !!panels.modal || !!panels.profileId || panels.infoOpen || !!calls.incoming;
+
+ useEffect(() => {
+  if (!expandedVoice || voiceOverlayOpen) return;
+  function exitOnEscape(event: KeyboardEvent) {
+   if (event.key !== 'Escape' || event.defaultPrevented) return;
+   event.preventDefault();
+   setExpandedRoom(undefined);
+   setExpandedChatOpen(false);
+   voiceExpandButton.current?.focus();
+  }
+  window.addEventListener('keydown', exitOnEscape);
+  return () => window.removeEventListener('keydown', exitOnEscape);
+ }, [expandedVoice, voiceOverlayOpen]);
 
  const infoTrigger = useRef<HTMLButtonElement>(null);
  const materialsTrigger = useRef<HTMLButtonElement>(null);
@@ -91,7 +121,7 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
   onActivate: activateNotification
  });
 
- useMessageReadState(chat.state, nav.channel?.id || '', messages.readsBlocked);
+ useMessageReadState(chat.state, nav.channel?.id || '', messages.readsBlocked || !voiceChatOpen);
 
  useLayoutEffect(() => {
   const composer = composerRef.current;
@@ -162,7 +192,10 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
     removeFriend: id => void contacts.remove(id)
    }}
   >
-   <main className="chat-shell text-foreground relative isolate flex min-h-0 flex-1 bg-transparent [font-family:var(--font-sans),Arial,sans-serif] text-[14px] leading-[normal]">
+   <main
+    className="chat-shell text-foreground relative isolate flex min-h-0 flex-1 bg-transparent [font-family:var(--font-sans),Arial,sans-serif] text-[14px] leading-[normal]"
+    data-voice-expanded={expandedVoice || undefined}
+   >
     {messages.voiceLayout && (calls.voiceRoom || nav.channel?.id) && <VoiceStageGradient />}
     {/* Playback belongs to the joined session, never Home/DM/channel navigation. */}
     <VoicePlayback voice={call} volumeForUser={calls.volumeForUser} />
@@ -170,6 +203,7 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
     <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0 flex-1" style={{height: 'auto'}}>
      <ResizablePanel
       id="channels"
+      data-voice-left=""
       defaultSize="346px"
       minSize="210px"
       maxSize="552px"
@@ -188,7 +222,7 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
        <ChatProfileControls state={chat.state} panels={panels} call={call} />
       </div>
      </ResizablePanel>
-     <ResizableHandle aria-label="Ширина списка каналов" />
+     <ResizableHandle data-voice-left="" aria-label="Ширина списка каналов" />
      <ResizablePanel id="conversation" minSize="55%" className="flex min-h-0 flex-col" style={{overflow: 'hidden'}}>
       <AttachmentDropZone
        channel={nav.channel?.id}
@@ -206,16 +240,19 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
        }
        onFile={file => void messages.actions.selectAttachment(file)}
       >
-       <ChatHeader
-        chat={chat}
-        nav={nav}
-        panels={panels}
-        messages={messages}
-        calls={calls}
-        call={call}
-        infoTrigger={infoTrigger}
-        materialsTrigger={materialsTrigger}
-       />
+       <div className={expandedVoice ? 'hidden' : 'contents'}>
+        <ChatHeader
+         chat={chat}
+         nav={nav}
+         panels={panels}
+         messages={messages}
+         calls={calls}
+         call={call}
+         infoTrigger={infoTrigger}
+         materialsTrigger={materialsTrigger}
+         voiceChat={stageRoom ? {open: voiceChatOpen, toggle: toggleVoiceChat} : undefined}
+        />
+       </div>
        <ChatWorkspace
         chat={chat}
         state={chat.state}
@@ -224,7 +261,15 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
         messages={messages}
         call={call}
         music={!nav.home ? roomMusic : undefined}
-        voiceRoom={calls.voiceRoom}
+        stageRoom={stageRoom}
+        expandedVoice={expandedVoice}
+        voiceChatOpen={voiceChatOpen}
+        voiceExpandButton={voiceExpandButton}
+        onToggleVoiceExpanded={() => {
+         setExpandedRoom(expandedVoice ? undefined : stageRoom);
+         setExpandedChatOpen(false);
+        }}
+        onToggleVoiceChat={toggleVoiceChat}
         composerRef={composerRef}
         forwardCommentRef={forwardCommentRef}
         motionRef={conversationMotion}

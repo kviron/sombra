@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import type {MouseEvent} from 'react';
 import {ArrowLeft, ArrowRight} from 'lucide-react';
 import {tauri} from '@/shared/api';
@@ -46,30 +47,32 @@ export function TitleBar({
    onMouseDown={handleMouseDown}
   >
    <nav aria-label="История переходов" className="flex items-center gap-1" data-no-drag>
-    <Button
-     type="button"
-     variant="ghost"
-     size="icon-xs"
-     className="text-muted-foreground"
-     aria-label="Назад"
-     title="Назад"
-     disabled={!canGoBack}
-     onClick={onBack}
-    >
-     <ArrowLeft />
-    </Button>
-    <Button
-     type="button"
-     variant="ghost"
-     size="icon-xs"
-     className="text-muted-foreground"
-     aria-label="Вперёд"
-     title="Вперёд"
-     disabled={!canGoForward}
-     onClick={onForward}
-    >
-     <ArrowRight />
-    </Button>
+    <TooltipLabel content="Назад">
+     <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      className="text-muted-foreground"
+      aria-label="Назад"
+      disabled={!canGoBack}
+      onClick={onBack}
+     >
+      <ArrowLeft />
+     </Button>
+    </TooltipLabel>
+    <TooltipLabel content="Вперёд">
+     <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      className="text-muted-foreground"
+      aria-label="Вперёд"
+      disabled={!canGoForward}
+      onClick={onForward}
+     >
+      <ArrowRight />
+     </Button>
+    </TooltipLabel>
    </nav>
 
    <div className="flex h-full items-center gap-1 pr-1" data-no-drag>

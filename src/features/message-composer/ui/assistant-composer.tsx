@@ -16,7 +16,7 @@ const menuLabelClass = 'text-muted-foreground m-[4px_8px_8px] text-[12px]';
 const menuEmptyClass = 'text-muted-foreground p-3 text-[14px]';
 /** Попап позиционируется от строки ввода: geometry уходит в утилиты, радиус — в CSS. */
 const menuPopoverClass =
- 'absolute right-auto bottom-[calc(100%+12px)] left-0 z-40 max-h-[min(340px,50vh)] w-[min(420px,100%)] min-w-0 overflow-auto p-2';
+ 'sombra-composer-menu sombra-menu-surface sombra-picker-material absolute inset-x-0 bottom-[calc(100%+12px)] z-40 max-h-[min(340px,50vh)] min-w-0 overflow-auto p-2 shadow-lg';
 /** Поле ввода: родные рамку, тень и resize снимает только оно само; border-current
    повторяет border: 0 из прежнего правила, иначе слой base вернёт цвет рамки. */
 const composerTextareaClass = 'min-w-0 resize-none border-0 border-current py-2.5 leading-[24px] text-foreground';
@@ -80,7 +80,7 @@ export function AssistantComposer(props: AssistantComposerProps) {
       char="@"
       matcher={model.matcher}
       adapter={model.mentionAdapter}
-      className={cn('sombra-composer-menu sombra-menu-surface', menuPopoverClass)}
+      className={menuPopoverClass}
       data-slot="mention-menu-content"
       aria-label="Участники чата"
      >
@@ -125,7 +125,7 @@ export function AssistantComposer(props: AssistantComposerProps) {
       char="/"
       matcher={model.matcher}
       adapter={model.commandAdapter}
-      className={cn('sombra-composer-menu sombra-menu-surface', menuPopoverClass)}
+      className={menuPopoverClass}
       data-slot="command-menu-content"
       aria-label="Команды переписки и ботов"
      >

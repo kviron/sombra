@@ -1,5 +1,9 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {useSyncExternalStore, type RefObject} from 'react';
 import {ResizableHandle, ResizablePanel, ResizablePanelGroup} from '@/shared/ui/resizable';
+import {Button} from '@/shared/ui/button';
+import {MotionIcon} from '@/shared/ui/motion-icon';
+import {Maximize, MessageCircle, Minimize, Volume2} from 'lucide-react';
 import {ConversationMaterials} from '@/features/conversation-details';
 import {VoiceStage, type RoomMusicModel, type Voice} from '@/features/voice-room';
 import type {useScreenGlitch} from '@/shared/ui/use-screen-glitch';
@@ -39,7 +43,12 @@ type Props = {
  messages: ChatMessagesModel;
  call: Voice;
  music: RoomMusicModel | undefined;
- voiceRoom: string | undefined;
+ stageRoom: string | undefined;
+ expandedVoice: boolean;
+ voiceChatOpen: boolean;
+ voiceExpandButton: RefObject<HTMLButtonElement | null>;
+ onToggleVoiceExpanded: () => void;
+ onToggleVoiceChat: () => void;
  composerRef: RefObject<HTMLDivElement | null>;
  forwardCommentRef: RefObject<HTMLTextAreaElement | null>;
  motionRef: ReturnType<typeof useScreenGlitch>;
@@ -56,7 +65,12 @@ export function ChatWorkspace({
  messages,
  call,
  music,
- voiceRoom,
+ stageRoom,
+ expandedVoice,
+ voiceChatOpen,
+ voiceExpandButton,
+ onToggleVoiceExpanded,
+ onToggleVoiceChat,
  composerRef,
  forwardCommentRef,
  motionRef,
@@ -64,10 +78,11 @@ export function ChatWorkspace({
  onJump
 }: Props) {
  const {channel} = nav;
- const stageRoom = voiceRoom || channel?.id;
  const mode = useSyncExternalStore(subscribeViewport, viewportMode, () => 'wide');
- const voiceVertical = mode !== 'wide';
+ const voiceVertical = !expandedVoice && mode !== 'wide';
  const showMembers = mode !== 'small' && !panels.materialsOpen && nav.canShowMembers && panels.members;
+ const expandLabel = expandedVoice ? 'Выйти из полноэкранного режима' : 'Развернуть на весь экран';
+ const chatLabel = voiceChatOpen ? 'Скрыть чат комнаты' : 'Открыть чат комнаты';
  const conversation = (
   <div
    className={
@@ -93,8 +108,16 @@ export function ChatWorkspace({
    <ResizablePanelGroup orientation="horizontal" className="min-h-0 min-w-0 flex-1" style={{height: 'auto'}}>
     <ResizablePanel id="chat-main" minSize="55%" className="flex min-h-0 flex-col" style={{overflow: 'hidden'}}>
      {messages.voiceLayout && stageRoom ? (
-      <ResizablePanelGroup orientation={voiceVertical ? 'vertical' : 'horizontal'}>
-       <ResizablePanel id="voice-stage" minSize={voiceVertical ? '45%' : '35%'} className="flex overflow-auto">
+      <ResizablePanelGroup
+       orientation={voiceVertical ? 'vertical' : 'horizontal'}
+       data-voice-chat-hidden={!voiceChatOpen || undefined}
+      >
+       <ResizablePanel
+        id="voice-stage"
+        minSize={voiceVertical ? '45%' : '35%'}
+        className="voice-stage-panel @container relative flex"
+        style={{overflow: 'clip'}}
+       >
         <VoiceStage
          music={music}
          voice={call}
@@ -107,10 +130,49 @@ export function ChatWorkspace({
          users={state?.users}
          onSettings={() => panels.actions.openSettings('voice')}
         />
+        {expandedVoice && (
+         <div className="pointer-events-none absolute inset-x-3 top-3 flex items-center justify-between gap-2">
+          <span className="text-muted-foreground flex min-w-0 items-center gap-2 text-sm">
+           <Volume2 className="size-4 shrink-0" aria-hidden="true" />
+           <span className="truncate">{nav.title}</span>
+          </span>
+          <TooltipLabel content={chatLabel}>
+           <Button
+            type="button"
+            variant="secondary"
+            size="icon-lg"
+            className="pointer-events-auto shrink-0"
+            aria-label={chatLabel}
+            aria-expanded={voiceChatOpen}
+            aria-controls="voice-chat"
+            onClick={onToggleVoiceChat}
+           >
+            <MotionIcon icon={MessageCircle} />
+           </Button>
+          </TooltipLabel>
+         </div>
+        )}
+        {call.room === stageRoom && (
+         <TooltipLabel content={expandLabel}>
+          <Button
+           ref={voiceExpandButton}
+           type="button"
+           variant="secondary"
+           size="icon-lg"
+           className="border-border bg-card/70 hover:bg-card/85 absolute right-3 bottom-3 rounded-xl shadow-sm backdrop-blur-md motion-safe:transition-[opacity,transform,background-color] motion-safe:duration-200 motion-safe:ease-out @max-[24rem]:bottom-18"
+           data-auto-hide
+           aria-label={expandLabel}
+           onClick={onToggleVoiceExpanded}
+          >
+           <MotionIcon icon={expandedVoice ? Minimize : Maximize} />
+          </Button>
+         </TooltipLabel>
+        )}
        </ResizablePanel>
-       <ResizableHandle aria-label={voiceVertical ? 'Высота чата канала' : 'Ширина чата канала'} />
+       <ResizableHandle data-voice-chat="" aria-label={voiceVertical ? 'Высота чата канала' : 'Ширина чата канала'} />
        <ResizablePanel
         id="voice-chat"
+        data-voice-chat=""
         defaultSize={voiceVertical ? '40%' : '340px'}
         minSize={voiceVertical ? '25%' : '180px'}
         maxSize={voiceVertical ? '55%' : '600px'}
@@ -127,9 +189,10 @@ export function ChatWorkspace({
     </ResizablePanel>
     {showMembers && (
      <>
-      <ResizableHandle aria-label="Ширина списка участников" />
+      <ResizableHandle data-voice-auxiliary="" aria-label="Ширина списка участников" />
       <ResizablePanel
        id="chat-members"
+       data-voice-auxiliary=""
        defaultSize="210px"
        minSize="150px"
        maxSize="420px"
@@ -146,7 +209,7 @@ export function ChatWorkspace({
      </>
     )}
    </ResizablePanelGroup>
-   {panels.materialsOpen && channel && !nav.friends && state && (
+   {!expandedVoice && panels.materialsOpen && channel && !nav.friends && state && (
     <ConversationMaterials
      key={`${channel.id}:${panels.materialsEpoch}`}
      initialCategory={panels.materialsCategory}

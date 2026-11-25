@@ -9,6 +9,11 @@ import {
  type VoiceRuntime
 } from './voice-call';
 import type {VoiceStore} from './voice-store';
+import {desktopPresentation} from './services/desktop-presentation';
+import {presentationCaptureQuality} from './presentation-quality';
+
+export type PresentationSource =
+ {type: 'window' | 'monitor'} | {type: 'desktop'; sourceId: string} | {type: 'camera'; deviceId: string};
 
 export function createVoiceMedia(store: VoiceStore, runtime: VoiceRuntime) {
  const stateActions = store.getState().actions;
@@ -31,12 +36,81 @@ export function createVoiceMedia(store: VoiceStore, runtime: VoiceRuntime) {
    if (!c.stop) stateActions.setError(mediaError(e));
   } finally {
    runtime.changingMedia = false;
-   stateActions.finishOperation();
+   if (runtime.call === c && !c.stop) {
+    stateActions.finishOperation();
+    if (c.presentation?.track.readyState === 'ended') void stopPresentation();
+   }
   }
+ }
+ async function startPresentation(source: PresentationSource) {
+  const c = runtime.call;
+  if (!c || c.audioOnly || c.presentation) return false;
+  let started = false;
+  await changeMedia(c, async () => {
+   const preferences = store.getState().preferences;
+   const quality = presentationCaptureQuality(preferences.presentationQuality);
+   const videoQuality = {
+    width: {ideal: quality.width, max: quality.width},
+    height: {ideal: quality.height, max: quality.height},
+    frameRate: {ideal: quality.frameRate, max: quality.frameRate}
+   };
+   let track: MediaStreamTrack | undefined;
+   if (source.type === 'camera') {
+    track = await captureTrack('video', {...preferences, camera: source.deviceId}, undefined, videoQuality);
+   } else if (source.type === 'desktop') {
+    track = await desktopPresentation.capture(source.sourceId, quality, () => runtime.call === c && !c.stop);
+   } else {
+    if (!navigator.mediaDevices?.getDisplayMedia) throw new Error('Захват экрана недоступен в этой сборке Sombra.');
+    try {
+     const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: {displaySurface: source.type, ...videoQuality},
+      audio: false
+     });
+     [track] = stream.getVideoTracks();
+     const surface = track?.getSettings().displaySurface;
+     if (!track || (surface && surface !== source.type)) {
+      stream.getTracks().forEach(stopCapturedTrack);
+      throw new Error(source.type === 'window' ? 'Выберите окно приложения.' : 'Выберите целый экран.');
+     }
+    } catch (error) {
+     if (error instanceof DOMException && error.name === 'NotAllowedError') return;
+     throw error;
+    }
+   }
+   track.contentHint = preferences.presentationQuality.profile === 'motion' ? 'motion' : 'detail';
+   const restoreCamera = store.getState().camera;
+   if (!(await replaceLocalTrack(c, 'video', track, setLocal))) return;
+   c.presentation = {track, restoreCamera};
+   track.addEventListener(
+    'ended',
+    () => {
+     if (runtime.call === c && c.presentation?.track === track) void stopPresentation();
+    },
+    {once: true}
+   );
+   stateActions.setCamera(false);
+   stateActions.setPresenting(true);
+   started = true;
+  });
+  return started;
+ }
+ async function stopPresentation() {
+  const c = runtime.call;
+  const presentation = c?.presentation;
+  if (!c || !presentation) return;
+  await changeMedia(c, async () => {
+   // Stop sharing immediately, even when the camera needs time to reopen.
+   stopCapturedTrack(presentation.track);
+   c.presentation = undefined;
+   stateActions.setPresenting(false);
+   if (!(await replaceLocalTrack(c, 'video', null, setLocal)) || !presentation.restoreCamera) return;
+   const camera = await captureTrack('video', store.getState().preferences);
+   if (await replaceLocalTrack(c, 'video', camera, setLocal)) stateActions.setCamera(true);
+  });
  }
  async function toggleCamera() {
   const c = runtime.call;
-  if (!c || c.audioOnly) return;
+  if (!c || c.audioOnly || c.presentation) return;
   await changeMedia(c, async () => {
    const track = c.stream.getVideoTracks().length ? null : await captureTrack('video', store.getState().preferences);
    if (await replaceLocalTrack(c, 'video', track, setLocal)) stateActions.setCamera(!!track);
@@ -96,7 +170,7 @@ export function createVoiceMedia(store: VoiceStore, runtime: VoiceRuntime) {
   if (runtime.pending || runtime.changingMedia) return;
   let kind: TrackKind | undefined;
   if (key === 'mic' || key === 'echo' || key === 'noise') kind = 'audio';
-  else if (key === 'camera' && c?.stream.getVideoTracks().length) kind = 'video';
+  else if (key === 'camera' && !c?.presentation && c?.stream.getVideoTracks().length) kind = 'video';
   if (!c || !kind) {
    save();
    return;
@@ -129,5 +203,5 @@ export function createVoiceMedia(store: VoiceStore, runtime: VoiceRuntime) {
   });
  }
 
- return {watchInput, actions: {setMicVolume, savePreferences, toggleCamera}};
+ return {watchInput, actions: {setMicVolume, savePreferences, toggleCamera, startPresentation, stopPresentation}};
 }

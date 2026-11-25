@@ -1,4 +1,5 @@
-import {selectRoomParticipants} from '../model/voice-selectors';
+import {TooltipLabel} from '@/shared/ui/tooltip';
+import {VoiceRoomParticipants} from './voice-room-participants';
 import type {RoomMusicModel} from '../model/use-room-music';
 import {MotionIcon} from '@/shared/ui/motion-icon';
 import {Button} from '@/shared/ui/button';
@@ -6,18 +7,14 @@ import {Switch} from '@/shared/ui/switch';
 import {Slider} from '@/shared/ui/slider';
 import {OptionsSelect} from '@/shared/ui/select';
 import {AudioDeviceAccess} from './audio-device-access';
-import {useLevelRail} from '../model/use-level-rail';
 import {Label} from '@/shared/ui/label';
 import {Progress} from '@/shared/ui/progress';
-import {useEffect, useRef, useState} from 'react';
 import {Mic, MicOff, Headphones, HeadphoneOff, Video, VideoOff, PhoneOff, Settings} from 'lucide-react';
 import type {Voice} from '../model/use-voice';
-import {UserAvatar} from '@/shared/ui/user-avatar';
-import {UserContextMenu} from '@/entities/user';
-import {useUserActions} from '@/shared/lib/user-actions';
 import type {User, VoicePresence} from '@/shared/types';
 import '@/shared/ui/account-media-settings.css';
-import {RoomMusic} from './room-music';
+import {RoomMusicControl} from './room-music';
+import {PresentationControl} from './presentation-control';
 import {useMediaPlayback} from '../model/use-media-playback';
 import {useVoiceSettings, type VoiceSettingsModel} from '../model/use-voice-settings';
 
@@ -78,102 +75,6 @@ export function VoicePlayback({voice, volumeForUser}: {voice: Voice; volumeForUs
   </div>
  );
 }
-export function hasVisibleVideo(stream?: MediaStream): boolean {
- return !!stream?.getVideoTracks().some(track => track.readyState === 'live' && track.enabled && !track.muted);
-}
-
-function VoiceTileVideo({stream}: {stream: MediaStream}) {
- const playback = useMediaPlayback({stream, volume: 0, audioOnly: false});
- const video = useRef<HTMLVideoElement>(null);
-
- useEffect(() => {
-  const element = video.current;
-  if (!element || typeof element.requestVideoFrameCallback !== 'function') return;
-  let frame = 0;
-  let timeout: ReturnType<typeof setTimeout>;
-  function hide() {
-   if (element) delete element.dataset.receiving;
-  }
-  function onFrame() {
-   if (!element) return;
-   if (!element.dataset.receiving) element.dataset.receiving = 'true';
-   clearTimeout(timeout);
-   timeout = setTimeout(hide, 2000);
-   frame = element.requestVideoFrameCallback(onFrame);
-  }
-  hide();
-  frame = element.requestVideoFrameCallback(onFrame);
-  element.addEventListener('emptied', hide);
-  element.addEventListener('error', hide);
-  return () => {
-   element.cancelVideoFrameCallback(frame);
-   clearTimeout(timeout);
-   element.removeEventListener('emptied', hide);
-   element.removeEventListener('error', hide);
-  };
- }, [stream]);
-
- return (
-  <video
-   ref={element => {
-    video.current = element;
-    playback.attach(element);
-   }}
-   className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 data-[receiving=true]:opacity-100"
-   autoPlay
-   playsInline
-   muted
-   onError={playback.onError}
-  />
- );
-}
-
-export function VoicePeerVisual({
- stream,
- user,
- onOpen,
- deaf = false
-}: {
- stream?: MediaStream;
- user: User;
- onOpen: () => void;
- deaf?: boolean;
-}) {
- const [, refresh] = useState(0);
- const rail = useLevelRail(stream, !deaf);
- useEffect(() => {
-  if (!stream) return;
-  let watched: MediaStreamTrack[] = [];
-  const changed = () => refresh(value => value + 1);
-  const sync = () => {
-   for (const track of watched)
-    for (const event of ['mute', 'unmute', 'ended']) track.removeEventListener(event, changed);
-   watched = stream.getVideoTracks();
-   for (const track of watched) for (const event of ['mute', 'unmute', 'ended']) track.addEventListener(event, changed);
-   changed();
-  };
-  stream.addEventListener('addtrack', sync);
-  stream.addEventListener('removetrack', sync);
-  sync();
-  return () => {
-   stream.removeEventListener('addtrack', sync);
-   stream.removeEventListener('removetrack', sync);
-   for (const track of watched)
-    for (const event of ['mute', 'unmute', 'ended']) track.removeEventListener(event, changed);
-  };
- }, [stream]);
- return (
-  <>
-   <div className="voice-tile-rail" ref={rail} aria-hidden="true">
-    <i />
-   </div>
-   <button type="button" className="voice-tile-avatar" title={`Профиль ${user.name}`} onClick={onOpen}>
-    <UserAvatar user={user} size="xl" decoration={user.decorations?.avatar} />
-   </button>
-   {stream && hasVisibleVideo(stream) && <VoiceTileVideo stream={stream} />}
-  </>
- );
-}
 export function VoiceStage({
  voice: v,
  id,
@@ -198,175 +99,121 @@ export function VoiceStage({
  music?: RoomMusicModel;
 }) {
  const joined = v.room === id;
- const participants = selectRoomParticipants(v, id, meUser?.id ?? '', presence);
- const actions = useUserActions();
  const microphoneOff = v.muted || v.deaf;
- const selfRail = useLevelRail(v.local, joined && !microphoneOff);
- const selfIdentity: User = meUser ?? {id: '', name: me, bio: '', created_at: 0, online: true};
- const selfTile = (
-  <div
-   key="self"
-   className="voice-tile border-border relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-[12px] border bg-black/55 backdrop-blur-md [&>video]:h-[200px] [&>video]:w-full [&>video]:object-cover"
-  >
-   <div className="voice-tile-rail" ref={selfRail} aria-hidden="true">
-    <i />
-   </div>
-   {v.camera && v.local ? (
-    <Media stream={v.local} muted volume={0} />
-   ) : (
-    <button
-     type="button"
-     className="voice-tile-avatar"
-     title="Открыть профиль"
-     onClick={() => meUser && actions?.openProfile(meUser.id)}
-    >
-     <UserAvatar user={selfIdentity} size="xl" decoration={selfIdentity.decorations?.avatar} />
-    </button>
-   )}
-   <span className="bg-card absolute bottom-2 left-2 rounded-[5px] px-2.5 py-1.5 text-[12px]">
-    {me} · Вы {microphoneOff ? '· микрофон выключен' : ''}
-   </span>
-  </div>
- );
  return (
-  <div className="voice-stage-region relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-   <div className="min-h-0 flex-1 overflow-auto">
-    <div className="voice-stage min-h-full">
-     <h1 className="shrink-0">{title}</h1>
-     <p>
-      {joined
-       ? v.peers.length
-         ? 'Вы в голосовой комнате'
-         : 'Вы в комнате. Пригласите друзей, чтобы начать общение.'
-       : 'Присоединитесь, чтобы общаться голосом и видео'}
-     </p>
-     {participants.length > 0 && (
-      <div className="voice-grid mx-0 my-2 mb-6 grid max-h-[60%] w-full max-w-[800px] grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 overflow-auto">
-       {participants.map(p => {
-        if (p.self)
-         return meUser ? (
-          <UserContextMenu key={p.key} user={meUser}>
-           {selfTile}
-          </UserContextMenu>
-         ) : (
-          selfTile
-         );
-        const identity: User = (p.id === meUser?.id ? meUser : users?.find(user => user.id === p.id)) ?? {
-         id: p.id,
-         name: userName(p.id),
-         bio: '',
-         created_at: 0,
-         online: true
-        };
-        const tile = (
-         <div className="voice-tile border-border relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-[12px] border bg-black/55 backdrop-blur-md">
-          {
-           <VoicePeerVisual
-            stream={joined ? v.streams[p.key] : undefined}
-            user={identity}
-            deaf={v.deaf}
-            onOpen={() => actions?.openProfile(identity.id)}
-           />
-          }
-          <span className="bg-card absolute bottom-2 left-2 rounded-[5px] px-2.5 py-1.5 text-[12px]">
-           {identity.name} ·{' '}
-           {!joined
-            ? 'В комнате'
-            : v.connections[p.key] === 'connected'
-              ? 'На связи'
-              : v.connections[p.key] === 'failed'
-                ? 'Переподключаюсь…'
-                : 'Подключение…'}
-          </span>
-         </div>
-        );
-        return (
-         <UserContextMenu key={p.key} user={identity}>
-          {tile}
-         </UserContextMenu>
-        );
-       })}
-      </div>
-     )}
-     {joined && v.microphoneLost && (
-      <p role="alert">
-       Микрофон отключён.{' '}
-       <Button variant="secondary" onClick={onSettings}>
-        Выбрать микрофон
-       </Button>
-      </p>
-     )}
-     {v.error && (
-      <p className="voice-error bg-primary text-foreground max-w-[550px] rounded-[8px] p-3.5" role="alert">
-       {v.error}
-      </p>
-     )}
-     {music && <RoomMusic key={id} music={music} joined={joined} />}
-    </div>
-   </div>
-   <div
-    className="voice-controls bg-card/70 mx-3 mb-3 flex shrink-0 flex-wrap justify-center gap-1 self-center rounded-xl border p-1.5 shadow-sm backdrop-blur-md motion-safe:transition-[opacity,transform] motion-safe:duration-200 motion-safe:ease-out"
-    data-auto-hide={joined || undefined}
-    role="group"
-    aria-label="Управление звонком"
-   >
-    {joined ? (
+  <div className="voice-stage-region [container-type:size] relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+   <VoiceRoomParticipants
+    key={id}
+    voice={v}
+    room={id}
+    presence={presence}
+    users={users}
+    meUser={meUser}
+    me={me}
+    userName={userName}
+    intro={
      <>
-      <Button
-       variant="ghost"
-       size="icon-lg"
-       title={microphoneOff ? 'Включить микрофон' : 'Выключить микрофон'}
-       aria-label="Микрофон"
-       aria-pressed={microphoneOff}
-       onClick={v.toggleMic}
-      >
-       {microphoneOff ? <MotionIcon icon={MicOff} kind="device" /> : <MotionIcon icon={Mic} kind="device" />}
+      <h1 className="shrink-0">{title}</h1>
+      <p>
+       {joined
+        ? v.peers.length
+          ? 'Вы в голосовой комнате'
+          : 'Вы в комнате. Пригласите друзей, чтобы начать общение.'
+        : 'Присоединитесь, чтобы общаться голосом и видео'}
+      </p>
+      {!joined && (
+       <Button type="button" size="lg" className="min-h-10" disabled={v.busy} onClick={() => void v.join(id)}>
+        {v.busy ? 'Подключение…' : 'Присоединиться к голосовому каналу'}
+       </Button>
+      )}
+     </>
+    }
+   >
+    {joined && v.microphoneLost && (
+     <p role="alert">
+      Микрофон отключён.{' '}
+      <Button variant="secondary" onClick={onSettings}>
+       Выбрать микрофон
       </Button>
-      <Button
-       variant="ghost"
-       size="icon-lg"
-       title={v.deaf ? 'Включить звук' : 'Отключить звук'}
-       aria-label="Наушники"
-       aria-pressed={v.deaf}
-       onClick={v.toggleDeaf}
-      >
-       {v.deaf ? <MotionIcon icon={HeadphoneOff} kind="device" /> : <MotionIcon icon={Headphones} kind="device" />}
-      </Button>
-      <Button
-       variant="ghost"
-       size="icon-lg"
-       disabled={v.busy || v.audioOnly}
-       title={
+     </p>
+    )}
+    {v.error && (
+     <p className="voice-error bg-primary text-foreground max-w-[550px] rounded-[8px] p-3.5" role="alert">
+      {v.error}
+     </p>
+    )}
+   </VoiceRoomParticipants>
+   {joined && (
+    <div
+     className="voice-controls relative mx-3 mb-3 flex shrink-0 flex-wrap items-center justify-center gap-2 self-center motion-safe:transition-[opacity,transform] motion-safe:duration-200 motion-safe:ease-out"
+     data-auto-hide
+     role="group"
+     aria-label="Управление звонком"
+    >
+     <div
+      className="border-border bg-card/70 flex flex-wrap items-center justify-center gap-1 rounded-xl border p-1.5 shadow-sm backdrop-blur-md"
+      role="group"
+      aria-label="Устройства и настройки"
+     >
+      <TooltipLabel content={microphoneOff ? 'Включить микрофон' : 'Выключить микрофон'}>
+       <Button variant="ghost" size="icon-lg" aria-label="Микрофон" aria-pressed={microphoneOff} onClick={v.toggleMic}>
+        {microphoneOff ? <MotionIcon icon={MicOff} kind="device" /> : <MotionIcon icon={Mic} kind="device" />}
+       </Button>
+      </TooltipLabel>
+      <TooltipLabel content={v.deaf ? 'Включить звук' : 'Отключить звук'}>
+       <Button variant="ghost" size="icon-lg" aria-label="Наушники" aria-pressed={v.deaf} onClick={v.toggleDeaf}>
+        {v.deaf ? <MotionIcon icon={HeadphoneOff} kind="device" /> : <MotionIcon icon={Headphones} kind="device" />}
+       </Button>
+      </TooltipLabel>
+      <TooltipLabel
+       content={
         v.audioOnly
          ? 'Пилотная комната LiveKit поддерживает только звук'
          : v.camera
            ? 'Выключить камеру'
            : 'Включить камеру'
        }
-       aria-label={v.camera ? 'Выключить камеру' : 'Включить камеру'}
-       onClick={() => void v.toggleCamera()}
       >
-       <MotionIcon icon={v.camera ? Video : VideoOff} />
-      </Button>
-      <Button variant="ghost" size="icon-lg" title="Отключиться" aria-label="Отключиться" onClick={v.leave}>
+       <Button
+        variant="ghost"
+        size="icon-lg"
+        disabled={v.busy || v.audioOnly || v.presenting}
+        aria-label={v.camera ? 'Выключить камеру' : 'Включить камеру'}
+        onClick={() => void v.toggleCamera()}
+       >
+        <MotionIcon icon={v.camera ? Video : VideoOff} />
+       </Button>
+      </TooltipLabel>
+      <TooltipLabel content="Настройки голоса и видео">
+       <Button variant="ghost" size="icon-lg" aria-label="Настройки голоса и видео" onClick={onSettings}>
+        <MotionIcon icon={Settings} kind="settings" />
+       </Button>
+      </TooltipLabel>
+     </div>
+     <div
+      role="group"
+      aria-label="Музыка и демонстрация экрана"
+      className="before:border-border before:bg-card/70 grid before:pointer-events-none before:col-start-1 before:row-start-1 before:rounded-xl before:border before:shadow-sm before:backdrop-blur-md"
+     >
+      <div className="z-0 col-start-1 row-start-1 flex items-center gap-1 p-[7px]">
+       {music && <RoomMusicControl key={id} music={music} joined />}
+       <PresentationControl key={id} voice={v} />
+      </div>
+     </div>
+     <TooltipLabel content="Отключиться">
+      <Button
+       type="button"
+       variant="destructive"
+       size="icon-lg"
+       className="border-destructive/30 bg-destructive/65 hover:bg-destructive/80 dark:bg-destructive/65 dark:hover:bg-destructive/80 h-[50px] w-12 rounded-xl text-white shadow-sm backdrop-blur-md"
+       aria-label="Отключиться"
+       onClick={v.leave}
+      >
        <MotionIcon icon={PhoneOff} />
       </Button>
-     </>
-    ) : (
-     <Button variant="secondary" className="min-h-10" disabled={v.busy} onClick={() => void v.join(id)}>
-      {v.busy ? 'Подключение…' : 'Присоединиться к голосовому каналу'}
-     </Button>
-    )}
-    <Button
-     variant="ghost"
-     size="icon-lg"
-     title="Настройки голоса и видео"
-     aria-label="Настройки голоса и видео"
-     onClick={onSettings}
-    >
-     <MotionIcon icon={Settings} kind="settings" />
-    </Button>
-   </div>
+     </TooltipLabel>
+    </div>
+   )}
   </div>
  );
 }

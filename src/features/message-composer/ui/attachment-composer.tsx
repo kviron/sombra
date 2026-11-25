@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {useRef, type ClipboardEvent} from 'react';
 import {Paperclip} from 'lucide-react';
 import {ComposerIconButton} from '@/shared/ui/elements-composer';
@@ -53,14 +54,15 @@ export function AttachmentComposer({disabled, reading, onFile}: AttachmentCompos
      if (file) onFile(file);
     }}
    />
-   <ComposerIconButton
-    disabled={disabled || reading}
-    title="Прикрепить файл (до 10 МиБ)"
-    aria-label="Прикрепить файл (до 10 МиБ)"
-    onClick={() => input.current?.click()}
-   >
-    <Paperclip size={16} />
-   </ComposerIconButton>
+   <TooltipLabel content="Прикрепить файл (до 10 МиБ)">
+    <ComposerIconButton
+     disabled={disabled || reading}
+     aria-label="Прикрепить файл (до 10 МиБ)"
+     onClick={() => input.current?.click()}
+    >
+     <Paperclip size={16} />
+    </ComposerIconButton>
+   </TooltipLabel>
   </div>
  );
 }

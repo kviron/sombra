@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Bell, BellOff, Pin, PinOff} from 'lucide-react';
 import type {ChatMessage, Dialog, DialogPreferences, User} from '@/shared/types';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
@@ -60,25 +61,30 @@ export function DialogListRow({
     <>
      <UnreadMentionBadge count={dialog.unreadMentionCount} />
      {readReceiptsSupported && (dialog.unreadCount || 0) > 0 && (
-      <span
-       className="bg-primary text-primary-foreground inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-[5px] text-[11px] font-semibold whitespace-nowrap"
-       title={`Непрочитанных сообщений: ${dialog.unreadCount}`}
-       aria-label={`Непрочитанных сообщений: ${dialog.unreadCount}`}
-      >
-       {dialog.unreadCount! > 99 ? '99+' : dialog.unreadCount}
-      </span>
+      <TooltipLabel content={`Непрочитанных сообщений: ${dialog.unreadCount}`}>
+       <span
+        className="bg-primary text-primary-foreground inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-[5px] text-[11px] font-semibold whitespace-nowrap"
+        aria-label={`Непрочитанных сообщений: ${dialog.unreadCount}`}
+       >
+        {dialog.unreadCount! > 99 ? '99+' : dialog.unreadCount}
+       </span>
+      </TooltipLabel>
      )}
      {(preferences.pinned || preferences.muted) && (
       <span className="text-muted-foreground inline-flex shrink-0 items-center gap-[5px] [&_svg]:shrink-0">
        {preferences.pinned && (
-        <span role="img" aria-label="Закреплённый чат" title="Закреплённый чат">
-         <Pin size={12} />
-        </span>
+        <TooltipLabel content="Закреплённый чат">
+         <span role="img" aria-label="Закреплённый чат">
+          <Pin size={12} />
+         </span>
+        </TooltipLabel>
        )}
        {preferences.muted && (
-        <span role="img" aria-label="Уведомления отключены" title="Уведомления отключены">
-         <BellOff size={12} />
-        </span>
+        <TooltipLabel content="Уведомления отключены">
+         <span role="img" aria-label="Уведомления отключены">
+          <BellOff size={12} />
+         </span>
+        </TooltipLabel>
        )}
       </span>
      )}

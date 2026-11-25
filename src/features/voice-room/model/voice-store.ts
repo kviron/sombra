@@ -19,6 +19,7 @@ type VoiceActions = {
  setLocal: (local: MediaStream) => void;
  setMicrophoneLost: (lost: boolean) => void;
  setCamera: (camera: boolean) => void;
+ setPresenting: (presenting: boolean) => void;
  setMicVolume: (micVolume: number) => void;
  setPreferences: (preferences: MediaPreferences) => void;
  setAvailability: (availability: VoiceAvailability) => void;
@@ -35,6 +36,7 @@ export type VoiceState = {
  error: string;
  microphoneLost: boolean;
  camera: boolean;
+ presenting: boolean;
  audioOnly: boolean;
  local: MediaStream | null;
  peers: VoicePeer[];
@@ -54,6 +56,7 @@ export function createVoiceStore(preferences: MediaPreferences) {
   error: '',
   microphoneLost: false,
   camera: false,
+  presenting: false,
   audioOnly: false,
   local: null,
   peers: [],
@@ -77,6 +80,7 @@ export function createVoiceStore(preferences: MediaPreferences) {
      streams: {},
      connections: {},
      camera: false,
+     presenting: false,
      audioOnly: false,
      microphoneLost: false,
      micVolume
@@ -84,6 +88,7 @@ export function createVoiceStore(preferences: MediaPreferences) {
    setLocal: local => set({local}),
    setMicrophoneLost: microphoneLost => set({microphoneLost}),
    setCamera: camera => set({camera}),
+   setPresenting: presenting => set({presenting}),
    setMicVolume: micVolume => set({micVolume}),
    setPreferences: preferences => set({preferences}),
    setAvailability: availability => set({availability}),

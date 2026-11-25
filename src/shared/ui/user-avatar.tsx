@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import type {CSSProperties} from 'react';
 import {cn} from '@/shared/lib/utils';
 import {ProfileEffectImage} from './profile-effect-image';
@@ -100,13 +101,14 @@ export function UserAvatar({
    )}
    {decoration ? <AvatarFrame decoration={decoration} target="avatar" size={size} /> : null}
    {presence && (
-    <span
-     className={presenceClass}
-     data-online={user.online ? 'true' : 'false'}
-     role="img"
-     aria-label={user.online ? 'В сети' : 'Не в сети'}
-     title={user.online ? 'В сети' : 'Не в сети'}
-    />
+    <TooltipLabel content={user.online ? 'В сети' : 'Не в сети'}>
+     <span
+      className={presenceClass}
+      data-online={user.online ? 'true' : 'false'}
+      role="img"
+      aria-label={user.online ? 'В сети' : 'Не в сети'}
+     />
+    </TooltipLabel>
    )}
   </span>
  );

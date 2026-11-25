@@ -35,7 +35,8 @@ export async function clearAttachmentCache(): Promise<CacheInfo> {
 let stateRequest = 0,
  acceptedStateRequest = 0,
  rawStateRequest = 0,
- acceptedRawStateRequest = 0;
+ acceptedRawStateRequest = 0,
+ sessionGeneration = 0;
 const attachmentRequests = new Map<string, Promise<unknown>>();
 // Several places read the same snapshot at nearly the same moment (a poll tick and a
 // notification activation, say). One request answers them all; mutating ops are never merged.
@@ -48,8 +49,7 @@ const readOperations = new Set([
  'bot_get_model_settings',
  'message_readers',
  'list_public_sticker_packs',
- 'search_conversation_members',
- 'sticker_image'
+ 'search_conversation_members'
 ]);
 const readRequests = new Map<string, Promise<unknown>>();
 /** Pictures are fetched once per version: see avatars.ts. */
@@ -62,6 +62,7 @@ const avatars = createAvatarCache(async ref =>
 );
 export const session = () => localStorage.getItem('mines-session') || '';
 export function clearSession() {
+ sessionGeneration++;
  resetAttachmentCacheAccess();
  attachmentRequests.clear();
  readRequests.clear();
@@ -72,6 +73,11 @@ export function clearSession() {
  if (window.location.hash !== '#register') window.location.hash = '#login';
 }
 export class ApiConnectionError extends Error {}
+export class StaleChatState extends Error {
+ constructor(readonly kind: 'session' | 'order') {
+  super(kind === 'session' ? 'Сессия изменилась.' : 'История уже обновлена.');
+ }
+}
 export async function request<T = any>(op: string, data: Record<string, unknown> = {}): Promise<T> {
  // Ask polling snapshots for avatar hashes instead of inline pictures.
  const payload = op === 'state' ? {avatar_assets: true, ...data} : data;
@@ -110,25 +116,36 @@ async function hydrateState<T>(state: T): Promise<T> {
  return normalizeState((await avatars.hydrate(state as unknown as ChatState)) as ChatState) as unknown as T;
 }
 
+function requireCurrentState(sequence: number, scope: number) {
+ if (scope !== sessionGeneration) throw new StaleChatState('session');
+ if (sequence < acceptedStateRequest) throw new StaleChatState('order');
+ acceptedStateRequest = sequence;
+}
+
 async function perform<T>(op: string, payload: Record<string, unknown>): Promise<T> {
+ const sessionScope = sessionGeneration;
+ const stateSequence = op === 'state' ? ++stateRequest : 0;
  if (tauri.isTauri()) {
   let result: T;
   try {
    result = await tauri.commands.remote<T>({op, token: session(), ...payload});
   } catch (error) {
    const message = String(error);
-   if (message.includes('AUTH_REQUIRED')) clearSession();
+   if (message.includes('AUTH_REQUIRED') && sessionScope === sessionGeneration) clearSession();
    if (message.startsWith('REMOTE_UNAVAILABLE:')) throw new ApiConnectionError(message.slice(19));
    throw new Error(message, {cause: error});
   }
-  return op === 'state' ? ((await hydrateState(result)) as T) : result;
+  if (op !== 'state') return result;
+  requireCurrentState(stateSequence, sessionScope);
+  const hydrated = await hydrateState(result);
+  requireCurrentState(stateSequence, sessionScope);
+  return hydrated;
  }
  if (op === 'login' || op === 'register' || op === 'logout') {
   resetAttachmentCacheAccess();
   attachmentRequests.clear();
  }
  const scope = attachmentCacheGeneration();
- const stateSequence = op === 'state' ? ++stateRequest : 0;
  if (op === 'attachment_file') {
   const writeEpoch = attachmentCacheWriteEpoch();
   const key = JSON.stringify([scope, writeEpoch, payload]);
@@ -157,10 +174,11 @@ async function perform<T>(op: string, payload: Record<string, unknown>): Promise
  }
  const result = await browserRaw<T>(op, payload);
  if (op === 'state') {
-  if (stateSequence < acceptedStateRequest) throw new Error('История уже обновлена.');
-  acceptedStateRequest = stateSequence;
+  requireCurrentState(stateSequence, sessionScope);
   const accepted = await acceptAttachmentCacheState(result as unknown as ChatState, scope);
-  return (await hydrateState(accepted)) as T;
+  const hydrated = (await hydrateState(accepted)) as T;
+  requireCurrentState(stateSequence, sessionScope);
+  return hydrated;
  }
  return result;
 }
@@ -210,7 +228,7 @@ async function browserRaw<T>(op: string, data: Record<string, unknown> = {}): Pr
  if (result.error) throw new Error(String(result.error));
  if (!('data' in result)) throw new Error('Некорректный ответ сервера. Попробуйте снова.');
  if (op === 'state') {
-  if (sequence < acceptedRawStateRequest) throw new Error('История уже обновлена.');
+  if (sequence < acceptedRawStateRequest) throw new StaleChatState('order');
   acceptedRawStateRequest = sequence;
  }
  return result.data as T;
@@ -221,7 +239,9 @@ export async function authenticate(op: 'login' | 'register', data: Record<string
   device: tauri.isTauri() ? 'Sombra · ' + navigator.platform : navigator.userAgent
  });
  if (!result?.user?.id) throw new Error('Сервер не подтвердил вход. Попробуйте снова.');
+ sessionGeneration++;
  avatars.clear();
+ readRequests.clear();
  if (tauri.isTauri() && result.token) localStorage.setItem('mines-session', result.token);
  window.dispatchEvent(new Event('authchange'));
  window.location.hash = '#chat';

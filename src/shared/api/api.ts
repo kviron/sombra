@@ -71,6 +71,7 @@ export const api = {
  },
  sticker: {
   image: method('sticker_image'),
+  thumbnail: method('sticker_thumbnail'),
   listPublicPacks: method('list_public_sticker_packs'),
   installPublicPack: method('install_public_sticker_pack'),
   importPack: method('import_sticker_pack'),

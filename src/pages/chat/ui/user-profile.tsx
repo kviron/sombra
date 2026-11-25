@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import type {RefObject} from 'react';
 import {ConversationMaterialRows, type ProfileConversationMaterials} from '@/features/conversation-details';
 import {Check, Clock3, MessageCircle, Sparkles, UserMinus, UserPlus, X} from 'lucide-react';
@@ -66,23 +67,24 @@ export function UserProfile({
     className={cn(
      'user-profile',
      'relative max-h-[calc(100vh_-_var(--title-bar-height,32px)_-_80px)] w-[min(760px,100%)] overflow-auto',
-     'border-border bg-background text-foreground rounded-[18px] border'
+     'border-border bg-background/80 text-foreground rounded-[18px] border backdrop-blur-md'
     )}
     data-avatar-fx-priority="profile"
     onMouseDown={event => event.stopPropagation()}
    >
-    <Button
-     ref={model.closeButton}
-     type="button"
-     variant="secondary"
-     size="icon"
-     className="absolute top-3 right-3 z-[2]"
-     title="Закрыть профиль"
-     aria-label="Закрыть профиль"
-     onClick={onClose}
-    >
-     <X size={18} />
-    </Button>
+    <TooltipLabel content="Закрыть профиль">
+     <Button
+      ref={model.closeButton}
+      type="button"
+      variant="secondary"
+      size="icon"
+      className="absolute top-3 right-3 z-[2]"
+      aria-label="Закрыть профиль"
+      onClick={onClose}
+     >
+      <X size={18} />
+     </Button>
+    </TooltipLabel>
     <ProfileCover user={user} accountId={me.id} className="user-profile-banner border-border border-b" />
     <div className="user-profile-body px-[26px] pb-[26px]">
      <div className="user-profile-identity relative z-[1] flex items-start gap-4">
@@ -215,7 +217,7 @@ export function UserProfile({
       {user.bio || 'Пользователь пока ничего не рассказал о себе.'}
      </p>
 
-     <dl className="user-profile-facts border-border bg-card mt-5 mb-0 grid grid-cols-3 gap-3 rounded-[12px] border px-4 py-3.5">
+     <dl className="user-profile-facts border-border bg-card/75 mt-5 mb-0 grid grid-cols-3 gap-3 rounded-[12px] border px-4 py-3.5">
       <div className="min-w-0">
        <dt className="text-muted-foreground text-[10px] font-semibold tracking-[0.08em] uppercase">В Sombra</dt>
        <dd className="text-foreground mt-[5px] mb-0 text-[13px] leading-[1.35] [overflow-wrap:anywhere]">
@@ -249,29 +251,31 @@ export function UserProfile({
        <ul className="mt-2 mb-0 flex list-none flex-col gap-0.5 p-0">
         {shared.map(({group, memberLabel}) => (
          <li key={group.id}>
-          <button
-           type="button"
-           disabled={!onOpenGroup}
-           onClick={() => actions.openGroup(group.id)}
-           title={onOpenGroup ? `Открыть «${group.name}»` : group.name}
-          >
-           <span
-            className="user-profile-group-avatar bg-card text-foreground grid size-8 flex-[0_0_32px] place-items-center overflow-hidden rounded-[10px] text-[14px] font-semibold"
-            aria-hidden="true"
+          <TooltipLabel content={onOpenGroup ? `Открыть «${group.name}»` : group.name}>
+           <button
+            type="button"
+            disabled={!onOpenGroup}
+            onClick={() => actions.openGroup(group.id)}
+            aria-label={onOpenGroup ? `Открыть «${group.name}»` : group.name}
            >
-            {group.avatar ? (
-             <img className="size-full object-cover" src={group.avatar} alt="" />
-            ) : (
-             group.name.slice(0, 1).toLocaleUpperCase('ru')
-            )}
-           </span>
-           <span className="user-profile-group-text flex min-w-0 flex-col">
-            <strong className="text-foreground overflow-hidden text-[13px] font-semibold text-ellipsis whitespace-nowrap">
-             {group.name}
-            </strong>
-            <small className="text-muted-foreground mt-0.5 text-[11px]">{memberLabel}</small>
-           </span>
-          </button>
+            <span
+             className="user-profile-group-avatar bg-card text-foreground grid size-8 flex-[0_0_32px] place-items-center overflow-hidden rounded-[10px] text-[14px] font-semibold"
+             aria-hidden="true"
+            >
+             {group.avatar ? (
+              <img className="size-full object-cover" src={group.avatar} alt="" />
+             ) : (
+              group.name.slice(0, 1).toLocaleUpperCase('ru')
+             )}
+            </span>
+            <span className="user-profile-group-text flex min-w-0 flex-col">
+             <strong className="text-foreground overflow-hidden text-[13px] font-semibold text-ellipsis whitespace-nowrap">
+              {group.name}
+             </strong>
+             <small className="text-muted-foreground mt-0.5 text-[11px]">{memberLabel}</small>
+            </span>
+           </button>
+          </TooltipLabel>
          </li>
         ))}
        </ul>
@@ -282,7 +286,7 @@ export function UserProfile({
       )}
      </section>
 
-     <section className="user-profile-note border-border bg-card mt-[22px] rounded-[12px] border px-4 pt-3.5 pb-4">
+     <section className="user-profile-note border-border bg-card/75 mt-[22px] rounded-[12px] border px-4 pt-3.5 pb-4">
       <div className="user-profile-note-head flex items-baseline justify-between gap-3">
        <h3 className="text-muted-foreground m-0 text-[11px] font-semibold tracking-[0.08em] uppercase">Заметка</h3>
        <span className="text-muted-foreground text-[11px]">{noteLabel}</span>

@@ -30,6 +30,7 @@ mod profile_covers;
 mod profile_decorations;
 mod profile_effect_drafts;
 mod sticker_catalog;
+mod sticker_thumbnails;
 fn id() -> String {
     uuid::Uuid::new_v4().to_string()
 }
@@ -733,7 +734,7 @@ impl Backend {
                 Some(sticker)
             })
             .collect();
-        json!({"features":{"avatarAssets":true,"messageReferences":message_references::supported()},"decorationSupported":true,"profileEffectDraftsSupported":self.profile_effect_drafts_supported(u),"effectCatalogSupported":true,"profileEffectUploadsSupported":true,"stickerCatalogSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":me,"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"historyTruncated":self.channels_with_more(uid),"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":users})
+        json!({"features":{"avatarAssets":true,"stickerThumbnails":true,"messageReferences":message_references::supported()},"decorationSupported":true,"profileEffectDraftsSupported":self.profile_effect_drafts_supported(u),"effectCatalogSupported":true,"profileEffectUploadsSupported":true,"stickerCatalogSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":me,"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"historyTruncated":self.channels_with_more(uid),"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":users})
     }
     /// One avatar for a client that asked for `avatar_assets`. The hash pins the
     /// exact picture the caller saw, so a stale snapshot never returns a newer file.
@@ -939,20 +940,11 @@ impl Backend {
             return self.attachment_file(&v);
         }
         if v["op"] == "sticker_image" {
-            let user = self.authenticate(s(&v, "token"))?;
-            let uid = s(&user, "id");
-            let sticker = self.db["stickers"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|sticker| {
-                    sticker["id"] == v["sticker"]
-                        && (self.sticker_in_library(sticker, uid)
-                            || self.sticker_in_history(sticker, uid)
-                            || self.sticker_pack_is_public(sticker))
-                })
-                .ok_or("Стикер не найден")?;
+            let sticker = self.authorized_sticker(&v)?;
             return Ok(json!({"image":self.sticker_image(sticker)?}));
+        }
+        if v["op"] == "sticker_thumbnail" {
+            return self.prepare_sticker_thumbnail(&v)?.render();
         }
         let prev = self.db.clone();
         let result = self.action(v);
@@ -1593,7 +1585,7 @@ mod tests {
         let other = b
             .request(json!({"op":"create_group","name":"Other","token":token}))
             .unwrap();
-        let items = json!([{"name":"One","image":"data:image/png;base64,iVBORw0KGgo="}]);
+        let items = json!([{"name":"One","image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGOQ0zBqAGEAB5EB8fQhVokAAAAASUVORK5CYII="}]);
         let import = json!({"op":"import_sticker_pack","token":token,"pack":"Test","group":group["id"],"stickers":items});
         let mut denied = import.clone();
         denied["token"] = gt.clone();
@@ -1618,13 +1610,17 @@ mod tests {
         assert!(state["stickers"][1]["keywords"].is_null());
         let sticker = &state["stickers"][0]["id"];
         let asset = json!({"op":"sticker_image","token":gt,"sticker":sticker});
+        let preview = json!({"op":"sticker_thumbnail","token":gt,"sticker":sticker});
+        assert_eq!(state["features"]["stickerThumbnails"], true);
         assert!(b.request(asset.clone()).is_err());
+        assert!(b.request(preview.clone()).is_err());
         b.request(json!({"op":"join_group","token":gt,"invite":group["invite"]}))
             .unwrap();
         assert_eq!(
             b.request(asset.clone()).unwrap()["image"],
             items[0]["image"]
         );
+        assert!(s(&b.request(preview.clone()).unwrap(), "image").starts_with("data:image/webp;base64,"));
         let personal = &state["stickers"][1]["id"];
         assert!(b
             .request(json!({"op":"sticker_image","token":gt,"sticker":personal}))
@@ -1645,6 +1641,7 @@ mod tests {
             json!(["привет", "здравствуй"])
         );
         assert_eq!(b.request(asset).unwrap()["image"], items[0]["image"]);
+        assert!(b.request(preview).is_ok());
         assert!(b.request(json!({"op":"message","token":gt,"channel":group["channels"][0]["id"],"sticker":sticker})).is_err());
     }
 
@@ -2048,6 +2045,7 @@ pub fn api_router(backend: Backend) -> axum::Router {
     struct ApiState {
         backend: Arc<Mutex<Backend>>,
         diagnostics: Arc<diagnostics::Diagnostics>,
+        sticker_thumbnails: Arc<sticker_thumbnails::StickerThumbnailQueue>,
     }
 
     fn response(status: StatusCode, body: Value) -> Response {
@@ -2102,7 +2100,9 @@ pub fn api_router(backend: Backend) -> axum::Router {
                 .unwrap_or("Browser"));
         }
         let max_age = session_lifetime(request["remember_me"].as_bool().unwrap_or(false));
-        let result = if operation == "music_stream_chunk" {
+        let result = if operation == "sticker_thumbnail" {
+            state.sticker_thumbnails.request(state.backend, request).await
+        } else if operation == "music_stream_chunk" {
             let prepare = || {
                 state
                     .backend
@@ -2213,7 +2213,9 @@ pub fn api_router(backend: Backend) -> axum::Router {
                 }
                 "MUSIC_STREAM_UNAVAILABLE" => (StatusCode::BAD_GATEWAY, "upstream", error),
                 "MUSIC_STREAM_TIMEOUT" => (StatusCode::GATEWAY_TIMEOUT, "upstream", error),
-                "MUSIC_STREAM_BUSY" => (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error),
+                "MUSIC_STREAM_BUSY" | "STICKER_THUMBNAIL_BUSY" => {
+                    (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error)
+                }
                 "MESSAGE_REFERENCE_UNAVAILABLE" | "MESSAGE_FORWARD_TARGET_UNAVAILABLE" => {
                     (StatusCode::NOT_FOUND, "authorization", error)
                 }
@@ -2263,6 +2265,7 @@ pub fn api_router(backend: Backend) -> axum::Router {
     let state = ApiState {
         diagnostics: Arc::clone(&backend.diagnostics),
         backend: Arc::new(Mutex::new(backend)),
+        sticker_thumbnails: Arc::default(),
     };
     // Weak ownership makes the maintenance task stop when the router is dropped.
     if let Ok(runtime) = tokio::runtime::Handle::try_current() {

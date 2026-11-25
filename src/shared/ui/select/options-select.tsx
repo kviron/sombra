@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue} from './primitives';
 
 export function OptionsSelect({
@@ -33,9 +34,9 @@ export function OptionsSelect({
    <SelectContent position="popper" align="start" collisionPadding={12} className="z-[200] max-w-[calc(100vw-24px)]">
     <SelectGroup>
      {options.map(option => (
-      <SelectItem key={option.value} value={prefix + option.value} title={option.label}>
-       {option.label}
-      </SelectItem>
+      <TooltipLabel content={option.label} key={option.value}>
+       <SelectItem value={prefix + option.value}>{option.label}</SelectItem>
+      </TooltipLabel>
      ))}
     </SelectGroup>
    </SelectContent>

@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 // Стили раздела одной таблицей: карточка профиля и секции безопасности. Раньше
 // переопределения карточки подключались из profile-media-dialogs.css — порядок сохранён.
 import './account-security.css';
@@ -135,18 +136,19 @@ export function AccountSecurity({
           Изменить обложку
          </Button>
          {state.me.cover && (
-          <Button
-           type="button"
-           variant="secondary"
-           size="icon-lg"
-           className="bg-card"
-           aria-label="Удалить обложку"
-           title="Удалить обложку"
-           disabled={busy}
-           onClick={() => void actions.saveImage('cover').catch(() => {})}
-          >
-           <Trash2 aria-hidden="true" />
-          </Button>
+          <TooltipLabel content="Удалить обложку">
+           <Button
+            type="button"
+            variant="secondary"
+            size="icon-lg"
+            className="bg-card"
+            aria-label="Удалить обложку"
+            disabled={busy}
+            onClick={() => void actions.saveImage('cover').catch(() => {})}
+           >
+            <Trash2 aria-hidden="true" />
+           </Button>
+          </TooltipLabel>
          )}
         </div>
        </div>
@@ -166,18 +168,19 @@ export function AccountSecurity({
           Изменить аватар
          </Button>
          {state.me.avatar && (
-          <Button
-           type="button"
-           variant="secondary"
-           size="icon-lg"
-           className="bg-card"
-           aria-label="Удалить аватар"
-           title="Удалить аватар"
-           disabled={busy}
-           onClick={() => void actions.saveImage('avatar').catch(() => {})}
-          >
-           <Trash2 aria-hidden="true" />
-          </Button>
+          <TooltipLabel content="Удалить аватар">
+           <Button
+            type="button"
+            variant="secondary"
+            size="icon-lg"
+            className="bg-card"
+            aria-label="Удалить аватар"
+            disabled={busy}
+            onClick={() => void actions.saveImage('avatar').catch(() => {})}
+           >
+            <Trash2 aria-hidden="true" />
+           </Button>
+          </TooltipLabel>
          )}
         </div>
        </div>
@@ -194,17 +197,18 @@ export function AccountSecurity({
           minLength={2}
           maxLength={32}
          />
-         <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          className="profile-identity-edit opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
-          title="Изменить имя"
-          aria-label="Изменить имя пользователя"
-          onClick={() => document.querySelector<HTMLInputElement>('#account-name')?.focus()}
-         >
-          <Pencil aria-hidden="true" />
-         </Button>
+         <TooltipLabel content="Изменить имя">
+          <Button
+           type="button"
+           variant="ghost"
+           size="icon-xs"
+           className="profile-identity-edit opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+           aria-label="Изменить имя пользователя"
+           onClick={() => document.querySelector<HTMLInputElement>('#account-name')?.focus()}
+          >
+           <Pencil aria-hidden="true" />
+          </Button>
+         </TooltipLabel>
         </div>
         <div className="profile-identity-field group flex min-w-0 items-center gap-2">
          <Input
@@ -217,17 +221,18 @@ export function AccountSecurity({
           onKeyDown={identityKey}
           maxLength={190}
          />
-         <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          className="profile-identity-edit opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
-          title="Изменить описание"
-          aria-label="Изменить описание"
-          onClick={() => document.querySelector<HTMLInputElement>('#account-bio')?.focus()}
-         >
-          <Pencil aria-hidden="true" />
-         </Button>
+         <TooltipLabel content="Изменить описание">
+          <Button
+           type="button"
+           variant="ghost"
+           size="icon-xs"
+           className="profile-identity-edit opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+           aria-label="Изменить описание"
+           onClick={() => document.querySelector<HTMLInputElement>('#account-bio')?.focus()}
+          >
+           <Pencil aria-hidden="true" />
+          </Button>
+         </TooltipLabel>
         </div>
         <small>Так профиль выглядит для собеседников — имя и описание сохраняются по Enter</small>
        </div>
@@ -423,7 +428,9 @@ export function AccountSecurity({
        <Monitor size={24} aria-hidden="true" />
        <div>
         <strong className="text-lg leading-[1.5]">{sessionTitle(session)}</strong>
-        <p title={session.device}>{deviceLabel(session.device)}</p>
+        <TooltipLabel content={session.device}>
+         <p>{deviceLabel(session.device)}</p>
+        </TooltipLabel>
         <small>Последняя активность: {lastSeenLabel(session.last_seen)}</small>
        </div>
        <Button variant="outline" size="sm" disabled={busy} onClick={() => actions.revokeSession(session)}>

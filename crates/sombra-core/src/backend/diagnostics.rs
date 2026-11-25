@@ -93,6 +93,7 @@ pub fn operation(name: &str) -> &'static str {
         "remove_bot_from_group",
         "create_sticker",
         "sticker_image",
+        "sticker_thumbnail",
         "import_sticker_pack",
         "list_public_sticker_packs",
         "set_sticker_pack_public",
@@ -309,6 +310,7 @@ impl Diagnostics {
                     | "me"
                     | "sessions"
                     | "sticker_image"
+                    | "sticker_thumbnail"
                     | "voice_poll"
                     | "voice_signal"
                     | "bot_poll"

@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {ChevronUp, Settings} from 'lucide-react';
 import {AudioDeviceAccess} from './audio-device-access';
 import {useState} from 'react';
@@ -60,16 +61,11 @@ export function VoiceQuickSettings({
  return (
   <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
    <DropdownMenuTrigger asChild>
-    <Button
-     type="button"
-     variant="ghost"
-     size="icon-xs"
-     className="voice-quick-trigger"
-     aria-label={labels.aria}
-     title={labels.title}
-    >
-     <ChevronUp className="size-3" />
-    </Button>
+    <TooltipLabel content={labels.title}>
+     <Button type="button" variant="ghost" size="icon-xs" className="voice-quick-trigger" aria-label={labels.aria}>
+      <ChevronUp className="size-3" />
+     </Button>
+    </TooltipLabel>
    </DropdownMenuTrigger>
    <DropdownMenuContent
     side="top"

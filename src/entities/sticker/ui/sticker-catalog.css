@@ -66,11 +66,10 @@
  width: 100%;
 }
 
-.sticker-preview-dialog .sticker-grid img,
-.public-sticker-catalog .sticker-grid img {
+.sticker-preview-dialog .sticker-grid [data-slot='sticker-image'],
+.public-sticker-catalog .sticker-grid [data-slot='sticker-image'] {
  width: 100%;
  height: 56px;
- object-fit: contain;
 }
 
 /* Узкий экран: окно коллекции поджимает отступы; переменную читает утилита

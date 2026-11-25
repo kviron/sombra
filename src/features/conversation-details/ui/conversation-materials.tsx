@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Button} from '@/shared/ui/button';
 import {Input} from '@/shared/ui/input';
 import {useEffect, useMemo, useRef, useState} from 'react';
@@ -105,11 +106,15 @@ export function ConversationMaterials({
     )}
     <div>
      <h2>{label}</h2>
-     <p title={title}>{title}</p>
+     <TooltipLabel content={title}>
+      <p>{title}</p>
+     </TooltipLabel>
     </div>
-    <button type="button" aria-label="Закрыть материалы" title="Закрыть панель" onClick={onClose}>
-     <X size={18} />
-    </button>
+    <TooltipLabel content="Закрыть панель">
+     <button type="button" aria-label="Закрыть материалы" onClick={onClose}>
+      <X size={18} />
+     </button>
+    </TooltipLabel>
    </header>
    <div className="relative mx-3 mb-3 shrink-0">
     <Search
@@ -223,20 +228,16 @@ export function ConversationMaterials({
             )
            )}
            <footer className="material-caption text-muted-foreground flex min-w-0 items-center gap-2 px-2 pt-1 pb-1 pl-3 text-[11px]">
-            <span
-             className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-             title={userName(item.message.user)}
-            >
-             {userName(item.message.user)} · {date(item.message.time)}
-            </span>
-            <button
-             type="button"
-             title="Перейти к сообщению"
-             aria-label={`Перейти к сообщению: ${item.title}`}
-             onClick={() => jump(item)}
-            >
-             <ArrowUpRight size={17} />
-            </button>
+            <TooltipLabel content={userName(item.message.user)}>
+             <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+              {userName(item.message.user)} · {date(item.message.time)}
+             </span>
+            </TooltipLabel>
+            <TooltipLabel content="Перейти к сообщению">
+             <button type="button" aria-label={`Перейти к сообщению: ${item.title}`} onClick={() => jump(item)}>
+              <ArrowUpRight size={17} />
+             </button>
+            </TooltipLabel>
            </footer>
           </article>
          ))}

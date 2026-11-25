@@ -1,26 +1,48 @@
 import {useEffect, type RefObject} from 'react';
 import {useStore} from 'zustand';
 import type {Sticker} from '@/shared/types';
-import {requestStickerImage, stickerImageStore} from './sticker-image-cache';
+import {requestStickerImage, stickerImageKey, stickerImageStore, type StickerImageVariant} from './sticker-image-cache';
 
-type Options = {sticker: Sticker; target: RefObject<HTMLImageElement | null>};
+type Options = {sticker: Sticker; target: RefObject<HTMLElement | null>; variant: StickerImageVariant};
 
-/** Картинка стикера: сразу из данных или лениво, когда элемент появился в окне. */
-export function useStickerImage({sticker, target}: Options) {
- const image = useStore(stickerImageStore, state => state.images[sticker.id]);
+const observed = new WeakMap<Element, () => void>();
+let observer: IntersectionObserver | undefined;
+
+function observeSticker(element: Element, load: () => void) {
+ if (typeof IntersectionObserver === 'undefined') {
+  load();
+  return;
+ }
+ observer ??= new IntersectionObserver(
+  entries => {
+   for (const entry of entries) {
+    if (!entry.isIntersecting) continue;
+    observed.get(entry.target)?.();
+   }
+  },
+  {rootMargin: '96px', scrollMargin: '96px'}
+ );
+ observed.set(element, load);
+ observer.observe(element);
+ return () => {
+  observed.delete(element);
+  observer?.unobserve(element);
+ };
+}
+
+export function useStickerImage({sticker, target, variant}: Options) {
+ const key = stickerImageKey(sticker.id, variant);
+ const image = useStore(stickerImageStore, state => state.images[key]);
 
  useEffect(() => {
-  if (sticker.image) return;
+  if (sticker.image && variant === 'original') return;
   const element = target.current;
   if (!element) return;
-  const observer = new IntersectionObserver(entries => {
-   if (!entries.some(entry => entry.isIntersecting)) return;
-   observer.disconnect();
-   void requestStickerImage(sticker.id).catch(() => {});
+  return observeSticker(element, () => {
+   if (stickerImageStore.getState().images[key]) return;
+   void requestStickerImage(sticker, variant).catch(() => {});
   });
-  observer.observe(element);
-  return () => observer.disconnect();
- }, [sticker.id, sticker.image, target]);
+ }, [key, sticker, target, variant]);
 
- return sticker.image || image;
+ return variant === 'original' ? sticker.image || image : image;
 }

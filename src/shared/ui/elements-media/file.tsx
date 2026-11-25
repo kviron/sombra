@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 // assistant-ui Elements File (MIT). Source commit 076de9eaf1b5f0f1fb6fb359c5e5d68770cae65c.
 // https://github.com/assistant-ui/assistant-ui/blob/076de9eaf1b5f0f1fb6fb359c5e5d68770cae65c/packages/ui/src/components/react/assistant-ui/elements/file.tsx
 // Sombra adaptation: the card keeps upstream geometry, icons and slots, but the download is a
@@ -110,24 +111,25 @@ export type FileDownloadProps = Omit<ComponentProps<'button'>, 'onClick'> & {
 /** Upstream FileDownload surface, wired to Sombra's authorised save path. */
 export function FileDownload({filename, busy = false, onDownload, className, children, ...props}: FileDownloadProps) {
  return (
-  <button
-   type="button"
-   data-slot="file-download"
-   disabled={busy}
-   aria-label={`Скачать ${filename || 'файл'}`}
-   title="Скачать файл"
-   className={cn(
-    'text-muted-foreground hover:bg-accent hover:text-accent-foreground shrink-0 rounded-md p-1 transition-colors disabled:opacity-50',
-    className
-   )}
-   onClick={event => {
-    event.stopPropagation();
-    onDownload();
-   }}
-   {...props}
-  >
-   {children || <DownloadIcon className="size-4" />}
-  </button>
+  <TooltipLabel content="Скачать файл">
+   <button
+    type="button"
+    data-slot="file-download"
+    disabled={busy}
+    aria-label={`Скачать ${filename || 'файл'}`}
+    className={cn(
+     'text-muted-foreground hover:bg-accent hover:text-accent-foreground shrink-0 rounded-md p-1 transition-colors disabled:opacity-50',
+     className
+    )}
+    onClick={event => {
+     event.stopPropagation();
+     onDownload();
+    }}
+    {...props}
+   >
+    {children || <DownloadIcon className="size-4" />}
+   </button>
+  </TooltipLabel>
  );
 }
 

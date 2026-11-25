@@ -42,6 +42,7 @@ export const selectVoiceView = (state: VoiceState) => ({
  busy: state.busy,
  error: state.error,
  camera: state.camera,
+ presenting: state.presenting,
  audioOnly: state.audioOnly,
  local: state.local,
  peers: state.peers,

@@ -71,6 +71,7 @@ export type Sticker = {
  packInstalled?: boolean;
  packAdded?: boolean;
 };
+export type StickerImageResponse = {image: string};
 export type Friend = {id: string; from: string; to: string; accepted: boolean};
 /** Страница истории канала: сервер отдаёт её от старых к новым. */
 export type MessagesPage = {messages: ChatMessage[]; hasMore: boolean; nextBefore: string | null};
@@ -78,6 +79,7 @@ export type MessagesPage = {messages: ChatMessage[]; hasMore: boolean; nextBefor
 export type ChatState = {
  features?: {
   messageReferences?: boolean;
+  stickerThumbnails?: boolean;
   /** Snapshot carries avatar hashes instead of inline pictures. */ avatarAssets?: boolean;
  };
  profileEffectUploadsSupported?: boolean;

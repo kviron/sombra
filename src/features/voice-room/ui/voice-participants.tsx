@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {selectVoiceChannelMembers} from '../model/voice-selectors';
 import {MicOff, HeadphoneOff, LogOut} from 'lucide-react';
 import type {User, VoicePresence} from '@/shared/types';
@@ -76,14 +77,18 @@ export function VoiceParticipants({voice, room, title, me, users, presence, volu
       trailing={
        <>
         {(muted || deaf) && (
-         <span title="Микрофон выключен">
-          <MicOff size={14} role="img" aria-label="Микрофон выключен" aria-hidden={false} />
-         </span>
+         <TooltipLabel content="Микрофон выключен">
+          <span>
+           <MicOff size={14} role="img" aria-label="Микрофон выключен" aria-hidden={false} />
+          </span>
+         </TooltipLabel>
         )}
         {deaf && (
-         <span title="Звук выключен">
-          <HeadphoneOff size={14} role="img" aria-label="Звук выключен" aria-hidden={false} />
-         </span>
+         <TooltipLabel content="Звук выключен">
+          <span>
+           <HeadphoneOff size={14} role="img" aria-label="Звук выключен" aria-hidden={false} />
+          </span>
+         </TooltipLabel>
         )}
        </>
       }

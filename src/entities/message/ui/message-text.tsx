@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {memo, useMemo, type MouseEvent} from 'react';
 import {useUserActions} from '@/shared/lib/user-actions';
 import {remarkVerifiedMentions, type VerifiedMention} from '../model/message-mentions';
@@ -47,15 +48,16 @@ export const MessageText = memo(
       button: ({node, children}) => {
        const id = node?.properties?.['data-mention-user'];
        return typeof id === 'string' ? (
-        <button
-         type="button"
-         className="message-mention"
-         title="Открыть профиль"
-         aria-label={`Открыть профиль ${String(children)}`}
-         onClick={() => actions?.openProfile(id)}
-        >
-         {children}
-        </button>
+        <TooltipLabel content="Открыть профиль">
+         <button
+          type="button"
+          className="message-mention"
+          aria-label={`Открыть профиль ${String(children)}`}
+          onClick={() => actions?.openProfile(id)}
+         >
+          {children}
+         </button>
+        </TooltipLabel>
        ) : (
         <>{children}</>
        );
@@ -63,16 +65,17 @@ export const MessageText = memo(
       a: ({href, children}) => {
        const safe = href ? normalizeLinkUrl(href) : null;
        return safe ? (
-        <a
-         href={safe}
-         target="_blank"
-         rel="noopener noreferrer"
-         title={safe}
-         onClick={handleMessageLinkClick}
-         onAuxClick={handleMessageLinkClick}
-        >
-         {children}
-        </a>
+        <TooltipLabel content={safe}>
+         <a
+          href={safe}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={handleMessageLinkClick}
+          onAuxClick={handleMessageLinkClick}
+         >
+          {children}
+         </a>
+        </TooltipLabel>
        ) : (
         <>{children}</>
        );

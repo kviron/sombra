@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Slider} from '@/shared/ui/slider';
 // assistant-ui Elements MediaPlayer (MIT). Source commit 076de9eaf1b5f0f1fb6fb359c5e5d68770cae65c.
 // https://github.com/assistant-ui/assistant-ui/blob/076de9eaf1b5f0f1fb6fb359c5e5d68770cae65c/packages/ui/src/components/react/assistant-ui/elements/media-player.tsx
@@ -140,9 +141,9 @@ export function AudioPlayer({
     {playing ? <PauseIcon aria-hidden className="size-4" /> : <PlayIcon aria-hidden className="ml-0.5 size-4" />}
    </button>
    <div className="flex min-w-0 grow basis-16 flex-col gap-1.5">
-    <span className="truncate text-[13.5px] font-medium" title={title}>
-     {displayTitle}
-    </span>
+    <TooltipLabel content={title}>
+     <span className="truncate text-[13.5px] font-medium">{displayTitle}</span>
+    </TooltipLabel>
     <Slider
      min={0}
      max={duration || 1}

@@ -1,6 +1,7 @@
 import {Input} from '@/shared/ui/input';
 import {useRef} from 'react';
-import {Dialog, ScrollArea} from 'radix-ui';
+import {Dialog} from 'radix-ui';
+import {ScrollArea} from '@/shared/ui/scroll-area';
 import {Check, Plus, Upload, X} from 'lucide-react';
 import {type ProfileDecorationDoc, type ProfileEffect, type ProfileEffectAsset, type User} from '@/shared/types';
 import {UserAvatar} from '@/shared/ui/user-avatar';
@@ -196,283 +197,275 @@ export function ProfileDecorationPicker({
       if (busy) event.preventDefault();
      }}
     >
-     <ScrollArea.Root className={cn('profile-effects-scroll', 'relative overflow-hidden')} type="hover">
-      <ScrollArea.Viewport className={cn('profile-effects-viewport', 'max-h-[calc(100dvh_-_34px)] w-full')}>
-       <div className={cn('profile-effects-body', 'grid gap-5 p-6')}>
-        <header className="flex items-start justify-between gap-3">
-         <div>
-          <Dialog.Title ref={heading} tabIndex={-1} className="m-0 text-2xl leading-[1.2] font-[650]">
-           {view === 'upload' ? 'Добавить свою GIF' : target === 'avatar' ? 'Эффект аватара' : 'Эффект обложки'}
-          </Dialog.Title>
-          <Dialog.Description className="text-muted-foreground mt-1.5 mb-0 text-sm leading-[1.5]">
-           {view === 'upload'
-            ? 'Выберите файл и проверьте, как он выглядит.'
-            : 'Выберите готовый эффект или добавьте свою анимацию.'}
-          </Dialog.Description>
-         </div>
-         <Dialog.Close asChild>
-          <Button type="button" variant="ghost" size="icon" disabled={busy} aria-label="Закрыть выбор эффекта">
-           <X />
-          </Button>
-         </Dialog.Close>
-        </header>
-        <div className={cn('profile-effect-toolbar', 'flex flex-wrap items-center justify-between gap-2')}>
-         <div
-          className={cn('profile-effect-tabs', 'flex gap-1 rounded-[10px] p-1')}
-          role="group"
-          aria-label="Коллекция эффектов"
+     <ScrollArea viewportClassName="max-h-[calc(100dvh_-_34px)]">
+      <div className={cn('profile-effects-body', 'grid gap-5 p-6')}>
+       <header className="flex items-start justify-between gap-3">
+        <div>
+         <Dialog.Title ref={heading} tabIndex={-1} className="m-0 text-2xl leading-[1.2] font-[650]">
+          {view === 'upload' ? 'Добавить свою GIF' : target === 'avatar' ? 'Эффект аватара' : 'Эффект обложки'}
+         </Dialog.Title>
+         <Dialog.Description className="text-muted-foreground mt-1.5 mb-0 text-sm leading-[1.5]">
+          {view === 'upload'
+           ? 'Выберите файл и проверьте, как он выглядит.'
+           : 'Выберите готовый эффект или добавьте свою анимацию.'}
+         </Dialog.Description>
+        </div>
+        <Dialog.Close asChild>
+         <Button type="button" variant="ghost" size="icon" disabled={busy} aria-label="Закрыть выбор эффекта">
+          <X />
+         </Button>
+        </Dialog.Close>
+       </header>
+       <div className={cn('profile-effect-toolbar', 'flex flex-wrap items-center justify-between gap-2')}>
+        <div
+         className={cn('profile-effect-tabs', 'flex gap-1 rounded-[10px] p-1')}
+         role="group"
+         aria-label="Коллекция эффектов"
+        >
+         <button
+          type="button"
+          aria-pressed={view === 'personal'}
+          disabled={busy}
+          onClick={() => actions.switchView('personal')}
          >
-          <button
-           type="button"
-           aria-pressed={view === 'personal'}
-           disabled={busy}
-           onClick={() => actions.switchView('personal')}
-          >
-           Личное
-          </button>
-          <button
-           type="button"
-           aria-pressed={view === 'catalog'}
-           disabled={busy}
-           onClick={() => actions.switchView('catalog')}
-          >
-           Общее
-          </button>
-         </div>
-         <div className={cn('profile-effect-actions', 'flex flex-wrap items-center gap-2')}>
-          {draftsSupported && (
-           <Button
-            type="button"
-            variant="ghost"
-            aria-pressed={view === 'create'}
-            disabled={busy}
-            onClick={() => actions.switchView('create')}
-           >
-            Создать эффект
-           </Button>
-          )}
+          Личное
+         </button>
+         <button
+          type="button"
+          aria-pressed={view === 'catalog'}
+          disabled={busy}
+          onClick={() => actions.switchView('catalog')}
+         >
+          Общее
+         </button>
+        </div>
+        <div className={cn('profile-effect-actions', 'flex flex-wrap items-center gap-2')}>
+         {draftsSupported && (
           <Button
            type="button"
-           variant="outline"
-           aria-pressed={view === 'upload'}
+           variant="ghost"
+           aria-pressed={view === 'create'}
            disabled={busy}
-           onClick={() => actions.switchView('upload')}
+           onClick={() => actions.switchView('create')}
           >
-           <Plus aria-hidden="true" />
-           Добавить свою GIF
+           Создать эффект
           </Button>
-         </div>
+         )}
+         <Button
+          type="button"
+          variant="outline"
+          aria-pressed={view === 'upload'}
+          disabled={busy}
+          onClick={() => actions.switchView('upload')}
+         >
+          <Plus aria-hidden="true" />
+          Добавить свою GIF
+         </Button>
         </div>
-        {view === 'upload' ? (
-         <form
-          className={cn('profile-effect-form', 'grid min-w-0 gap-2')}
-          onSubmit={event => {
-           event.preventDefault();
-           actions.upload();
-          }}
-         >
-          {uploadsSupported ? (
-           <div
-            className={cn(
-             'profile-effect-upload',
-             'border-border bg-card grid justify-items-start gap-2 rounded-[12px] border border-dashed p-4'
-            )}
-           >
-            <Upload size={22} aria-hidden="true" />
-            <label htmlFor="profile-effect-file">Файл анимации</label>
-            <Input
-             id="profile-effect-file"
-             type="file"
-             accept="image/gif,.gif"
-             required
-             disabled={busy}
-             className="max-w-full [font:inherit]"
-             onChange={event => actions.chooseFile(event.currentTarget.files?.[0])}
-            />
-            <p className={note}>GIF · до 2 МиБ. При сохранении эффект останется личным.</p>
-            {fileError && (
-             <p className={note} role="alert">
-              {fileError}
-             </p>
-            )}
-            {file && preview && (
-             <div className="profile-effect-upload-preview bg-popover w-[min(100%,320px)] overflow-hidden rounded-[8px]">
-              <img src={preview} alt="Предпросмотр GIF" className="block h-[140px] w-full object-contain" />
-             </div>
-            )}
-            <label htmlFor="profile-effect-name">Название</label>
-            <Input
-             id="profile-effect-name"
-             type="text"
-             required
-             maxLength={MAX_EFFECT_TITLE}
-             value={title}
-             disabled={busy}
-             className="border-border bg-popover text-card-foreground min-h-11 w-[min(100%,320px)] rounded-[8px] border px-3 py-2"
-             onChange={event => actions.setTitle(event.target.value)}
-             placeholder="Название эффекта"
-            />
-           </div>
-          ) : (
-           <p className={note} role="status">
-            Этот сервер пока не поддерживает загрузку GIF. Готовые эффекты доступны в разделе «Личное».
-           </p>
-          )}
-          <footer className="flex flex-wrap justify-end gap-2">
-           <Button type="button" variant="ghost" disabled={busy} onClick={() => actions.switchView('personal')}>
-            Назад
-           </Button>
-           {uploadsSupported && (
-            <Button type="submit" disabled={busy || !file || !title.trim()}>
-             Добавить в личное
-            </Button>
-           )}
-          </footer>
-         </form>
-        ) : view === 'create' ? (
-         <form
-          className={cn('profile-effect-form', 'grid min-w-0 gap-2')}
-          onSubmit={event => {
-           event.preventDefault();
-           actions.generate();
-          }}
-         >
-          <label htmlFor="profile-effect-prompt">Как должен выглядеть эффект?</label>
-          <Textarea
-           id="profile-effect-prompt"
-           rows={3}
-           required
-           maxLength={400}
-           value={prompt}
-           disabled={busy || pending}
-           onChange={event => actions.setPrompt(event.target.value)}
-           placeholder={
-            target === 'avatar' ? 'Например, тёплые искры по краю аватара' : 'Например, звёзды над ночным городом'
-           }
-           className="min-h-22 resize-y"
-          />
-          <p className={note}>
-           Сначала появится превью. Сохранённый черновик будет личным, пока вы не опубликуете его сами.
-          </p>
-          {pending && (
-           <p className={note} role="status">
-            {draft?.status === 'queued' ? 'Черновик в очереди…' : 'Создаём эффект…'}
-           </p>
-          )}
-          {pollError && (
-           <p className={note} role="alert">
-            {pollError}{' '}
-            <Button type="button" variant="outline" onClick={actions.clearPollError}>
-             Проверить ещё раз
-            </Button>
-           </p>
-          )}
-          {draft?.status === 'failed' && (
-           <p className={note} role="alert">
-            {draft.error || 'Не удалось создать эффект. Попробуйте ещё раз.'}
-           </p>
-          )}
-          {draft?.status === 'ready' && !draftReady && (
-           <p className={note} role="alert">
-            Не удалось показать этот эффект. Попробуйте создать его снова.
-           </p>
-          )}
-          {draftReady && (
-           <div
-            className={cn(
-             'profile-effect-draft',
-             'border-border bg-card grid max-w-60 gap-2 rounded-[12px] border p-2 text-center [overflow-wrap:anywhere]'
-            )}
-           >
-            <EffectSample user={user} target={target} decoration={draftReady.decoration} />
-            <strong>{draftReady.title}</strong>
-           </div>
-          )}
-          <footer className="flex flex-wrap justify-end gap-2">
-           <Button
-            type="submit"
-            variant={draftReady ? 'outline' : 'default'}
-            disabled={busy || pending || !prompt.trim()}
-           >
-            {draft ? 'Создать заново' : 'Создать превью'}
-           </Button>
-           {draftReady && (
-            <Button type="button" disabled={busy} onClick={actions.saveDraft}>
-             Сохранить черновик
-            </Button>
-           )}
-          </footer>
-         </form>
-        ) : (
-         <>
-          <div
-           className={cn('profile-effect-options', 'grid grid-cols-3 gap-3')}
-           role="group"
-           aria-label={target === 'avatar' ? 'Рамки аватара' : 'Эффекты обложки'}
-          >
-           {items.map(({choice: item, kind, record}) => renderCard(item, kind, record))}
-          </div>
-          {!catalogSupported && view === 'catalog' && (
-           <p className={cn('profile-effect-state', note, 'text-muted-foreground')} role="status">
-            Этот сервер пока не поддерживает общий каталог. Готовые эффекты доступны в разделе «Личное».
-           </p>
-          )}
-          {pageLoading && (
-           <p className={cn('profile-effect-state', note, 'text-muted-foreground')} role="status">
-            Загружаем эффекты…
-           </p>
-          )}
-          {pageError && (
-           <div className={cn('profile-effect-state', note, 'text-muted-foreground')} role="alert">
-            {pageError}{' '}
-            <Button type="button" variant="outline" disabled={busy} onClick={actions.retry}>
-             Повторить
-            </Button>
-           </div>
-          )}
-          {catalogSupported && !pageLoading && !pageError && !effectsCount && (
-           <p className={cn('profile-effect-state', note, 'text-muted-foreground')}>
-            {view === 'catalog'
-             ? 'В каталоге пока нет эффектов для этого раздела.'
-             : 'Здесь появятся созданные вами эффекты и эффекты, которые вы примените из каталога.'}
-           </p>
-          )}
-          {page.nextOffset !== null && (
-           <Button type="button" variant="outline" disabled={busy || pageLoading} onClick={actions.loadMore}>
-            Показать ещё
-           </Button>
-          )}
-          <footer className="flex flex-wrap justify-end gap-2">
-           <Dialog.Close asChild>
-            <Button type="button" variant="ghost" disabled={busy}>
-             Отмена
-            </Button>
-           </Dialog.Close>
-           <Button type="button" disabled={busy || !canApply} onClick={actions.apply}>
-            Применить
-           </Button>
-          </footer>
-         </>
-        )}
-        {error && (
-         <p className={cn('profile-effect-error', note)} role="alert">
-          {error}
-         </p>
-        )}
-        {notice && (
-         <p className="profile-effect-state" role="status">
-          {notice}
-         </p>
-        )}
        </div>
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar
-       className={cn('profile-effects-scrollbar', 'flex w-2.5 touch-none p-0.5 select-none')}
-       orientation="vertical"
-      >
-       <ScrollArea.Thumb className={cn('profile-effects-thumb', 'relative flex-1 rounded-full')} />
-      </ScrollArea.Scrollbar>
-     </ScrollArea.Root>
+       {view === 'upload' ? (
+        <form
+         className={cn('profile-effect-form', 'grid min-w-0 gap-2')}
+         onSubmit={event => {
+          event.preventDefault();
+          actions.upload();
+         }}
+        >
+         {uploadsSupported ? (
+          <div
+           className={cn(
+            'profile-effect-upload',
+            'border-border bg-card grid justify-items-start gap-2 rounded-[12px] border border-dashed p-4'
+           )}
+          >
+           <Upload size={22} aria-hidden="true" />
+           <label htmlFor="profile-effect-file">Файл анимации</label>
+           <Input
+            id="profile-effect-file"
+            type="file"
+            accept="image/gif,.gif"
+            required
+            disabled={busy}
+            className="max-w-full [font:inherit]"
+            onChange={event => actions.chooseFile(event.currentTarget.files?.[0])}
+           />
+           <p className={note}>GIF · до 2 МиБ. При сохранении эффект останется личным.</p>
+           {fileError && (
+            <p className={note} role="alert">
+             {fileError}
+            </p>
+           )}
+           {file && preview && (
+            <div className="profile-effect-upload-preview bg-popover w-[min(100%,320px)] overflow-hidden rounded-[8px]">
+             <img src={preview} alt="Предпросмотр GIF" className="block h-[140px] w-full object-contain" />
+            </div>
+           )}
+           <label htmlFor="profile-effect-name">Название</label>
+           <Input
+            id="profile-effect-name"
+            type="text"
+            required
+            maxLength={MAX_EFFECT_TITLE}
+            value={title}
+            disabled={busy}
+            className="border-border bg-popover text-card-foreground min-h-11 w-[min(100%,320px)] rounded-[8px] border px-3 py-2"
+            onChange={event => actions.setTitle(event.target.value)}
+            placeholder="Название эффекта"
+           />
+          </div>
+         ) : (
+          <p className={note} role="status">
+           Этот сервер пока не поддерживает загрузку GIF. Готовые эффекты доступны в разделе «Личное».
+          </p>
+         )}
+         <footer className="flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" disabled={busy} onClick={() => actions.switchView('personal')}>
+           Назад
+          </Button>
+          {uploadsSupported && (
+           <Button type="submit" disabled={busy || !file || !title.trim()}>
+            Добавить в личное
+           </Button>
+          )}
+         </footer>
+        </form>
+       ) : view === 'create' ? (
+        <form
+         className={cn('profile-effect-form', 'grid min-w-0 gap-2')}
+         onSubmit={event => {
+          event.preventDefault();
+          actions.generate();
+         }}
+        >
+         <label htmlFor="profile-effect-prompt">Как должен выглядеть эффект?</label>
+         <Textarea
+          id="profile-effect-prompt"
+          rows={3}
+          required
+          maxLength={400}
+          value={prompt}
+          disabled={busy || pending}
+          onChange={event => actions.setPrompt(event.target.value)}
+          placeholder={
+           target === 'avatar' ? 'Например, тёплые искры по краю аватара' : 'Например, звёзды над ночным городом'
+          }
+          className="min-h-22 resize-y"
+         />
+         <p className={note}>
+          Сначала появится превью. Сохранённый черновик будет личным, пока вы не опубликуете его сами.
+         </p>
+         {pending && (
+          <p className={note} role="status">
+           {draft?.status === 'queued' ? 'Черновик в очереди…' : 'Создаём эффект…'}
+          </p>
+         )}
+         {pollError && (
+          <p className={note} role="alert">
+           {pollError}{' '}
+           <Button type="button" variant="outline" onClick={actions.clearPollError}>
+            Проверить ещё раз
+           </Button>
+          </p>
+         )}
+         {draft?.status === 'failed' && (
+          <p className={note} role="alert">
+           {draft.error || 'Не удалось создать эффект. Попробуйте ещё раз.'}
+          </p>
+         )}
+         {draft?.status === 'ready' && !draftReady && (
+          <p className={note} role="alert">
+           Не удалось показать этот эффект. Попробуйте создать его снова.
+          </p>
+         )}
+         {draftReady && (
+          <div
+           className={cn(
+            'profile-effect-draft',
+            'border-border bg-card grid max-w-60 gap-2 rounded-[12px] border p-2 text-center [overflow-wrap:anywhere]'
+           )}
+          >
+           <EffectSample user={user} target={target} decoration={draftReady.decoration} />
+           <strong>{draftReady.title}</strong>
+          </div>
+         )}
+         <footer className="flex flex-wrap justify-end gap-2">
+          <Button
+           type="submit"
+           variant={draftReady ? 'outline' : 'default'}
+           disabled={busy || pending || !prompt.trim()}
+          >
+           {draft ? 'Создать заново' : 'Создать превью'}
+          </Button>
+          {draftReady && (
+           <Button type="button" disabled={busy} onClick={actions.saveDraft}>
+            Сохранить черновик
+           </Button>
+          )}
+         </footer>
+        </form>
+       ) : (
+        <>
+         <div
+          className={cn('profile-effect-options', 'grid grid-cols-3 gap-3')}
+          role="group"
+          aria-label={target === 'avatar' ? 'Рамки аватара' : 'Эффекты обложки'}
+         >
+          {items.map(({choice: item, kind, record}) => renderCard(item, kind, record))}
+         </div>
+         {!catalogSupported && view === 'catalog' && (
+          <p className={cn('profile-effect-state', note, 'text-muted-foreground')} role="status">
+           Этот сервер пока не поддерживает общий каталог. Готовые эффекты доступны в разделе «Личное».
+          </p>
+         )}
+         {pageLoading && (
+          <p className={cn('profile-effect-state', note, 'text-muted-foreground')} role="status">
+           Загружаем эффекты…
+          </p>
+         )}
+         {pageError && (
+          <div className={cn('profile-effect-state', note, 'text-muted-foreground')} role="alert">
+           {pageError}{' '}
+           <Button type="button" variant="outline" disabled={busy} onClick={actions.retry}>
+            Повторить
+           </Button>
+          </div>
+         )}
+         {catalogSupported && !pageLoading && !pageError && !effectsCount && (
+          <p className={cn('profile-effect-state', note, 'text-muted-foreground')}>
+           {view === 'catalog'
+            ? 'В каталоге пока нет эффектов для этого раздела.'
+            : 'Здесь появятся созданные вами эффекты и эффекты, которые вы примените из каталога.'}
+          </p>
+         )}
+         {page.nextOffset !== null && (
+          <Button type="button" variant="outline" disabled={busy || pageLoading} onClick={actions.loadMore}>
+           Показать ещё
+          </Button>
+         )}
+         <footer className="flex flex-wrap justify-end gap-2">
+          <Dialog.Close asChild>
+           <Button type="button" variant="ghost" disabled={busy}>
+            Отмена
+           </Button>
+          </Dialog.Close>
+          <Button type="button" disabled={busy || !canApply} onClick={actions.apply}>
+           Применить
+          </Button>
+         </footer>
+        </>
+       )}
+       {error && (
+        <p className={cn('profile-effect-error', note)} role="alert">
+         {error}
+        </p>
+       )}
+       {notice && (
+        <p className="profile-effect-state" role="status">
+         {notice}
+        </p>
+       )}
+      </div>
+     </ScrollArea>
     </Dialog.Content>
    </Dialog.Portal>
   </Dialog.Root>

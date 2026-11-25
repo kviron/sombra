@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Input} from '@/shared/ui/input';
 import {useEffect, useRef} from 'react';
 import {Dialog as DialogPrimitive} from 'radix-ui';
@@ -152,17 +153,18 @@ export function ConversationInfoDialog({
     >
      <header className="border-border flex items-center justify-between border-b px-4 py-3 text-sm leading-[1.5] font-semibold">
       <span>Информация о чате</span>
-      <button
-       ref={close}
-       type="button"
-       className="grid size-11 place-items-center rounded-[8px] border-0 bg-transparent"
-       disabled={busy}
-       aria-label="Закрыть информацию о чате"
-       title="Закрыть"
-       onClick={onClose}
-      >
-       <X size={20} />
-      </button>
+      <TooltipLabel content="Закрыть">
+       <button
+        ref={close}
+        type="button"
+        className="grid size-11 place-items-center rounded-[8px] border-0 bg-transparent"
+        disabled={busy}
+        aria-label="Закрыть информацию о чате"
+        onClick={onClose}
+       >
+        <X size={20} />
+       </button>
+      </TooltipLabel>
      </header>
      <div className="conversation-info-scroll overflow-auto px-5 pb-5">
       <div className="conversation-info-identity py-6 text-center">

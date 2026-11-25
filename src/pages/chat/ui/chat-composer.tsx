@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import type {RefObject} from 'react';
 import {ArrowUp} from 'lucide-react';
 import {ComposerSendButton} from '@/shared/ui/elements-composer';
@@ -78,9 +79,11 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
          }
         }}
        />
-       <ComposerSendButton type="submit" disabled={busy} title="Отправить пересылку" aria-label="Отправить пересылку">
-        <MotionIcon icon={ArrowUp} kind="send" size={16} />
-       </ComposerSendButton>
+       <TooltipLabel content="Отправить пересылку">
+        <ComposerSendButton type="submit" disabled={busy} aria-label="Отправить пересылку">
+         <MotionIcon icon={ArrowUp} kind="send" size={16} />
+        </ComposerSendButton>
+       </TooltipLabel>
       </form>
      </>
     ) : (
@@ -126,9 +129,11 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
         if (file) void messages.actions.selectAttachment(file);
        }}
        sendButton={
-        <ComposerSendButton type="submit" title="Отправить сообщение" disabled={messages.sendDisabled}>
-         <MotionIcon icon={ArrowUp} kind="send" size={16} />
-        </ComposerSendButton>
+        <TooltipLabel content="Отправить сообщение">
+         <ComposerSendButton type="submit" aria-label="Отправить сообщение" disabled={messages.sendDisabled}>
+          <MotionIcon icon={ArrowUp} kind="send" size={16} />
+         </ComposerSendButton>
+        </TooltipLabel>
        }
       >
        <AttachmentComposer

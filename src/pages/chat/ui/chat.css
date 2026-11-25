@@ -131,14 +131,14 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
- .voice-stage-region:not(:hover) .voice-controls[data-auto-hide]:not(:focus-within) {
+ .voice-stage-panel:not(:hover) [data-auto-hide]:not(:focus-within, :has([data-music-open])) {
   opacity: 0;
   pointer-events: none;
  }
 }
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
- .voice-stage-region:not(:hover) .voice-controls[data-auto-hide]:not(:focus-within) {
+ .voice-stage-panel:not(:hover) [data-auto-hide]:not(:focus-within, :has([data-music-open])) {
   transform: translateY(100%);
  }
 }
@@ -427,4 +427,10 @@
   padding: 6px 8px;
   gap: 4px;
  }
+}
+.chat-window:has([data-voice-expanded]) > header,
+[data-voice-expanded] [data-voice-left],
+[data-voice-expanded] [data-voice-auxiliary],
+[data-voice-chat-hidden] > [data-voice-chat] {
+ display: none !important;
 }

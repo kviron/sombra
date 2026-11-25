@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Check, CheckCheck, Eye, Forward, Pencil, Copy, RefreshCw, Trash2, Reply} from 'lucide-react';
 import {ContextMenu} from 'radix-ui';
 import type {ChatMessage, ChatState} from '@/shared/types';
@@ -123,21 +124,28 @@ export function MessageItem({
        <>
         {' '}
         {model.canOpenProfile ? (
-         <button type="button" className="avatar-trigger" title={`Профиль ${model.name}`} onClick={model.openProfile}>
-          {model.identity ? (
-           <UserAvatar
-            user={model.identity}
-            size="md"
-            presence={false}
-            decorative
-            decoration={model.identity.decorations?.avatar}
-           />
-          ) : model.avatar ? (
-           <img src={model.avatar} alt="" />
-          ) : (
-           model.name[0]
-          )}
-         </button>
+         <TooltipLabel content={`Профиль ${model.name}`}>
+          <button
+           type="button"
+           className="avatar-trigger"
+           aria-label={`Профиль ${model.name}`}
+           onClick={model.openProfile}
+          >
+           {model.identity ? (
+            <UserAvatar
+             user={model.identity}
+             size="md"
+             presence={false}
+             decorative
+             decoration={model.identity.decorations?.avatar}
+            />
+           ) : model.avatar ? (
+            <img src={model.avatar} alt="" />
+           ) : (
+            model.name[0]
+           )}
+          </button>
+         </TooltipLabel>
         ) : model.avatar ? (
          <img src={model.avatar} alt="" />
         ) : (
@@ -151,9 +159,16 @@ export function MessageItem({
        <MessageHeader className="message-meta">
         <strong>
          {model.canOpenProfile ? (
-          <button type="button" className="message-author" title={`Профиль ${model.name}`} onClick={model.openProfile}>
-           {model.name}
-          </button>
+          <TooltipLabel content={`Профиль ${model.name}`}>
+           <button
+            type="button"
+            className="message-author"
+            aria-label={`Профиль ${model.name}`}
+            onClick={model.openProfile}
+           >
+            {model.name}
+           </button>
+          </TooltipLabel>
          ) : (
           model.name
          )}
@@ -206,15 +221,16 @@ export function MessageItem({
            (pending === 'sending' ? (
             <span className="message-pending" role="status" aria-label="Отправляется" />
            ) : model.read ? (
-            <button
-             type="button"
-             className="message-read-check"
-             aria-label="Просмотрено"
-             title={model.readTitle}
-             onClick={actions.openReaders}
-            >
-             <CheckCheck size={13} />
-            </button>
+            <TooltipLabel content={model.readTitle}>
+             <button
+              type="button"
+              className="message-read-check"
+              aria-label="Просмотрено"
+              onClick={actions.openReaders}
+             >
+              <CheckCheck size={13} />
+             </button>
+            </TooltipLabel>
            ) : (
             <Check size={13} aria-label="Отправлено" />
            ))}
@@ -247,16 +263,11 @@ export function MessageItem({
         <span className="text-destructive" role="status">
          Ошибка отправки
         </span>
-        <Button
-         type="button"
-         variant="ghost"
-         size="icon-xs"
-         aria-label="Повторить отправку"
-         title={model.pendingHint}
-         onClick={actions.retry}
-        >
-         <RefreshCw aria-hidden="true" />
-        </Button>
+        <TooltipLabel content={model.pendingHint}>
+         <Button type="button" variant="ghost" size="icon-xs" aria-label="Повторить отправку" onClick={actions.retry}>
+          <RefreshCw aria-hidden="true" />
+         </Button>
+        </TooltipLabel>
        </MessageFooter>
       )}
      </MessageContent>

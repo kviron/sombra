@@ -1,3 +1,4 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import type {User, Group} from '@/shared/types';
 import {UserRow} from '@/entities/user';
 import {useUserActions} from '@/shared/lib/user-actions';
@@ -27,10 +28,12 @@ export function MemberList({
      ? 'Владелец'
      : roles.find(role => role.id === (group?.memberRoles?.[user.id] || 'member'))?.name || 'Участник';
  const roleBadge = (user: User) => (
-  <small className="group-member-role" title={roleName(user)}>
-   {user.id === meId ? 'Вы · ' : ''}
-   {roleName(user)}
-  </small>
+  <TooltipLabel content={roleName(user)}>
+   <small className="group-member-role">
+    {user.id === meId ? 'Вы · ' : ''}
+    {roleName(user)}
+   </small>
+  </TooltipLabel>
  );
  const actions = useUserActions();
  const people = members.map(id => users.find(user => user.id === id)).filter((user): user is User => !!user);

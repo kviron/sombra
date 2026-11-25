@@ -15,12 +15,17 @@ export function mediaError(e: unknown) {
 function videoConstraints(p: MediaPreferences) {
  return {deviceId: p.camera ? {exact: p.camera} : undefined, width: {ideal: 1280}, height: {ideal: 720}};
 }
-export async function captureTrack(kind: TrackKind, preferences: MediaPreferences, shouldReport = () => true) {
+export async function captureTrack(
+ kind: TrackKind,
+ preferences: MediaPreferences,
+ shouldReport = () => true,
+ videoQuality?: MediaTrackConstraints
+) {
  try {
   const stream =
    kind === 'audio'
     ? await captureVoiceStream(preferences)
-    : await navigator.mediaDevices.getUserMedia({video: videoConstraints(preferences)});
+    : await navigator.mediaDevices.getUserMedia({video: {...videoConstraints(preferences), ...videoQuality}});
   const track = stream.getTracks().find(t => t.kind === kind);
   if (track) {
    refreshCapturedDevice(track);

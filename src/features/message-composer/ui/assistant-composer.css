@@ -7,13 +7,9 @@
    - плотность поверхности композера на токенах --surface-* и режим
      «уменьшить прозрачность». */
 
-/* Материал и текст меню держим локально: попап читается и без размытия Windows. */
-.sombra-composer-menu[data-slot] {
- --sombra-menu-blur: none;
-}
-
 /* Пункт подсказки — слот assistant-ui: подсветку присылают data-highlighted и :hover. */
 .sombra-composer-menu[data-slot] button[role='option']:is([data-highlighted], :hover, :focus-visible) {
+ background-color: var(--accent);
  color: var(--accent-foreground);
 }
 

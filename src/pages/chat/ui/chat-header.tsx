@@ -1,5 +1,19 @@
+import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Input} from '@/shared/ui/input';
-import {Bot, MessageCircle, PanelRight, Phone, Search, Settings, Users, Video, Volume2, X} from 'lucide-react';
+import {
+ Bot,
+ MessageCircle,
+ PanelRight,
+ PanelRightClose,
+ PanelRightOpen,
+ Phone,
+ Search,
+ Settings,
+ Users,
+ Video,
+ Volume2,
+ X
+} from 'lucide-react';
 import type {RefObject} from 'react';
 import {DmHeaderIdentity} from '@/entities/conversation';
 import {participantCount} from '@/features/conversation-details';
@@ -21,11 +35,23 @@ type Props = {
  call: Voice;
  infoTrigger: RefObject<HTMLButtonElement | null>;
  materialsTrigger: RefObject<HTMLButtonElement | null>;
+ voiceChat?: {open: boolean; toggle: () => void};
 };
 
 /** Шапка чата, уведомление об ошибке и баннер звонка в переписке. */
-export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigger, materialsTrigger}: Props) {
+export function ChatHeader({
+ chat,
+ nav,
+ panels,
+ messages,
+ calls,
+ call,
+ infoTrigger,
+ materialsTrigger,
+ voiceChat
+}: Props) {
  const {home, channel, title, friends, peer, dmBot, typingUntil} = nav;
+ const chatToggleLabel = voiceChat?.open ? 'Свернуть чат комнаты' : 'Открыть чат комнаты';
  return (
   <>
    <header className="chat-header flex shrink-0 items-center gap-2.5 border-b px-4">
@@ -40,74 +66,82 @@ export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigge
       <MessageCircle className="text-muted-foreground" />
      ))}
     {channel && !friends ? (
-     <button
-      ref={infoTrigger}
-      type="button"
-      className={`chat-conversation-info${peer ? 'dm-header-info' : ''}`}
-      aria-label="Информация о чате"
-      title="Информация о чате"
-      onClick={panels.actions.openChatInfo}
-     >
-      {peer ? <DmHeaderIdentity user={peer} typingUntil={typingUntil} /> : <strong>{title}</strong>}
-      {home && 'members' in channel && channel.members.length > 2 && (
-       <small>{participantCount(channel.members.length)}</small>
-      )}
-     </button>
+     <TooltipLabel content="Информация о чате">
+      <button
+       ref={infoTrigger}
+       type="button"
+       className={`chat-conversation-info${peer ? 'dm-header-info' : ''}`}
+       aria-label="Информация о чате"
+       onClick={panels.actions.openChatInfo}
+      >
+       {peer ? <DmHeaderIdentity user={peer} typingUntil={typingUntil} /> : <strong>{title}</strong>}
+       {home && 'members' in channel && channel.members.length > 2 && (
+        <small>{participantCount(channel.members.length)}</small>
+       )}
+      </button>
+     </TooltipLabel>
     ) : (
      <strong>{title}</strong>
     )}
     <div className="header-actions ml-auto flex items-center gap-5 [&_svg]:w-5">
      {dmBot && (
-      <Button
-       type="button"
-       variant="ghost"
-       size="icon-sm"
-       title="Управление ботом"
-       aria-label="Управление ботом"
-       onClick={() => panels.actions.openBotSettings(dmBot.id)}
-      >
-       <Settings />
-      </Button>
+      <TooltipLabel content="Управление ботом">
+       <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Управление ботом"
+        onClick={() => panels.actions.openBotSettings(dmBot.id)}
+       >
+        <Settings />
+       </Button>
+      </TooltipLabel>
      )}
      {home && channel && !friends && !peer?.bot && (
       <div className="dialog-call-header-actions">
-       <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        title="Начать аудиозвонок"
-        aria-label="Начать аудиозвонок"
-        disabled={calls.busy || call.busy}
-        onClick={() => void calls.start(channel.id, false)}
-       >
-        <Phone />
-       </Button>
-       <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        title="Начать видеозвонок"
-        aria-label="Начать видеозвонок"
-        disabled={calls.busy || call.busy}
-        onClick={() => void calls.start(channel.id, true)}
-       >
-        <Video />
-       </Button>
+       <TooltipLabel content="Начать аудиозвонок">
+        <Button
+         type="button"
+         variant="ghost"
+         size="icon-sm"
+         aria-label="Начать аудиозвонок"
+         disabled={calls.busy || call.busy}
+         onClick={() => void calls.start(channel.id, false)}
+        >
+         <Phone />
+        </Button>
+       </TooltipLabel>
+       <TooltipLabel content="Начать видеозвонок">
+        <Button
+         type="button"
+         variant="ghost"
+         size="icon-sm"
+         aria-label="Начать видеозвонок"
+         disabled={calls.busy || call.busy}
+         onClick={() => void calls.start(channel.id, true)}
+        >
+         <Video />
+        </Button>
+       </TooltipLabel>
       </div>
      )}
      {!home && channel && (
-      <button title="Боты комнаты" onClick={() => panels.actions.openModal('bots')}>
-       <Bot />
-      </button>
+      <TooltipLabel content="Боты комнаты">
+       <button aria-label="Боты комнаты" onClick={() => panels.actions.openModal('bots')}>
+        <Bot />
+       </button>
+      </TooltipLabel>
      )}
      {nav.canShowMembers && (
-      <button
-       title="Участники"
-       aria-pressed={panels.members && !panels.materialsOpen}
-       onClick={panels.actions.toggleMembers}
-      >
-       <Users />
-      </button>
+      <TooltipLabel content="Участники">
+       <button
+        aria-label="Участники"
+        aria-pressed={panels.members && !panels.materialsOpen}
+        onClick={panels.actions.toggleMembers}
+       >
+        <Users />
+       </button>
+      </TooltipLabel>
      )}
      <div className="chat-search relative">
       <Input
@@ -115,26 +149,46 @@ export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigge
        aria-label="Поиск сообщений"
        placeholder="Поиск сообщений"
        value={messages.search}
-       onChange={event => messages.actions.setSearch(event.target.value)}
+       onChange={event => {
+        const query = event.target.value;
+        if (query && voiceChat && !voiceChat.open) voiceChat.toggle();
+        messages.actions.setSearch(query);
+       }}
       />
       <Search
        aria-hidden="true"
        className="text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2"
       />
      </div>
+     {voiceChat && (
+      <TooltipLabel content={chatToggleLabel}>
+       <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={chatToggleLabel}
+        aria-controls="voice-chat"
+        aria-expanded={voiceChat.open}
+        onClick={voiceChat.toggle}
+       >
+        {voiceChat.open ? <PanelRightClose /> : <PanelRightOpen />}
+       </Button>
+      </TooltipLabel>
+     )}
      {channel && !friends && (
-      <button
-       ref={materialsTrigger}
-       type="button"
-       className="materials-toggle"
-       aria-label="Открыть материалы переписки"
-       title="Фото, файлы и ссылки"
-       aria-controls="conversation-materials"
-       aria-expanded={panels.materialsOpen}
-       onClick={panels.actions.toggleMaterials}
-      >
-       <PanelRight size={19} />
-      </button>
+      <TooltipLabel content="Фото, файлы и ссылки">
+       <button
+        ref={materialsTrigger}
+        type="button"
+        className="materials-toggle"
+        aria-label="Открыть материалы переписки"
+        aria-controls="conversation-materials"
+        aria-expanded={panels.materialsOpen}
+        onClick={panels.actions.toggleMaterials}
+       >
+        <PanelRight size={19} />
+       </button>
+      </TooltipLabel>
      )}
     </div>
    </header>
@@ -142,9 +196,11 @@ export function ChatHeader({chat, nav, panels, messages, calls, call, infoTrigge
     <div className="chat-notice flex items-center gap-3 border-b px-4 py-3 text-[13px]" role="alert">
      {chat.error}
      <a href="#login">Войти</a>
-     <button className="ml-auto" onClick={chat.actions.clearError} title="Закрыть">
-      <X size={16} />
-     </button>
+     <TooltipLabel content="Закрыть">
+      <button className="ml-auto" onClick={chat.actions.clearError} aria-label="Закрыть">
+       <X size={16} />
+      </button>
+     </TooltipLabel>
     </div>
    )}
    {calls.error && !calls.incoming && (
