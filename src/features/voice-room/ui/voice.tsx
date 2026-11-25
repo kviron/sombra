@@ -69,7 +69,7 @@ export function VoicePlayback({voice, volumeForUser}: {voice: Voice; volumeForUs
       stream={stream}
       muted={voice.deaf}
       volume={volume}
-      speaker={voice.preferences.speaker}
+      speaker={voice.speakerOutput}
       audioOnly
      />
     );
@@ -257,7 +257,7 @@ export function VoiceStage({
       <Button
        variant="secondary"
        className="min-h-10"
-       disabled={v.busy}
+       disabled={v.busy || v.audioOnly}
        title={v.camera ? 'Выключить камеру' : 'Включить камеру'}
        onClick={() => void v.toggleCamera()}
       >
@@ -378,9 +378,8 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
       />
      </div>
      <p className="settings-hint">
-      Звук идёт через сервер Sombra, как в Discord. Включайте, если прямое соединение с собеседником блокируется: «слышу
-      его, а он меня нет». По умолчанию выключено — прямой путь быстрее и не нагружает сервер, а TURN остаётся запасным
-      маршрутом автоматически. Новые участники подключаются с этой настройкой сразу.
+      Включите, если звук между участниками пропадает при прямом соединении. При наличии TURN новые соединения пойдут
+      через него. По умолчанию маршрут выбирается автоматически. В комнате LiveKit звук всегда идёт через сервер.
      </p>
     </div>
    </section>

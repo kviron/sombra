@@ -133,6 +133,8 @@ pub fn desktop_runtime_category(operation: &str, category: &str) -> Option<&'sta
         ("webview", "js_error") => Some("js_error"),
         ("webview", "unhandled_rejection") => Some("unhandled_rejection"),
         ("webview", "render_error") => Some("render_error"),
+        // Главный поток стоял дольше порога: окно не перерисовывалось.
+        ("webview", "ui_freeze") => Some("ui_freeze"),
         ("voice_microphone" | "voice_camera" | "voice_speaker", "device_error") => {
             Some("device_error")
         }
@@ -455,6 +457,7 @@ mod client_contract {
         ("webview", "js_error"),
         ("webview", "unhandled_rejection"),
         ("webview", "render_error"),
+        ("webview", "ui_freeze"),
         ("voice_microphone", "device_error"),
         ("voice_microphone", "device_permission"),
         ("voice_camera", "device_error"),

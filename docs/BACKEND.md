@@ -83,6 +83,10 @@ Open a voice channel and choose Join. Camera starts with its button. Settings â†
 
 `voice_join` and `voice_poll` accept optional `muted` and `deaf` booleans for the caller's connection and return these flags with each peer. Deafen suppresses both incoming audio and the local microphone. The `muted` flag records the separate microphone toggle.
 
+For P2P rooms the server returns `iceTtlSeconds` whenever it issues temporary TURN credentials. The client requests fresh credentials at 80% of that lifetime by adding `refreshIce: true` to its next authenticated `voice_poll`. Ordinary presence polls retain the static ICE list. New connections and ICE restarts use the most recent credentials. A server that omits the TTL keeps the original join-only behavior.
+
+P2P clients advertise `iceVersion: 2` on SDP offers and answers. Each offer carries a fresh `connectionId`; its answer and candidates echo it. After a peer advertises v2, candidates may arrive as an ordered `candidates` array of up to 16 items. Older peers receive individual `candidate` messages. An in-place restart offer includes `restartOf`, the preceding exchange ID. Only the original offerer initiates it. The answering peer can request recovery with `restart` and request a replacement connection with `replace: true` if the restart fails. The API forwards these payloads through the existing signaling mailbox.
+
 `state` includes `voicePresence`, a map from voice channel IDs to live members of each room. Each entry exposes a user ID and mute/deafen flags. Only rooms in groups the requester belongs to are included. Presence expires after 20 seconds without polling.
 
 For multiple computers all clients must use the SAME backend/database. Deploy only `mines-server` and the HTTPS API gateway as described in DEPLOY.md; installed clients use a native HTTP cookie jar against that shared `/api`. The deployment does not serve a browser build. Separate desktop instances currently keep independent embedded databases; they do not discover each other. Do not run two writers against the same database.

@@ -10,7 +10,13 @@ export type DiagnosticEntryRecord = {
  category: string;
  status: number | null;
 };
-export type AudioDeviceContext = {input: string | null; output: string | null; sampleRate: number | null};
+export type AudioDeviceContext = {
+ remoteSession: boolean;
+ inputs: number;
+ outputs: number;
+ defaultInput: boolean;
+ defaultOutput: boolean;
+};
 export type DownloadProgress = {received: number; total?: number};
 
 /**
@@ -54,6 +60,6 @@ export const commands = {
  },
 
  audio: {
-  deviceContext: <T>() => invoke<T>('audio_device_context')
+  deviceContext: () => invoke<AudioDeviceContext>('audio_device_context')
  }
 };
