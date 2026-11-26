@@ -1,7 +1,11 @@
 import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Input} from '@/shared/ui/input';
+import {Button} from '@/shared/ui/button';
+import {paper} from '@/shared/ui/elements-composer';
+import {UserRow} from '@/entities/user';
+import '@/shared/ui/menu-material.css';
 import {Dialog} from 'radix-ui';
-import {Forward, Hash, MessageCircle, Reply, Search, Volume2, X} from 'lucide-react';
+import {Forward, Hash, Reply, Search, Volume2, X} from 'lucide-react';
 import type {ChatMessage, MessageReply} from '@/shared/types';
 import {messagePreview, type ForwardDestination} from '../model/message-references-rules';
 import {useForwardPicker} from '../model/use-forward-picker';
@@ -26,13 +30,10 @@ export function MessageQuote({
    </div>
   );
  const content = (
-  <>
-   <Reply size={15} aria-hidden="true" />
-   <span>
-    <strong>{userName(reply.author)}</strong>
-    <small>{reply.text || 'Сообщение без текста'}</small>
-   </span>
-  </>
+  <span>
+   <strong>{userName(reply.author)}</strong>
+   <small>{reply.text || 'Сообщение без текста'}</small>
+  </span>
  );
  return onJump ? (
   <TooltipLabel content="Перейти к исходному сообщению">
@@ -59,7 +60,7 @@ export function ReferenceDraft({
 }) {
  const Icon = kind === 'reply' ? Reply : Forward;
  return (
-  <div className="reference-draft">
+  <div className={`reference-draft ${paper}`}>
    <Icon size={17} aria-hidden="true" />
    <span>
     <strong>
@@ -103,13 +104,13 @@ export function ForwardPicker({
   >
    <Dialog.Portal>
     <Dialog.Overlay className="modal-backdrop" />
-    <Dialog.Content className="group-modal forward-picker bg-background border">
-     <header className="text-foreground flex items-center gap-2">
-      <Dialog.Title>Переслать сообщение</Dialog.Title>
+    <Dialog.Content className="sombra-picker-material border-border fixed top-1/2 left-1/2 z-[101] flex max-h-[85dvh] w-[min(430px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 overflow-y-auto rounded-xl border p-4 shadow-xl">
+     <header className="flex shrink-0 items-center justify-between gap-2">
+      <Dialog.Title className="text-lg font-semibold">Переслать сообщение</Dialog.Title>
       <Dialog.Close asChild>
-       <button type="button" aria-label="Закрыть">
-        <X size={19} />
-       </button>
+       <Button type="button" variant="ghost" size="icon-sm" aria-label="Закрыть">
+        <X />
+       </Button>
       </Dialog.Close>
      </header>
      <Dialog.Description asChild>
@@ -121,37 +122,55 @@ export function ForwardPicker({
        </span>
       </div>
      </Dialog.Description>
-     <label className="dialog-search w-full">
-      <Search size={17} aria-hidden="true" />
+     <div className="relative shrink-0">
+      <Search
+       className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+       aria-hidden="true"
+      />
       <Input
        autoFocus
+       type="search"
+       className="pl-9"
        placeholder="Поиск чата или канала"
        aria-label="Поиск чата или канала"
        value={model.query}
        onChange={event => model.actions.setQuery(event.target.value)}
       />
-     </label>
-     <ul className="m-0 grid max-h-[min(45vh,340px)] list-none gap-0.5 overflow-auto p-0" aria-label="Куда переслать">
+     </div>
+     <ul
+      className="m-0 grid max-h-[min(45dvh,340px)] min-h-0 list-none gap-0.5 overflow-y-auto p-0"
+      aria-label="Куда переслать"
+     >
       {model.matches.map(item => {
-       const Icon = item.voice ? Volume2 : item.group ? Hash : MessageCircle;
+       const Icon = item.voice ? Volume2 : Hash;
        return (
         <li key={item.id}>
-         <button
-          type="button"
-          className="text-muted-foreground flex min-h-12 w-full items-center gap-3 rounded-[6px] px-2.5 py-1.5 text-left"
+         <UserRow
+          as="button"
+          variant="dialog"
+          menu={false}
+          presence={!item.group && !!item.peer}
+          className="hover:bg-accent focus-visible:bg-accent"
+          identity={item.peer ?? {id: item.id, name: item.name, avatar: item.avatar}}
+          subtitle={item.group?.name || 'Личные сообщения'}
+          avatar={
+           item.group && (
+            <span className="bg-muted text-muted-foreground grid size-10 shrink-0 place-items-center rounded-full">
+             <Icon className="size-5" aria-hidden="true" />
+            </span>
+           )
+          }
           onClick={() => onChoose(item)}
-         >
-          <Icon size={18} aria-hidden="true" />
-          <span>
-           <strong>{item.name}</strong>
-           <small>{item.group?.name || 'Личные сообщения'}</small>
-          </span>
-         </button>
+         />
         </li>
        );
       })}
      </ul>
-     {!model.matches.length && <p role="status">{model.emptyText}</p>}
+     {!model.matches.length && (
+      <p className="text-muted-foreground px-2 py-1 text-sm" role="status">
+       {model.emptyText}
+      </p>
+     )}
     </Dialog.Content>
    </Dialog.Portal>
   </Dialog.Root>

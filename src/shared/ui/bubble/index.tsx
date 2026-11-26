@@ -102,14 +102,17 @@ function BubbleReactions({
  ...props
 }: React.ComponentProps<'div'> & {
  align?: 'start' | 'end';
- side?: 'top' | 'bottom';
+ side?: 'top' | 'bottom' | 'inline';
 }) {
  return (
   <div
    data-slot="bubble-reactions"
    data-align={align}
    data-side={side}
-   className={cn(bubbleReactionsVariants({side, align}), className)}
+   className={cn(
+    side === 'inline' ? 'flex min-w-0 flex-wrap items-center gap-1' : bubbleReactionsVariants({side, align}),
+    className
+   )}
    {...props}
   />
  );

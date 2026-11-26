@@ -2,6 +2,12 @@ import type {ComponentProps} from 'react';
 import {Slot} from 'radix-ui';
 import {cn} from '@/shared/lib/utils';
 
+const sidebarMenuButtonSizes = {
+ sm: 'min-h-7 text-xs',
+ default: 'min-h-8 text-sm',
+ lg: 'min-h-12 text-sm'
+} as const;
+
 // Adapted from shadcn/ui's non-collapsible Sidebar and menu primitives.
 // Settings keeps navigation visible at every size, so no viewport drawer is needed.
 export function Sidebar({className, ...props}: ComponentProps<'aside'>) {
@@ -38,15 +44,19 @@ export function SidebarMenuButton({
  className,
  asChild = false,
  isActive = false,
+ size = 'default',
  ...props
-}: ComponentProps<'button'> & {asChild?: boolean; isActive?: boolean}) {
+}: ComponentProps<'button'> & {asChild?: boolean; isActive?: boolean; size?: keyof typeof sidebarMenuButtonSizes}) {
  const Comp = asChild ? Slot.Root : 'button';
  return (
   <Comp
    data-sidebar="menu-button"
+   data-slot="sidebar-menu-button"
+   data-size={size}
    data-active={isActive}
    className={cn(
-    'ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground flex min-h-8 w-full items-center gap-2 rounded-md p-2 text-left text-sm outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 data-[active=true]:font-medium [&>svg]:size-4 [&>svg]:shrink-0',
+    'ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground flex w-full items-center gap-2 rounded-md p-2 text-left outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 data-[active=true]:font-medium [&>svg]:size-4 [&>svg]:shrink-0',
+    sidebarMenuButtonSizes[size],
     className
    )}
    {...props}

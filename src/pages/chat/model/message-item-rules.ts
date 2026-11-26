@@ -11,7 +11,7 @@ export const imageMimes = ['image/gif', 'image/png', 'image/jpeg', 'image/webp']
 export type MessageActionId = 'reply' | 'forward' | 'readers' | 'edit' | 'copy' | 'delete';
 export type MessageAction = {id: MessageActionId; label: string; disabled?: boolean};
 
-export type ReactionView = {emoji: string; count: number; pressed: boolean};
+export type ReactionView = {emoji: string; count: number; pressed: boolean; reactors: string[]};
 
 /** Соседние сообщения одного автора склеиваются, в пределах одного дня. */
 export function isGrouped(previous: ChatMessage | undefined, message: ChatMessage) {
@@ -59,7 +59,16 @@ export const showsRead = (readReceiptsSupported: boolean | undefined, author: bo
 export function reactionViews(reactions: ChatMessage['reactions'], me: string): ReactionView[] {
  return reactionEmojis.flatMap(emoji => {
   const rows = reactions?.filter(reaction => reaction.emoji === emoji) ?? [];
-  return rows.length ? [{emoji, count: rows.length, pressed: rows.some(reaction => reaction.user === me)}] : [];
+  return rows.length
+   ? [
+      {
+       emoji,
+       count: rows.length,
+       pressed: rows.some(reaction => reaction.user === me),
+       reactors: rows.length <= 3 ? rows.map(row => row.user) : []
+      }
+     ]
+   : [];
  });
 }
 

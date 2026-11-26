@@ -95,6 +95,7 @@ export function AccountSidebar<T extends string>({
       {filtered.map(({id, label, icon: Icon}) => (
        <SidebarMenuItem key={id}>
         <SidebarMenuButton
+         size="lg"
          isActive={section === id}
          aria-current={section === id ? 'page' : undefined}
          aria-controls="account-panel"
@@ -112,7 +113,7 @@ export function AccountSidebar<T extends string>({
     <Separator />
     <SidebarMenu>
      <SidebarMenuItem>
-      <SidebarMenuButton onClick={onLogout}>
+      <SidebarMenuButton size="lg" onClick={onLogout}>
        <LogOut />
        <span>Выйти из аккаунта</span>
       </SidebarMenuButton>

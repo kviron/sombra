@@ -321,12 +321,15 @@ test('выбранные участники нового диалога огра
 });
 
 test('назначения пересылки: переписки и каналы групп', () => {
- const destinations = forwardDestinations(state);
+ const destinations = forwardDestinations({...state, dialogs: [dialog, {...groupDialog, avatar: 'group-avatar'}]});
  assert.deepEqual(
   destinations.map(item => item.id),
   ['d1', 'd2', 'c1', 'c2', 'v1']
  );
  assert.equal(destinations[0].name, 'Друг');
+ assert.equal(destinations[0].peer, friendUser);
+ assert.equal(destinations[1].peer, undefined);
+ assert.equal(destinations[1].avatar, 'group-avatar');
  assert.equal(destinations[0].keywords, ' friend', 'псевдонимы участников через пробел');
  assert.deepEqual(destinations[3].group, {id: 'g1', name: 'Группа'});
  assert.equal(destinations[4].voice, true);

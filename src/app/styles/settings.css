@@ -73,25 +73,6 @@
  font-size: 13px;
 }
 
-.account-modal [data-sidebar='content'] [data-sidebar='menu'] {
- gap: 2px;
-}
-
-.chat-shell .account-modal aside [data-sidebar='menu-button'] {
- justify-content: flex-start;
- min-height: 32px;
- padding: 6px 8px;
- border-radius: var(--radius-md);
- font-size: 13px;
- line-height: 18px;
- color: var(--muted-foreground);
-}
-
-.chat-shell .account-modal aside [data-sidebar='menu-button'][data-active='true'],
-.chat-shell .account-modal aside [data-sidebar='menu-button']:hover {
- color: var(--sidebar-accent-foreground);
-}
-
 .account-modal [data-sidebar='footer'] {
  gap: 8px;
  padding: 8px 0 0;

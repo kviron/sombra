@@ -28,13 +28,6 @@ const cardAttachmentShell = cn(attachmentShell, 'w-80 overflow-visible border-0 
 /** Действие над картинкой: цель 44×44, тёмная плашка, светлая иконка. */
 const imageActionButton =
  'flex size-11 min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border-0 bg-primary p-1 text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-[3px]';
-const imageDownloadButton = cn(
- 'attachment-image-download',
- imageActionButton,
- 'absolute top-2 right-2 pointer-events-none opacity-0 transition-opacity duration-150 ease-[ease]',
- 'group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
- 'disabled:cursor-wait motion-reduce:transition-none'
-);
 const imageRetryButton = cn('attachment-image-retry', imageActionButton, 'absolute right-2 bottom-2');
 const viewerCloseButton = cn(
  'attachment-viewer-close',
@@ -101,22 +94,6 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
     )}
    </span>
   );
-  const downloadButton = (
-   <TooltipLabel content="Скачать изображение">
-    <button
-     type="button"
-     className={imageDownloadButton}
-     disabled={busy}
-     aria-label={`Скачать ${attachment.name}`}
-     onClick={event => {
-      event.stopPropagation();
-      actions.download();
-     }}
-    >
-     <Download size={18} />
-    </button>
-   </TooltipLabel>
-  );
   return (
    <div
     ref={root}
@@ -124,7 +101,7 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
     aria-label="Изображение"
    >
     <div
-     className={cn('attachment-image-surface', 'group relative max-w-full')}
+     className="attachment-image-surface relative max-w-full"
      onContextMenu={event => {
       // Меню картинки не должно открывать меню сообщения и нативное меню WebView.
       event.preventDefault();
@@ -164,7 +141,6 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
        )}
       </button>
      </TooltipLabel>
-     {available && downloadButton}
      {available && error && (
       <button
        type="button"
@@ -176,7 +152,7 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
       </button>
      )}
     </div>
-    {attachment.cached && <p className="attachment-cache-status">{cacheNote(attachment)}</p>}
+    {attachment.cached && attachment.expired && <p className="attachment-cache-status">{cacheNote(attachment)}</p>}
     {copyError && (
      <p className="attachment-copy-status" role="status">
       {copyError}
@@ -233,7 +209,6 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
         ) : (
          placeholder
         )}
-        {downloadButton}
         {error && (
          <button
           type="button"

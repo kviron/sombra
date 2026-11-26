@@ -24,6 +24,7 @@ export function UserRow({
  as = 'div',
  variant = 'member',
  identity,
+ avatar,
  subtitle,
  meta,
  trailing,
@@ -41,6 +42,7 @@ export function UserRow({
  as?: 'li' | 'button' | 'div';
  variant?: UserRowVariant;
  identity: UserIdentity;
+ avatar?: ReactNode;
  subtitle?: ReactNode;
  meta?: ReactNode;
  trailing?: ReactNode;
@@ -59,7 +61,9 @@ export function UserRow({
  const content = (
   <>
    {before}
-   <UserAvatar user={identity} size={avatarSize} presence={presence} decoration={identity.decorations?.avatar} />
+   {avatar ?? (
+    <UserAvatar user={identity} size={avatarSize} presence={presence} decoration={identity.decorations?.avatar} />
+   )}
    {adornment}
    <span className="user-row-main flex min-w-0 flex-1 flex-col gap-0.5 group-data-[variant=voice]:gap-0">
     <span className="user-row-title flex min-w-0 items-center gap-2">

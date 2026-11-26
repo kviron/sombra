@@ -30,31 +30,57 @@
  margin-bottom: 2px;
 }
 
-.chat-message .message-bubble[data-sticker-only='true'],
-.chat-message .message-bubble[data-image-message='true'] {
- background: transparent;
- border-color: transparent;
+.chat-message [data-slot='bubble']:not([data-variant='ghost']) > [data-slot='bubble-content'] {
+ border-radius: var(--radius-xl);
+ padding: 6px 10px;
+}
+
+.chat-message[data-group-end='true'] [data-slot='bubble']:is([data-variant='default'], [data-variant='muted'])::before {
+ position: absolute;
+ inset-inline-start: -5px;
+ bottom: 0;
+ width: calc(var(--radius-xl) + 5px);
+ height: 9px;
+ background-color: var(--muted);
+ clip-path: polygon(26% 0, 100% 100%, 0 100%, 15% 78%, 23% 45%);
+ pointer-events: none;
+ content: '';
+}
+
+.chat-message[data-group-end='true'] [data-slot='bubble'][data-variant='default']::before {
+ background-color: var(--primary);
 }
 
 .chat-message .message-meta {
- gap: 8px;
- min-height: 18px;
- margin-bottom: 1px;
- padding-right: 8px;
+ gap: 6px;
+ min-height: 17px;
+ margin-bottom: 2px;
+ color: var(--primary);
  font-size: 12px;
+ line-height: 17px;
 }
 
-.chat-message .message-meta button {
- opacity: 1;
- display: flex;
- align-items: center;
- justify-content: center;
- min-width: 24px;
- min-height: 24px;
+.chat-message [data-variant='default'] .message-meta {
+ color: inherit;
 }
 
 .chat-message .message-meta .message-author {
- min-height: 18px;
+ display: block;
+ max-width: 100%;
+ min-height: 17px;
+ overflow: hidden;
+ padding: 0;
+ color: inherit;
+ text-overflow: ellipsis;
+ white-space: nowrap;
+}
+
+.chat-message .message-meta > strong {
+ min-width: 0;
+}
+
+.chat-message .bot-badge {
+ background-color: color-mix(in oklab, currentColor 12%, transparent);
 }
 
 .chat-message .message-content .message-text {
@@ -62,28 +88,40 @@
  line-height: 1.4;
 }
 
-.chat-message [data-slot='bubble']:has(> [data-slot='bubble-reactions']) {
- margin-bottom: 20px;
+.chat-message .message-content .message-text p {
+ line-height: inherit;
 }
 
-.chat-message
- [data-slot='bubble'][data-variant='default']
- > [data-slot='bubble-reactions']
- > button:hover:not(:disabled) {
- background-color: color-mix(in oklab, currentColor 10%, transparent);
+.message-bubble-footer {
+ display: flex;
+ flex-wrap: wrap;
+ align-items: flex-end;
+ justify-content: space-between;
+ gap: 4px 8px;
+ margin-top: 4px;
+}
+
+.message-bubble-footer .message-delivery-meta {
+ margin-inline-start: auto;
+}
+
+.chat-message .message-reaction {
+ min-width: 28px;
+ border-radius: 999px;
+ padding-inline: 5px;
+ background-color: color-mix(in oklab, currentColor 9%, transparent);
  color: inherit;
 }
 
-.chat-message
- [data-slot='bubble'][data-variant='default']
- > [data-slot='bubble-reactions']
- > button[aria-pressed='true'] {
- border-color: color-mix(in oklab, currentColor 35%, transparent);
+.chat-message .message-reaction:is(:hover:not(:disabled), [aria-pressed='true']) {
+ background-color: color-mix(in oklab, currentColor 16%, transparent);
+}
+
+.chat-message .message-reaction[aria-pressed='true'] {
+ border-color: color-mix(in oklab, currentColor 28%, transparent);
 }
 
 .message-delivery-meta {
- position: relative;
- inset-block-start: 4px;
  display: flex;
  align-items: center;
  justify-content: flex-end;
@@ -131,13 +169,6 @@
  height: 0;
  margin-bottom: 0;
  visibility: hidden;
-}
-
-/* Media starts on the same outer grid as a text bubble, not inside a second padded bubble. */
-.chat-message .message-bubble[data-image-message='true'] {
- padding: 0;
- border: 0;
- border-radius: 0;
 }
 
 .chat-message .sent-sticker {

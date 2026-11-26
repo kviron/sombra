@@ -38,7 +38,9 @@ export type AssistantComposerProps = {
  placeholder: string;
  textareaRef: RefObject<HTMLTextAreaElement | null>;
  onPaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
- children: ReactNode;
+ leadingActions?: ReactNode;
+ trailingActions?: ReactNode;
+ suggestions?: ReactNode;
  attachments?: ReactNode;
  sendButton: ReactNode;
 };

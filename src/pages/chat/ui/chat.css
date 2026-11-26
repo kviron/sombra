@@ -137,6 +137,16 @@
  }
 }
 
+.voice-stage-region:has(> [data-voice-video-focused]) > .voice-controls {
+ position: absolute;
+ bottom: 0;
+ left: 50%;
+ width: max-content;
+ max-width: calc(100% - 24px);
+ margin-inline: 0;
+ translate: -50%;
+}
+
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
  .voice-stage-panel:not(:hover) [data-auto-hide]:not(:focus-within, :has([data-music-open])) {
   transform: translateY(100%);
@@ -397,8 +407,14 @@
  border-radius: 8px;
 }
 
+.chat-shell {
+ --chat-bottom-row-height: 58px;
+ --chat-bottom-gutter: 8px;
+}
+
 .profile {
- flex: 0 0 58px;
+ flex: 0 0 var(--chat-bottom-row-height);
+ margin-block-end: var(--chat-bottom-gutter);
  min-width: 0;
  overflow: hidden;
 }

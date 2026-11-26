@@ -1,10 +1,12 @@
 // Чистые правила ссылок на сообщения: краткое описание и поиск назначения пересылки.
 // Сеть, DOM и React здесь не нужны, поэтому правила проверяются тестами.
-import type {ChatMessage} from '@/shared/types';
+import type {ChatMessage, User} from '@/shared/types';
 
 export type ForwardDestination = {
  id: string;
  name: string;
+ peer?: User;
+ avatar?: string;
  group?: {id: string; name: string};
  voice?: boolean;
  keywords?: string;

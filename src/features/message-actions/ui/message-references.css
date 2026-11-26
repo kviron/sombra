@@ -3,10 +3,7 @@
      а chat.css безусловно задаёт `.chat-shell button` (display/gap) вне слоя,
      да и сами классы общие с pages/chat;
    - .message-forwarded и .forward-composer рисует pages/chat (message-item,
-     chat-composer), срез держит их стили;
-   - .forward-picker поверх .group-modal перебивает глобальные правила чата
-     (`.group-modal h2`, `.modal-backdrop`), поэтому остаётся нелейерным.
-   Список и шапка пикера — в портале, вне .chat-shell, и собраны утилитами. */
+     chat-composer), срез держит их стили. */
 
 .message-reference,
 .reference-draft {
@@ -21,22 +18,30 @@
 
 .message-reference {
  max-width: 100%;
- width: fit-content;
- margin-block: 4px;
+ width: 100%;
+ margin-block: 2px 4px;
  padding: 4px 8px;
- border-inline-start: 2px solid var(--muted-foreground);
- border-radius: 4px;
+ border-inline-start: 2px solid var(--primary);
+ border-radius: var(--radius-sm);
+ background-color: color-mix(in oklab, currentColor 10%, transparent);
+ color: inherit;
+ line-height: 1.35;
 }
 
-button.message-reference:hover,
-.reference-draft button:hover,
-.forward-picker button:hover {
+[data-variant='default'] .message-reference {
+ border-inline-start-color: var(--primary-foreground);
+}
+
+button.message-reference:hover {
+ background-color: color-mix(in oklab, currentColor 16%, transparent);
+}
+
+.reference-draft button:hover {
  color: var(--accent-foreground);
 }
 
 .message-reference span,
-.reference-draft span,
-.forward-picker li span {
+.reference-draft span {
  min-width: 0;
  display: grid;
 }
@@ -44,24 +49,24 @@ button.message-reference:hover,
 .message-reference strong,
 .message-reference small,
 .reference-draft strong,
-.reference-draft small,
-.forward-picker strong,
-.forward-picker small {
+.reference-draft small {
  overflow: hidden;
  text-overflow: ellipsis;
  white-space: nowrap;
 }
 
-.message-reference strong,
-.reference-draft strong,
-.forward-picker strong {
+.reference-draft strong {
  color: var(--foreground);
  font-size: inherit;
 }
 
+.message-reference strong {
+ font-size: inherit;
+ font-weight: 600;
+}
+
 .message-reference svg,
-.reference-draft svg,
-.forward-picker svg {
+.reference-draft svg {
  flex: none;
 }
 
@@ -70,8 +75,20 @@ button.message-reference:hover,
  align-items: center;
  gap: 6px;
  margin-block: 4px;
- color: var(--muted-foreground);
+ color: inherit;
+ opacity: 0.85;
  font-size: 0.75rem;
+}
+
+.chat-shell .message-forwarded button.message-forwarded-author {
+ display: inline;
+ min-width: 0;
+ overflow: hidden;
+ color: inherit;
+ text-overflow: ellipsis;
+ text-decoration: underline;
+ text-underline-offset: 2px;
+ white-space: nowrap;
 }
 
 .reference-draft {
@@ -80,8 +97,7 @@ button.message-reference:hover,
  margin-bottom: 4px;
 }
 
-.reference-draft button,
-.forward-picker header button {
+.reference-draft button {
  display: grid;
  place-items: center;
  flex: none;
@@ -110,25 +126,6 @@ button.message-reference:hover,
  background: transparent;
 }
 
-/* Окно пикера: перебивает .group-modal из chat.css. */
-.forward-picker.group-modal {
- position: fixed;
- z-index: 101;
- inset: 50% auto auto 50%;
- transform: translate(-50%, -50%);
- display: grid;
- gap: 12px;
- width: min(430px, calc(100vw - 32px));
- max-height: 85vh;
- padding: 16px;
- overflow: auto;
-}
-
-.forward-picker h2 {
- margin: 0;
-}
-
-.forward-picker button:focus-visible,
 .reference-draft button:focus-visible,
 .message-reference:focus-visible,
 .forward-composer textarea:not([data-slot]):focus-visible {

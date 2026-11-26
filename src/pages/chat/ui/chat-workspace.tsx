@@ -197,6 +197,7 @@ export function ChatWorkspace({
        minSize="150px"
        maxSize="420px"
        groupResizeBehavior="preserve-pixel-size"
+       className="bg-card/75 backdrop-blur-sm"
       >
        <aside className="member-list h-full" aria-label="Участники">
         {state && nav.group ? (

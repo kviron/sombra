@@ -135,39 +135,44 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
          </ComposerSendButton>
         </TooltipLabel>
        }
-      >
-       <AttachmentComposer
-        reading={readingAttachment}
-        disabled={busy}
-        onFile={file => void messages.actions.selectAttachment(file)}
-        onRemove={messages.actions.removeAttachment}
-       />
-       {state && (
-        <StickerSuggestions
-         draft={draft}
-         stickers={state.stickers}
-         user={state.me.id}
-         group={home ? undefined : group?.id}
-         busy={busy}
-         onSelect={messages.actions.sendStickerSuggestion}
-        />
-       )}
-       {state && (
-        <ExpressionPicker
-         state={state}
-         refresh={chat.actions.refresh}
-         onError={chat.actions.setError}
+       leadingActions={
+        <AttachmentComposer
+         reading={readingAttachment}
          disabled={busy}
-         group={home ? undefined : group}
-         onManage={panels.actions.manageStickers}
-         onEmoji={emoji => messages.actions.setDraft(draft + emoji)}
-         onSticker={async sticker => {
-          if (!(await messages.actions.sendStickerSuggestion(sticker, false)))
-           throw new Error('Не удалось отправить стикер');
-         }}
+         onFile={file => void messages.actions.selectAttachment(file)}
+         onRemove={messages.actions.removeAttachment}
         />
-       )}
-      </AssistantComposer>
+       }
+       suggestions={
+        state && (
+         <StickerSuggestions
+          draft={draft}
+          stickers={state.stickers}
+          user={state.me.id}
+          group={home ? undefined : group?.id}
+          busy={busy}
+          onSelect={messages.actions.sendStickerSuggestion}
+         />
+        )
+       }
+       trailingActions={
+        state && (
+         <ExpressionPicker
+          state={state}
+          refresh={chat.actions.refresh}
+          onError={chat.actions.setError}
+          disabled={busy}
+          group={home ? undefined : group}
+          onManage={panels.actions.manageStickers}
+          onEmoji={emoji => messages.actions.setDraft(draft + emoji)}
+          onSticker={async sticker => {
+           if (!(await messages.actions.sendStickerSuggestion(sticker, false)))
+            throw new Error('Не удалось отправить стикер');
+          }}
+         />
+        )
+       }
+      />
      </>
     )}
    </div>

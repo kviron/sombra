@@ -19,7 +19,8 @@ const menuPopoverClass =
  'sombra-composer-menu sombra-menu-surface sombra-picker-material absolute inset-x-0 bottom-[calc(100%+12px)] z-40 max-h-[min(340px,50vh)] min-w-0 overflow-auto p-2 shadow-lg';
 /** Поле ввода: родные рамку, тень и resize снимает только оно само; border-current
    повторяет border: 0 из прежнего правила, иначе слой base вернёт цвет рамки. */
-const composerTextareaClass = 'min-w-0 resize-none border-0 border-current py-2.5 leading-[24px] text-foreground';
+const composerTextareaClass =
+ 'text-foreground min-h-8 min-w-0 flex-1 resize-none border-0 border-current px-1 py-1 leading-6';
 
 /**
  * Поле помощника только раскладывает разметку: текст, подсказки, упоминания и
@@ -35,46 +36,47 @@ export function AssistantComposer(props: AssistantComposerProps) {
     <ComposerPrimitive.Root
      onKeyDownCapture={handlers.keyDownCapture}
      data-slot="composer"
-     className={cn(
-      paper,
-      'sombra-assistant-composer relative flex w-full flex-col gap-2 rounded-[24px] p-2.5 transition-colors'
-     )}
+     className={cn(paper, 'sombra-assistant-composer relative flex w-full flex-col rounded-xl px-2 transition-colors')}
      onSubmit={props.onSubmit}
     >
      {props.attachments}
-     <ComposerPrimitive.Input
-      className={cn(composerInputClass, composerTextareaClass)}
-      data-slot="composer-input"
-      ref={props.textareaRef}
-      rows={1}
-      maxRows={5}
-      maxLength={2000}
-      aria-label="Сообщение"
-      role="combobox"
-      aria-autocomplete="list"
-      placeholder={props.placeholder}
-      cancelOnEscape={false}
-      addAttachmentOnPaste={false}
-      unstable_focusOnRunStart={false}
-      unstable_focusOnScrollToBottom={false}
-      onPaste={props.onPaste}
-     />
-     <ComposerToolbar>
-      <ComposerActions>{props.children}</ComposerActions>
-      {props.hasAttachment && !props.draft.trim() ? (
-       props.sendButton
-      ) : (
-       <ComposerPrimitive.Send
-        asChild
-        disabled={props.sendDisabled}
-        onClick={event => {
-         event.preventDefault();
-         event.currentTarget.closest('form')?.requestSubmit();
-        }}
-       >
-        {props.sendButton}
-       </ComposerPrimitive.Send>
-      )}
+     {props.suggestions}
+     <ComposerToolbar className="min-h-[calc(var(--chat-bottom-row-height,58px)-2px)] min-w-0 items-end gap-1 py-3">
+      {props.leadingActions}
+      <ComposerPrimitive.Input
+       className={cn(composerInputClass, composerTextareaClass)}
+       data-slot="composer-input"
+       ref={props.textareaRef}
+       rows={1}
+       maxRows={5}
+       maxLength={2000}
+       aria-label="Сообщение"
+       role="combobox"
+       aria-autocomplete="list"
+       placeholder={props.placeholder}
+       cancelOnEscape={false}
+       addAttachmentOnPaste={false}
+       unstable_focusOnRunStart={false}
+       unstable_focusOnScrollToBottom={false}
+       onPaste={props.onPaste}
+      />
+      <ComposerActions className="shrink-0 gap-1">
+       {props.trailingActions}
+       {props.hasAttachment && !props.draft.trim() ? (
+        props.sendButton
+       ) : (
+        <ComposerPrimitive.Send
+         asChild
+         disabled={props.sendDisabled}
+         onClick={event => {
+          event.preventDefault();
+          event.currentTarget.closest('form')?.requestSubmit();
+         }}
+        >
+         {props.sendButton}
+        </ComposerPrimitive.Send>
+       )}
+      </ComposerActions>
      </ComposerToolbar>
      <ComposerPrimitive.TriggerPopover
       char="@"

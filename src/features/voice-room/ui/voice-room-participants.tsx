@@ -232,10 +232,14 @@ export function VoiceRoomParticipants({voice, room, presence, users, meUser, me,
    : (users?.find(user => user.id === selectedParticipant.id)?.name ?? userName(selectedParticipant.id));
   const participantsLabel = hideParticipants ? 'Показать участников' : 'Скрыть участников';
   return (
-   <section className="flex min-h-0 flex-1 flex-col gap-2 p-2" aria-label={`Видео · ${name}`}>
+   <section
+    className="relative flex min-h-0 flex-1 flex-col gap-2 p-2"
+    data-voice-video-focused
+    aria-label={`Видео · ${name}`}
+   >
     <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-black/70">
      <VoiceTileVideo key={selectedParticipant.key} stream={selectedStream} contain />
-     <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
+     <div className="absolute inset-x-2 top-12 flex items-center justify-between gap-2">
       <span className="truncate rounded-md bg-black/70 px-2 py-1 text-xs text-white">{name}</span>
       <div className="flex shrink-0 gap-1">
        <TooltipLabel content={participantsLabel}>
@@ -268,7 +272,11 @@ export function VoiceRoomParticipants({voice, room, presence, users, meUser, me,
      </div>
     </div>
     {!hideParticipants && (
-     <div className="flex shrink-0 justify-center-safe gap-2 overflow-x-auto" role="group" aria-label="Участники">
+     <div
+      className="absolute inset-x-2 bottom-20 flex justify-center-safe gap-2 overflow-x-auto"
+      role="group"
+      aria-label="Участники"
+     >
       {tiles}
      </div>
     )}

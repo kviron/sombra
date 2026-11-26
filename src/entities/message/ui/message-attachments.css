@@ -22,7 +22,7 @@
  flex-shrink: 0;
  min-width: 0;
  max-width: 100%;
- margin: 8px;
+ margin: var(--chat-bottom-gutter, 8px);
  display: flex;
  flex-direction: column;
  gap: 8px;
@@ -36,7 +36,6 @@
 .chat-main:not(.voice-layout) > .composer-chrome {
  position: absolute;
  inset: auto 0 0 0;
- margin: 8px;
  z-index: 20;
 }
 
@@ -106,14 +105,6 @@
  clip: rect(0, 0, 0, 0) !important;
  white-space: nowrap !important;
  border: 0 !important;
-}
-
-/* На сенсорном экране hover-действие показывается всегда. */
-@media (hover: none) {
- .attachment-image-download {
-  opacity: 1;
-  pointer-events: auto;
- }
 }
 
 /* Elements AudioPlayer: размеры и время — внутренние слоты, класс не навесить. */

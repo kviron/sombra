@@ -361,6 +361,8 @@ export function forwardDestinations(state: ChatState): ForwardDestination[] {
   ...state.dialogs.map(dialog => ({
    id: dialog.id,
    name: dialogName(state, dialog),
+   peer: dialog.members.length === 2 ? dialogPeer(state, dialog) : undefined,
+   avatar: dialog.members.length > 2 ? dialog.avatar : undefined,
    keywords: state.users
     .filter(user => dialog.members.includes(user.id))
     .map(user => user.username || '')

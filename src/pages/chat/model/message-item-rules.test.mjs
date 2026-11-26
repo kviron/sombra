@@ -89,8 +89,8 @@ test('реакции считаются и отмечают мой голос', 
   'me'
  );
  assert.deepEqual(views, [
-  {emoji: '👍', count: 2, pressed: true},
-  {emoji: '🔥', count: 1, pressed: false}
+  {emoji: '👍', count: 2, pressed: true, reactors: ['u1', 'me']},
+  {emoji: '🔥', count: 1, pressed: false, reactors: ['u1']}
  ]);
  assert.deepEqual(reactionViews(undefined, 'me'), []);
 });

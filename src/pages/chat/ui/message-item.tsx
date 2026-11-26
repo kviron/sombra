@@ -4,7 +4,8 @@ import {ContextMenu} from 'radix-ui';
 import type {ChatMessage, ChatState} from '@/shared/types';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {Message, MessageAvatar, MessageContent, MessageHeader, MessageFooter} from '@/shared/ui/message';
-import {Bubble, BubbleContent, BubbleReactions} from '@/shared/ui/bubble';
+import {Bubble, BubbleContent} from '@/shared/ui/bubble';
+import {MessageReactions} from './message-reactions';
 import {Button} from '@/shared/ui/button';
 import {UserAvatar} from '@/shared/ui/user-avatar';
 import {MessageActionDialog} from '@/features/message-actions';
@@ -79,6 +80,39 @@ export function MessageItem({
  const invitedChannel =
   invitedGroup && invitedGroup.channels.find(channel => channel.kind === 'voice' && channel.id === invitation.channel);
  const bubbleVariant = model.hasImage || (sticker && !model.hasText) ? 'ghost' : author ? 'default' : 'muted';
+ const header = !grouped && (
+  <MessageHeader className="message-meta px-0">
+   <strong>
+    {model.canOpenProfile ? (
+     <TooltipLabel content={`Профиль ${model.name}`}>
+      <button type="button" className="message-author" aria-label={`Профиль ${model.name}`} onClick={model.openProfile}>
+       {model.name}
+      </button>
+     </TooltipLabel>
+    ) : (
+     model.name
+    )}
+   </strong>
+   {(m.bot_name || model.identity?.bot) && <small className="bot-badge rounded px-1 text-[9px]">БОТ</small>}
+  </MessageHeader>
+ );
+ const deliveryMeta = pending !== 'failed' && (
+  <span className="message-delivery-meta">
+   <time dateTime={model.dateTime}>{model.time}</time>
+   {author &&
+    (pending === 'sending' ? (
+     <span className="message-pending" role="status" aria-label="Отправляется" />
+    ) : model.read ? (
+     <TooltipLabel content={model.readTitle}>
+      <button type="button" className="message-read-check" aria-label="Просмотрено" onClick={actions.openReaders}>
+       <CheckCheck size={13} />
+      </button>
+     </TooltipLabel>
+    ) : (
+     <Check size={13} aria-label="Отправлено" />
+    ))}
+  </span>
+ );
  const menuActions = localOnly
   ? []
   : model.menu.map(item => ({
@@ -110,6 +144,7 @@ export function MessageItem({
      data-read-message-id={m.id}
      data-message-id={m.id}
      data-grouped={grouped}
+     data-group-end={showAvatar}
      data-own={author}
      aria-label={model.name}
      align="start"
@@ -155,36 +190,27 @@ export function MessageItem({
       )}
      </MessageAvatar>
      <MessageContent className="message-content w-fit gap-0">
-      {!grouped && (
-       <MessageHeader className="message-meta">
-        <strong>
-         {model.canOpenProfile ? (
-          <TooltipLabel content={`Профиль ${model.name}`}>
-           <button
-            type="button"
-            className="message-author"
-            aria-label={`Профиль ${model.name}`}
-            onClick={model.openProfile}
-           >
-            {model.name}
-           </button>
-          </TooltipLabel>
-         ) : (
-          model.name
-         )}
-        </strong>
-        {(m.bot_name || model.identity?.bot) && (
-         <small className="bot-badge text-primary rounded-[4px] px-[5px] py-px text-[9px]">БОТ</small>
-        )}
-       </MessageHeader>
-      )}
+      {bubbleVariant === 'ghost' && header}
       <Bubble variant={bubbleVariant} className="max-w-full">
-       <BubbleContent data-inline-meta={!!m.text && !m.attachment && !sticker}>
+       <BubbleContent data-inline-meta={!!m.text && !m.attachment && !sticker && !reactions.length}>
+        {bubbleVariant !== 'ghost' && header}
         {m.replyTo && <MessageQuote reply={m.replyTo} userName={userName} onJump={model.replyOpen} />}
-        {m.forwardedFrom && (
+        {model.forwardedAuthor && (
          <div className="message-forwarded">
           <Forward size={14} aria-hidden="true" />
-          Переслано от {userName(m.forwardedFrom.author)}
+          <span>Переслано от</span>
+          {model.forwardedAuthor.openProfile ? (
+           <button
+            type="button"
+            className="message-forwarded-author"
+            aria-label={`Открыть профиль ${model.forwardedAuthor.name}`}
+            onClick={model.forwardedAuthor.openProfile}
+           >
+            {model.forwardedAuthor.name}
+           </button>
+          ) : (
+           <span>{model.forwardedAuthor.name}</span>
+          )}
          </div>
         )}
         {invitedGroup && invitedChannel ? (
@@ -214,49 +240,21 @@ export function MessageItem({
          />
         )}
         {m.attachment && <MessageAttachment messageId={m.id} attachment={m.attachment} />}
-        {pending !== 'failed' && (
-         <span className="message-delivery-meta">
-          <time dateTime={model.dateTime}>{model.time}</time>
-          {author &&
-           (pending === 'sending' ? (
-            <span className="message-pending" role="status" aria-label="Отправляется" />
-           ) : model.read ? (
-            <TooltipLabel content={model.readTitle}>
-             <button
-              type="button"
-              className="message-read-check"
-              aria-label="Просмотрено"
-              onClick={actions.openReaders}
-             >
-              <CheckCheck size={13} />
-             </button>
-            </TooltipLabel>
-           ) : (
-            <Check size={13} aria-label="Отправлено" />
-           ))}
-         </span>
+        {reactions.length ? (
+         <div className="message-bubble-footer">
+          <MessageReactions
+           reactions={reactions}
+           me={state.me}
+           users={state.users}
+           busy={busy}
+           onReact={actions.react}
+          />
+          {deliveryMeta}
+         </div>
+        ) : (
+         deliveryMeta
         )}
        </BubbleContent>
-       {reactions.length > 0 && (
-        <BubbleReactions align="start">
-         {reactions.map(reaction => (
-          <Button
-           type="button"
-           size={reaction.count > 1 ? 'xs' : 'icon-xs'}
-           variant={reaction.pressed && bubbleVariant !== 'default' ? 'secondary' : 'ghost'}
-
-           disabled={busy}
-           aria-label={`Реакция ${reaction.emoji}, ${reaction.count}`}
-           aria-pressed={reaction.pressed}
-           key={reaction.emoji}
-           onClick={() => actions.react(reaction.emoji)}
-          >
-           {reaction.emoji}
-           {reaction.count > 1 && <span>{reaction.count}</span>}
-          </Button>
-         ))}
-        </BubbleReactions>
-       )}
       </Bubble>
       {pending === 'failed' && (
        <MessageFooter className="gap-1">

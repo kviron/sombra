@@ -80,6 +80,16 @@ export function useMessageItem({
  // Временное сообщение нельзя ни править, ни пересылать: у него ещё нет серверного id.
  const localOnly = !!pending || isLocalMessage(message.id);
  const reply = message.replyTo;
+ const forwardedId = message.forwardedFrom?.author;
+ const forwardedAuthor = forwardedId
+  ? {
+     name: userName(forwardedId),
+     openProfile:
+      userActions && (forwardedId === state.me.id || state.users.some(user => user.id === forwardedId))
+       ? () => userActions.openProfile(forwardedId)
+       : undefined
+    }
+  : undefined;
  const menu = messageMenu({
   hasReply: !!onReply,
   hasForward: !!onForward && !message.attachment && !message.sticker && !message.gif && text,
@@ -133,6 +143,7 @@ export function useMessageItem({
   name,
   canOpenProfile,
   openProfile,
+  forwardedAuthor,
   hasText: text,
   hasImage: image,
   reactions,
