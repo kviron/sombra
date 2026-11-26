@@ -1,7 +1,8 @@
+import {memo} from 'react';
 import {TooltipLabel} from '@/shared/ui/tooltip';
 import {Check, CheckCheck, Eye, Forward, Pencil, Copy, RefreshCw, Trash2, Reply} from 'lucide-react';
 import {ContextMenu} from 'radix-ui';
-import type {ChatMessage, ChatState} from '@/shared/types';
+import type {ChatMessage} from '@/shared/types';
 import {EntityContextMenu} from '@/shared/ui/entity-context-menu';
 import {Message, MessageAvatar, MessageContent, MessageHeader, MessageFooter} from '@/shared/ui/message';
 import {Bubble, BubbleContent} from '@/shared/ui/bubble';
@@ -12,9 +13,10 @@ import {MessageActionDialog} from '@/features/message-actions';
 import {MessageReadersDialog} from '@/features/message-actions';
 import {MessageQuote} from '@/features/message-actions';
 import {SentSticker} from '@/entities/sticker';
-import {MessageAttachment, MessageText} from '@/entities/message';
+import {MessageAttachment, MessageAttachments, MessageText} from '@/entities/message';
 import {readVoiceInvitation} from '@/features/voice-room';
 import {chatNavigationActions} from '../model/chat-navigation';
+import type {MessageRowState} from '../model/message-item';
 import {useMessageItem} from '../model/use-message-item';
 import {reactionEmojis} from '../model/message-item-rules';
 import type {MessageActionId} from '../model/message-item-rules';
@@ -33,7 +35,7 @@ const menuIcons: Record<MessageActionId, typeof Reply> = {
  * Карточка сообщения только показывает: группировка, права, реакции и меню
  * приходят из модели страницы, поэтому здесь нет запросов и обработки ошибок.
  */
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
  message: m,
  previous,
  showAvatar = true,
@@ -59,7 +61,7 @@ export function MessageItem({
  pending?: 'sending' | 'failed';
  pendingError?: string;
  onRetry?: () => void;
-} & {state: ChatState; refresh: () => Promise<unknown>; onError: (message: string) => void}) {
+} & {state: MessageRowState; refresh: () => Promise<unknown>; onError: (message: string) => void}) {
  const model = useMessageItem({
   message: m,
   previous,
@@ -74,12 +76,18 @@ export function MessageItem({
   pendingError,
   onRetry
  });
- const {grouped, sticker, author, localOnly, busy, reactions, actions} = model;
+ const {grouped, sticker, author, localOnly, busy, reactions, actions, attachments} = model;
+ const album = attachments.length > 1;
+ const captionedPhoto = model.soloImage && model.hasText;
  const invitation = m.text ? readVoiceInvitation(m.text) : null;
- const invitedGroup = invitation && state.groups.find(group => group.id === invitation.group);
  const invitedChannel =
-  invitedGroup && invitedGroup.channels.find(channel => channel.kind === 'voice' && channel.id === invitation.channel);
- const bubbleVariant = model.hasImage || (sticker && !model.hasText) ? 'ghost' : author ? 'default' : 'muted';
+  invitation &&
+  state.voiceChannels.find(channel => channel.group === invitation.group && channel.id === invitation.channel);
+ const bubbleVariant =
+  !album && !model.hasText && (model.soloImage || sticker) ? 'ghost' : author ? 'default' : 'muted';
+ const soloAttachment = attachments.length === 1 && (
+  <MessageAttachment messageId={m.id} attachment={attachments[0]} authorName={model.name} sentAt={m.time} />
+ );
  const header = !grouped && (
   <MessageHeader className="message-meta px-0">
    <strong>
@@ -142,6 +150,7 @@ export function MessageItem({
     <Message
      ref={model.row}
      data-read-message-id={m.id}
+     data-read-channel={m.user !== state.me.id && !localOnly ? m.channel : undefined}
      data-message-id={m.id}
      data-grouped={grouped}
      data-group-end={showAvatar}
@@ -189,10 +198,12 @@ export function MessageItem({
        </>
       )}
      </MessageAvatar>
-     <MessageContent className="message-content w-fit gap-0">
+     <MessageContent className="message-content w-fit gap-0" data-album={album || undefined}>
       {bubbleVariant === 'ghost' && header}
-      <Bubble variant={bubbleVariant} className="max-w-full">
-       <BubbleContent data-inline-meta={!!m.text && !m.attachment && !sticker && !reactions.length}>
+      <Bubble variant={bubbleVariant} className={captionedPhoto ? 'max-w-[min(100%,320px)]' : 'max-w-full'}>
+       <BubbleContent
+        data-inline-meta={!!m.text && (!soloAttachment || captionedPhoto) && !sticker && !reactions.length}
+       >
         {bubbleVariant !== 'ghost' && header}
         {m.replyTo && <MessageQuote reply={m.replyTo} userName={userName} onJump={model.replyOpen} />}
         {model.forwardedAuthor && (
@@ -213,14 +224,18 @@ export function MessageItem({
           )}
          </div>
         )}
-        {invitedGroup && invitedChannel ? (
+        {album && (
+         <MessageAttachments messageId={m.id} attachments={attachments} authorName={model.name} sentAt={m.time} />
+        )}
+        {captionedPhoto && <div className="message-caption-photo">{soloAttachment}</div>}
+        {invitedChannel ? (
          <div className="grid justify-items-start gap-1.5">
           <span>Голосовой канал «{invitedChannel.name}»</span>
           <Button
            type="button"
            size="sm"
            variant={bubbleVariant === 'default' ? 'secondary' : 'default'}
-           onClick={() => chatNavigationActions.openGroup(invitedGroup.id, invitedChannel.id)}
+           onClick={() => chatNavigationActions.openGroup(invitedChannel.group, invitedChannel.id)}
           >
            Открыть канал
           </Button>
@@ -239,7 +254,7 @@ export function MessageItem({
           refresh={refresh}
          />
         )}
-        {m.attachment && <MessageAttachment messageId={m.id} attachment={m.attachment} />}
+        {!captionedPhoto && soloAttachment}
         {reactions.length ? (
          <div className="message-bubble-footer">
           <MessageReactions
@@ -281,10 +296,10 @@ export function MessageItem({
      author={author}
      canDeleteEveryone={model.canDeleteEveryone}
      trigger={model.row}
-     refresh={refresh}
+     refresh={actions.refreshAfterAction}
      onClose={actions.closeDialog}
     />
    )}
   </>
  );
-}
+});

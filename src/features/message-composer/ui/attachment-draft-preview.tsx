@@ -1,72 +1,94 @@
-import {useMemo} from 'react';
-import {ComposerAttachments, ComposerAttachmentChip} from '@/shared/ui/elements-composer';
-import type {AttachmentDraft} from '@/shared/types';
-import {MAX_ATTACHMENT_SIZE} from './attachment-composer';
+import {useEffect, useState} from 'react';
+import {XIcon} from 'lucide-react';
+import {
+ Attachment,
+ AttachmentAction,
+ AttachmentActions,
+ AttachmentContent,
+ AttachmentDescription,
+ AttachmentGroup,
+ AttachmentMedia,
+ AttachmentTitle
+} from '@/shared/ui/attachment';
+import {FileIconDisplay, fileLabel, formatFileSize} from '@/shared/ui/elements-media';
+import {draftImageMime, type DraftAttachment} from '../model/draft-attachments';
 
-/** Decode only bounded raw base64; metadata never authorizes an image preview. */
-export function decodeDraftBytes(data: string): Uint8Array | null {
- if (
-  data.length > 4 * Math.ceil(MAX_ATTACHMENT_SIZE / 3) ||
-  data.length % 4 !== 0 ||
-  !/^[A-Za-z0-9+/]*={0,2}$/.test(data)
- )
-  return null;
- try {
-  const raw = atob(data);
-  if (raw.length > MAX_ATTACHMENT_SIZE) return null;
-  return Uint8Array.from(raw, char => char.charCodeAt(0));
- } catch {
-  return null;
- }
+function DraftCard({file, disabled, onRemove}: {file: File; disabled?: boolean; onRemove: () => void}) {
+ const [preview, setPreview] = useState<string>();
+ useEffect(() => {
+  let current = true;
+  let url: string | undefined;
+  void file
+   .slice(0, 12)
+   .arrayBuffer()
+   .then(header => {
+    const mime = draftImageMime(new Uint8Array(header));
+    if (current && mime) {
+     url = URL.createObjectURL(file.slice(0, file.size, mime));
+     setPreview(url);
+    }
+   })
+   .catch(() => {});
+  return () => {
+   current = false;
+   if (url) URL.revokeObjectURL(url);
+  };
+ }, [file]);
+ const name = file.name || 'Вложение';
+ const type = name.match(/\.([a-z0-9]{1,12})$/i)?.[1].toUpperCase() || fileLabel(file.type);
+ return (
+  <Attachment orientation="vertical" className="rounded-2xl">
+   <AttachmentMedia variant={preview ? 'image' : 'icon'}>
+    {preview ? (
+     <img
+      src={preview}
+      alt=""
+      className="size-full object-cover"
+      loading="lazy"
+      decoding="async"
+      onError={() => setPreview(undefined)}
+     />
+    ) : (
+     <FileIconDisplay mimeType={file.type} />
+    )}
+   </AttachmentMedia>
+   <AttachmentContent>
+    <AttachmentTitle title={name}>{name}</AttachmentTitle>
+    <AttachmentDescription>
+     {type} · {formatFileSize(file.size)}
+    </AttachmentDescription>
+   </AttachmentContent>
+   <AttachmentActions>
+    <AttachmentAction
+     type="button"
+     variant="secondary"
+     disabled={disabled}
+     className="size-6 rounded-full"
+     aria-label={`Убрать ${name}`}
+     onClick={onRemove}
+    >
+     <XIcon />
+    </AttachmentAction>
+   </AttachmentActions>
+  </Attachment>
+ );
 }
-export function draftImageMime(bytes: Uint8Array): string | undefined {
- const starts = (values: number[]) => values.every((value, index) => bytes[index] === value);
- if (bytes.length >= 8 && starts([137, 80, 78, 71, 13, 10, 26, 10])) return 'image/png';
- if (bytes.length >= 3 && starts([255, 216, 255])) return 'image/jpeg';
- if (bytes.length >= 6 && starts([71, 73, 70, 56]) && (bytes[4] === 55 || bytes[4] === 57) && bytes[5] === 97)
-  return 'image/gif';
- if (
-  bytes.length >= 12 &&
-  starts([82, 73, 70, 70]) &&
-  bytes[8] === 87 &&
-  bytes[9] === 69 &&
-  bytes[10] === 66 &&
-  bytes[11] === 80
- )
-  return 'image/webp';
-}
-export function draftByteSize(size: number): string {
- return size >= 1024 * 1024
-  ? `${(size / (1024 * 1024)).toFixed(1)} МБ`
-  : size >= 1024
-    ? `${(size / 1024).toFixed(1)} КБ`
-    : `${size} Б`;
-}
-// Native files retain the upstream generic file chip, never a large image card.
+
 export function AttachmentDraftPreview({
- draft,
- reading,
+ attachments,
  disabled,
  onRemove
 }: {
- draft?: AttachmentDraft;
- reading?: boolean;
+ attachments: readonly DraftAttachment[];
  disabled?: boolean;
- onRemove: () => void;
+ onRemove: (id: string) => void;
 }) {
- const data = draft?.data;
- const size = useMemo(() => (data === undefined ? undefined : decodeDraftBytes(data)?.length), [data]);
- if (!draft && !reading) return null;
+ if (!attachments.length) return null;
  return (
-  <ComposerAttachments aria-label="Вложение перед отправкой">
-   <ComposerAttachmentChip
-    attachment={{
-     name: draft?.name || 'Читаем файл…',
-     meta: reading ? 'Читаем файл…' : draftByteSize(size || 0),
-     state: reading ? 'uploading' : 'done'
-    }}
-    onRemove={disabled ? undefined : onRemove}
-   />
-  </ComposerAttachments>
+  <AttachmentGroup role="group" aria-label="Вложения перед отправкой" className="items-start pt-2">
+   {attachments.map(({id, file}) => (
+    <DraftCard key={id} file={file} disabled={disabled} onRemove={() => onRemove(id)} />
+   ))}
+  </AttachmentGroup>
  );
 }

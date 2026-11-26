@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="ru">
+ <meta charset="utf-8" />
+ <title>Проверка прокрутки истории Sombra</title>
+ <style>
+  #transcript {
+   display: flex;
+   flex-direction: column;
+   height: 320px;
+   width: 560px;
+  }
+ </style>
+ <div id="transcript"></div>
+ <output id="result">Проверка…</output>
+ <script type="module">
+  import '@/app/styles/index.css';
+  import '@/pages/chat/ui/chat.css';
+  import {createElement as h} from 'react';
+  import {createRoot} from 'react-dom/client';
+  import {useStore} from 'zustand';
+  import {ChatTranscript} from '@/pages/chat/ui/chat-transcript';
+  import {chatHistoryStore} from '@/pages/chat/model/chat-history';
+  import {createMessageRowSelector} from '@/pages/chat/model/message-item';
+  import {useChatMessages} from '@/pages/chat/model/use-chat-messages';
+  import {chatSnapshotActions, chatSnapshotStore} from '@/pages/chat/model/chat-state';
+  import {messageService, sufficientlyVisible} from '@/entities/message';
+
+  const me = {id: 'scroll-fixture-user', name: 'Автор'};
+  const peer = {id: 'peer', name: 'Участник'};
+  const channel = {id: 'scroll-fixture-channel', kind: 'text', name: 'История'};
+  const canvas = document.createElement('canvas');
+  canvas.width = 960;
+  canvas.height = 300;
+  const file = {data: canvas.toDataURL().split(',')[1], name: 'old-photo.png', mime: 'image/png'};
+  // Legacy attachments have no dimensions until their bytes arrive.
+  const photo = {id: 'photo', name: file.name, mime: file.mime, size: atob(file.data).length};
+  function page(start) {
+   return Array.from({length: 50}, (_, i) => ({
+    id: 'm' + (start + i),
+    channel: channel.id,
+    user: [60, 142].includes(start + i) ? peer.id : me.id,
+    time: 86400 + start + i,
+    text: 'Сообщение ' + (start + i),
+    ...(start + i === 57 ? {attachment: photo} : {}),
+    ...(start + i === 72 ? {attachment: {...photo, id: 'known', width: 960, height: 300}} : {}),
+    ...(start + i === 66 ? {replyTo: {id: 'm65', author: me.id, text: 'Сообщение 65'}} : {})
+   }));
+  }
+  const state = {
+   me,
+   users: [me, peer],
+   readReceiptsSupported: true,
+   bots: [],
+   groups: [{id: 'g', owner: 'someone', members: [me.id], channels: [channel], permissions: []}],
+   stickers: [],
+   dialogs: [],
+   messages: page(100),
+   historyTruncated: [channel.id]
+  };
+  const options = {state, channel, voice: {room: ''}, panels: {}, music: {}, home: false};
+  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  async function until(predicate) {
+   const deadline = performance.now() + 10000;
+   let value;
+   while (!(value = predicate())) {
+    if (performance.now() > deadline) throw Error('Истекло время ожидания: ' + String(predicate).slice(0, 140));
+    await delay(20);
+   }
+   return value;
+  }
+
+  let calls = 0,
+   renders = 0,
+   model;
+  // Each MessageItem formats its delivery time once per render.
+  const formatTime = Date.prototype.toLocaleTimeString;
+  Date.prototype.toLocaleTimeString = function (...args) {
+   renders++;
+   return formatTime.apply(this, args);
+  };
+  const nav = {channel, userName: () => me.name};
+  const db = [...page(0), ...page(50), ...page(100)];
+  const seen = new Set();
+  messageService.markRead = async ({messages}) => messages.forEach(id => seen.add(id));
+  const chat = {
+   actions: {
+    refresh: async () => chatSnapshotActions.applyState(structuredClone(chatSnapshotStore.getState().snapshot)),
+    setError: error => {
+     throw Error(error);
+    }
+   }
+  };
+  messageService.update = async ({message, text}) => {
+   db.find(row => row.id === message).text = text;
+  };
+  messageService.react = async ({message, emoji}) => {
+   db.find(row => row.id === message).reactions = [{user: me.id, emoji}];
+  };
+  messageService.remove = async ({message}) => {
+   db.splice(
+    db.findIndex(row => row.id === message),
+    1
+   );
+  };
+  let finishFirstPage;
+  const firstPage = new Promise(resolve => {
+   finishFirstPage = resolve;
+  });
+  let slowRestore = false;
+  messageService.page = async ({before, limit}) => {
+   calls++;
+   if (before === 'm100') await firstPage;
+   if (slowRestore) await delay(400);
+   const end = before ? db.findIndex(row => row.id === before) : db.length;
+   if (end < 0) throw Error('HISTORY_CURSOR_INVALID');
+   const start = Math.max(0, end - limit);
+   return {
+    messages: structuredClone(db.slice(start, end)),
+    hasMore: start > 0,
+    nextBefore: start > 0 ? db[start].id : null
+   };
+  };
+  let photoReads = 0,
+   releasePhoto;
+  const photoReady = new Promise(resolve => {
+   releasePhoto = resolve;
+  });
+  let knownReads = 0;
+  messageService.attachment = async ({message}) => {
+   if (message === 'm72') {
+    if (++knownReads === 1) throw Error('Временный сбой чтения');
+    return file;
+   }
+   photoReads++;
+   await photoReady;
+   return file;
+  };
+  chatSnapshotActions.applyState(state);
+  function App({initialLoading = false}) {
+   const current = useStore(chatSnapshotStore, store => store.snapshot);
+   const snapshot = initialLoading ? null : current;
+   model = useChatMessages({...options, state: snapshot});
+   return h(ChatTranscript, {chat, state: snapshot, nav, messages: model});
+  }
+
+  const bookmark = 'sombra-chat-scroll-v1:' + JSON.stringify([me.id, channel.id]);
+  localStorage.removeItem(bookmark);
+  let app = createRoot(document.getElementById('transcript'));
+  const report = document.getElementById('result');
+  const row = id => document.querySelector('[data-read-message-id="' + id + '"]');
+  try {
+   if (!sufficientlyVisible(33.59375, 33.40625, 320) || sufficientlyVisible(33.59375, 32, 320))
+    throw Error('Неверный порог прочтения для дробной высоты строки');
+   app.render(h(App, {initialLoading: true}));
+   await until(() => document.querySelector('[data-slot="skeleton"]'));
+   app.render(h(App));
+   await until(() => model?.history.hasMore && row('m100'));
+   const viewport = document.querySelector('.message-scroll');
+   await until(() => viewport.scrollTop > 0);
+   const goUp = () => {
+    viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, bubbles: true}));
+    viewport.scrollTop = 0;
+   };
+   renders = 0;
+   goUp();
+   const original = row('m100');
+   const top = original.getBoundingClientRect().top;
+   await until(() => document.querySelector('.chat-history [data-slot="skeleton"]'));
+   if (row('m100') !== original) throw Error('Во время загрузки пропали сообщения');
+   finishFirstPage();
+   await until(() => row('m50'));
+   await delay(350);
+   if (calls !== 1) throw Error('Один жест загрузил несколько страниц');
+   if (row('m100') !== original || Math.abs(original.getBoundingClientRect().top - top) > 1)
+    throw Error('Потеряна позиция читаемого сообщения');
+   if (renders > 52) throw Error('Лента заново отрисовала старые карточки');
+   const scrollToRow = id => {
+    viewport.scrollTop += row(id).getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+   };
+   scrollToRow('m57');
+   await until(() => photoReads === 1);
+   const frame = id => row(id).querySelector('.attachment-preview').getBoundingClientRect();
+   if (Math.abs(frame('m72').height - 100) > 1) throw Error('Известные размеры фото не учтены');
+   const nextPhotoRow = row('m58');
+   const readingY = nextPhotoRow.getBoundingClientRect().top;
+   releasePhoto();
+   await until(() => row('m57').querySelector('.attachment-preview img')?.naturalHeight === 300);
+   if (Math.abs(nextPhotoRow.getBoundingClientRect().top - readingY) > 1)
+    throw Error('Фото сдвинуло следующее сообщение');
+   scrollToRow('m140');
+   await delay(100);
+   scrollToRow('m57');
+   await delay(100);
+   if (photoReads !== 1 || calls !== 1) throw Error('Повторная прокрутка вызвала лишний запрос');
+   if (Math.abs(frame('m57').height - 100) > 1) throw Error('Измеренный размер фото потерялся');
+   scrollToRow('m60');
+   await until(() => seen.has('m60'));
+   scrollToRow('m72');
+   await until(() => knownReads >= 1);
+   scrollToRow('m140');
+   await delay(120);
+   scrollToRow('m72');
+   await until(() => row('m72').querySelector('.attachment-preview img')?.naturalWidth === 960);
+   if (row('m72').querySelector('.attachment-image-retry')) throw Error('Ошибка осталась после загрузки фото');
+   const thumbnail = row('m72').querySelector('.attachment-preview');
+   thumbnail.click();
+   const viewer = await until(() => document.querySelector('.attachment-viewer'));
+   const stage = viewer.querySelector('.attachment-viewer-stage');
+   const picture = viewer.querySelector('img');
+   const originalWidth = picture.getBoundingClientRect().width;
+   const wheel = (deltaY, ctrlKey) =>
+    stage.dispatchEvent(new WheelEvent('wheel', {deltaY, ctrlKey, cancelable: true, bubbles: true}));
+   if (wheel(-120, true)) throw Error('Ctrl + колесо меняет масштаб WebView');
+   await until(() => picture.getBoundingClientRect().width > originalWidth + 1);
+   wheel(240, true);
+   await until(() => picture.getBoundingClientRect().width < originalWidth - 1);
+   const reducedWidth = picture.getBoundingClientRect().width;
+   wheel(-120, false);
+   await delay(30);
+   if (Math.abs(picture.getBoundingClientRect().width - reducedWidth) > 1)
+    throw Error('Обычная прокрутка меняет масштаб');
+   const more = viewer.querySelector('[aria-haspopup="menu"]');
+   more.click();
+   const menu = await until(() => viewer.querySelector('[role="menu"]'));
+   const labels = element => Array.from(element.querySelectorAll('[role="menuitem"]'), item => item.textContent);
+   if (labels(menu).join() !== 'Скопировать,Скачать') throw Error('Неполное меню фотографии');
+   const escape = () =>
+    document.activeElement.dispatchEvent(
+     new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})
+    );
+   escape();
+   await until(() => !viewer.querySelector('[role="menu"]') && document.activeElement === more);
+   viewer
+    .querySelector('img')
+    .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true, clientX: 50, clientY: 50}));
+   const context = await until(() => viewer.querySelector('[role="menu"]'));
+   if (labels(context).join() !== labels(menu).join()) throw Error('Действия по правой кнопке и через меню отличаются');
+   escape();
+   await until(() => !viewer.querySelector('[role="menu"]'));
+   escape();
+   await until(() => !document.querySelector('.attachment-viewer') && document.activeElement === thumbnail);
+   thumbnail.click();
+   await until(
+    () => Math.abs(document.querySelector('.attachment-viewer img')?.getBoundingClientRect().width - originalWidth) < 1
+   );
+   document.querySelector('.attachment-viewer-close').click();
+   await until(() => !document.querySelector('.attachment-viewer'));
+   goUp();
+   await until(() => row('m0') && !model.history.hasMore);
+   if (calls !== 2) throw Error('Неверное количество запросов истории');
+   // All pages are in memory. A poll can arrive mid-scroll in this same channel.
+   const poll = structuredClone(state);
+   poll.me.last_seen = 123;
+   poll.users[0].online = true;
+   poll.groups[0].channels[0].unreadCount = 1;
+   poll.humanTyping = [{user: 'someone', channel: channel.id, until: 123}];
+   renders = 0;
+   chatSnapshotActions.applyState(poll);
+   scrollToRow('m140');
+   await delay(150);
+   if (renders || calls !== 2 || photoReads !== 1) throw Error('Фоновое обновление перерисовало загруженную историю');
+   const edited = structuredClone(poll);
+   const message = edited.messages.find(item => item.id === 'm141');
+   message.text = 'Исправленный текст';
+   message.reactions = [{user: me.id, emoji: '👍'}];
+   chatSnapshotActions.applyState(edited);
+   await until(() => row('m141')?.textContent.includes(message.text) && row('m141').querySelector('.message-reaction'));
+   if (renders < 1 || renders > 2) throw Error('Правка одного сообщения затронула лишние карточки');
+   const renamed = structuredClone(edited);
+   renamed.users[0].name = 'Новое имя';
+   chatSnapshotActions.applyState(renamed);
+   await until(() => row('m141')?.getAttribute('aria-label') === 'Новое имя');
+   const select = createMessageRowSelector();
+   if (select(renamed, channel.id).canDeleteAny) throw Error('Лишнее право удаления');
+   const granted = structuredClone(renamed);
+   granted.groups[0].permissions = ['messages.delete_any'];
+   granted.groups[0].channels.push({id: 'voice', kind: 'voice', name: 'Голос'});
+   granted.messages.find(item => item.id === 'm140').text = 'Приглашение в голосовой канал\n[sombra-voice:g/voice]';
+   if (!select(granted, channel.id).canDeleteAny || select(granted, 'elsewhere').canDeleteAny)
+    throw Error('Право удаления не соответствует каналу');
+   chatSnapshotActions.applyState(granted);
+   await until(() => row('m140')?.textContent.includes('«Голос»'));
+   chatSnapshotActions.applyState({...granted, groups: []});
+   await until(() => row('m140')?.textContent.includes('Голосовой канал недоступен'));
+   app.unmount();
+   app = createRoot(document.getElementById('transcript'));
+   app.render(h(App));
+   await until(() => row('m0') && row('m149'));
+   if (calls !== 2) throw Error('Повторное открытие чата перечитало историю');
+   const openAction = async (id, label) => {
+    const element = row(id);
+    element.scrollIntoView({block: 'center'});
+    // Radix restores focus and pointer events after a modal closes.
+    await until(
+     () =>
+      !document.querySelector('[role="dialog"],[role="alertdialog"]') && document.body.style.pointerEvents !== 'none'
+    );
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    element.dispatchEvent(
+     new MouseEvent('contextmenu', {button: 2, bubbles: true, cancelable: true, clientX: 150, clientY: 120})
+    );
+    const item = () =>
+     [...document.querySelectorAll('[role="menuitem"]')].find(
+      node => node.textContent === label || node.getAttribute('aria-label') === label
+     );
+    try {
+     await until(item);
+    } catch {
+     throw Error(
+      'Меню ' +
+       label +
+       ': ' +
+       Array.from(
+        document.querySelectorAll('[role="menuitem"]'),
+        node => node.getAttribute('aria-label') || node.textContent
+       ).join(', ')
+     );
+    }
+    item().click();
+   };
+   await openAction('m65', 'Редактировать');
+   const input = () => document.querySelector('textarea[aria-label="Текст сообщения"]');
+   await until(input);
+   Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input(), 'Сохранённая правка');
+   input().dispatchEvent(new Event('input', {bubbles: true}));
+   const submit = () => document.querySelector('[role="dialog"] button[type="submit"]:enabled');
+   await until(submit);
+   submit().click();
+   await until(
+    () =>
+     !input() &&
+     row('m65').textContent.includes('Сохранённая правка') &&
+     row('m66').textContent.includes('Сохранённая правка')
+   );
+   await openAction('m65', 'Реакция 👍');
+   await until(() => row('m65').querySelector('.message-reaction'));
+   await openAction('m65', 'Удалить сообщение');
+   const confirm = () => document.querySelector('[role="alertdialog"] button[type="submit"]');
+   await until(confirm);
+   confirm().click();
+   await until(() => !row('m65') && row('m66').textContent.includes('Исходное сообщение недоступно'));
+   if (db.some(item => item.id === 'm65')) throw Error('Сервис не получил удаление');
+
+   const currentView = document.querySelector('.message-scroll');
+   const wrapper = id => row(id).closest('[data-slot="message-scroller-item"]');
+   currentView.scrollTop += wrapper('m20').getBoundingClientRect().top - currentView.getBoundingClientRect().top + 6;
+   await until(() => JSON.parse(localStorage.getItem(bookmark))?.id === 'm20');
+   const saved = JSON.parse(localStorage.getItem(bookmark));
+   app.unmount();
+   chatHistoryStore.setState({channels: {}});
+   slowRestore = true;
+   app = createRoot(document.getElementById('transcript'));
+   app.render(h(App));
+   await until(
+    () =>
+     row('m20') &&
+     Math.abs(
+      wrapper('m20').getBoundingClientRect().top -
+       document.querySelector('.message-scroll').getBoundingClientRect().top -
+       saved.offset
+     ) <= 1
+   );
+   if (JSON.parse(localStorage.getItem(bookmark))?.id !== 'm20') throw Error('Закладка перезаписана во время загрузки');
+   report.textContent = 'OK';
+  } catch (error) {
+   report.textContent = String(error);
+   throw error;
+  } finally {
+   Date.prototype.toLocaleTimeString = formatTime;
+   app.unmount();
+   localStorage.removeItem(bookmark);
+  }
+ </script>
+</html>

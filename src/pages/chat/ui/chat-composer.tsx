@@ -12,7 +12,7 @@ import {
  AssistantComposer,
  ExpressionPicker,
  StickerSuggestions,
- pastedAttachment
+ pastedAttachments
 } from '@/features/message-composer';
 import type {ChatState} from '@/shared/types';
 import type {ChatNavigationModel} from '../model/use-chat-navigation';
@@ -33,7 +33,7 @@ type Props = {
 /** Поле ввода: ответ, пересылка, вложения, стикеры, упоминания и подсказки. */
 export function ChatComposer({chat, state, nav, panels, messages, composerRef, forwardCommentRef}: Props) {
  const {home, channel, group, title} = nav;
- const {draft, replyDraft, forwardDraft, attachment, readingAttachment} = messages;
+ const {draft, replyDraft, forwardDraft, attachments} = messages;
  const meId = state?.me.id || '';
  const busy = chat.busy;
  const focusComposer = () => requestAnimationFrame(() => messages.textareaRef.current?.focus());
@@ -115,18 +115,16 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
        attachments={
         <AttachmentDraftPreview
          key={`${meId}:${channel.id}`}
-         draft={attachment}
-         reading={readingAttachment}
+         attachments={attachments}
          disabled={busy}
          onRemove={messages.actions.removeAttachment}
         />
        }
-       hasAttachment={!!attachment}
+       hasAttachment={attachments.length > 0}
        placeholder={`Написать в ${title}`}
        textareaRef={messages.textareaRef}
        onPaste={event => {
-        const file = pastedAttachment(event);
-        if (file) void messages.actions.selectAttachment(file);
+        messages.actions.selectAttachments(pastedAttachments(event));
        }}
        sendButton={
         <TooltipLabel content="Отправить сообщение">
@@ -135,14 +133,7 @@ export function ChatComposer({chat, state, nav, panels, messages, composerRef, f
          </ComposerSendButton>
         </TooltipLabel>
        }
-       leadingActions={
-        <AttachmentComposer
-         reading={readingAttachment}
-         disabled={busy}
-         onFile={file => void messages.actions.selectAttachment(file)}
-         onRemove={messages.actions.removeAttachment}
-        />
-       }
+       leadingActions={<AttachmentComposer disabled={busy} onFiles={messages.actions.selectAttachments} />}
        suggestions={
         state && (
          <StickerSuggestions

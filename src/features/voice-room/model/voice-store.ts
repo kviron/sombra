@@ -7,6 +7,7 @@ type VoiceActions = {
  beginOperation: () => void;
  finishOperation: () => void;
  setError: (error: string) => void;
+ setPresenceDelayed: (presenceDelayed: boolean) => void;
  connected: (
   room: string,
   local: MediaStream,
@@ -34,6 +35,7 @@ export type VoiceState = {
  room: string;
  busy: boolean;
  error: string;
+ presenceDelayed: boolean;
  microphoneLost: boolean;
  camera: boolean;
  presenting: boolean;
@@ -63,17 +65,20 @@ export function createVoiceStore(preferences: MediaPreferences) {
   streams: {},
   connections: {},
   preferences: {...preferences},
+  presenceDelayed: false,
   availability: {muted: false, deaf: false},
   micVolume: 100,
   actions: {
    beginOperation: () => set({busy: true, error: ''}),
    finishOperation: () => set({busy: false}),
    setError: error => set({error}),
+   setPresenceDelayed: presenceDelayed => set({presenceDelayed}),
    connected: (room, local, camera, peers, ownClient, audioOnly = false) =>
     set({room, local, camera, audioOnly, peers: reconcileVoicePeers([], peers, ownClient)}),
    resetCall: micVolume =>
     set({
      room: '',
+     presenceDelayed: false,
      busy: false,
      local: null,
      peers: [],

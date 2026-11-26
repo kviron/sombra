@@ -175,9 +175,7 @@ export function useChatPanels({state, home, channel, peer, group, voice}: Option
    closeInfo() {
     chatPanelsActions.closeInfo();
    },
-   openProfile(id: string) {
-    chatPanelsActions.openProfile(id, false);
-   },
+   openProfile: chatPanelsActions.openProfile,
    closeProfile() {
     chatPanelsActions.closeProfile();
    },

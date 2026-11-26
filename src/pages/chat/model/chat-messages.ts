@@ -3,7 +3,9 @@
 // Черновики адресуются ключом «аккаунт + переписка», поэтому хранилище модульное: страница одна.
 import {createStore} from 'zustand/vanilla';
 import type {VerifiedMention} from '@/entities/message';
-import type {AttachmentDraft, ChatMessage} from '@/shared/types';
+import type {ChatMessage} from '@/shared/types';
+import type {DraftAttachment} from '@/features/message-composer';
+import {matchesAlbum} from './outgoing-attachments';
 import {matchesServerMessage, outgoingText} from './chat-rules';
 
 export type ForwardDraft = {message: ChatMessage; comment: string};
@@ -14,12 +16,18 @@ export type OutgoingDraft = {
  user: string;
  text: string;
  mentions: VerifiedMention[];
- attachment?: AttachmentDraft;
+ files: File[];
  replyTo?: string;
  time: number;
 };
 
-export type OutgoingEntry = {status: 'sending' | 'failed'; draft: OutgoingDraft; error?: string};
+export type OutgoingEntry = {
+ status: 'sending' | 'failed';
+ draft: OutgoingDraft;
+ uploadedIds: string[];
+ publishedId?: string;
+ error?: string;
+};
 
 export type ChatMessagesState = {
  search: string;
@@ -30,8 +38,7 @@ export type ChatMessagesState = {
  replyDrafts: Record<string, ChatMessage | undefined>;
  forwardDrafts: Record<string, ForwardDraft | undefined>;
  forwardPicker: {owner: string; message: ChatMessage} | undefined;
- attachments: Record<string, AttachmentDraft | undefined>;
- readingAttachments: Record<string, boolean>;
+ attachments: Record<string, DraftAttachment[] | undefined>;
  outbox: Record<string, OutgoingEntry>;
 };
 
@@ -45,7 +52,6 @@ const initialState: ChatMessagesState = {
  forwardDrafts: {},
  forwardPicker: undefined,
  attachments: {},
- readingAttachments: {},
  outbox: {}
 };
 
@@ -118,39 +124,40 @@ export const chatMessagesActions = {
  cancelForwardDraft(key: string) {
   chatMessagesStore.setState(current => ({forwardDrafts: {...current.forwardDrafts, [key]: undefined}}));
  },
- setAttachment(channel: string, draft: AttachmentDraft | undefined) {
-  chatMessagesStore.setState(current => ({attachments: {...current.attachments, [channel]: draft}}));
+ setAttachments(key: string, attachments: DraftAttachment[]) {
+  chatMessagesStore.setState(current => ({attachments: {...current.attachments, [key]: attachments}}));
  },
- setReading(channel: string, reading: boolean) {
-  chatMessagesStore.setState(current => ({readingAttachments: {...current.readingAttachments, [channel]: reading}}));
+ removeAttachment(key: string, id: string) {
+  const attachments = chatMessagesStore.getState().attachments[key];
+  if (attachments)
+   chatMessagesActions.setAttachments(
+    key,
+    attachments.filter(item => item.id !== id)
+   );
  },
- /** Отправка убирает только то вложение, которое отправили. */
- clearSentAttachment(channel: string, draft: AttachmentDraft) {
-  chatMessagesStore.setState(current =>
-   current.attachments[channel] !== draft ? current : {attachments: {...current.attachments, [channel]: undefined}}
-  );
+ resetOutgoingDrafts() {
+  chatMessagesStore.setState({attachments: {}, outbox: {}});
  },
- resetAttachments() {
-  chatMessagesStore.setState({attachments: {}, readingAttachments: {}});
+ /** Файлы и ответ сразу переезжают из поля ввода в исходящее сообщение. */
+ beginOutgoing(id: string, key: string, draft: OutgoingDraft) {
+  chatMessagesStore.setState(current => ({
+   attachments: {...current.attachments, [key]: undefined},
+   replyDrafts: {...current.replyDrafts, [key]: undefined},
+   outbox: {...current.outbox, [id]: {status: 'sending', draft, uploadedIds: []}}
+  }));
  },
- /** Оптимистичная отправка: запись появляется в переписке сразу, ещё до ответа сервера. */
- beginOutgoing(id: string, draft: OutgoingDraft) {
-  chatMessagesStore.setState(current => ({outbox: {...current.outbox, [id]: {status: 'sending', draft}}}));
+ updateOutgoing(id: string, patch: Partial<Omit<OutgoingEntry, 'draft'>>) {
+  chatMessagesStore.setState(current => {
+   const entry = current.outbox[id];
+   return entry ? {outbox: {...current.outbox, [id]: {...entry, ...patch}}} : current;
+  });
  },
  /** Повтор берёт тот же черновик: причина ошибки сбрасывается, статус снова «отправляется». */
  retryOutgoing(id: string) {
-  chatMessagesStore.setState(current => {
-   const entry = current.outbox[id];
-   if (!entry) return current;
-   return {outbox: {...current.outbox, [id]: {status: 'sending', draft: entry.draft}}};
-  });
+  chatMessagesActions.updateOutgoing(id, {status: 'sending', error: undefined});
  },
  failOutgoing(id: string, error: string) {
-  chatMessagesStore.setState(current => {
-   const entry = current.outbox[id];
-   if (!entry) return current;
-   return {outbox: {...current.outbox, [id]: {status: 'failed', draft: entry.draft, error}}};
-  });
+  chatMessagesActions.updateOutgoing(id, {status: 'failed', error});
  },
  /** Сервер подтвердил отправку: временное сообщение больше не нужно. */
  discardOutgoing(id: string) {
@@ -165,11 +172,25 @@ export const chatMessagesActions = {
   * Опрос мог принести настоящее сообщение раньше ответа на отправку:
   * временное совпадение по содержанию и близкому времени убираем, чтобы не было двух одинаковых.
   */
- reconcileOutgoing(messages: readonly ChatMessage[]) {
+ reconcileOutgoing(messages: readonly ChatMessage[], previousIds: ReadonlySet<string>) {
   chatMessagesStore.setState(current => {
-   const kept = Object.entries(current.outbox).filter(
-    ([, entry]) => !messages.some(message => matchesServerMessage(entry.draft, message))
-   );
+   const matched = new Set<string>();
+   const kept = Object.entries(current.outbox).filter(([, entry]) => {
+    const {draft, publishedId, uploadedIds} = entry;
+    const message = messages.find(message => {
+     if (matched.has(message.id) || message.channel !== draft.channel || message.user !== draft.user) return false;
+     if (publishedId) return publishedId === message.id;
+     if (draft.files.length > 1) return matchesAlbum(uploadedIds, draft.files.length, message);
+     if (previousIds.has(message.id) || (message.attachments?.length || 0) > 1) return false;
+     const file = draft.files[0],
+      attachment = message.attachments?.[0] || message.attachment;
+     if (file && (attachment?.name !== file.name || attachment?.size !== file.size)) return false;
+     if (!file && attachment) return false;
+     return matchesServerMessage({...draft, text: outgoingText(draft.text, file?.name)}, message);
+    });
+    if (message) matched.add(message.id);
+    return !message;
+   });
    if (kept.length === Object.keys(current.outbox).length) return current;
    return {outbox: Object.fromEntries(kept)};
   });
@@ -182,15 +203,15 @@ export function outgoingMessage(id: string, draft: OutgoingDraft): ChatMessage {
   id,
   channel: draft.channel,
   user: draft.user,
-  text: outgoingText(draft.text, draft.attachment?.name),
+  text: outgoingText(draft.text, draft.files.length > 1 ? `Вложения (${draft.files.length})` : draft.files[0]?.name),
   time: draft.time
  };
 }
 
 /** Исходящие одного канала в порядке отправки: в переписке они всегда идут последними. */
-export function outgoingEntries(outbox: Record<string, OutgoingEntry>, channel: string) {
+export function outgoingEntries(outbox: Record<string, OutgoingEntry>, channel: string, user: string) {
  return Object.entries(outbox)
-  .filter(([, entry]) => entry.draft.channel === channel)
+  .filter(([, entry]) => entry.draft.channel === channel && entry.draft.user === user)
   .map(([id, entry]) => ({id, message: outgoingMessage(id, entry.draft), status: entry.status, error: entry.error}));
 }
 
@@ -200,7 +221,6 @@ export function outgoingPayload(draft: OutgoingDraft) {
   channel: draft.channel,
   text: draft.text,
   mentions: draft.mentions,
-  ...(draft.attachment ? {attachment: draft.attachment} : {}),
   ...(draft.replyTo ? {replyTo: draft.replyTo} : {})
  };
 }

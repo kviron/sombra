@@ -1,5 +1,6 @@
 /* global AudioContext, document */
 // Browser-only fixture. The runner substitutes only the backend; WebRTC is real.
+import {ApiConnectionError} from '@/shared/api';
 import {createElement as h, useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
 import {useVoice} from '../../src/features/voice-room/model/use-voice';
@@ -325,6 +326,102 @@ async function checkLostMicrophone() {
  if (!calls[0].room || calls[0].muted || calls[0].local.getAudioTracks()[0].readyState !== 'live')
   throw new Error('Microphone recovery lost the call or mute state');
 }
+async function checkPresenceRecovery() {
+ const backend = globalThis.voiceTestBackend;
+ const session = createVoiceSession(defaultMedia);
+ const admissions = [];
+ let failures = 0;
+ let recovered = false;
+ globalThis.voiceTestBackend = {
+  ...backend,
+  async join(args) {
+   admissions.push(args.client);
+   return backend.join(args);
+  },
+  async poll(args) {
+   if (args.client === admissions[0]) {
+    if (++failures === 1) throw new ApiConnectionError('Temporary outage');
+    peers.delete(args.client);
+    throw new Error('Соединение завершено. Войдите в комнату снова.');
+   }
+   recovered = true;
+   return backend.poll(args);
+  }
+ };
+ try {
+  await session.actions.join('signaling-test');
+  const input = session.store.getState().local.getAudioTracks()[0];
+  await until(() => recovered || !session.store.getState().room, 'Presence did not recover', 350);
+  if (!recovered || admissions.length !== 2 || session.store.getState().local?.getAudioTracks()[0] !== input)
+   throw new Error('Presence expiry discarded the active microphone or failed to readmit');
+  globalThis.voiceTestBackend.poll = async () => {
+   throw new Error('Нет доступа к голосовой комнате');
+  };
+  await until(() => !session.store.getState().room, 'Access denial did not end the call', 150);
+  if (admissions.length !== 2 || input.readyState !== 'ended') throw new Error('Access denial allowed readmission');
+ } finally {
+  session.actions.leave();
+  globalThis.voiceTestBackend = backend;
+ }
+}
+
+async function checkRejoinControls() {
+ const backend = globalThis.voiceTestBackend;
+ const capture = navigator.mediaDevices.getUserMedia;
+ const session = createVoiceSession(defaultMedia);
+ let raw, firstPublished, releaseCapture;
+ try {
+  navigator.mediaDevices.getUserMedia = async () => {
+   const stream = await capture();
+   raw = stream.getAudioTracks()[0];
+   return stream;
+  };
+  globalThis.voiceTestBackend = {
+   ...backend,
+   poll: async args => {
+    firstPublished ??= session.store.getState().local?.getAudioTracks()[0];
+    return backend.poll(args);
+   }
+  };
+  session.actions.setMicVolume(0);
+  if (!(await session.actions.join('gain-on-admission')) || !firstPublished || firstPublished === raw)
+   throw new Error('Raw microphone was published while volume was zero');
+  const analyser = audio.createAnalyser();
+  const source = audio.createMediaStreamSource(new globalThis.MediaStream([firstPublished]));
+  source.connect(analyser);
+  const samples = new Float32Array(analyser.fftSize);
+  const hasTone = () => {
+   analyser.getFloatTimeDomainData(samples);
+   return samples.some(sample => Math.abs(sample) > 0.05);
+  };
+  try {
+   await delay(120);
+   if (hasTone()) throw new Error('Initial zero volume passed microphone audio');
+   session.actions.setMicVolume(75);
+   await until(hasTone, 'Raising gain did not restore the microphone on the same track');
+  } finally {
+   source.disconnect();
+  }
+  const lateStream = await capture();
+  navigator.mediaDevices.getUserMedia = () =>
+   new Promise(resolve => {
+    releaseCapture = () => resolve(lateStream);
+   });
+  session.actions.savePreferences('mic', 'delayed-device');
+  session.actions.leave();
+  navigator.mediaDevices.getUserMedia = capture;
+  if (!(await session.actions.join('next-room'))) throw new Error('Old device request blocked new room');
+  releaseCapture();
+  await until(() => lateStream.getTracks().every(t => t.readyState === 'ended'), 'Late device was retained');
+  if (session.store.getState().preferences.mic === 'delayed-device') throw new Error('Old device changed new room');
+ } finally {
+  releaseCapture?.();
+  session.actions.leave();
+  globalThis.voiceTestBackend = backend;
+  navigator.mediaDevices.getUserMedia = capture;
+ }
+}
+
 async function checkLateCapture() {
  const capture = navigator.mediaDevices.getUserMedia;
  const stream = audio.createMediaStreamDestination().stream;
@@ -465,6 +562,8 @@ async function check() {
      return {ok: false, error: 'Unmount left microphone tracks or room membership active', members: peers.size};
     await checkCancelledNegotiation();
     await checkLateCapture();
+    await checkPresenceRecovery();
+    await checkRejoinControls();
     return {
      ok: true,
      receiverHz: peaks,
@@ -474,6 +573,10 @@ async function check() {
      unmountReleased: true,
      cancelledNegotiation: true,
      mediaControls: true,
+     presenceReadmitted: true,
+     accessDenialClosedCall: true,
+     initialGainApplied: true,
+     lateDeviceReleased: true,
      lateCaptureReleased: true
     };
    }

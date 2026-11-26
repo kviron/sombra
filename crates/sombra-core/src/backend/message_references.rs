@@ -89,6 +89,7 @@ impl Backend {
         }
         let text = s(source, "text");
         if text.trim().is_empty()
+            || !attachments::message_attachments(source).is_empty()
             || !source["attachment"].is_null()
             || !s(source, "sticker").is_empty()
             || !source["gif"].is_null()

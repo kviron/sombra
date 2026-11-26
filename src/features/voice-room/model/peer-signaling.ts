@@ -10,6 +10,7 @@ const BATCH_SIZE = 16;
 function candidateSender(
  signal: (payload: VoiceSignalPayload) => Promise<unknown>,
  supportsBatch: () => boolean,
+ retryable: (error: unknown) => boolean,
  onError: (error: unknown) => void
 ) {
  const queue: RTCIceCandidateInit[] = [];
@@ -17,17 +18,27 @@ function candidateSender(
   sending = false,
   closed = false;
  let timer: ReturnType<typeof setTimeout> | undefined;
+ let pending: VoiceSignalPayload | undefined;
+ let attempts = 0;
  async function flush() {
   timer = undefined;
   if (sending || !announced || closed) return;
   sending = true;
   while (queue.length && !closed) {
-   const payload = supportsBatch() ? {candidates: queue.splice(0, BATCH_SIZE)} : {candidate: queue.shift()!};
+   pending ??= supportsBatch() ? {candidates: queue.slice(0, BATCH_SIZE)} : {candidate: queue[0]};
    try {
-    await signal(payload);
+    await signal(pending);
    } catch (error) {
-    if (!closed) onError(error);
+    if (closed) break;
+    if (retryable(error) && attempts < MAX_RETRIES) {
+     timer = setTimeout(flush, 250 * 2 ** attempts++);
+     break;
+    }
+    onError(error);
    }
+   queue.splice(0, pending.candidates?.length ?? 1);
+   pending = undefined;
+   attempts = 0;
   }
   sending = false;
  }
@@ -63,6 +74,7 @@ type Options = {
  onConnection: (id: string, state: RTCPeerConnectionState | null) => void;
  onStream: (id: string, stream: MediaStream | null) => void;
  onSignalError: (error: unknown) => void;
+ retryableSignalError: (error: unknown) => boolean;
  watch: (id: string, pc: RTCPeerConnection, stream: MediaStream) => void;
  forget: (id: string) => void;
 };
@@ -77,6 +89,7 @@ export function createPeerLink(client: string, id: string, options: Options) {
  let timer: ReturnType<typeof setTimeout> | undefined;
  let answerTimer: ReturnType<typeof setTimeout> | undefined;
  let incoming: {candidate: RTCIceCandidateInit; connectionId?: string}[] = [];
+ const appliedCandidates = new Set<string>();
  let outgoing: ReturnType<typeof candidateSender> | undefined;
  let remoteIceVersion = 1;
  let iceRestart: 'idle' | 'requested' | 'in-progress' = 'idle';
@@ -85,9 +98,11 @@ export function createPeerLink(client: string, id: string, options: Options) {
  function beginExchange(generation?: string) {
   outgoing?.close();
   connectionId = generation;
+  appliedCandidates.clear();
   outgoing = candidateSender(
    payload => options.signal(id, {...payload, connectionId: generation}),
    () => remoteIceVersion >= ICE_VERSION,
+   options.retryableSignalError,
    options.onSignalError
   );
  }
@@ -189,7 +204,16 @@ export function createPeerLink(client: string, id: string, options: Options) {
 
  async function addCandidate(connection: RTCPeerConnection, candidate: RTCIceCandidateInit) {
   try {
+   const key = JSON.stringify([
+    candidate.candidate,
+    candidate.sdpMid,
+    candidate.sdpMLineIndex,
+    candidate.usernameFragment
+   ]);
+   if (appliedCandidates.has(key)) return;
+   const generation = connectionId;
    await connection.addIceCandidate(candidate);
+   if (pc === connection && connectionId === generation) appliedCandidates.add(key);
   } catch (error) {
    // Older clients send untagged candidates. A stale ICE generation rejects just that candidate.
    if (pc === connection && !(error instanceof DOMException && error.name === 'OperationError')) throw error;

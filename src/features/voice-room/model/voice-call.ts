@@ -10,6 +10,7 @@ export type Call = {
  client: string;
  stream: MediaStream;
  stop: boolean;
+ changingMedia?: boolean;
  stopTransport?: () => void;
  replaceTransportTrack?: (kind: TrackKind, track: MediaStreamTrack | null) => Promise<void>;
  setTransportMuted?: (muted: boolean) => void;
@@ -100,7 +101,6 @@ export function stopCall(c: Call) {
 export type VoiceRuntime = {
  call: Call | null;
  pending: symbol | null;
- changingMedia: boolean;
  generation: number;
  availabilityRevision: number;
  preferredMicVolume: number;

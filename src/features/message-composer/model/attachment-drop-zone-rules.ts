@@ -26,10 +26,9 @@ export const dropEffectFor = (accepting: boolean) => (accepting ? 'copy' : 'none
 
 export const isFileItem = (item: {kind?: string}) => item.kind === 'file';
 
-/** Папка или несколько файлов: поле ввода принимает ровно один файл. */
+/** Папку нельзя прочитать как один из файлов сообщения. */
 export function dropError({directories, count}: {directories: boolean; count: number}) {
  if (directories) return 'Перетащите файл, а не папку.';
- if (count > 1) return 'Пока можно прикрепить один файл за раз.';
  if (count === 0) return 'Не удалось получить файл. Попробуйте кнопку вложения.';
  return '';
 }

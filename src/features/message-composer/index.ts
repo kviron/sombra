@@ -2,6 +2,7 @@
 export * from './model/assistant-composer-rules';
 export * from './model/attachment-drop-zone-rules';
 export * from './model/composer-candidates';
+export * from './model/draft-attachments';
 export * from './model/expression-picker-rules';
 export * from './model/use-chat-draft';
 export * from './model/use-message-link';

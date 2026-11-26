@@ -48,9 +48,15 @@ async function limited<T>(run: () => Promise<T>): Promise<T> {
 }
 
 /** Единственный путь сохранения: нативное окно Tauri или авторизованный запрос браузера. */
-export async function saveAttachment(messageId: string, alive: () => boolean): Promise<string | undefined> {
- if (tauri.isTauri()) return tauri.commands.files.saveAttachment<string>({message: messageId});
- const file = await limited(() => messageService.attachment<AttachmentFile>({message: messageId}));
+export async function saveAttachment(
+ messageId: string,
+ attachmentId: string,
+ alive: () => boolean
+): Promise<string | undefined> {
+ if (tauri.isTauri()) return tauri.commands.files.saveAttachment<string>({message: messageId, attachmentId});
+ const file = await limited(() =>
+  messageService.attachment<AttachmentFile>({message: messageId, attachment_id: attachmentId})
+ );
  if (!alive()) return;
  const url = URL.createObjectURL(attachmentBlob(file));
  const anchor = document.createElement('a');
@@ -68,16 +74,17 @@ export async function saveAttachment(messageId: string, alive: () => boolean): P
 
 export type DownloadOptions = {
  messageId: string;
+ attachmentId: string;
  isAlive: () => boolean;
  onBusy: (busy: boolean) => void;
  onError: (error: string) => void;
 };
 
 /** Скачивание: состояние кнопки, сообщение об ошибке и разлогин при истёкшей сессии. */
-export async function downloadAttachment({messageId, isAlive, onBusy, onError}: DownloadOptions) {
+export async function downloadAttachment({messageId, attachmentId, isAlive, onBusy, onError}: DownloadOptions) {
  onBusy(true);
  try {
-  const path = await saveAttachment(messageId, isAlive);
+  const path = await saveAttachment(messageId, attachmentId, isAlive);
   if (isAlive() && path) toast.success('Файл сохранён в Загрузки', {description: path});
  } catch (reason) {
   const failure = attachmentDownloadFailure(reason, 'Не удалось скачать файл.');

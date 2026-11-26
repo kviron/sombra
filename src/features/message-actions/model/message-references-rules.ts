@@ -1,3 +1,4 @@
+import {albumSummary} from '../../../shared/lib/message-attachments.ts';
 // Чистые правила ссылок на сообщения: краткое описание и поиск назначения пересылки.
 // Сеть, DOM и React здесь не нужны, поэтому правила проверяются тестами.
 import type {ChatMessage, User} from '@/shared/types';
@@ -15,7 +16,10 @@ export type ForwardDestination = {
 /** Короткое описание сообщения: текст, вложение, стикер или GIF. */
 export function messagePreview(message: ChatMessage) {
  return (
-  message.text?.trim() || message.attachment?.name || (message.sticker ? 'Стикер' : message.gif ? 'GIF' : 'Сообщение')
+  message.text?.trim() ||
+  albumSummary(message) ||
+  message.attachment?.name ||
+  (message.sticker ? 'Стикер' : message.gif ? 'GIF' : 'Сообщение')
  );
 }
 

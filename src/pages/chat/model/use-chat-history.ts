@@ -1,54 +1,36 @@
-// Связка истории с активным каналом: обрезанный канал один раз сам открывает страницу,
-// дальше решают кнопка и прокрутка. Поколение аккаунта защищает от поздних ответов.
-import {useCallback, useEffect, useRef} from 'react';
+import {useCallback, useLayoutEffect, useMemo} from 'react';
 import {useStore} from 'zustand';
 import type {ChatMessage, ChatState} from '@/shared/types';
 import {chatHistoryActions, chatHistoryStore} from './chat-history';
 import {historyTruncated} from './chat-history-rules';
 
-type Options = {state: ChatState | null; channel: string};
-
 const NO_MESSAGES: ChatMessage[] = [];
 
-export function useChatHistory({state, channel}: Options) {
- const history = useStore(chatHistoryStore);
- const account = state?.me.id || '';
- const autoLoaded = useRef(new Set<string>());
- // Действие всегда попадает в текущий канал: старый обработчик не догрузит прошлый.
- const active = useRef(channel);
- active.current = channel;
+export function useChatHistory({state, channel}: {state: ChatState | null; channel: string}) {
+ const account = state?.me.id;
+ const history = useStore(chatHistoryStore, cache => (cache.account === account ? cache.channels[channel] : undefined));
+ const serverMessages = state?.messages;
+ const recent = useMemo(
+  () => serverMessages?.filter(row => row.channel === channel) ?? NO_MESSAGES,
+  [serverMessages, channel]
+ );
+ const truncated = historyTruncated(state, channel);
 
- // Смена аккаунта или размонтирование: чужие страницы не должны пережить сеанс.
- useEffect(() => {
-  autoLoaded.current = new Set();
-  chatHistoryActions.resetAll();
-  return () => {
-   autoLoaded.current = new Set();
-   chatHistoryActions.resetAll();
-  };
- }, [account]);
-
- // Одна автодогрузка на канал: дальше прокрутка и кнопка, поэтому цикла нет.
- useEffect(() => {
-  if (!account || !channel || !historyTruncated(state, channel)) return;
-  const key = `${account}:${channel}`;
-  if (autoLoaded.current.has(key)) return;
-  autoLoaded.current.add(key);
-  // Страница уже в памяти (возврат в канал): повторный запрос не нужен.
-  if (Object.prototype.hasOwnProperty.call(chatHistoryStore.getState().nextBefore, channel)) return;
-  void chatHistoryActions.loadOlder(channel);
- }, [account, channel, state]);
+ useLayoutEffect(() => {
+  if (account && channel) return chatHistoryActions.retain(account, channel);
+ }, [account, channel]);
+ useLayoutEffect(() => {
+  if (account && channel) chatHistoryActions.acceptRecent(channel, recent, truncated);
+ }, [account, channel, recent, truncated]);
 
  const loadOlder = useCallback(() => {
-  const target = active.current;
-  if (target) void chatHistoryActions.loadOlder(target);
- }, []);
-
+  if (account && chatHistoryStore.getState().account === account) void chatHistoryActions.loadOlder(channel);
+ }, [account, channel]);
  return {
-  messages: history.pages[channel] || NO_MESSAGES,
-  hasMore: history.hasMore[channel] === true,
-  loading: history.loading[channel] === true,
-  error: history.errors[channel] || '',
+  messages: history?.messages ?? NO_MESSAGES,
+  hasMore: history?.hasMore ?? false,
+  loading: history?.loading ?? false,
+  error: history?.error ?? '',
   loadOlder
  };
 }

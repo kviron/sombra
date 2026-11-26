@@ -59,10 +59,11 @@ export function createAttachmentAudioModel() {
     error: 'Не удалось воспроизвести файл. Скачайте его.'
    });
   },
-  download({messageId, isAlive}: {messageId: string; isAlive: () => boolean}) {
+  download({messageId, attachmentId, isAlive}: {messageId: string; attachmentId: string; isAlive: () => boolean}) {
    if (store.getState().busy) return;
    void downloadAttachment({
     messageId,
+    attachmentId,
     isAlive,
     onBusy: busy => store.setState({busy}),
     onError: error => store.setState({error})

@@ -1,6 +1,7 @@
 import {ApiConnectionError} from '@/shared/api';
 import type {VoiceAvailability, VoicePeer as Peer, VoicePoll, VoiceSignalPayload} from '@/shared/types';
 import {voiceService} from './services/voice-service';
+import {createVoicePresence} from './voice-presence';
 import {createVoiceSampling} from './voice-transport-sampling';
 import {createPeerLink} from './peer-signaling';
 import {otherMembers} from './voice-peers';
@@ -17,14 +18,25 @@ type Options = {
  onConnection: (id: string, state: string | null) => void;
  onError: (error: unknown) => void;
  onSignalError: (error: unknown) => void;
+ onPresenceDelay: (delayed: boolean) => void;
 };
 export function startVoiceTransport(
  c: Call,
  first: VoicePoll,
- {availability, availabilityRevision, preferences, onPeers, onStream, onConnection, onError, onSignalError}: Options
+ {
+  availability,
+  availabilityRevision,
+  preferences,
+  onPeers,
+  onStream,
+  onConnection,
+  onError,
+  onSignalError,
+  onPresenceDelay
+ }: Options
 ) {
  let cursor = 0;
- let lastPoll = performance.now();
+ const presence = createVoicePresence(c, availability, onPresenceDelay);
  const signal = (target: string, payload: VoiceSignalPayload) =>
   voiceService.signal({room: c.room, client: c.client, target, payload});
  const sampling = createVoiceSampling(c, availability, availabilityRevision);
@@ -39,15 +51,20 @@ export function startVoiceTransport(
   onStream,
   onConnection,
   onSignalError,
+  retryableSignalError: (error: unknown) => error instanceof ApiConnectionError,
   watch: sampling.watch,
   forget: sampling.forget
  };
  let timer: ReturnType<typeof setTimeout>;
- c.stopTransport = () => {
-  clearTimeout(timer);
+ function clearLinks() {
   for (const link of links.values()) link.close();
   links.clear();
   sampling.clear();
+ }
+ c.stopTransport = () => {
+  presence.stop();
+  clearTimeout(timer);
+  clearLinks();
  };
  c.replaceTransportTrack = async (kind, track) => {
   // Let every sender settle before voice-call rolls the stream back.
@@ -70,19 +87,15 @@ export function startVoiceTransport(
   if (c.stop) return;
   try {
    const refreshIce = Date.now() >= renewIceAt;
-   const data = await voiceService.poll({
-    room: c.room,
-    client: c.client,
-    after: cursor,
-    ...availability(),
-    ...(refreshIce && {refreshIce})
-   });
-   if (c.stop) return;
-   if (refreshIce) {
+   const result = await presence.poll(cursor, refreshIce);
+   if (!result || c.stop) return;
+   const {data, readmitted} = result;
+   if (readmitted) clearLinks();
+   if (refreshIce || readmitted) {
     options.iceServers = data.iceServers;
     renewIceAt = renewAt(data.iceTtlSeconds);
    }
-   lastPoll = performance.now();
+   const lastPoll = performance.now();
    updatePresence(data.peers);
    const nextClients = new Set(data.peers.map(peer => peer.client));
    for (const [id, link] of links) {
@@ -107,11 +120,10 @@ export function startVoiceTransport(
    sampling.sample(data.peers, lastPoll);
    cursor = data.cursor;
   } catch (error) {
-   if (error instanceof ApiConnectionError && performance.now() - lastPoll < 14000) return;
    if (!c.stop) onError(error);
   } finally {
    // An empty room only polls for arrivals.
-   if (!c.stop) timer = setTimeout(poll, links.size ? 700 : 1000);
+   if (!c.stop) timer = setTimeout(poll, presence.interval(links.size ? 700 : 1000));
   }
  }
  void poll();

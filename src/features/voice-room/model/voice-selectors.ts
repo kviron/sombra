@@ -40,7 +40,7 @@ export function selectVoiceChannelMembers(
 export const selectVoiceView = (state: VoiceState) => ({
  room: state.room,
  busy: state.busy,
- error: state.error,
+ error: state.error || (state.presenceDelayed ? 'Восстанавливаем связь с сервером голосовой комнаты…' : ''),
  camera: state.camera,
  presenting: state.presenting,
  audioOnly: state.audioOnly,

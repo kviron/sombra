@@ -1,19 +1,28 @@
-import {useEffect, useMemo, useRef} from 'react';
+import {useEffect, useLayoutEffect, useMemo, useRef} from 'react';
 import {useStore} from 'zustand';
 import {toast} from 'sonner';
-import {readAttachment, mentionCandidates, useChatDraft, useMessageLink} from '@/features/message-composer';
+import {
+ attachmentSelectionError,
+ readAttachment,
+ mentionCandidates,
+ useChatDraft,
+ useMessageLink
+} from '@/features/message-composer';
 import {hasLiveImageActivity} from '@/features/bots';
 import {editMentionDraft, mentionSendPayload, messageService} from '@/entities/message';
 import type {MentionDraft, VerifiedMention} from '@/entities/message';
 import {useHumanTyping} from '@/entities/user';
 import type {ForwardDestination} from '@/features/message-actions';
 import type {Voice} from '@/features/voice-room';
+import {sessionService} from '@/shared/api';
+import {stageAttachments} from './outgoing-attachments';
 import {parseMusicCommand} from '@/shared/lib/music-command';
 import type {ChatMessage, ChatState, Channel, Dialog, Group, User} from '@/shared/types';
 import {chatMessagesActions, chatMessagesStore, outgoingEntries, outgoingPayload} from './chat-messages';
-import type {OutgoingDraft} from './chat-messages';
+import type {OutgoingDraft, OutgoingEntry} from './chat-messages';
 import {chatSnapshotActions, chatSnapshotStore} from './chat-state';
-import {mergeHistoryMessages} from './chat-history-rules';
+import {historyTruncated, mergeHistoryMessages} from './chat-history-rules';
+import {chatHistoryActions} from './chat-history';
 import {useChatHistory} from './use-chat-history';
 import {
  filterMessages,
@@ -69,17 +78,19 @@ export function useChatMessages({
  /** Страницы старых сообщений: подмешиваются перед снапшотом, порядок и дни не меняются. */
  const history = useChatHistory({state, channel: destination});
  const meId = state?.me.id || '';
+ const quoteRequest = useRef(0);
+ useLayoutEffect(
+  () => () => {
+   quoteRequest.current++;
+  },
+  [meId, destination]
+ );
  const busy = chatSnapshotStore.getState().busy;
- const {draft, setDraft: storeDraft, clearSent} = useChatDraft(destination);
- const mentionDrafts = useRef<Record<string, MentionDraft>>({});
- const attachmentReads = useRef<Record<string, number>>({});
- const attachmentOwner = useRef(meId);
- attachmentOwner.current = meId;
- const attachmentMounted = useRef(true);
-
- const attachment = channel ? messages.attachments[channel.id] : undefined;
- const readingAttachment = channel ? !!messages.readingAttachments[channel.id] : false;
  const referenceKey = referenceDraftKey(meId, channel?.id);
+ const {draft, getDraft, setDraft: storeDraft, clearSent} = useChatDraft(referenceKey);
+ const mentionDrafts = useRef<Record<string, MentionDraft>>({});
+ const previousMessageIds = useRef(new Set<string>());
+ const attachments = messages.attachments[referenceKey] || [];
  const references = referencesSupported(state);
  const replyDraft = references ? messages.replyDrafts[referenceKey] : undefined;
  const forwardDraft = references ? messages.forwardDrafts[referenceKey] : undefined;
@@ -95,9 +106,9 @@ export function useChatMessages({
    mergeHistoryMessages(
     history.messages,
     serverMessages?.filter(message => message.channel === destination) ?? [],
-    outgoingEntries(outbox, destination).map(item => item.message)
+    outgoingEntries(outbox, destination, meId).map(item => item.message)
    ),
-  [history.messages, serverMessages, outbox, destination]
+  [history.messages, serverMessages, outbox, destination, meId]
  );
  const visibleMessages = useMemo(
   () => filterMessages({messages: chatMessages, search, users: users ?? []}),
@@ -122,8 +133,8 @@ export function useChatMessages({
 
  /** Ввод текста обновляет и черновик, и карту упоминаний: смещения живут вместе с текстом. */
  function setDraft(text: string) {
-  mentionDrafts.current[destination] = editMentionDraft(
-   mentionDrafts.current[destination] || {text: draft, mentions: []},
+  mentionDrafts.current[referenceKey] = editMentionDraft(
+   mentionDrafts.current[referenceKey] || {text: draft, mentions: []},
    text
   );
   storeDraft(text);
@@ -139,8 +150,10 @@ export function useChatMessages({
 
  useEffect(() => () => chatMessagesActions.reset(), []);
 
- useEffect(() => {
+ useLayoutEffect(() => {
   mentionDrafts.current = {};
+  previousMessageIds.current = new Set();
+  return () => chatMessagesActions.resetOutgoingDrafts();
  }, [meId]);
 
  // Смена переписки закрывает поиск и один раз применяет отложенный переход из уведомления.
@@ -148,23 +161,12 @@ export function useChatMessages({
   chatMessagesActions.onChannelChange(destination);
  }, [destination]);
 
- // Опрос мог принести настоящее сообщение раньше ответа на отправку — временное убираем.
- useEffect(() => {
-  chatMessagesActions.reconcileOutgoing(state?.messages || []);
+ // Когда опрос опередил ответ на отправку, убираем временное сообщение до отрисовки.
+ useLayoutEffect(() => {
+  const incoming = state?.messages || [];
+  chatMessagesActions.reconcileOutgoing(incoming, previousMessageIds.current);
+  previousMessageIds.current = new Set(incoming.map(message => message.id));
  }, [state?.messages]);
-
- useEffect(() => {
-  attachmentMounted.current = true;
-  return () => {
-   attachmentMounted.current = false;
-   attachmentReads.current = {};
-  };
- }, []);
-
- useEffect(() => {
-  attachmentReads.current = {};
-  chatMessagesActions.resetAttachments();
- }, [meId]);
 
  /** Псевдонимы участников ограничены перепиской: устаревший псевдоним не должен уйти на сервер. */
  function mentionAliases(target: string) {
@@ -177,49 +179,107 @@ export function useChatMessages({
   });
  }
 
- async function selectAttachment(file: File) {
+ function selectAttachments(files: File[]) {
   const snapshot = chatSnapshotStore.getState();
-  if (!destination || snapshot.busy) return;
-  const owner = snapshot.snapshot?.me.id || '';
-  const epoch = (attachmentReads.current[destination] || 0) + 1;
-  const current = () =>
-   attachmentMounted.current && attachmentOwner.current === owner && attachmentReads.current[destination] === epoch;
-  attachmentReads.current[destination] = epoch;
-  chatMessagesActions.setReading(destination, true);
-  try {
-   const result = await readAttachment(file);
-   if (current()) chatMessagesActions.setAttachment(destination, result);
-  } catch (error) {
-   if (current()) toast.error((error as Error).message);
-  } finally {
-   if (current()) chatMessagesActions.setReading(destination, false);
+  if (!destination || !files.length || snapshot.busy || snapshot.snapshot?.me.id !== meId) return;
+  const current = chatMessagesStore.getState().attachments[referenceKey] || [];
+  const error = attachmentSelectionError(current.length, files);
+  if (error) {
+   toast.error(error);
+   return;
   }
+  chatMessagesActions.setAttachments(referenceKey, [
+   ...current,
+   ...files.map(file => ({id: crypto.randomUUID(), file}))
+  ]);
  }
 
- function removeAttachment() {
-  if (!destination) return;
-  attachmentReads.current[destination] = (attachmentReads.current[destination] || 0) + 1;
-  chatMessagesActions.setAttachment(destination, undefined);
-  chatMessagesActions.setReading(destination, false);
+ function removeAttachment(id: string) {
+  chatMessagesActions.removeAttachment(referenceKey, id);
+ }
+
+ /** Поле ввода сразу готово к следующему сообщению; все данные повтора принадлежат записи outbox. */
+ async function deliverOutgoing(id: string, entry: OutgoingEntry) {
+  const {draft: outgoing, uploadedIds} = entry;
+  const {channel, user, files} = outgoing;
+  const session = sessionService.token();
+  function requireCurrent() {
+   if (
+    sessionService.token() !== session ||
+    chatSnapshotStore.getState().snapshot?.me.id !== user ||
+    chatMessagesStore.getState().outbox[id]?.draft !== outgoing
+   )
+    throw new Error('Сессия изменилась.');
+  }
+  try {
+   const payload = outgoingPayload(outgoing);
+   let media: {attachment_ids?: string[]; attachment?: Awaited<ReturnType<typeof readAttachment>>} = {};
+   if (files.length === 1) {
+    media = {attachment: await readAttachment(files[0])};
+   } else if (files.length > 1) {
+    if (!chatSnapshotStore.getState().snapshot?.features?.messageAttachments)
+     throw new Error('Для отправки нескольких вложений обновите сервер Sombra.');
+    const ids = await stageAttachments(
+     files,
+     uploadedIds,
+     async file => {
+      requireCurrent();
+      const attachment = await readAttachment(file);
+      requireCurrent();
+      return (await messageService.uploadAttachment<{id: string}>({channel, attachment})).id;
+     },
+     ids => chatMessagesActions.updateOutgoing(id, {uploadedIds: ids})
+    );
+    media = {attachment_ids: ids};
+   }
+   requireCurrent();
+   const result = await messageService.send<{id: string}>({...payload, ...media});
+   if (!result?.id) throw new Error('Сервер не подтвердил отправку сообщения.');
+   chatMessagesActions.updateOutgoing(id, {publishedId: result.id});
+   if (chatSnapshotStore.getState().snapshot?.messages.some(message => message.id === result.id))
+    chatMessagesActions.discardOutgoing(id);
+  } catch (error) {
+   let reason = (error as Error).message;
+   if (reason.includes('MESSAGE_ATTACHMENTS_UNAVAILABLE')) {
+    chatMessagesActions.updateOutgoing(id, {uploadedIds: []});
+    reason = 'Загруженные файлы больше недоступны. Повторите отправку, чтобы загрузить их снова.';
+   } else if (reason.includes('MESSAGE_ATTACHMENTS_LIMIT')) {
+    reason = 'На сервере слишком много файлов в очереди. Попробуйте позже.';
+   } else if (reason.includes('MESSAGE_ATTACHMENTS_CONFLICT')) {
+    reason = 'Эти файлы уже опубликованы в другом сообщении.';
+   } else if (reason.includes('MESSAGE_ATTACHMENTS_INVALID')) {
+    reason = 'Сервер отклонил список вложений.';
+   }
+   chatMessagesActions.failOutgoing(id, reason);
+   return;
+  }
+  if (sessionService.token() === session && chatSnapshotStore.getState().snapshot?.me.id === user)
+   await chatSnapshotActions.refresh().catch(reason => {
+    if (chatSnapshotStore.getState().snapshot?.me.id === user) chatSnapshotActions.setError((reason as Error).message);
+   });
  }
 
  /** Отправка: музыкальная команда уходит в комнату, остальное — сообщением с упоминаниями. */
  async function send() {
-  const sent = draft;
-  const sentAttachment = attachment;
-  if (!destination || (!sent.trim() && !sentAttachment) || chatSnapshotStore.getState().busy || readingAttachment)
+  const sent = getDraft();
+  const files = (chatMessagesStore.getState().attachments[referenceKey] || []).map(item => item.file);
+  const snapshot = chatSnapshotStore.getState();
+  if (!destination || (!sent.trim() && !files.length) || snapshot.busy || snapshot.snapshot?.me.id !== meId) return;
+  if (files.length > 1 && !snapshot.snapshot.features?.messageAttachments) {
+   toast.error('Для отправки нескольких вложений обновите сервер Sombra.');
    return;
+  }
   humanTyping.stop();
   chatSnapshotActions.clearError();
-  if (!home && voiceLayout && !sentAttachment && !replyDraft) {
+  if (!home && voiceLayout && !files.length && !replyDraft) {
    const musicCommand = parseMusicCommand(sent);
    if (musicCommand) {
     chatSnapshotActions.setBusy(true);
     try {
      if (musicRoom !== destination) throw new Error('Сначала войдите в эту голосовую комнату.');
      await music.command(musicCommand.action, musicCommand.url, musicCommand.limit);
-     if (mentionDrafts.current[destination]?.text === sent) delete mentionDrafts.current[destination];
-     clearSent(destination, sent);
+     if (mentionDrafts.current[referenceKey]?.text === sent) delete mentionDrafts.current[referenceKey];
+     clearSent(referenceKey, sent);
     } catch (error) {
      chatSnapshotActions.setError((error as Error).message);
     } finally {
@@ -230,7 +290,7 @@ export function useChatMessages({
   }
   // Сервер обрезает текст сам; отправляем ту же обрезанную строку, чтобы смещения упоминаний сошлись.
   const payload = mentionSendPayload(
-   mentionDrafts.current[destination] || {text: sent, mentions: []},
+   mentionDrafts.current[referenceKey] || {text: sent, mentions: []},
    sent,
    mentionAliases(destination)
   );
@@ -239,46 +299,23 @@ export function useChatMessages({
    user: meId,
    text: payload.text,
    mentions: payload.mentions,
-   ...(sentAttachment ? {attachment: sentAttachment} : {}),
+   files,
    ...(replyDraft ? {replyTo: replyDraft.id} : {}),
    time: Date.now() / 1000
   };
   // Поле очищается сразу, сообщение уже в переписке со статусом «отправляется».
   const id = localMessageId(crypto.randomUUID());
-  chatMessagesActions.beginOutgoing(id, draftMessage);
-  clearSent(destination, sent);
-  try {
-   const message = await messageService.send<ChatMessage>(outgoingPayload(draftMessage));
-   chatMessagesActions.discardOutgoing(id);
-   if (message?.id) chatSnapshotActions.appendMessage(message);
-   if (replyDraft) chatMessagesActions.cancelReply(referenceKey, replyDraft);
-   if (mentionDrafts.current[destination]?.text === sent) delete mentionDrafts.current[destination];
-   if (sentAttachment) chatMessagesActions.clearSentAttachment(destination, sentAttachment);
-   // Опрос мог ещё не увидеть новое сообщение: держим его в переписке до следующего снапшота.
-   await chatSnapshotActions.refresh().catch(reason => chatSnapshotActions.setError((reason as Error).message));
-   if (!chatSnapshotStore.getState().snapshot?.messages.some(item => item.id === message.id))
-    chatSnapshotActions.appendMessage(message);
-  } catch (error) {
-   chatMessagesActions.failOutgoing(id, (error as Error).message);
-  }
+  chatMessagesActions.beginOutgoing(id, referenceKey, draftMessage);
+  clearSent(referenceKey, sent);
+  delete mentionDrafts.current[referenceKey];
+  await deliverOutgoing(id, chatMessagesStore.getState().outbox[id]);
  }
 
- /** Повтор неудачной отправки: тот же черновик, статус снова «отправляется». */
  async function retryOutgoing(id: string) {
   const entry = chatMessagesStore.getState().outbox[id];
-  if (!entry || entry.status === 'sending') return;
+  if (!entry || entry.status !== 'failed' || chatSnapshotStore.getState().snapshot?.me.id !== entry.draft.user) return;
   chatMessagesActions.retryOutgoing(id);
-  try {
-   const message = await messageService.send<ChatMessage>(outgoingPayload(entry.draft));
-   chatMessagesActions.discardOutgoing(id);
-   if (message?.id) chatSnapshotActions.appendMessage(message);
-   if (entry.draft.attachment) chatMessagesActions.clearSentAttachment(entry.draft.channel, entry.draft.attachment);
-   await chatSnapshotActions.refresh().catch(reason => chatSnapshotActions.setError((reason as Error).message));
-   if (!chatSnapshotStore.getState().snapshot?.messages.some(item => item.id === message.id))
-    chatSnapshotActions.appendMessage(message);
-  } catch (error) {
-   chatMessagesActions.failOutgoing(id, (error as Error).message);
-  }
+  await deliverOutgoing(id, entry);
  }
 
  async function sendForward() {
@@ -311,8 +348,8 @@ export function useChatMessages({
   try {
    await messageService.send({channel: destination, sticker, ...(replyDraft ? {replyTo: replyDraft.id} : {})});
    if (replyDraft) chatMessagesActions.cancelReply(referenceKey, replyDraft);
-   if (replaceDraft) clearSent(destination, sent);
-   if (replaceDraft && mentionDrafts.current[destination]?.text === sent) delete mentionDrafts.current[destination];
+   if (replaceDraft) clearSent(referenceKey, sent);
+   if (replaceDraft && mentionDrafts.current[referenceKey]?.text === sent) delete mentionDrafts.current[referenceKey];
    void chatSnapshotActions.refresh().catch(error => chatSnapshotActions.setError((error as Error).message));
    return true;
   } catch (error) {
@@ -328,7 +365,7 @@ export function useChatMessages({
   sendForward,
   sendStickerSuggestion,
   setDraft,
-  selectAttachment,
+  selectAttachments,
   removeAttachment,
   /** Маршрут уведомления: отложенный переход применяется при смене переписки. */
   setPendingJump: chatMessagesActions.setPendingJump,
@@ -365,20 +402,36 @@ export function useChatMessages({
    chatMessagesActions.cancelForwardDraft(referenceKey);
   },
   insertMention(mention: VerifiedMention, text: string) {
-   const current = editMentionDraft(mentionDrafts.current[destination] || {text: draft, mentions: []}, text);
-   mentionDrafts.current[destination] = {
+   const current = editMentionDraft(mentionDrafts.current[referenceKey] || {text: draft, mentions: []}, text);
+   mentionDrafts.current[referenceKey] = {
     text,
     mentions: [...current.mentions.filter(item => item.end <= mention.start || item.start >= mention.end), mention]
    };
   },
-  jumpToQuote(id: string) {
-   const snapshot = chatSnapshotStore.getState().snapshot;
-   if (!snapshot?.messages.some(message => message.id === id && message.channel === destination)) {
+  async jumpToQuote(id: string) {
+   const request = ++quoteRequest.current;
+   const epoch = chatMessagesStore.getState().jumpEpoch;
+   const current = () =>
+    quoteRequest.current === request &&
+    chatMessagesStore.getState().jumpEpoch === epoch &&
+    chatSnapshotStore.getState().snapshot?.me.id === meId;
+   if (!meId || !destination || !current()) return;
+   let found = chatMessages.some(message => message.id === id);
+   if (!found && (history.hasMore || historyTruncated(state, destination))) {
+    try {
+     found = await chatHistoryActions.findMessage(destination, id, current);
+    } catch {
+     if (current()) toast.error('Не удалось загрузить историю. Попробуйте ещё раз.');
+     return;
+    }
+   }
+   if (!current()) return;
+   if (!found) {
     toast.error('Исходное сообщение недоступно');
     return;
    }
-   chatMessagesActions.jumpTo(id, snapshot.me.id);
    chatMessagesActions.clearSearch();
+   chatMessagesActions.jumpTo(id, meId);
   },
   onChannelChange() {
    chatMessagesActions.onChannelChange(destination);
@@ -393,8 +446,7 @@ export function useChatMessages({
   forwardDraft,
   picker,
   referencesSupported: references,
-  attachment,
-  readingAttachment,
+  attachments,
   search: messages.search,
   jumpTarget,
   jumpEpoch: messages.jumpEpoch,
@@ -412,10 +464,10 @@ export function useChatMessages({
   voiceLayout,
   sendDisabled: sendDisabled({
    busy,
-   reading: readingAttachment,
+   reading: false,
    hasChannel: !!channel,
    draft,
-   attachment: !!attachment
+   attachment: attachments.length > 0
   }),
   readsBlocked: readsBlocked({
    settings: panels.settings,

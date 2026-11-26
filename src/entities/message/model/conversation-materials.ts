@@ -1,10 +1,12 @@
-import type {ChatMessage} from '@/shared/types';
-import {parseMessageLinks} from '@/shared/lib/message-links.ts';
+import {getMessageAttachments} from '../../../shared/lib/message-attachments.ts';
+import type {ChatMessage, MessageAttachmentMetadata} from '@/shared/types';
+import {parseMessageLinks} from '../../../shared/lib/message-links.ts';
 export type MaterialCategory = 'photos' | 'videos' | 'files' | 'audio' | 'links';
 export type ConversationMaterial = {
  id: string;
  category: MaterialCategory;
  message: ChatMessage;
+ attachment?: MessageAttachmentMetadata;
  title: string;
  href?: string;
 };
@@ -24,12 +26,12 @@ export function conversationMaterials(messages: ChatMessage[], channel: string):
  const result: ConversationMaterial[] = [];
  for (const message of messages) {
   if (message.channel !== channel) continue;
-  const file = message.attachment;
-  if (file)
+  for (const file of getMessageAttachments(message))
    result.push({
-    id: `${message.id}:file`,
+    id: `${message.id}:file:${file.id}`,
     category: attachmentCategory(file.name, file.mime),
     message,
+    attachment: file,
     title: file.name
    });
   const links = new Set<string>();
@@ -39,7 +41,7 @@ export function conversationMaterials(messages: ChatMessage[], channel: string):
    result.push({id: `${message.id}:${part.href}`, category: 'links', message, title: part.text, href: part.href});
   }
  }
- return result.sort((a, b) => b.message.time - a.message.time || a.id.localeCompare(b.id));
+ return result.sort((a, b) => b.message.time - a.message.time);
 }
 export function filterMaterials(
  items: ConversationMaterial[],

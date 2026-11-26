@@ -236,3 +236,79 @@ test('production default caps are 48 entries and 64MiB with oldest idle eviction
  b.release();
  g.cache.clear();
 });
+
+test('offscreen placeholders do not evict loaded previews on a return scroll', async () => {
+ const f = fixture({entries: 2});
+ let loads = 0;
+ const open = (id, active) =>
+  f.cache.acquire(
+   id,
+   {...owner(), active},
+   async () => ++loads,
+   blob,
+   () => true
+  );
+ const seen = open('seen', true);
+ await tick();
+ seen.update(false);
+ const placeholders = Array.from({length: 5}, (_, index) => open(String(index), false));
+ seen.update(true);
+ await tick();
+ for (const handle of [seen, ...placeholders]) handle.release();
+ f.cache.clear();
+ assert.equal(loads, 1);
+});
+
+test('scrolling away during a download retains its result for the mounted row', async () => {
+ const f = fixture();
+ let finish,
+  loads = 0;
+ const handle = f.cache.acquire(
+  'slow',
+  owner(),
+  () => {
+   loads++;
+   return new Promise(resolve => {
+    finish = resolve;
+   });
+  },
+  blob,
+  () => true
+ );
+ handle.update(false);
+ finish('file');
+ await tick();
+ handle.update(true);
+ const count = loads;
+ handle.release();
+ f.cache.clear();
+ assert.equal(count, 1);
+});
+
+test('decoded image dimensions survive URL release until the account or cache is reset', async () => {
+ const {cache} = fixture();
+ let valid = true;
+ const lease = cache.acquire(
+  'photo',
+  owner(),
+  async () => '',
+  blob,
+  () => valid
+ );
+ await tick();
+ const size = {width: 960, height: 300};
+ cache.rememberImageSize('photo', 'blob:stale', size);
+ cache.rememberImageSize('photo', 'blob:1', {width: 0, height: 300});
+ assert.equal(cache.imageSize('photo'), undefined);
+ valid = false;
+ cache.rememberImageSize('photo', 'blob:1', size);
+ assert.equal(cache.imageSize('photo'), undefined);
+ valid = true;
+ cache.rememberImageSize('photo', 'blob:1', size);
+ lease.release();
+ assert.deepEqual(cache.imageSize('photo'), size);
+ assert.equal(cache.imageSize('other-scope/photo'), undefined);
+ cache.clear();
+ cache.rememberImageSize('photo', 'blob:1', size);
+ assert.equal(cache.imageSize('photo'), undefined);
+});

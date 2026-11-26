@@ -61,7 +61,7 @@ export function createDiagnosticJournalModel() {
   async copyDetails(details: ReturnType<typeof entryDetails>, {isAlive}: AliveArgs) {
    try {
     await navigator.clipboard.writeText(JSON.stringify(details, null, 2));
-    if (isAlive()) store.setState({feedback: 'Детали ошибки скопированы.'});
+    if (isAlive()) store.setState({feedback: 'Детали события скопированы.'});
    } catch {
     if (isAlive()) store.setState({feedback: 'Не удалось скопировать детали ошибки.'});
    }

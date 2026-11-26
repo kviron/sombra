@@ -34,7 +34,7 @@ export function useChatState() {
   actions: {
    setError: chatSnapshotActions.setError,
    clearError: chatSnapshotActions.clearError,
-   refresh: () => chatSnapshotActions.refresh(),
+   refresh: chatSnapshotActions.refresh,
    applyState: chatSnapshotActions.applyState,
    savedDialogMetadata: chatSnapshotActions.savedDialogMetadata,
    applyChatPreferences: chatSnapshotActions.applyChatPreferences,

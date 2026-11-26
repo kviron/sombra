@@ -2,9 +2,48 @@
 // Модель создаётся на карточку: у каждого сообщения свои «занято» и окна.
 import {createStore} from 'zustand/vanilla';
 import {toast} from 'sonner';
+import {dequal} from 'dequal/lite';
+import type {ChatState, User} from '@/shared/types';
+import {canGroup} from '@/entities/group';
 import {messageService} from '@/entities/message';
 
 export type MessageDialog = 'edit' | 'delete';
+
+export type MessageRowState = Pick<
+ ChatState,
+ 'me' | 'users' | 'stickers' | 'readReceiptsSupported' | 'stickerCatalogSupported'
+> & {
+ canDeleteAny: boolean;
+ voiceChannels: {group: string; id: string; name: string}[];
+};
+
+function rowIdentity({online: _online, last_seen: _lastSeen, ...identity}: User) {
+ return identity;
+}
+
+// Keep a single presentation snapshot per mounted transcript. Presence belongs to the member list.
+export function createMessageRowSelector() {
+ let previous: MessageRowState | undefined;
+ return (state: ChatState, channelId?: string) => {
+  const current = state.groups.find(group => group.channels.some(channel => channel.id === channelId));
+  const next: MessageRowState = {
+   me: rowIdentity(state.me),
+   users: state.users.map(rowIdentity),
+   canDeleteAny: !!current?.permissions && canGroup(current, state.me.id, 'messages.delete_any'),
+   voiceChannels: state.groups.flatMap(group =>
+    group.channels
+     .filter(channel => channel.kind === 'voice')
+     .map(channel => ({group: group.id, id: channel.id, name: channel.name}))
+   ),
+   stickers: state.stickers,
+   readReceiptsSupported: state.readReceiptsSupported,
+   stickerCatalogSupported: state.stickerCatalogSupported
+  };
+  if (previous && dequal(previous, next)) return previous;
+  previous = next;
+  return next;
+ };
+}
 
 export type MessageItemState = {
  busy: boolean;

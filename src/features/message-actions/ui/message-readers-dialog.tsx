@@ -11,7 +11,7 @@ export function MessageReadersDialog({
  trigger,
  onClose
 }: {
- state: ChatState;
+ state: Pick<ChatState, 'me' | 'users' | 'readReceiptsSupported'>;
  message: ChatMessage;
  trigger: RefObject<HTMLElement | null>;
  onClose: () => void;

@@ -2,14 +2,14 @@
 import {toast} from 'sonner';
 import {createStore} from 'zustand/vanilla';
 import {copyImageToClipboard, previewImageBlob} from './attachment-clipboard';
-import {downloadAttachment} from './attachment-preview';
+import {attachmentPreviews, downloadAttachment} from './attachment-preview';
+import type {ImageSize} from './attachment-preview-cache';
 import {attachmentCopyError, canCopyAttachment} from './message-attachment-rules';
 
 export type MessageAttachmentState = {
- visible: boolean;
- inViewport: boolean;
  preview: string | undefined;
  previewIdentity: string;
+ imageSize?: ImageSize;
  error: string;
  busy: boolean;
  copying: boolean;
@@ -19,8 +19,6 @@ export type MessageAttachmentState = {
 };
 
 const initialState: MessageAttachmentState = {
- visible: false,
- inViewport: false,
  preview: undefined,
  previewIdentity: '',
  error: '',
@@ -31,7 +29,12 @@ const initialState: MessageAttachmentState = {
  retry: 0
 };
 
-export type AttachmentDownloadArgs = {messageId: string; available: boolean; isAlive: () => boolean};
+export type AttachmentDownloadArgs = {
+ messageId: string;
+ attachmentId: string;
+ available: boolean;
+ isAlive: () => boolean;
+};
 export type AttachmentCopyArgs = {
  preview: string | undefined;
  available: boolean;
@@ -43,18 +46,21 @@ export function createMessageAttachmentModel() {
  const store = createStore<MessageAttachmentState>(() => initialState);
 
  const actions = {
-  setVisible(visible: boolean) {
-   store.setState({visible});
-  },
-  setInViewport(inViewport: boolean) {
-   store.setState({inViewport});
-  },
   /** Новый файл или аккаунт: старый предпросмотр и ошибка больше не относятся к вложению. */
   startPreview(identity: string) {
-   store.setState({preview: undefined, error: '', copyError: '', previewIdentity: identity});
+   store.setState(state => ({
+    preview: undefined,
+    error: '',
+    copyError: '',
+    previewIdentity: identity,
+    imageSize: state.previewIdentity === identity ? state.imageSize : attachmentPreviews.imageSize(identity)
+   }));
+  },
+  applyImageSize(size: ImageSize) {
+   if (store.getState().imageSize !== size) store.setState({imageSize: size});
   },
   setPreview(preview: string | undefined, reason?: unknown) {
-   if (!reason) store.setState({preview});
+   if (!reason) store.setState(preview ? {preview, error: ''} : {preview});
    else
     store.setState({
      preview,
@@ -71,10 +77,11 @@ export function createMessageAttachmentModel() {
    store.setState(state => ({error: '', copyError: '', retry: state.retry + 1}));
   },
   /** Скачивание не запускается повторно, пока идёт предыдущее, и для недоступного файла. */
-  download({messageId, available, isAlive}: AttachmentDownloadArgs) {
+  download({messageId, attachmentId, available, isAlive}: AttachmentDownloadArgs) {
    if (store.getState().busy || !available) return;
    void downloadAttachment({
     messageId,
+    attachmentId,
     isAlive,
     onBusy: busy => store.setState({busy}),
     onError: error => store.setState({error})

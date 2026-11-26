@@ -1,3 +1,4 @@
+import {albumSummary} from '../../../shared/lib/message-attachments.ts';
 import type {ChatState} from '@/shared/types';
 
 export function newDirectMessages(
@@ -15,6 +16,7 @@ export function newDirectMessages(
   const user = users.get(message.user);
   const text =
    message.text.trim() ||
+   albumSummary(message) ||
    (message.attachment ? `Файл: ${message.attachment.name}` : message.sticker ? 'Стикер' : 'Новое сообщение');
   const characters = [...text];
   incoming.push({

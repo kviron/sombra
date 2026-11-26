@@ -91,7 +91,7 @@ export function ChatWorkspace({
      : 'chat-main relative flex h-full min-h-0 min-w-0 flex-col'
    }
   >
-   <ChatTranscript chat={chat} state={state} nav={nav} messages={messages} />
+   <ChatTranscript chat={chat} state={state} nav={nav} messages={messages} hidden={!voiceChatOpen} />
    <ChatComposer
     chat={chat}
     state={state}

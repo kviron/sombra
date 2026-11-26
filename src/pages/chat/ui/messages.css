@@ -35,6 +35,36 @@
  padding: 6px 10px;
 }
 
+.chat-message .message-content[data-album] {
+ width: 430px;
+}
+
+.message-content[data-album] :is([data-slot='bubble'], [data-slot='bubble-content']) {
+ width: 100%;
+}
+
+/* Extend the mosaic to the bubble edges while keeping its shared caption aligned with other messages. */
+.chat-message :is(.message-album, .message-caption-photo) {
+ margin: 3px -10px 4px;
+}
+
+.chat-message :is(.message-album, .message-caption-photo):first-child {
+ margin-top: -6px;
+}
+
+.message-caption-photo {
+ display: flex;
+ justify-content: center;
+}
+
+.message-caption-photo .message-attachment-image {
+ margin-top: 0;
+}
+
+.message-caption-photo .attachment-image-trigger {
+ border-radius: 0;
+}
+
 .chat-message[data-group-end='true'] [data-slot='bubble']:is([data-variant='default'], [data-variant='muted'])::before {
  position: absolute;
  inset-inline-start: -5px;

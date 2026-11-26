@@ -22,6 +22,27 @@ const CATEGORIES: Record<string, string> = {
  render_error: 'Экран остановился из-за ошибки',
  device_error: 'Ошибка устройства',
  device_permission: 'Нет доступа к устройству',
+ ice_checking: 'Проверка голосового соединения',
+ ice_connected: 'Голосовое соединение установлено',
+ ice_disconnected: 'Голосовое соединение прервано',
+ ice_failed: 'Не удалось установить голосовое соединение',
+ path_direct: 'Прямое голосовое соединение',
+ path_relay: 'Звук через ретранслятор',
+ audio_receive_stalled: 'Входящие аудиопакеты перестали поступать',
+ audio_receive_recovered: 'Приём аудиопакетов возобновился',
+ audio_send_stalled: 'Отправка аудиопакетов остановилась',
+ audio_send_recovered: 'Отправка аудиопакетов возобновилась',
+ audio_receive_silent: 'Тишина во входящем звуке',
+ audio_receive_silent_recovered: 'Во входящем потоке снова есть звук',
+ audio_send_silent: 'Тишина в исходящем звуке',
+ audio_send_silent_recovered: 'В исходящем потоке снова есть звук',
+ mic_muted: 'Микрофон выключен',
+ mic_unmuted: 'Микрофон включён',
+ output_deafened: 'Звук звонка выключен',
+ output_undeafened: 'Звук звонка включён',
+ playback_failed: 'Не удалось обработать звук для воспроизведения',
+ output_device_failed: 'Устройство вывода недоступно',
+ input_device_failed: 'Устройство ввода недоступно',
  mic_silent: 'Микрофон молчит',
  mic_silent_recovered: 'Звук с микрофона пошёл',
  autoplay_blocked: 'Автовоспроизведение заблокировано',
@@ -37,7 +58,7 @@ const clock = new Intl.DateTimeFormat('ru', {hour: '2-digit', minute: '2-digit',
 const fullDate = new Intl.DateTimeFormat('ru', {dateStyle: 'medium', timeStyle: 'medium'});
 
 export function categoryLabel(category: string): string {
- return CATEGORIES[category] ?? 'Ошибка приложения';
+ return CATEGORIES[category] ?? 'Диагностическое событие';
 }
 
 /** Операция важнее категории: так запись узнаётся без открытия деталей. */

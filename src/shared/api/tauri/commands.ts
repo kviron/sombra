@@ -65,7 +65,8 @@ export const commands = {
  },
 
  files: {
-  saveAttachment: <T = void>(payload: {message: string}) => invoke<T>('save_message_attachment', payload)
+  saveAttachment: <T = void>(payload: {message: string; attachmentId?: string}) =>
+   invoke<T>('save_message_attachment', payload)
  },
 
  audio: {

@@ -14,5 +14,6 @@ export const messageService = {
  markRead: (payload: Record<string, unknown>) => api.message.markRead(payload),
  /** История канала страницами: `before` — id самого раннего загруженного сообщения. */
  page: (payload: {channel: string; before?: string; limit?: number}) => api.message.page<MessagesPage>(payload),
+ uploadAttachment: <T = {id: string}>(payload: Record<string, unknown>) => api.message.uploadAttachment<T>(payload),
  attachment: <T = AttachmentFile>(payload: Record<string, unknown>) => api.message.attachment<T>(payload)
 };

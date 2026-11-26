@@ -408,6 +408,7 @@ impl Backend {
             .into_iter()
             .find(|g| arr(&g["channels"]).iter().any(|c| c["id"] == channel));
         let mut pending = Vec::new();
+        let mut attachment_digests = None;
         for (index, b) in arr(&self.db["bots"]).iter().enumerate() {
             if b["legacy"] == true || !self.bot_target_allowed(b, channel) {
                 continue;
@@ -452,17 +453,22 @@ impl Backend {
             } else {
                 natural.unwrap_or("direct")
             });
-            if let Some(path) = self.attachment_path(&message["attachment"]) {
-                use std::io::Read;
-                if let Ok(file) = std::fs::File::open(path) {
-                    let mut bytes = Vec::new();
-                    if file.take(10485761).read_to_end(&mut bytes).is_ok()
-                        && bytes.len() <= 10485760
-                    {
-                        update["attachment_digest"] = json!(token_hash(
-                            &base64::engine::general_purpose::STANDARD.encode(bytes)
-                        ));
+            let items = attachments::message_attachments(message);
+            if !items.is_empty() {
+                let digests = attachment_digests.get_or_insert_with(|| {
+                    let mut digests = json!({});
+                    for item in items {
+                        if let Ok(bytes) = self.attachment_bytes(item) {
+                            digests[s(item, "id")] = json!(token_hash(
+                                &base64::engine::general_purpose::STANDARD.encode(bytes)
+                            ));
+                        }
                     }
+                    digests
+                });
+                update["attachment_digest"] = digests[s(&items[0], "id")].clone();
+                if message["attachments"].is_array() {
+                    update["attachment_digests"] = digests.clone();
                 }
             }
             if !command.is_null() {
@@ -569,6 +575,7 @@ impl Backend {
                         "response",
                         "responses",
                         "attachment_digest",
+                        "attachment_digests",
                         super::bot_model_settings::OWNER_APPLIED,
                         super::bot_decorations::APPLIED,
                     ] {

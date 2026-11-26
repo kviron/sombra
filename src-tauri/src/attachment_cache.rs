@@ -2,7 +2,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -110,10 +110,11 @@ fn atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 pub struct Cache {
     root: PathBuf,
     pub account: Option<String>,
-    pub visible: HashMap<String, Value>,
+    visible: HashMap<String, Vec<Value>>,
     pub accepted: Option<Instant>,
     pub revision: u64,
     pub scope_revision: u64,
+    pub supports_attachment_metadata: bool,
     limit: u32,
 }
 impl Cache {
@@ -125,12 +126,14 @@ impl Cache {
             accepted: None,
             revision: 0,
             scope_revision: 0,
+            supports_attachment_metadata: false,
             limit: 1024,
         }
     }
     pub fn invalidate(&mut self) {
         self.account = None;
         self.visible.clear();
+        self.supports_attachment_metadata = false;
         self.accepted = None;
         self.revision += 1;
         self.scope_revision += 1;
@@ -206,6 +209,7 @@ impl Cache {
             self.invalidate();
             return false;
         };
+        self.supports_attachment_metadata = data["features"]["attachmentMetadata"] == true;
         let changed = self.account.as_deref() != Some(account);
         self.account = Some(account.to_owned());
         if changed {
@@ -230,32 +234,48 @@ impl Cache {
             .iter()
             .filter_map(|m| {
                 let id = m["id"].as_str()?;
-                let mut a = m.get("attachment")?.clone();
-                a.as_object_mut()?.remove("cached");
-                a["id"].as_str()?;
-                Some((id.to_owned(), a))
+                let files = m["attachments"]
+                    .as_array()
+                    .filter(|list| !list.is_empty())
+                    .map(Vec::as_slice)
+                    .unwrap_or_else(|| std::slice::from_ref(&m["attachment"]));
+                let metadata: Vec<_> = files
+                    .iter()
+                    .filter(|file| file["id"].is_string())
+                    .cloned()
+                    .collect();
+                (!metadata.is_empty()).then(|| (id.to_owned(), metadata))
             })
             .collect();
         self.accepted = Some(Instant::now());
         if changed
             || previous.iter().any(|(id, old)| {
-                self.visible
-                    .get(id)
-                    .is_none_or(|new| !Self::same_attachment(old, new))
+                self.visible.get(id).is_none_or(|new| {
+                    old.len() > new.len()
+                        || old
+                            .iter()
+                            .zip(new)
+                            .any(|(a, b)| !Self::same_attachment(a, b))
+                })
             })
         {
             self.revision += 1;
             self.scope_revision += 1;
         }
-        let allowed: Vec<_> = self
+        let allowed: HashSet<_> = self
             .visible
             .iter()
-            .map(|(m, a)| format!("{}.bin", key(account, m, a)))
+            .flat_map(|(m, files)| {
+                files
+                    .iter()
+                    .map(move |a| format!("{}.bin", key(account, m, a)))
+            })
             .collect();
         for (p, _, _) in self.entries() {
-            if !allowed
-                .iter()
-                .any(|n| p.file_name().is_some_and(|s| s == n.as_str()))
+            if !p
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| allowed.contains(name))
             {
                 let _ = fs::remove_file(p);
             }
@@ -269,8 +289,15 @@ impl Cache {
                 .accepted
                 .is_some_and(|t| t.elapsed().as_secs_f64() <= 5.0)
     }
-    fn path(&self, message: &str) -> Option<PathBuf> {
-        let meta = self.visible.get(message)?;
+    pub fn metadata(&self, message: &str, attachment_id: Option<&str>) -> Option<&Value> {
+        let files = self.visible.get(message)?;
+        match attachment_id {
+            Some(id) => files.iter().find(|file| file["id"].as_str() == Some(id)),
+            None => files.first(),
+        }
+    }
+    fn path(&self, message: &str, attachment_id: Option<&str>) -> Option<PathBuf> {
+        let meta = self.metadata(message, attachment_id)?;
         Some(self.dir()?.join(format!(
             "{}.bin",
             key(self.account.as_ref()?, message, meta)
@@ -281,10 +308,13 @@ impl Cache {
             .iter()
             .all(|field| a[*field] == b[*field])
     }
-    pub fn valid(&self, message: &str, payload: &Value) -> bool {
-        let Some(meta) = self.visible.get(message) else {
+    pub fn valid(&self, message: &str, attachment_id: Option<&str>, payload: &Value) -> bool {
+        let Some(meta) = self.metadata(message, attachment_id) else {
             return false;
         };
+        Self::matches_payload(meta, payload)
+    }
+    pub fn matches_payload(meta: &Value, payload: &Value) -> bool {
         let Some(encoded) = payload["data"].as_str() else {
             return false;
         };
@@ -299,14 +329,19 @@ impl Cache {
             && payload["name"] == meta["name"]
             && payload["mime"] == meta["mime"]
     }
-    pub fn read(&mut self, message: &str) -> Option<Value> {
-        self.read_inner(message, true)
+    pub fn read(&mut self, message: &str, attachment_id: Option<&str>) -> Option<Value> {
+        self.read_inner(message, attachment_id, true)
     }
-    fn read_inner(&mut self, message: &str, touch: bool) -> Option<Value> {
+    fn read_inner(
+        &mut self,
+        message: &str,
+        attachment_id: Option<&str>,
+        touch: bool,
+    ) -> Option<Value> {
         if self.limit == 0 || !self.fresh() {
             return None;
         }
-        let path = self.path(message)?;
+        let path = self.path(message, attachment_id)?;
         if !safe(&path) {
             return None;
         }
@@ -317,7 +352,7 @@ impl Cache {
             let payload = &record["payload"];
             if record["key"] != path.file_stem()?.to_str()?
                 || record["digest"] != hash(&serde_json::to_vec(payload).ok()?)
-                || !self.valid(message, payload)
+                || !self.valid(message, attachment_id, payload)
             {
                 return None;
             }
@@ -334,15 +369,21 @@ impl Cache {
         }
         result
     }
-    pub fn write(&mut self, message: &str, payload: &Value, revision: u64) {
+    pub fn write(
+        &mut self,
+        message: &str,
+        attachment_id: Option<&str>,
+        payload: &Value,
+        revision: u64,
+    ) {
         if self.revision != revision
             || self.limit == 0
             || !self.fresh()
-            || !self.valid(message, payload)
+            || !self.valid(message, attachment_id, payload)
         {
             return;
         }
-        let Some(path) = self.path(message) else {
+        let Some(path) = self.path(message, attachment_id) else {
             return;
         };
         let record = json!({"key":path.file_stem().unwrap().to_str(),"digest":hash(&serde_json::to_vec(payload).unwrap()),"payload":payload});
@@ -363,19 +404,26 @@ impl Cache {
         if let Some(messages) = data["messages"].as_array_mut() {
             for m in messages {
                 if let Some(id) = m["id"].as_str().map(str::to_owned) {
-                    if m["attachment"].is_object() {
-                        // A UI availability hint, never permission to read bytes. State polls
-                        // must not decrypt/hash/base64-decode every attachment. The actual
-                        // read still checks fresh authorization and full DPAPI integrity.
+                    // Existence is a UI hint. Reads still check authorization and full DPAPI integrity.
+                    let mark = |file: &mut Value| {
+                        if !file.is_object() {
+                            return;
+                        }
                         let cached = self.limit > 0
                             && self.fresh()
-                            && self.path(&id).is_some_and(|path| {
+                            && self.path(&id, file["id"].as_str()).is_some_and(|path| {
                                 safe(&path)
                                     && fs::metadata(path).is_ok_and(|meta| {
                                         meta.is_file() && meta.len() <= (MAX * 2) as u64
                                     })
                             });
-                        m["attachment"]["cached"] = json!(cached);
+                        file["cached"] = json!(cached);
+                    };
+                    if let Some(files) = m.get_mut("attachments").and_then(Value::as_array_mut) {
+                        files.iter_mut().for_each(mark);
+                    }
+                    if let Some(file) = m.get_mut("attachment") {
+                        mark(file);
                     }
                 }
             }
@@ -398,37 +446,64 @@ mod tests {
         let original = state("one");
         c.accept(&original);
         let payload = json!({"name":"a.txt","mime":"application/octet-stream","data":"eA=="});
-        c.write("m", &payload, c.revision);
+        c.write("m", None, &payload, c.revision);
         let mut expired = original.clone();
         expired["messages"][0]["attachment"]["expired"] = json!(true);
         c.accept(&expired);
-        assert_eq!(c.read("m").unwrap()["cached"], true);
+        assert_eq!(c.read("m", None).unwrap()["cached"], true);
         c.invalidate();
-        assert!(c.read("m").is_none());
+        assert!(c.read("m", None).is_none());
         c.accept(&original);
-        assert!(c.read("m").is_some());
+        assert!(c.read("m", None).is_some());
         c.accept(&state("two"));
-        assert!(c.read("m").is_none());
+        assert!(c.read("m", None).is_none());
         c.accept(&original);
-        assert!(c.read("m").is_some());
+        assert!(c.read("m", None).is_some());
         c.accepted = Some(Instant::now() - std::time::Duration::from_secs(6));
-        assert!(c.read("m").is_none());
+        assert!(c.read("m", None).is_none());
         c.accept(&original);
         let old = c.revision;
         c.set_limit(0).unwrap();
-        c.write("m", &payload, old);
+        c.write("m", None, &payload, old);
         assert_eq!(c.info()["files"], 0);
         assert!(!c.info()["enabled"].as_bool().unwrap());
         c.invalidate();
         c.accept(&original);
         assert_eq!(c.info()["limitMiB"], 0);
         c.set_limit(256).unwrap();
-        c.write("m", &payload, c.revision);
+        c.write("m", None, &payload, c.revision);
         c.accept(&json!({"me":{"id":"one"},"messages":[]}));
         assert_eq!(c.info()["files"], 0);
         assert!(c.set_limit(1).is_err());
         let _ = fs::remove_dir_all(c.root);
     }
+    #[test]
+    #[cfg(windows)]
+    fn album_files_with_identical_metadata_have_independent_bytes_and_visibility() {
+        let mut c = cache();
+        let mut snapshot = state("one");
+        let first = snapshot["messages"][0]["attachment"].clone();
+        let mut second = first.clone();
+        second["id"] = json!("b");
+        snapshot["messages"][0]["attachments"] = json!([first, second]);
+        c.accept(&snapshot);
+        let payload = json!({"name":"a.txt","mime":"application/octet-stream","data":"eA=="});
+        let mut other = payload.clone();
+        other["data"] = json!("eQ==");
+        c.write("m", Some("b"), &other, c.revision);
+        c.decorate(&mut snapshot);
+        assert_eq!(snapshot["messages"][0]["attachments"][1]["cached"], true);
+        assert_eq!(snapshot["messages"][0]["attachment"]["cached"], false);
+        c.write("m", None, &payload, c.revision);
+        assert_eq!(c.read("m", Some("a")).unwrap()["data"], "eA==");
+        assert_eq!(c.read("m", Some("b")).unwrap()["data"], "eQ==");
+        assert!(c.read("m", Some("unknown")).is_none());
+        c.accept(&state("one"));
+        assert!(c.read("m", Some("b")).is_none());
+        assert_eq!(c.info()["files"], 1);
+        let _ = fs::remove_dir_all(c.root);
+    }
+
     #[test]
     fn attachment_cache_lru_quota_and_safe_paths() {
         let mut c = cache();
@@ -502,14 +577,14 @@ mod tests {
         let mut c = cache();
         assert!(!c.fresh());
         c.accept(&state("one"));
-        let a = c.path("m").unwrap();
+        let a = c.path("m", None).unwrap();
         assert!(c.fresh());
         c.accept(&state("two"));
-        assert_ne!(a, c.path("m").unwrap());
+        assert_ne!(a, c.path("m", None).unwrap());
         c.accepted = Some(Instant::now() - std::time::Duration::from_secs(6));
         assert!(!c.fresh());
         c.invalidate();
-        assert!(c.path("m").is_none());
+        assert!(c.path("m", None).is_none());
     }
     #[test]
     fn attachment_cache_metadata_and_key() {
@@ -517,10 +592,12 @@ mod tests {
         c.accept(&state("one"));
         assert!(c.valid(
             "m",
+            None,
             &json!({"name":"a.txt","mime":"application/octet-stream","data":"eA=="})
         ));
         assert!(!c.valid(
             "m",
+            None,
             &json!({"name":"evil","mime":"application/octet-stream","data":"eA=="})
         ));
         assert_ne!(
@@ -547,14 +624,14 @@ mod tests {
             .collect::<Vec<_>>());
         for i in 0..10 {
             c.accept(&snapshot);
-            c.write(&format!("m{i}"), &payload, c.revision);
+            c.write(&format!("m{i}"), None, &payload, c.revision);
         }
         let start = Instant::now();
         for i in 0..10 {
             // Keep the real authorization policy; this probes the former poll work,
             // not network freshness or a relaxation of its five-second bound.
             c.accept(&snapshot);
-            assert!(c.read_inner(&format!("m{i}"), false).is_some());
+            assert!(c.read_inner(&format!("m{i}"), None, false).is_some());
         }
         let former_poll = start.elapsed();
         c.accept(&snapshot);
@@ -576,17 +653,17 @@ mod tests {
         let mut snapshot = state("one");
         c.accept(&snapshot);
         let payload = json!({"name":"a.txt","mime":"application/octet-stream","data":"eA=="});
-        c.write("m", &payload, c.revision);
+        c.write("m", None, &payload, c.revision);
         c.decorate(&mut snapshot);
         assert_eq!(snapshot["messages"][0]["attachment"]["cached"], true);
-        fs::write(c.path("m").unwrap(), b"corrupt").unwrap();
+        fs::write(c.path("m", None).unwrap(), b"corrupt").unwrap();
         // Existence is deliberately optimistic, but it cannot publish any bytes.
         c.decorate(&mut snapshot);
         assert_eq!(snapshot["messages"][0]["attachment"]["cached"], true);
-        assert!(c.read("m").is_none());
+        assert!(c.read("m", None).is_none());
         c.decorate(&mut snapshot);
         assert_eq!(snapshot["messages"][0]["attachment"]["cached"], false);
-        c.write("m", &payload, c.revision);
+        c.write("m", None, &payload, c.revision);
         c.accepted = Some(Instant::now() - std::time::Duration::from_secs(6));
         c.decorate(&mut snapshot);
         assert_eq!(snapshot["messages"][0]["attachment"]["cached"], false);
@@ -601,14 +678,14 @@ mod tests {
         let mut c = cache();
         c.accept(&state("one"));
         let p = json!({"name":"a.txt","mime":"application/octet-stream","data":"eA=="});
-        c.write("m", &p, c.revision);
-        assert!(c.read("m").is_some());
+        c.write("m", None, &p, c.revision);
+        assert!(c.read("m", None).is_some());
         let old = c.revision;
         c.clear();
-        c.write("m", &p, old);
-        assert!(c.read("m").is_none());
-        c.write("m", &p, c.revision);
-        let path = c.path("m").unwrap();
+        c.write("m", None, &p, old);
+        assert!(c.read("m", None).is_none());
+        c.write("m", None, &p, c.revision);
+        let path = c.path("m", None).unwrap();
         let encrypted = fs::read(&path).unwrap();
         let plain = crate::session_storage::crypt(&encrypted, false).unwrap();
         let mut record: Value = serde_json::from_slice(&plain).unwrap();
@@ -618,10 +695,10 @@ mod tests {
             crate::session_storage::crypt(&serde_json::to_vec(&record).unwrap(), true).unwrap(),
         )
         .unwrap();
-        assert!(c.read("m").is_none());
-        c.write("m", &p, c.revision);
-        fs::write(c.path("m").unwrap(), b"corrupt").unwrap();
-        assert!(c.read("m").is_none());
+        assert!(c.read("m", None).is_none());
+        c.write("m", None, &p, c.revision);
+        fs::write(c.path("m", None).unwrap(), b"corrupt").unwrap();
+        assert!(c.read("m", None).is_none());
         assert_eq!(c.info()["files"], 0);
         let root = c.root.clone();
         let _ = fs::remove_dir_all(root);

@@ -325,9 +325,13 @@
  height: 60px;
 }
 
+.sticker-suggestions {
+ background-color: var(--popover);
+}
+
 .chat-shell .sticker-suggestions button {
- flex: 0 0 50px;
- height: 50px;
+ flex: 0 0 60px;
+ height: 60px;
  padding: 3px;
  border-radius: 7px;
 }

@@ -54,6 +54,7 @@ pub fn operation(name: &str) -> &'static str {
         "message",
         "forward_message",
         "attachment_file",
+        "upload_message_attachment",
         "delete_message",
         "update_message",
         "reaction",

@@ -1,7 +1,6 @@
 import type {VoiceAvailability, VoicePeer, VoicePoll} from '@/shared/types';
-import {ApiConnectionError} from '@/shared/api';
+import {createVoicePresence} from './voice-presence';
 import type {Call} from './voice-call';
-import {voiceService} from './services/voice-service';
 
 type Options = {
  availability: () => VoiceAvailability;
@@ -9,12 +8,13 @@ type Options = {
  onStream: (id: string, stream: MediaStream | null) => void;
  onConnection: (id: string, state: string | null) => void;
  onError: (error: unknown) => void;
+ onPresenceDelay: (delayed: boolean) => void;
 };
 
 export async function startLiveKitTransport(
  call: Call,
  first: VoicePoll & {liveKit: NonNullable<VoicePoll['liveKit']>},
- {availability, onPeers, onStream, onConnection, onError}: Options
+ {availability, onPeers, onStream, onConnection, onError, onPresenceDelay}: Options
 ) {
  const {Room, RoomEvent, Track, LocalAudioTrack} = await import('livekit-client');
  if (call.stop) return;
@@ -23,7 +23,7 @@ export async function startLiveKitTransport(
  let peers = first.peers;
  let joined = false;
  let timer: ReturnType<typeof setTimeout> | undefined;
- let lastPoll = performance.now();
+ const presence = createVoicePresence(call, availability, onPresenceDelay);
 
  call.stopTransport = () => {
   clearTimeout(timer);
@@ -90,13 +90,14 @@ export async function startLiveKitTransport(
  async function pollPresence() {
   if (call.stop) return;
   try {
-   const data = await voiceService.poll({room: call.room, client: call.client, after: 0, ...availability()});
+   const result = await presence.poll(0);
    if (call.stop) return;
-   lastPoll = performance.now();
-   peers = data.peers;
-   if (room.state === 'connected') sync();
+   if (result) {
+    peers = result.data.peers;
+    if (room.state === 'connected') sync();
+   }
   } catch (error) {
-   if (!call.stop && (!(error instanceof ApiConnectionError) || performance.now() - lastPoll > 14000)) onError(error);
+   if (!call.stop) onError(error);
   }
   if (!call.stop) timer = setTimeout(() => void pollPresence(), 5000);
  }

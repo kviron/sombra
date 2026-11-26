@@ -147,6 +147,9 @@ async function perform<T>(op: string, payload: Record<string, unknown>): Promise
  }
  const scope = attachmentCacheGeneration();
  if (op === 'attachment_file') {
+  if ('attachment_id' in payload && (typeof payload.attachment_id !== 'string' || !payload.attachment_id))
+   throw new Error('Некорректный идентификатор вложения');
+  if (payload.metadata_only === true) return browserRaw<T>(op, payload);
   const writeEpoch = attachmentCacheWriteEpoch();
   const key = JSON.stringify([scope, writeEpoch, payload]);
   const existing = attachmentRequests.get(key);
@@ -155,13 +158,19 @@ async function perform<T>(op: string, payload: Record<string, unknown>): Promise
    if (attachmentCacheNeedsState())
     await browserRaw<ChatState>('state').then(state => acceptAttachmentCacheState(state, scope));
    if (scope !== attachmentCacheGeneration()) throw new Error('Сессия изменилась. Повторите загрузку.');
-   const cached = await readAttachmentCache(String(payload.message));
+   const attachmentId = typeof payload.attachment_id === 'string' ? payload.attachment_id : undefined;
+   const cached = await readAttachmentCache(String(payload.message), attachmentId);
    if (scope !== attachmentCacheGeneration()) throw new Error('Сессия изменилась.');
    if (cached) return cached as T;
-   const file = await browserRaw<AttachmentFile>(op, payload);
+   const file = await browserRaw<AttachmentFile & {id?: string}>(
+    op,
+    attachmentId ? {...payload, with_attachment_id: true} : payload
+   );
+   if (attachmentId && file.id !== undefined && file.id !== attachmentId)
+    throw new Error('Сервер вернул другое вложение.');
    file.cached = false;
    if (scope !== attachmentCacheGeneration()) throw new Error('Сессия изменилась. Повторите загрузку.');
-   await writeAttachmentCache(String(payload.message), file, scope, writeEpoch);
+   await writeAttachmentCache(String(payload.message), file, scope, writeEpoch, attachmentId);
    if (scope !== attachmentCacheGeneration()) throw new Error('Сессия изменилась.');
    return file as T;
   })();
@@ -194,7 +203,7 @@ async function browserRaw<T>(op: string, data: Record<string, unknown> = {}): Pr
    signal: AbortSignal.timeout(
     op === 'voice_poll'
      ? 5000
-     : op === 'attachment_file' || (op === 'message' && data.attachment)
+     : op === 'attachment_file' || op === 'upload_message_attachment' || (op === 'message' && data.attachment)
        ? 90000
        : op === 'state'
          ? 30000
@@ -204,7 +213,8 @@ async function browserRaw<T>(op: string, data: Record<string, unknown> = {}): Pr
  } catch {
   throw new ApiConnectionError('Не удалось связаться с сервером. Проверьте соединение и попробуйте снова.');
  }
- if (op === 'voice_poll' && response.status >= 500) throw new ApiConnectionError('Сервер временно недоступен');
+ if (['voice_poll', 'voice_signal', 'voice_join'].includes(op) && response.status >= 500)
+  throw new ApiConnectionError('Сервер временно недоступен');
  let result;
  try {
   result = await response.json();

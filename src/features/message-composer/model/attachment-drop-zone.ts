@@ -7,7 +7,7 @@ import {dropEffectFor, dropError, hasDraggedFiles, isFileItem} from './attachmen
 
 export type AttachmentDropState = {dragging: boolean};
 
-export type DropArgs = {accepting: boolean; onFile: (file: File) => void};
+export type DropArgs = {accepting: boolean; onFiles: (files: File[]) => void};
 
 export function createAttachmentDropModel() {
  const store = createStore<AttachmentDropState>(() => ({dragging: false}));
@@ -47,8 +47,8 @@ export function createAttachmentDropModel() {
    if (!depth || (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)))
     actions.reset();
   },
-  /** Сброс: один файл и не папка, иначе подсказка вместо вложения. */
-  drop(event: DragEvent<HTMLElement>, {accepting, onFile}: DropArgs) {
+  /** Список файлов сохраняет порядок переноса. */
+  drop(event: DragEvent<HTMLElement>, {accepting, onFiles}: DropArgs) {
    if (!hasDraggedFiles(event.dataTransfer)) return;
    event.preventDefault();
    event.stopPropagation();
@@ -64,7 +64,7 @@ export function createAttachmentDropModel() {
     toast.error(message);
     return;
    }
-   onFile(files[0]);
+   onFiles(files);
   }
  };
 

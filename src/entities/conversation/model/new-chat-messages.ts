@@ -1,3 +1,4 @@
+import {albumSummary} from '../../../shared/lib/message-attachments.ts';
 import type {ChatState} from '@/shared/types';
 
 export type ChatNotificationPreferences = {
@@ -92,6 +93,7 @@ export function newChatMessages(
   const sender = (mentioned ? 'Вас упомянули · ' : '') + (context.name ? `${context.name} · ${author}` : author);
   const text = preview(
    message.text.trim() ||
+    albumSummary(message) ||
     (message.attachment ? `Файл: ${message.attachment.name}` : message.sticker ? 'Стикер' : 'Новое сообщение')
   );
   incoming.push({

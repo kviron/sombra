@@ -1,3 +1,4 @@
+import {getMessageAttachments} from '../../../shared/lib/message-attachments.ts';
 // Чистые правила активности бота: разбор записи, истечение окна и подписи строк.
 // Файл импортирует только типы: так его читает node --experimental-strip-types.
 import type {ChatState, User} from '@/shared/types';
@@ -107,8 +108,7 @@ export function imageDelivered(state: Pick<ChatState, 'messages'>, entry: BotTyp
   message =>
    message.channel === entry.channel &&
    message.user === entry.bot &&
-   !!message.attachment &&
-   IMAGE_MIMES.has(message.attachment.mime) &&
+   getMessageAttachments(message).some(file => IMAGE_MIMES.has(file.mime)) &&
    message.time * 1000 >= startMs
  );
 }

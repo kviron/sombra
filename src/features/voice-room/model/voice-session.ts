@@ -17,7 +17,6 @@ export function createVoiceSession(preferences: MediaPreferences) {
  const runtime: VoiceRuntime = {
   call: null,
   pending: null,
-  changingMedia: false,
   generation: 0,
   availabilityRevision: 0,
   preferredMicVolume: 100
@@ -40,7 +39,7 @@ export function createVoiceSession(preferences: MediaPreferences) {
   stateActions.resetCall(runtime.preferredMicVolume);
  }
  async function join(destination: string, withVideo = false) {
-  if (runtime.pending || runtime.changingMedia) return false;
+  if (runtime.pending || runtime.call?.changingMedia) return false;
   leave();
   const operation = Symbol('voice-join');
   runtime.pending = operation;
@@ -70,18 +69,22 @@ export function createVoiceSession(preferences: MediaPreferences) {
    runtime.call = c;
    setCapturedTrackEnabled(c.microphone, !availability().muted && !availability().deaf);
    media.watchInput(c, c.microphone);
-   monitorOutgoingMicrophone(c, c.microphone);
    const first = await voiceService.join({room: c.room, client: c.client, ...availability()});
    if (c.stop) {
     // Server admission may finish after cancellation; retire only the abandoned client.
     void voiceService.leave({room: c.room, client: c.client}).catch(() => {});
     return false;
    }
+   if (runtime.preferredMicVolume !== 100) {
+    await media.applyMicVolume(c, runtime.preferredMicVolume);
+    if (c.stop) return false;
+   } else monitorOutgoingMicrophone(c, c.microphone);
    c.members = otherMembers(first.peers, c.client);
    const callbacks = {
     availability,
     availabilityRevision: () => runtime.availabilityRevision,
     preferences: preferred,
+    onPresenceDelay: stateActions.setPresenceDelayed,
     onPeers: (incoming: typeof first.peers) => stateActions.setPeers(incoming, c.client),
     onStream: stateActions.setRemoteStream,
     onConnection: stateActions.setConnection,
@@ -120,7 +123,7 @@ export function createVoiceSession(preferences: MediaPreferences) {
    if (runtime.pending === operation) {
     runtime.pending = null;
     stateActions.finishOperation();
-    if (runtime.call && store.getState().room && runtime.preferredMicVolume !== 100)
+    if (runtime.call && store.getState().room && !runtime.call.micGain && runtime.preferredMicVolume !== 100)
      media.actions.setMicVolume(runtime.preferredMicVolume);
    }
   }

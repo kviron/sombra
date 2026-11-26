@@ -41,9 +41,9 @@ test('элемент переноса считается файлом по kind'
  assert.equal(isFileItem({}), false);
 });
 
-test('причина отказа объясняет папку, несколько файлов и пустой сброс', () => {
+test('зона принимает несколько файлов и объясняет отказ для папки и пустого сброса', () => {
  assert.equal(dropError({directories: true, count: 1}), 'Перетащите файл, а не папку.');
- assert.equal(dropError({directories: false, count: 3}), 'Пока можно прикрепить один файл за раз.');
+ assert.equal(dropError({directories: false, count: 3}), '');
  assert.equal(dropError({directories: false, count: 0}), 'Не удалось получить файл. Попробуйте кнопку вложения.');
  assert.equal(dropError({directories: false, count: 1}), '');
  assert.equal(dropError({directories: true, count: 0}), 'Перетащите файл, а не папку.', 'папка важнее счётчика');

@@ -74,15 +74,13 @@ export function DiagnosticJournal({
     className="journal-summary bg-secondary text-secondary-foreground mt-5 flex items-center gap-3 rounded-[var(--radius-lg)] px-4 py-3"
     role="status"
    >
-    <strong className="journal-total text-destructive text-2xl leading-[1.25] tabular-nums">
-     {entries?.length ?? '—'}
-    </strong>
+    <strong className="journal-total text-2xl leading-[1.25] tabular-nums">{entries?.length ?? '—'}</strong>
     <div>
-     <strong>Ошибки</strong>
+     <strong>События</strong>
      <p>В сохранённых записях</p>
     </div>
    </div>
-   <h3 className="mt-4 mb-3 text-base leading-[1.5] font-semibold">Хронология ошибок</h3>
+   <h3 className="mt-4 mb-3 text-base leading-[1.5] font-semibold">Хронология событий</h3>
    {!model.available ? (
     <p role="status">Журнал доступен только в настольном приложении.</p>
    ) : loading ? (
@@ -93,7 +91,7 @@ export function DiagnosticJournal({
      {entries ? ' Ниже показаны ранее загруженные данные.' : ''}
     </p>
    ) : entries?.length === 0 ? (
-    <p role="status">За последние 48 часов ошибок не сохранено.</p>
+    <p role="status">За последние 48 часов событий не сохранено.</p>
    ) : null}
    {!!entries?.length && (
     <ol className="journal-entries m-0 list-none p-0">
@@ -128,14 +126,14 @@ export function DiagnosticJournal({
          </summary>
          <div className="journal-entry-details border-border bg-secondary overflow-hidden rounded-b-[var(--radius-lg)] border-t">
           <div className="journal-code-head border-border flex flex-wrap items-center justify-between gap-2 border-b px-3 py-1">
-           <strong>Детали ошибки</strong>
+           <strong>Детали события</strong>
            <span className="text-muted-foreground inline-flex items-center gap-1 text-xs leading-[1.5]">
             JSON{' '}
             <Button
              type="button"
              variant="ghost"
              size="icon"
-             aria-label="Копировать JSON ошибки"
+             aria-label="Копировать JSON события"
              onClick={() => model.copyDetails(details)}
             >
              <Copy />

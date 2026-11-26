@@ -54,8 +54,10 @@ fn save_unique(directory: &Path, name: &str, bytes: &[u8]) -> Result<PathBuf, St
 }
 
 #[tauri::command]
-pub async fn save_message_attachment(app: tauri::AppHandle, state: tauri::State<'_, crate::remote::Remote>, message: String) -> Result<String, String> {
-    let response = crate::remote::remote_api(state, serde_json::json!({"op":"attachment_file", "message":message})).await?;
+pub async fn save_message_attachment(app: tauri::AppHandle, state: tauri::State<'_, crate::remote::Remote>, message: String, attachment_id: Option<String>) -> Result<String, String> {
+    let mut request = serde_json::json!({"op":"attachment_file", "message":message});
+    if let Some(id) = attachment_id { request["attachment_id"] = serde_json::json!(id); }
+    let response = crate::remote::remote_api(state, request).await?;
     let data = response["data"].as_str().ok_or("Сервер вернул некорректное вложение.")?;
     if data.len() > MAX_BYTES.div_ceil(3) * 4 { return Err("Размер вложения превышает 10 МиБ.".into()); }
     let bytes = base64::engine::general_purpose::STANDARD.decode(data).map_err(|_| "Сервер вернул повреждённое вложение.")?;

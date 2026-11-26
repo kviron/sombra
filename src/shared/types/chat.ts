@@ -35,6 +35,8 @@ export type MessageAttachmentMetadata = {
  name: string;
  size: number;
  mime: string;
+ width?: number;
+ height?: number;
  expired?: boolean;
  cached?: boolean;
 };
@@ -54,6 +56,7 @@ export type ChatMessage = {
  time: number;
  sticker?: string;
  attachment?: MessageAttachmentMetadata;
+ attachments?: MessageAttachmentMetadata[];
  bot_name?: string;
  reactions?: {user: string; emoji: string}[];
 };
@@ -80,6 +83,8 @@ export type ChatState = {
  features?: {
   messageReferences?: boolean;
   stickerThumbnails?: boolean;
+  attachmentMetadata?: boolean;
+  messageAttachments?: boolean;
   /** Snapshot carries avatar hashes instead of inline pictures. */ avatarAssets?: boolean;
  };
  profileEffectUploadsSupported?: boolean;

@@ -7,14 +7,14 @@ import {createAttachmentDropModel} from './attachment-drop-zone';
 type Options = {
  channel?: string;
  disabled?: boolean;
- onFile: (file: File) => void;
+ onFiles: (files: File[]) => void;
 };
 
 /**
  * Единственное место, где живёт логика переноса: подсказка, счётчик входов и
  * защита окна от чужих файлов. Компонент получает флаг и обработчики.
  */
-export function useAttachmentDropZone({channel, disabled = false, onFile}: Options) {
+export function useAttachmentDropZone({channel, disabled = false, onFiles}: Options) {
  const [model] = useState(createAttachmentDropModel);
  const {dragging} = useStore(model.store);
  const {actions} = model;
@@ -62,7 +62,7 @@ export function useAttachmentDropZone({channel, disabled = false, onFile}: Optio
    enter: (event: DragEvent<HTMLElement>) => actions.enter(event, accepting),
    over: (event: DragEvent<HTMLElement>) => actions.over(event, accepting),
    leave: actions.leave,
-   drop: (event: DragEvent<HTMLElement>) => actions.drop(event, {accepting, onFile})
+   drop: (event: DragEvent<HTMLElement>) => actions.drop(event, {accepting, onFiles})
   }
  };
 }

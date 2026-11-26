@@ -1,4 +1,9 @@
 // Conversation-local decoded previews; never retains RPC/base64 payloads.
+export type ImageSize = {width: number; height: number};
+export function hasImageSize(size: Partial<ImageSize>): size is ImageSize {
+ const {width = 0, height = 0} = size;
+ return Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
+}
 export type PreviewOwner = {
  active: boolean;
  priority: number;
@@ -19,6 +24,7 @@ type Entry = {
 };
 export class AttachmentPreviewCache {
  private entries = new Map<string, Entry>();
+ private imageSizes = new Map<string, ImageSize>();
  private active = 0;
  private timer: ReturnType<typeof setTimeout> | undefined;
  private options: {
@@ -33,6 +39,18 @@ export class AttachmentPreviewCache {
  constructor(options: AttachmentPreviewCache['options'] = {}) {
   this.options = options;
  }
+ imageSize(key: string) {
+  return this.imageSizes.get(key);
+ }
+ rememberImageSize(key: string, url: string, size: ImageSize) {
+  const entry = this.entries.get(key);
+  if (!entry || entry.url !== url || !entry.valid() || !hasImageSize(size)) return false;
+  // A few numbers per photo can outlive the much larger decoded URL.
+  this.imageSizes.delete(key);
+  this.imageSizes.set(key, size);
+  if (this.imageSizes.size > 1024) this.imageSizes.delete(this.imageSizes.keys().next().value!);
+  return true;
+ }
  private now() {
   return this.options.now?.() ?? Date.now();
  }
@@ -46,14 +64,16 @@ export class AttachmentPreviewCache {
   for (const owner of e.owners) owner.notify(undefined);
  }
  clear() {
+  this.imageSizes.clear();
   if (this.timer) clearTimeout(this.timer);
   this.timer = undefined;
   for (const e of [...this.entries.values()]) this.remove(e);
  }
  sweep() {
   const idle = [...this.entries.values()].filter(e => !this.interested(e)).sort((a, b) => a.used - b.used);
-  let bytes = [...this.entries.values()].reduce((sum, e) => sum + e.bytes, 0),
-   count = this.entries.size;
+  const loaded = [...this.entries.values()].filter(entry => entry.url);
+  let bytes = loaded.reduce((sum, e) => sum + e.bytes, 0),
+   count = loaded.length;
   for (const e of idle)
    if (
     this.now() - e.idle >= (this.options.grace ?? 60000) ||
@@ -61,7 +81,7 @@ export class AttachmentPreviewCache {
     count > (this.options.entries ?? 48)
    ) {
     bytes -= e.bytes;
-    count--;
+    if (e.url) count--;
     this.remove(e);
    }
   if (this.timer) clearTimeout(this.timer);
@@ -94,7 +114,6 @@ export class AttachmentPreviewCache {
     running: false,
     queued: false
    };
-   this.entries.set(key, e);
   }
   let entry = e;
   entry.owners.add(owner);
@@ -118,6 +137,7 @@ export class AttachmentPreviewCache {
    }
    entry.used = this.now();
    if (!this.interested(entry)) entry.idle = this.now();
+   if (!this.entries.has(key)) return;
    if (active && !entry.url && !entry.running) entry.queued = true;
    this.sweep();
    this.pump();
@@ -149,7 +169,7 @@ export class AttachmentPreviewCache {
    e.queued = false;
    e.running = true;
    this.active++;
-   const current = () => this.entries.get(e.key) === e && e.valid() && this.interested(e);
+   const current = () => this.entries.get(e.key) === e && e.valid() && e.owners.size > 0;
    void (async () => {
     try {
      const file = await e.load();

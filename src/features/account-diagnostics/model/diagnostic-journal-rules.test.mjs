@@ -8,7 +8,9 @@ const entry = (time, operation, category, status = null) => ({time, source: 'des
 test('известная категория получает подпись, неизвестная — общую', () => {
  assert.equal(categoryLabel('timeout'), 'Время ожидания истекло');
  assert.equal(categoryLabel('render_error'), 'Экран остановился из-за ошибки');
- assert.equal(categoryLabel('unknown'), 'Ошибка приложения');
+ assert.equal(categoryLabel('unknown'), 'Диагностическое событие');
+ assert.equal(entryLabel('voice_transport', 'ice_connected'), 'Голосовое соединение установлено');
+ assert.equal(entryLabel('voice_transport', 'path_relay'), 'Звук через ретранслятор');
 });
 
 test('операция важнее категории, иначе показывается категория', () => {

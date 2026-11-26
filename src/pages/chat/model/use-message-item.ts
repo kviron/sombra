@@ -1,8 +1,9 @@
 import {useRef, useState} from 'react';
 import {useStore} from 'zustand';
-import type {ChatMessage, ChatState} from '@/shared/types';
-import {canGroup} from '@/entities/group';
-import {useUserActions} from '@/shared/lib/user-actions';
+import type {ChatMessage} from '@/shared/types';
+import {getMessageAttachments} from '@/shared/lib/message-attachments';
+import {useOpenProfile} from '@/shared/lib/user-actions';
+import {chatHistoryActions} from './chat-history';
 import {failedMessageHint, isLocalMessage} from './chat-rules';
 import {
  authorIdentity,
@@ -20,12 +21,13 @@ import {
  showsRead
 } from './message-item-rules';
 import type {MessageActionId} from './message-item-rules';
+import type {MessageRowState} from './message-item';
 import {createMessageItemModel} from './message-item';
 
 type Options = {
  message: ChatMessage;
  previous?: ChatMessage;
- state: ChatState;
+ state: MessageRowState;
  refresh: () => Promise<unknown>;
  onError: (message: string) => void;
  userName: (id: string) => string;
@@ -58,23 +60,20 @@ export function useMessageItem({
 }: Options) {
  const [model] = useState(createMessageItemModel);
  const item = useStore(model.store);
- const userActions = useUserActions();
+ const showProfile = useOpenProfile();
  const row = useRef<HTMLElement>(null);
 
  const grouped = isGrouped(previous, message);
  const sticker = state.stickers?.find(row => row.id === message.sticker);
  const author = isAuthor(message, state.me.id);
- const messageGroup = state.groups.find(group => group.channels.some(channel => channel.id === message.channel));
- const deleteEverywhere = canDeleteEveryone(
-  author,
-  !!messageGroup?.permissions && canGroup(messageGroup, state.me.id, 'messages.delete_any')
- );
+ const deleteEverywhere = canDeleteEveryone(author, state.canDeleteAny);
  const identity = authorIdentity(state, message);
  const avatar = identity?.avatar;
  const name = authorName(identity, message, userName(message.user));
  const canOpenProfile = !!identity;
  const text = hasText(message);
- const image = !!message.attachment && isImageAttachment(message.attachment.mime);
+ const attachments = getMessageAttachments(message);
+ const soloImage = attachments.length === 1 && isImageAttachment(attachments[0].mime);
  const reactions = reactionViews(message.reactions, state.me.id);
  const read = showsRead(state.readReceiptsSupported, author, message.readCount);
  // Временное сообщение нельзя ни править, ни пересылать: у него ещё нет серверного id.
@@ -85,14 +84,14 @@ export function useMessageItem({
   ? {
      name: userName(forwardedId),
      openProfile:
-      userActions && (forwardedId === state.me.id || state.users.some(user => user.id === forwardedId))
-       ? () => userActions.openProfile(forwardedId)
+      showProfile && (forwardedId === state.me.id || state.users.some(user => user.id === forwardedId))
+       ? () => showProfile(forwardedId)
        : undefined
     }
   : undefined;
  const menu = messageMenu({
   hasReply: !!onReply,
-  hasForward: !!onForward && !message.attachment && !message.sticker && !message.gif && text,
+  hasForward: !!onForward && !attachments.length && !message.sticker && !message.gif && text,
   hasText: text,
   author,
   forwarded: !!message.forwardedFrom,
@@ -102,11 +101,15 @@ export function useMessageItem({
  });
 
  function openProfile() {
-  if (canOpenProfile) userActions?.openProfile(message.user);
+  if (canOpenProfile) showProfile?.(message.user);
+ }
+
+ function refreshMessage(deleted = false) {
+  return chatHistoryActions.refreshMessage(state.me.id, message, deleted, refresh);
  }
 
  function react(emoji: string) {
-  void model.actions.react({message: message.id, emoji, refresh, onError});
+  void model.actions.react({message: message.id, emoji, refresh: refreshMessage, onError});
  }
 
  function run(id: MessageActionId) {
@@ -145,7 +148,8 @@ export function useMessageItem({
   openProfile,
   forwardedAuthor,
   hasText: text,
-  hasImage: image,
+  attachments,
+  soloImage,
   reactions,
   read,
   readTitle: readTitle(message),
@@ -160,6 +164,7 @@ export function useMessageItem({
   replyOpen: onJump && reply ? () => onJump(reply.id) : undefined,
   actions: {
    react,
+   refreshAfterAction: () => refreshMessage(item.dialog === 'delete'),
    run,
    retry: onRetry,
    openReaders: model.actions.openReaders,

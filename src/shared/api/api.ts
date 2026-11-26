@@ -40,6 +40,7 @@ export const api = {
   readers: method('message_readers'),
   markRead: method('mark_messages_read'),
   page: method('messages_page'),
+  uploadAttachment: method('upload_message_attachment'),
   attachment: method('attachment_file')
  },
  conversation: {

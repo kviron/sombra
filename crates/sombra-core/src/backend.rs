@@ -303,6 +303,12 @@ impl Backend {
                 return Err("Invalid collection".into());
             }
         }
+        if b.db["pending_attachments"].is_null() {
+            b.db["pending_attachments"] = json!({});
+        }
+        if !b.db["pending_attachments"].is_object() {
+            return Err("Invalid pending attachments".into());
+        }
         b.db["schema_version"] = json!(3);
         for user in b.db["users"].as_array_mut().unwrap() {
             if user["created_at"].is_null() {
@@ -339,6 +345,7 @@ impl Backend {
             .map_err(|e| e.to_string())?;
             b.save()?;
         }
+        b.cleanup_staged_attachments(now())?;
         Ok(b)
     }
     fn new_user(&self, name: &str, email: &str, password: &str) -> Value {
@@ -466,6 +473,7 @@ impl Backend {
             fields.remove("hidden_by");
             fields.remove("messageSeq");
             fields.remove("reply_to");
+            fields.remove("attachment_request_hash");
             if let Some(author) = fields.remove("forwarded_author").filter(Value::is_string) {
                 fields.insert("forwardedFrom".into(), json!({"author":author}));
             }
@@ -473,12 +481,106 @@ impl Backend {
         if !message["mentions"].is_array() {
             message["mentions"] = json!([]);
         }
-        if message["attachment"].is_object() {
+        if let Some(items) = message["attachments"].as_array_mut() {
+            for item in items.iter_mut() {
+                item["expired"] = json!(self.attachment_expired(item));
+            }
+            if let Some(first) = items.first().cloned() {
+                message["attachment"] = first;
+            }
+        } else if message["attachment"].is_object() {
             message["attachment"]["expired"] =
                 json!(self.attachment_expired(&message["attachment"]));
         }
         message
     }
+    fn send_message(&mut self, v: &Value, uid: &str) -> Result<Value, String> {
+        let channel = s(v, "channel");
+        if !self.allowed(uid, channel) {
+            return Err("Нет доступа к чату".into());
+        }
+        let text = s(v, "text").trim();
+        let sticker = s(v, "sticker");
+        let ids = attachments::attachment_ids(v)?;
+        let inline = v.get("attachment").filter(|value| !value.is_null());
+        if (text.is_empty() && sticker.is_empty() && inline.is_none() && ids.is_none())
+            || text.chars().count() > 2000
+        {
+            return Err("Сообщение: 1–2000 символов или вложение".into());
+        }
+        // The ordered IDs identify one submission, even after a lost response, restart or caption edit.
+        let request_hash = ids
+            .as_ref()
+            .map(|_| token_hash(&json!([text, v["mentions"], v["replyTo"]]).to_string()));
+        if let (Some(ids), Some(hash)) = (&ids, &request_hash) {
+            if let Some(previous) = self.previous_attachment_message(uid, channel, ids, hash)? {
+                return Ok(json!({"ok":true,"id":previous["id"]}));
+            }
+        }
+        let reply = self.validated_reply(v, uid, channel)?;
+        if !sticker.is_empty() {
+            let row = self.db["stickers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| {
+                    row["id"] == sticker
+                        && (row["archived"] != true || self.sticker_pack_installed(row, uid))
+                })
+                .ok_or("Стикер не найден")?;
+            let group = s(row, "group");
+            let sendable = if group.is_empty() {
+                self.sticker_in_library(row, uid) || self.sticker_in_history(row, uid)
+            } else {
+                self.db["groups"].as_array().unwrap().iter().any(|row| {
+                    row["id"] == group && arr(&row["channels"]).iter().any(|c| c["id"] == channel)
+                })
+            };
+            if !sendable {
+                return Err("Стикер не найден".into());
+            }
+        }
+        let mentions = self.canonical_mentions(channel, text, v.get("mentions"))?;
+        let message_id = id();
+        let mut message = json!({"id":message_id,"channel":channel,"user":uid,"text":text,"sticker":sticker,"time":now(),"mentions":mentions});
+        if let Some(reply) = reply {
+            message["reply_to"] = json!(reply);
+        }
+        let mut inline_path = None;
+        if let Some(ids) = &ids {
+            let items = self.staged_attachments(ids, uid, channel)?;
+            message["attachment"] = items[0].clone();
+            message["attachments"] = Value::Array(items);
+            message["attachment_request_hash"] = json!(request_hash);
+        } else if let Some(inline) = inline {
+            let attachment = self.store_attachment(inline)?;
+            inline_path = self.attachment_path(&attachment);
+            message["attachment"] = attachment;
+        }
+        let result = self.enqueue_bots(&message).and_then(|_| {
+            self.db["messages"].as_array_mut().unwrap().push(message);
+            if let Some(ids) = &ids {
+                let pending = self.db["pending_attachments"].as_object_mut().unwrap();
+                for &id in ids {
+                    pending.remove(id);
+                }
+            }
+            self.save()
+        });
+        if let Err(error) = result {
+            if let Some(path) = inline_path {
+                let _ = std::fs::remove_file(path);
+            }
+            return Err(error);
+        }
+        self.clear_human_typing(uid, channel);
+        if ids.is_some() {
+            Ok(json!({"ok":true,"id":message_id}))
+        } else {
+            Ok(json!({"ok":true}))
+        }
+    }
+
     fn voice_action(&mut self, v: &Value, uid: &str, session: &str) -> Result<Value, String> {
         self.cleanup_calls(now());
         self.signals
@@ -734,7 +836,7 @@ impl Backend {
                 Some(sticker)
             })
             .collect();
-        json!({"features":{"avatarAssets":true,"stickerThumbnails":true,"messageReferences":message_references::supported()},"decorationSupported":true,"profileEffectDraftsSupported":self.profile_effect_drafts_supported(u),"effectCatalogSupported":true,"profileEffectUploadsSupported":true,"stickerCatalogSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":me,"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"historyTruncated":self.channels_with_more(uid),"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":users})
+        json!({"features":{"avatarAssets":true,"stickerThumbnails":true,"attachmentMetadata":true,"messageAttachments":true,"messageReferences":message_references::supported()},"decorationSupported":true,"profileEffectDraftsSupported":self.profile_effect_drafts_supported(u),"effectCatalogSupported":true,"profileEffectUploadsSupported":true,"stickerCatalogSupported":true,"conversationMemberSearchSupported":true,"dialogMetadataSupported":true,"humanTypingSupported":true,"humanTyping":self.visible_human_typing(uid),"readReceiptsSupported":true,"me":me,"email":u["email"],"chatPreferences":self.chat_preferences(u),"botTyping":self.visible_bot_typing(uid),"groups":groups,"voicePresence":voice_presence,"dialogCalls":self.dialog_calls.iter().filter(|c|self.dialog_member(uid,s(c,"dialog"))).map(|c|self.call_dto(c)).collect::<Vec<_>>(),"dialogs":arr(&self.db["dialogs"]).into_iter().filter(|d|arr(&d["members"]).contains(&json!(uid))).map(|d|{let mut dto=self.receipt_dialog(d,uid);dto["unreadMentionCount"]=json!(mention_counts.get(s(&dto,"id")).copied().unwrap_or(0));dto}).collect::<Vec<_>>(),"messages":messages,"historyTruncated":self.channels_with_more(uid),"stickers":stickers,"friends":arr(&self.db["friends"]).into_iter().filter(|x|x["from"]==uid||x["to"]==uid).collect::<Vec<_>>(),"bots":self.visible_bots(uid),"users":users})
     }
     /// One avatar for a client that asked for `avatar_assets`. The hash pins the
     /// exact picture the caller saw, so a stale snapshot never returns a newer file.
@@ -1272,31 +1374,8 @@ impl Backend {
     }
    },
    "forward_message"=>return self.forward_message(&v,uid),
-   "message"=>{let channel=s(&v,"channel");if !self.allowed(uid,channel){return Err("Нет доступа к чату".into())}let text=s(&v,"text").trim();let sticker=s(&v,"sticker");
-     let reply=self.validated_reply(&v,uid,channel)?;
-    if !sticker.is_empty(){
-     let sticker=self.db["stickers"].as_array().unwrap().iter().find(|row|row["id"]==sticker&&(row["archived"]!=true||self.sticker_pack_installed(row,uid))).ok_or("Стикер не найден")?;
-     let group=s(sticker,"group");
-     let sendable=if group.is_empty(){
-      self.sticker_in_library(sticker,uid)||self.sticker_in_history(sticker,uid)
-     }else{
-      self.db["groups"].as_array().unwrap().iter().any(|row|row["id"]==group&&arr(&row["channels"]).iter().any(|c|c["id"]==channel))
-     };
-     if !sendable{return Err("Стикер не найден".into())}
-    }
-    let attachment=v.get("attachment").filter(|value|!value.is_null());
-     if (text.is_empty()&&sticker.is_empty()&&attachment.is_none())||text.chars().count()>2000{return Err("Сообщение: 1–2000 символов или вложение".into())}
-     let mentions=self.canonical_mentions(channel,text,v.get("mentions"))?;
-      let attachment=attachment.map(|value|self.store_attachment(value)).transpose()?;
-     let mut message=json!({"id":id(),"channel":channel,"user":uid,"text":text,"sticker":sticker,"time":now(),"mentions":mentions});
-     if let Some(reply)=reply{message["reply_to"]=json!(reply);}
-      if let Some(ref attachment)=attachment{message["attachment"]=attachment.clone();}
-     if let Err(error)=self.enqueue_bots(&message){if let Some(path)=attachment.as_ref().and_then(|value|self.attachment_path(value)){let _=std::fs::remove_file(path);}return Err(error)}self.db["messages"].as_array_mut().unwrap().push(message);
-     if let Err(error)=self.save(){
-      if let Some(path)=attachment.as_ref().and_then(|value|self.attachment_path(value)){let _=std::fs::remove_file(path);}
-      return Err(error)
-     }
-     self.clear_human_typing(uid,channel);return Ok(json!({"ok":true}));},
+   "upload_message_attachment"=>return self.upload_message_attachment(&v,uid),
+   "message"=>return self.send_message(&v,uid),
    _=>return Err("Неизвестная команда".into())
   }
         self.save()?;
@@ -2193,6 +2272,9 @@ pub fn api_router(backend: Backend) -> axum::Router {
                     (StatusCode::FORBIDDEN, "authorization", error)
                 }
                 "PROFILE_EFFECT_DRAFT_NOT_FOUND" => (StatusCode::NOT_FOUND, "validation", error),
+                "MESSAGE_ATTACHMENTS_UNAVAILABLE" => (StatusCode::NOT_FOUND, "validation", error),
+                "MESSAGE_ATTACHMENTS_CONFLICT" => (StatusCode::CONFLICT, "validation", error),
+                "MESSAGE_ATTACHMENTS_LIMIT" => (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error),
                 "PROFILE_EFFECT_DRAFT_CONFLICT" => (StatusCode::CONFLICT, "validation", error),
                 "PROFILE_EFFECT_DRAFT_LIMIT" => {
                     (StatusCode::TOO_MANY_REQUESTS, "rate_limit", error)
@@ -2272,13 +2354,21 @@ pub fn api_router(backend: Backend) -> axum::Router {
         let backend = Arc::downgrade(&state.backend);
         runtime.spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+            let mut next_attachment_cleanup = now() + 60;
             loop {
                 interval.tick().await;
                 let Some(backend) = backend.upgrade() else {
                     break;
                 };
                 if let Ok(mut backend) = backend.lock() {
-                    backend.cleanup_calls(now());
+                    let timestamp = now();
+                    backend.cleanup_calls(timestamp);
+                    if timestamp >= next_attachment_cleanup {
+                        next_attachment_cleanup = timestamp + 60;
+                        if backend.cleanup_staged_attachments(timestamp).is_err() {
+                            backend.diagnostics.server("upload_message_attachment", 500, "storage");
+                        }
+                    }
                 };
             }
         });

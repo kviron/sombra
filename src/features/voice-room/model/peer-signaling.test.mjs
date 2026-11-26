@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createPeerLink, peerConfiguration} from './peer-signaling.ts';
 
-function fixture(t, ownClient = 'z') {
+function fixture(t, ownClient = 'z', deliver = () => {}) {
  const connections = [],
   signals = [],
   errors = [];
@@ -53,9 +53,11 @@ function fixture(t, ownClient = 'z') {
  const link = createPeerLink(ownClient, 'm', {
   iceServers: [],
   preferRelay: () => false,
+  retryableSignalError: error => error.message === 'lost ack',
   stream: {getTracks: () => [], getAudioTracks: () => [{}], getVideoTracks: () => []},
   signal: async (_, payload) => {
    signals.push(payload);
+   await deliver(payload);
   },
   onConnection() {},
   onStream() {},
@@ -250,4 +252,50 @@ test('a lost restart answer falls back to a new connection and legacy peers use 
  await link.offer();
  assert.equal(connections.length, 3);
  assert.equal(connections[1].restarted, undefined);
+});
+
+test('lost acknowledgement retries the same ICE batch; receiver applies candidates once per generation', async t => {
+ t.mock.timers.enable({apis: ['setTimeout']});
+ const duplicate = {candidate: 'relay', sdpMid: '0'};
+ let attempts = 0;
+ const {link, connections, signals, errors} = fixture(t, 'z', payload => {
+  if (payload.candidates?.some(c => c.candidate === 'relay') && ++attempts === 1) throw new Error('lost ack');
+ });
+ await link.receive({...offer('one'), iceVersion: 2});
+ connections[0].onicecandidate({candidate: {toJSON: () => duplicate}});
+ t.mock.timers.tick(30);
+ await new Promise(resolve => setImmediate(resolve));
+ t.mock.timers.tick(1000);
+ await new Promise(resolve => setImmediate(resolve));
+ assert.equal(attempts, 2);
+ for (const payload of signals.filter(s => s.candidates?.some(c => c.candidate === 'relay')))
+  await link.receive(payload);
+ assert.deepEqual(connections[0].received, [duplicate]);
+ assert.deepEqual(errors, []);
+ await link.receive({...offer('two'), iceVersion: 2});
+ await link.receive({connectionId: 'two', candidates: [duplicate]});
+ assert.deepEqual(connections[1].received, [duplicate]);
+});
+
+test('retiring a peer cancels an ICE retry; permanent failures are surfaced immediately', async t => {
+ t.mock.timers.enable({apis: ['setTimeout']});
+ const {link, connections, signals, errors} = fixture(t, 'z', payload => {
+  const item = payload.candidates?.[0]?.candidate;
+  if (item === 'gone' || item === 'offline') throw new Error(item === 'gone' ? 'peer left' : 'lost ack');
+ });
+ await link.receive({...offer('one'), iceVersion: 2});
+ for (const value of ['gone', 'offline']) {
+  connections[0].onicecandidate({candidate: {toJSON: () => ({candidate: value})}});
+  t.mock.timers.tick(30);
+  await new Promise(resolve => setImmediate(resolve));
+ }
+ assert.deepEqual(
+  errors.map(error => error.message),
+  ['peer left']
+ );
+ const before = signals.length;
+ link.close();
+ t.mock.timers.tick(10000);
+ await new Promise(resolve => setImmediate(resolve));
+ assert.equal(signals.length, before);
 });

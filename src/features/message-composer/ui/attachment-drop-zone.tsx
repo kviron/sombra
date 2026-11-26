@@ -8,16 +8,16 @@ export function AttachmentDropZone({
  channel,
  disabled = false,
  className,
- onFile,
+ onFiles,
  children
 }: {
  channel?: string;
  disabled?: boolean;
  className?: string;
- onFile: (file: File) => void;
+ onFiles: (files: File[]) => void;
  children: ReactNode;
 }) {
- const model = useAttachmentDropZone({channel, disabled, onFile});
+ const model = useAttachmentDropZone({channel, disabled, onFiles});
  const {handlers} = model;
 
  return (
@@ -45,13 +45,13 @@ export function AttachmentDropZone({
        />
       </span>
       <strong className="block text-[22px] leading-[1.35] font-semibold max-[760px]:text-[18px]">
-       Перетащите файл сюда
+       Перетащите файлы сюда
       </strong>
       <p className="text-foreground my-3 text-[15px] leading-[1.6] max-[760px]:text-[14px]">
-       Изображение, документ или любой другой файл до 10 МиБ
+       До 10 файлов по 10 МиБ в одном сообщении
       </p>
       <small className="text-muted-foreground block text-[13px] leading-[1.6]">
-       Файл добавится во вложения. Отправка — только по кнопке.
+       Файлы добавятся в черновик сообщения.
       </small>
      </div>
     </div>

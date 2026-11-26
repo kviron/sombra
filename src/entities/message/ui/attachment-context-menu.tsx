@@ -9,9 +9,11 @@ const actionIcons = {copy: Copy, download: Download};
 /** Отступ от края окна, чтобы пункты не прилипали к рамке. */
 const windowEdge = 8;
 
+export type AttachmentMenuPosition = {x: number; y: number} | 'trigger';
+
 type AttachmentContextMenuProps = {
- x: number;
- y: number;
+ position: AttachmentMenuPosition;
+ container?: HTMLElement | null;
  items: AttachmentActionItem[];
  label: string;
  onClose: () => void;
@@ -27,8 +29,8 @@ const menuActions = (menu: HTMLElement | null) => [...(menu?.querySelectorAll<HT
  * держит фокус внутри себя и возвращает его на картинку после закрытия.
  */
 export function AttachmentContextMenu({
- x,
- y,
+ position,
+ container,
  items,
  label,
  onClose,
@@ -36,17 +38,25 @@ export function AttachmentContextMenu({
  returnFocus
 }: AttachmentContextMenuProps) {
  const menu = useRef<HTMLDivElement>(null);
- const [position, setPosition] = useState({left: x, top: y, ready: false});
+ const [coordinates, setCoordinates] = useState({left: windowEdge, top: windowEdge});
 
- // Координаты уточняются по реальному размеру меню: правый нижний угол окна разворачивает его внутрь.
  useLayoutEffect(() => {
   const element = menu.current;
   if (!element) return;
-  const bounds = element.getBoundingClientRect();
-  const left = Math.max(windowEdge, Math.min(x, window.innerWidth - bounds.width - windowEdge));
-  const top = Math.max(windowEdge, Math.min(y, window.innerHeight - bounds.height - windowEdge));
-  setPosition({left, top, ready: true});
- }, [x, y]);
+  const place = () => {
+   const anchor = returnFocus.current?.getBoundingClientRect();
+   const {offsetWidth: width, offsetHeight: height} = element;
+   const x = position === 'trigger' ? (anchor?.right ?? window.innerWidth) - width : position.x;
+   const y = position === 'trigger' ? (anchor?.top ?? window.innerHeight) - height - 4 : position.y;
+   setCoordinates({
+    left: Math.max(windowEdge, Math.min(x, window.innerWidth - width - windowEdge)),
+    top: Math.max(windowEdge, Math.min(y, window.innerHeight - height - windowEdge))
+   });
+  };
+  place();
+  window.addEventListener('resize', place);
+  return () => window.removeEventListener('resize', place);
+ }, [position, returnFocus]);
 
  // Фокус входит в первое доступное действие и возвращается туда, откуда меню открыли.
  useEffect(() => {
@@ -54,18 +64,21 @@ export function AttachmentContextMenu({
   const actions = menuActions(menu.current);
   (actions.find(action => !action.hasAttribute('data-disabled')) ?? actions[0] ?? menu.current)?.focus();
   return () => {
-   target?.focus();
+   target?.focus({preventScroll: true});
   };
  }, [returnFocus]);
 
- // Клик вне меню закрывает его до того, как событие дойдёт до картинки.
  useEffect(() => {
-  const handle = (event: PointerEvent) => {
-   if (!menu.current?.contains(event.target as Node)) onClose();
+  const handle = (event: Event) => {
+   const target = event.target as Node;
+   if (container && returnFocus.current?.contains(target)) return;
+   if (!menu.current?.contains(target)) onClose();
   };
-  document.addEventListener('pointerdown', handle, true);
-  return () => document.removeEventListener('pointerdown', handle, true);
- }, [onClose]);
+  // Фон просмотрщика должен получить клик, пока меню ещё открыто, чтобы закрыть только меню.
+  const eventType = container ? 'click' : 'pointerdown';
+  document.addEventListener(eventType, handle, !container);
+  return () => document.removeEventListener(eventType, handle, !container);
+ }, [onClose, container, returnFocus]);
 
  function moveFocus(step: number) {
   const actions = menuActions(menu.current);
@@ -120,9 +133,12 @@ export function AttachmentContextMenu({
     'border-border bg-popover text-popover-foreground fixed z-[160] flex max-w-[calc(100vw_-_16px)] min-w-44 flex-col gap-0.5 rounded-md border p-1',
     'shadow-[0_16px_40px_#0005,inset_0_1px_0_#ffffff10]'
    )}
-   style={{left: position.left, top: position.top, visibility: position.ready ? undefined : 'hidden'}}
+   style={coordinates}
    onKeyDown={handleKeyDown}
-   onContextMenu={event => event.preventDefault()}
+   onContextMenu={event => {
+    event.preventDefault();
+    event.stopPropagation();
+   }}
   >
    {items.map(item => {
     const Icon = actionIcons[item.id];
@@ -152,6 +168,6 @@ export function AttachmentContextMenu({
     );
    })}
   </div>,
-  document.body
+  container ?? document.body
  );
 }

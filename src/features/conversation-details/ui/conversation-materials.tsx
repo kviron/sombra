@@ -194,7 +194,7 @@ export function ConversationMaterials({
            )}
            data-material-id={item.id}
            data-category={item.category}
-           data-expired={(item.message.attachment?.expired && !item.message.attachment.cached) || undefined}
+           data-expired={(item.attachment?.expired && !item.attachment.cached) || undefined}
           >
            {item.href ? (
             <div className="material-link flex min-w-0 items-start gap-2.5 px-3 pt-3 pb-1">
@@ -221,10 +221,13 @@ export function ConversationMaterials({
              </div>
             </div>
            ) : (
-            item.message.attachment && (
-             <>
-              <MessageAttachment messageId={item.message.id} attachment={item.message.attachment} />
-             </>
+            item.attachment && (
+             <MessageAttachment
+              messageId={item.message.id}
+              attachment={item.attachment}
+              authorName={item.message.bot_name || userName(item.message.user)}
+              sentAt={item.message.time}
+             />
             )
            )}
            <footer className="material-caption text-muted-foreground flex min-w-0 items-center gap-2 px-2 pt-1 pb-1 pl-3 text-[11px]">

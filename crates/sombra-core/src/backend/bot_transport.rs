@@ -98,7 +98,12 @@ impl Backend {
             })
             .ok_or("BOT_SOURCE_UNAVAILABLE")?;
         if source["text"] != u["message"]["text"]
-            || source["attachment"]["id"] != u["message"]["attachment"]["id"]
+            || !attachments::message_attachments(&source)
+                .iter()
+                .map(|m| s(m, "id"))
+                .eq(attachments::message_attachments(&u["message"])
+                    .iter()
+                    .map(|m| s(m, "id")))
         {
             return Err("BOT_SOURCE_UNAVAILABLE".into());
         }
@@ -202,23 +207,17 @@ impl Backend {
             return Ok(json!({"ok":true}));
         }
         if op == "bot_attachment_file" {
-            use std::io::Read;
-            let meta = &update["message"]["attachment"];
-            let path = self
-                .attachment_path(meta)
+            let meta = attachments::selected_attachment(&update["message"], v.get("attachment_id"))
                 .ok_or("BOT_ATTACHMENT_UNAVAILABLE")?;
-            let file = std::fs::File::open(path).map_err(|_| "BOT_ATTACHMENT_UNAVAILABLE")?;
-            let mut bytes = Vec::new();
-            file.take(10485761)
-                .read_to_end(&mut bytes)
+            let bytes = self.attachment_bytes(meta)
                 .map_err(|_| "BOT_ATTACHMENT_UNAVAILABLE")?;
-            if bytes.len() > 10485760 || meta["size"].as_u64() != Some(bytes.len() as u64) {
-                return Err("BOT_ATTACHMENT_UNAVAILABLE".into());
-            }
             let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
-            if update["attachment_digest"].is_string()
-                && update["attachment_digest"] != token_hash(&encoded)
-            {
+            let expected = if update["attachment_digests"].is_object() {
+                Some(update["attachment_digests"][s(meta, "id")].as_str().ok_or("BOT_ATTACHMENT_UNAVAILABLE")?)
+            } else {
+                update["attachment_digest"].as_str()
+            };
+            if expected.is_some_and(|expected| expected != token_hash(&encoded)) {
                 return Err("BOT_ATTACHMENT_UNAVAILABLE".into());
             }
             return Ok(json!({"name":meta["name"],"mime":meta["mime"],"data":encoded}));

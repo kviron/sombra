@@ -16,8 +16,18 @@ export type UserActionsValue = {
 
 const UserActionsContext = createContext<UserActionsValue | null>(null);
 
+const OpenProfileContext = createContext<UserActionsValue['openProfile'] | undefined>(undefined);
+
+export function useOpenProfile() {
+ return useContext(OpenProfileContext);
+}
+
 export function UserActionsProvider({value, children}: {value: UserActionsValue; children: ReactNode}) {
- return <UserActionsContext.Provider value={value}>{children}</UserActionsContext.Provider>;
+ return (
+  <UserActionsContext.Provider value={value}>
+   <OpenProfileContext.Provider value={value.openProfile}>{children}</OpenProfileContext.Provider>
+  </UserActionsContext.Provider>
+ );
 }
 
 export function useUserActions() {

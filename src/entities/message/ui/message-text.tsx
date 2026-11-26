@@ -1,6 +1,6 @@
 import {TooltipLabel} from '@/shared/ui/tooltip';
 import {memo, useMemo, type MouseEvent} from 'react';
-import {useUserActions} from '@/shared/lib/user-actions';
+import {useOpenProfile} from '@/shared/lib/user-actions';
 import {remarkVerifiedMentions, type VerifiedMention} from '../model/message-mentions';
 import './message-mentions.css';
 import Markdown from 'react-markdown';
@@ -33,7 +33,7 @@ function sameMentions(previous?: readonly VerifiedMention[], next?: readonly Ver
 
 export const MessageText = memo(
  function MessageText({text, mentions}: {text: string; mentions?: readonly VerifiedMention[]}) {
-  const actions = useUserActions();
+  const openProfile = useOpenProfile();
   const plugins = useMemo(
    () => [remarkGfm, [remarkVerifiedMentions, mentions || []], remarkSombraLinks] as import('unified').PluggableList,
    [mentions]
@@ -53,7 +53,7 @@ export const MessageText = memo(
           type="button"
           className="message-mention"
           aria-label={`Открыть профиль ${String(children)}`}
-          onClick={() => actions?.openProfile(id)}
+          onClick={() => openProfile?.(id)}
          >
           {children}
          </button>

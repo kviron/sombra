@@ -12,7 +12,11 @@ import {
 } from './message-readers-rules';
 import {createMessageReadersModel} from './message-readers';
 
-type Options = {state: ChatState; message: ChatMessage; onClose: () => void};
+type Options = {
+ state: Pick<ChatState, 'me' | 'users' | 'readReceiptsSupported'>;
+ message: ChatMessage;
+ onClose: () => void;
+};
 
 /**
  * Единственное место, где живёт логика просмотров: доступность, загрузка, повтор и

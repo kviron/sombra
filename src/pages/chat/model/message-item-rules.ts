@@ -120,5 +120,5 @@ export const readTitle = (message: ChatMessage) =>
  `Посмотрели: ${message.readCount}${message.readAt ? ' · ' + new Date(message.readAt * 1000).toLocaleString('ru') : ''}`;
 
 /** Автор сообщения из снапшота: по нему карточка рисует аватар и открывает профиль. */
-export const authorIdentity = (state: ChatState, message: ChatMessage) =>
+export const authorIdentity = (state: Pick<ChatState, 'users'>, message: ChatMessage) =>
  state.users.find(user => user.id === message.user);

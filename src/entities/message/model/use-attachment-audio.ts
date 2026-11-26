@@ -81,7 +81,7 @@ export function useAttachmentAudio({messageId, attachment, root}: Options) {
   const handle = attachmentPreviews.acquire(
    identity,
    owner,
-   () => messageService.attachment<AttachmentFile>({message: messageId}),
+   () => messageService.attachment<AttachmentFile>({message: messageId, attachment_id: attachment.id}),
    value => {
     const blob = verifiedMediaBlob(value as AttachmentFile, attachment, 'audio');
     if (!document.createElement('audio').canPlayType(blob.type))
@@ -125,7 +125,7 @@ export function useAttachmentAudio({messageId, attachment, root}: Options) {
     if (alive.current) model.actions.playbackFailed();
    },
    retry: model.actions.retryLoad,
-   download: () => model.actions.download({messageId, isAlive: () => alive.current})
+   download: () => model.actions.download({messageId, attachmentId: attachment.id, isAlive: () => alive.current})
   }
  };
 }

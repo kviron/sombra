@@ -27,15 +27,15 @@ export function createVoiceMedia(store: VoiceStore, runtime: VoiceRuntime) {
  }
  const setLocal = stateActions.setLocal;
  async function changeMedia(c: Call, action: () => Promise<void>) {
-  if (runtime.pending || runtime.changingMedia) return;
-  runtime.changingMedia = true;
+  if (runtime.pending || c.changingMedia) return;
+  c.changingMedia = true;
   stateActions.beginOperation();
   try {
    await action();
   } catch (e) {
    if (!c.stop) stateActions.setError(mediaError(e));
   } finally {
-   runtime.changingMedia = false;
+   c.changingMedia = false;
    if (runtime.call === c && !c.stop) {
     stateActions.finishOperation();
     if (c.presentation?.track.readyState === 'ended') void stopPresentation();
@@ -130,30 +130,31 @@ export function createVoiceMedia(store: VoiceStore, runtime: VoiceRuntime) {
    return;
   }
   if (value === 100) return;
-  void changeMedia(c, async () => {
-   const context = new AudioContext();
-   let graph: Call['micGain'];
-   try {
-    const gain = context.createGain(),
-     output = context.createMediaStreamDestination();
-    gain.gain.value = value / 100;
-    const source = microphoneSource(context, gain, c.microphone);
-    gain.connect(output);
-    graph = {context, source, gain, track: output.stream.getAudioTracks()[0]};
-    c.micGain = graph;
-    stateActions.setMicVolume(value);
-    await context.resume();
-    if (!c.stop) await replaceLocalTrack(c, 'audio', graph.track, setLocal, {keepPrevious: true});
-   } catch (error) {
-    if (!c.stop) {
-     c.micGain = undefined;
-     if (graph) stopMicrophoneGain(graph);
-     else void context.close();
-     stateActions.setMicVolume(100);
-    }
-    throw error;
+  void changeMedia(c, () => applyMicVolume(c, value));
+ }
+ async function applyMicVolume(c: Call, value: number) {
+  const context = new AudioContext();
+  let graph: Call['micGain'];
+  try {
+   const gain = context.createGain(),
+    output = context.createMediaStreamDestination();
+   gain.gain.value = value / 100;
+   const source = microphoneSource(context, gain, c.microphone);
+   gain.connect(output);
+   graph = {context, source, gain, track: output.stream.getAudioTracks()[0]};
+   c.micGain = graph;
+   stateActions.setMicVolume(value);
+   await context.resume();
+   if (!c.stop) await replaceLocalTrack(c, 'audio', graph.track, setLocal, {keepPrevious: true});
+  } catch (error) {
+   if (!c.stop) {
+    c.micGain = undefined;
+    if (graph) stopMicrophoneGain(graph);
+    else void context.close();
+    stateActions.setMicVolume(100);
    }
-  });
+   throw error;
+  }
  }
  function savePreferences<K extends keyof MediaPreferences>(key: K, value: MediaPreferences[K]) {
   if (store.getState().preferences[key] === value && !(key === 'mic' && store.getState().microphoneLost)) return;
@@ -167,7 +168,7 @@ export function createVoiceMedia(store: VoiceStore, runtime: VoiceRuntime) {
    save();
    return;
   }
-  if (runtime.pending || runtime.changingMedia) return;
+  if (runtime.pending || c?.changingMedia) return;
   let kind: TrackKind | undefined;
   if (key === 'mic' || key === 'echo' || key === 'noise') kind = 'audio';
   else if (key === 'camera' && !c?.presentation && c?.stream.getVideoTracks().length) kind = 'video';
@@ -203,5 +204,9 @@ export function createVoiceMedia(store: VoiceStore, runtime: VoiceRuntime) {
   });
  }
 
- return {watchInput, actions: {setMicVolume, savePreferences, toggleCamera, startPresentation, stopPresentation}};
+ return {
+  watchInput,
+  applyMicVolume,
+  actions: {setMicVolume, savePreferences, toggleCamera, startPresentation, stopPresentation}
+ };
 }

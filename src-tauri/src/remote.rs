@@ -178,7 +178,7 @@ impl Remote {
             // The snapshot is the one request that must outlive a slow link.
             outgoing = outgoing.timeout(Duration::from_secs(30));
         }
-        if op == "attachment_file" || (op == "message" && request.get("attachment").is_some()) {
+        if op == "upload_message_attachment" || (op == "attachment_file" && request["metadata_only"] != true) || (op == "message" && request.get("attachment").is_some()) {
             outgoing = outgoing.timeout(Duration::from_secs(90));
         }
         let response = outgoing.send().await.map_err(|error| {
@@ -230,7 +230,7 @@ impl Remote {
                 return Err("AUTH_REQUIRED".into());
             }
         }
-        if op == "voice_poll" && status.is_server_error() {
+        if matches!(op, "voice_poll" | "voice_signal" | "voice_join") && status.is_server_error() {
             return Err(format!(
                 "REMOTE_UNAVAILABLE:Сервер временно недоступен ({status})"
             ));
@@ -326,7 +326,7 @@ impl Remote {
         }
         Ok(())
     }
-    async fn request(&self, request: Value) -> Result<Value, String> {
+    async fn request(&self, mut request: Value) -> Result<Value, String> {
         let op = request["op"].as_str().unwrap_or_default().to_owned();
         if matches!(
             op.as_str(),
@@ -338,6 +338,14 @@ impl Remote {
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         }
         let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
+        if op == "attachment_file" {
+            if request.get("attachment_id").is_some_and(|value| value.as_str().is_none_or(str::is_empty)) {
+                return Err("Некорректный идентификатор вложения".into());
+            }
+            if request["metadata_only"] == true {
+                return self.http(request).await;
+            }
+        }
         let mut order = if matches!(
             op.as_str(),
             "state"
@@ -356,17 +364,22 @@ impl Remote {
             return Err(SESSION_CHANGED.into());
         }
         let message = request["message"].as_str().unwrap_or_default().to_owned();
+        let selected = request.get("attachment_id").and_then(Value::as_str).map(str::to_owned);
+        let attachment_id = selected.as_deref();
         let mut expected_attachment = None;
         let revision = if op == "attachment_file" {
             self.ensure_cache_scope().await?;
             let mut cache = self.cache.lock().map_err(|_| "Cache unavailable")?;
-            if !cache.visible.contains_key(&message) {
+            if cache.metadata(&message, attachment_id).is_none() && !cache.supports_attachment_metadata {
                 return Err("Сообщение не найдено".into());
             }
-            if let Some(payload) = cache.read(&message) {
+            if let Some(payload) = cache.read(&message, attachment_id) {
                 return Ok(payload);
             }
-            expected_attachment = cache.visible.get(&message).cloned();
+            expected_attachment = cache.metadata(&message, attachment_id).cloned();
+            if expected_attachment.is_none() || attachment_id.is_some() {
+                request["with_attachment_id"] = json!(true);
+            }
             cache.revision
         } else {
             0
@@ -380,8 +393,20 @@ impl Remote {
         if op == "attachment_file" {
             drop(order.take());
         }
-        let result = self.http(request).await;
+        let mut result = self.http(request).await;
+        let mut history_metadata = None;
         if op == "attachment_file" {
+            // Older files are online-only. Keep both HTTP requests outside the lock used by state and logout.
+            if result.is_ok() && expected_attachment.is_none()
+                && generation == self.generation.load(std::sync::atomic::Ordering::SeqCst)
+            {
+                let mut lookup = json!({"op":"attachment_file","message":message,"metadata_only":true});
+                if let Some(id) = attachment_id { lookup["attachment_id"] = json!(id); }
+                match self.http(lookup).await {
+                    Ok(metadata) => history_metadata = Some(metadata),
+                    Err(reason) => result = Err(reason),
+                }
+            }
             order = Some(self.requests.lock().await);
             {
                 let _scope = self.cache.lock().map_err(|_| "Cache unavailable")?;
@@ -431,20 +456,28 @@ impl Remote {
                 return Err("AUTH_REQUIRED".into());
             }
             cache.decorate(&mut data);
+        } else if let Some(metadata) = history_metadata {
+            if cache.scope_revision != state_revision || !cache.supports_attachment_metadata
+                || metadata["id"].as_str().is_none() || metadata["id"] != data["id"]
+                || attachment_id.is_some_and(|id| metadata["id"] != id)
+                || !crate::attachment_cache::Cache::matches_payload(&metadata, &data)
+            {
+                return Err("Сообщение не найдено".into());
+            }
         } else if op == "attachment_file" {
             let authorized = expected_attachment
                 .as_ref()
-                .zip(cache.visible.get(&message))
+                .zip(cache.metadata(&message, attachment_id))
                 .is_some_and(|(before, current)| {
                     crate::attachment_cache::Cache::same_attachment(before, current)
                 });
             if !authorized {
                 return Err("Сообщение не найдено".into());
             }
-            if !cache.valid(&message, &data) {
+            if !cache.valid(&message, attachment_id, &data) || (data["id"].is_string() && attachment_id.is_some_and(|id| data["id"] != id)) {
                 return Err("Некорректное вложение".into());
             }
-            cache.write(&message, &data, revision);
+            cache.write(&message, attachment_id, &data, revision);
         }
         drop(order);
         Ok(data)
@@ -591,6 +624,43 @@ mod tests {
         let _ = server.await;
         let _ = fs::remove_dir_all(root);
     }
+    #[tokio::test]
+    async fn historical_files_require_current_metadata_and_never_enter_the_disk_cache() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let allowed = Arc::new(AtomicBool::new(true));
+        let check = allowed.clone();
+        let app = axum::Router::new().route("/", axum::routing::post(move |axum::Json(request): axum::Json<Value>| {
+            let check = check.clone();
+            async move {
+                let data = if request["op"] == "state" {
+                    json!({"me":{"id":"reader"},"messages":[],"features":{"attachmentMetadata":true}})
+                } else if request["metadata_only"] == true {
+                    if !check.load(Ordering::SeqCst) {
+                        return (axum::http::StatusCode::BAD_REQUEST, axum::Json(json!({"error":"Сообщение не найдено"})));
+                    }
+                    json!({"id":"photo","name":"x","mime":"image/png","size":1})
+                } else {
+                    json!({"id":"photo","name":"x","mime":"image/png","data":"eA=="})
+                };
+                (axum::http::StatusCode::OK, axum::Json(json!({"data":data})))
+            }
+        }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let root = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+        let mut remote = Remote::new(root.join("session.dpapi")).unwrap();
+        remote.endpoint = format!("http://{}/", listener.local_addr().unwrap());
+        *remote.cookie.lock().unwrap() = "mines_session=test".into();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let request = json!({"op":"attachment_file","message":"older"});
+        assert_eq!(remote.request(request.clone()).await.unwrap()["data"], "eA==");
+        assert_eq!(remote.cache.lock().unwrap().info()["files"], 0);
+        allowed.store(false, Ordering::SeqCst);
+        assert_eq!(remote.request(request).await.unwrap_err(), "Сообщение не найдено");
+        server.abort();
+        let _ = server.await;
+        let _ = fs::remove_dir_all(root);
+    }
+
     #[tokio::test]
     #[cfg(windows)]
     async fn attachment_cache_transfers_do_not_block_state_and_recheck_revocation() {

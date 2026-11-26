@@ -1,5 +1,6 @@
 // Снапшот состояния страницы: одно хранилище на страницу, потому что чат в окне один.
 // Здесь же ревизии: более свежие группа, название переписки и предпочтения не перетираются опросом.
+import {dequal} from 'dequal/lite';
 import {createStore} from 'zustand/vanilla';
 import {accountService} from '@/entities/account';
 import {acceptStickerImageSnapshot, clearStickerImages} from '@/entities/sticker';
@@ -43,6 +44,16 @@ function uniqueById<T extends {id: string}>(items: T[]): T[] {
   return true;
  });
  return unique.length === items.length ? items : unique;
+}
+
+// A sliding snapshot can drop the oldest message and append a new one in the same poll.
+function reuseMessages(previous: ChatMessage[], next: ChatMessage[]) {
+ if (dequal(previous, next)) return previous;
+ const byId = new Map(previous.map(message => [message.id, message]));
+ return next.map(message => {
+  const old = byId.get(message.id);
+  return old && dequal(old, message) ? old : message;
+ });
 }
 
 const patchSnapshot = (update: (state: ChatState) => ChatState) => {
@@ -107,7 +118,13 @@ export const chatSnapshotActions = {
      : next.chatPreferences;
    return {
     ...current,
-    snapshot: {...next, groups, chatPreferences, dialogs: mergeDialogs(previous.dialogs, next.dialogs)}
+    snapshot: {
+     ...next,
+     messages: reuseMessages(previous.messages, next.messages),
+     groups,
+     chatPreferences,
+     dialogs: mergeDialogs(previous.dialogs, next.dialogs)
+    }
    };
   });
  },

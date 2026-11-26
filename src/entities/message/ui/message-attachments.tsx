@@ -1,11 +1,13 @@
 import {TooltipLabel} from '@/shared/ui/tooltip';
-import {useRef, useState} from 'react';
-import {Download, FileWarning, RotateCw, X} from 'lucide-react';
+import {type CSSProperties, useRef, useState} from 'react';
+import {Download, FileWarning, ImageOff, RotateCw} from 'lucide-react';
 import {Dialog} from 'radix-ui';
 import {type MessageAttachmentMetadata} from '@/shared/types';
-import {attachmentMenuItems, cacheNote} from '../model/message-attachment-rules';
+import {attachmentAlbumRows} from '../model/attachment-album';
+import {type AttachmentActionId, attachmentMenuItems, cacheNote} from '../model/message-attachment-rules';
 import {useMessageAttachment} from '../model/use-message-attachment';
 import {useAttachmentAudio} from '../model/use-attachment-audio';
+import {AttachmentImageViewer} from './attachment-image-viewer';
 import {AttachmentContextMenu} from './attachment-context-menu';
 import {
  AudioPlayer,
@@ -22,18 +24,10 @@ import './message-attachments.css';
 /** Оболочка карточки: ширина, отступ, рамка и фон приходят из токенов темы. */
 const attachmentShell = 'mt-2 min-w-0 max-w-full rounded-lg border border-border bg-background';
 /** Картинка рисует себя сама, поэтому рамку и фон оболочки она снимает. */
-const imageAttachmentShell = cn(attachmentShell, 'w-fit overflow-visible border-0 bg-transparent');
+const imageAttachmentShell = cn(attachmentShell, 'overflow-visible border-0 bg-transparent');
 /** Audio/File — это поверхность Elements; оболочка задаёт только ширину и снимает рамку. */
 const cardAttachmentShell = cn(attachmentShell, 'w-80 overflow-visible border-0 bg-transparent');
-/** Действие над картинкой: цель 44×44, тёмная плашка, светлая иконка. */
-const imageActionButton =
- 'flex size-11 min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border-0 bg-primary p-1 text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-[3px]';
-const imageRetryButton = cn('attachment-image-retry', imageActionButton, 'absolute right-2 bottom-2');
-const viewerCloseButton = cn(
- 'attachment-viewer-close',
- imageActionButton,
- 'absolute right-0 top-[max(-48px,calc(-10dvh_+_env(safe-area-inset-top,0px)_+_8px))]'
-);
+const retryImageLabel = 'Повторить загрузку изображения';
 /** Кнопка скачивания аудио: появляется при наведении на плеер. */
 const audioDownloadButton = cn(
  'attachment-player-download',
@@ -47,23 +41,57 @@ const audioRetryButton = cn(
  'flex-none mt-0.5 flex size-8 min-h-8 min-w-8 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent p-0 text-muted-foreground'
 );
 
-export type MessageAttachmentProps = {messageId: string; attachment: MessageAttachmentMetadata};
+export type MessageAttachmentProps = {
+ messageId: string;
+ attachment: MessageAttachmentMetadata;
+ authorName?: string;
+ sentAt?: number;
+};
 
 export function MessageAttachment(props: MessageAttachmentProps) {
  // Identity key resets only for a different file, not every history poll.
  return <AttachmentView key={props.messageId + ':' + props.attachment.id} {...props} />;
 }
 
+export function MessageAttachments({
+ attachments,
+ ...props
+}: Omit<MessageAttachmentProps, 'attachment'> & {attachments: readonly MessageAttachmentMetadata[]}) {
+ return (
+  <div className="message-album" role="group" aria-label={`Вложения: ${attachments.length}`}>
+   {attachmentAlbumRows(attachments).map(row =>
+    row.kind === 'file' ? (
+     <MessageAttachment key={row.attachment.id} attachment={row.attachment} {...props} />
+    ) : (
+     <div
+      key={row.photos[0].attachment.id}
+      className="message-album-row"
+      style={{
+       aspectRatio: row.ratio,
+       gridTemplateColumns: row.photos.map(photo => `minmax(0, ${photo.ratio}fr)`).join(' ')
+      }}
+     >
+      {row.photos.map(({attachment}) => (
+       <MessageAttachment key={attachment.id} attachment={attachment} {...props} />
+      ))}
+     </div>
+    )
+   )}
+  </div>
+ );
+}
+
 /** Компонент только показывает: доступность, предпросмотр и скачивание приходят из модели. */
-function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
+function AttachmentView({messageId, attachment, authorName, sentAt}: MessageAttachmentProps) {
  const root = useRef<HTMLDivElement>(null);
  const trigger = useRef<HTMLButtonElement>(null);
  const [menuAt, setMenuAt] = useState<{x: number; y: number} | undefined>(undefined);
- const {isImage, isAudio, available, preview, error, busy, copying, copyError, open, actions} = useMessageAttachment({
-  messageId,
-  attachment,
-  root
- });
+ const {isImage, imageSize, isAudio, available, preview, error, busy, copying, copyError, open, actions} =
+  useMessageAttachment({
+   messageId,
+   attachment,
+   root
+  });
  const menuItems = attachmentMenuItems({
   available,
   mime: attachment.mime,
@@ -74,7 +102,28 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
  });
 
  if (isImage) {
-  const placeholder = (
+  function selectAction(id: AttachmentActionId) {
+   if (id === 'copy') void actions.copy();
+   else actions.download();
+  }
+  const frame = imageSize
+   ? ({
+      '--photo-width': Math.min(320, imageSize.width, (420 * imageSize.width) / imageSize.height) + 'px',
+      '--photo-ratio': imageSize.width + ' / ' + imageSize.height
+     } as CSSProperties)
+   : undefined;
+  const canRetry = available && !!error;
+  const placeholder = canRetry ? (
+   <span className="absolute inset-0 grid place-items-center overflow-hidden rounded-[inherit] border border-white/10 bg-neutral-950">
+    <ImageOff className="size-7 text-neutral-500" strokeWidth={1.5} aria-hidden="true" />
+    <span className="attachment-retry-icon absolute grid size-11 place-items-center rounded-full border border-white/30 bg-black text-white">
+     <RotateCw size={19} aria-hidden="true" />
+    </span>
+    <span className="sr-only" role="status">
+     Не удалось загрузить изображение
+    </span>
+   </span>
+  ) : (
    <span
     className={cn(
      'attachment-image-placeholder',
@@ -87,8 +136,6 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
       <FileWarning aria-hidden="true" />
       Изображение недоступно
      </>
-    ) : error ? (
-     'Не удалось загрузить изображение'
     ) : (
      'Загрузка изображения…'
     )}
@@ -98,6 +145,7 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
    <div
     ref={root}
     className={cn('message-attachment message-attachment-image', imageAttachmentShell)}
+    style={frame}
     aria-label="Изображение"
    >
     <div
@@ -109,19 +157,19 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
       setMenuAt({x: event.clientX, y: event.clientY});
      }}
     >
-     <TooltipLabel content="Открыть фото">
+     <TooltipLabel content={canRetry ? retryImageLabel : 'Открыть фото'}>
       <button
        ref={trigger}
        type="button"
        className={cn(
         'attachment-preview attachment-image-trigger',
-        'grid h-auto max-h-[var(--attachment-image-max-height)] min-h-[120px] w-[min(320px,100%)] max-w-full min-w-[min(160px,100%)]',
-        'text-muted-foreground cursor-zoom-in place-items-center content-center justify-center overflow-hidden rounded-md border-0 bg-transparent p-0 text-center text-xs leading-[normal]',
-        'disabled:cursor-default'
+        'relative grid w-full max-w-full place-items-center',
+        'text-muted-foreground overflow-hidden rounded-md border-0 bg-transparent p-0 text-center text-xs leading-[normal]',
+        canRetry ? 'attachment-image-retry cursor-pointer' : 'cursor-zoom-in disabled:cursor-default'
        )}
        disabled={!available}
-       aria-label={`Открыть фото ${attachment.name}`}
-       onClick={() => actions.setOpen(true)}
+       aria-label={canRetry ? `${retryImageLabel} ${attachment.name}` : `Открыть фото ${attachment.name}`}
+       onClick={canRetry ? actions.retry : () => actions.setOpen(true)}
        onKeyDown={event => {
         if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
         event.preventDefault();
@@ -131,9 +179,11 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
       >
        {available && preview && !error ? (
         <img
-         className={cn('block h-auto max-h-[var(--attachment-image-max-height)] w-auto max-w-full object-contain')}
+         className="absolute inset-0 m-auto block h-auto max-h-full w-auto max-w-full object-contain"
+         decoding="async"
          src={preview}
          alt="Изображение из переписки"
+         onLoad={event => actions.rememberImageSize(event.currentTarget)}
          onError={() => actions.setError('Не удалось показать изображение.')}
         />
        ) : (
@@ -141,16 +191,6 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
        )}
       </button>
      </TooltipLabel>
-     {available && error && (
-      <button
-       type="button"
-       className={imageRetryButton}
-       aria-label="Повторить загрузку изображения"
-       onClick={actions.retry}
-      >
-       <RotateCw size={18} />
-      </button>
-     )}
     </div>
     {attachment.cached && attachment.expired && <p className="attachment-cache-status">{cacheNote(attachment)}</p>}
     {copyError && (
@@ -161,67 +201,49 @@ function AttachmentView({messageId, attachment}: MessageAttachmentProps) {
     {menuAt && (
      <AttachmentContextMenu
       key={`${menuAt.x}:${menuAt.y}`}
-      x={menuAt.x}
-      y={menuAt.y}
+      position={menuAt}
       items={menuItems}
       label={`Действия с изображением ${attachment.name}`}
       returnFocus={trigger}
       onClose={() => setMenuAt(undefined)}
-      onSelect={id => {
-       if (id === 'copy') void actions.copy();
-       else actions.download();
-      }}
+      onSelect={selectAction}
      />
     )}
     <Dialog.Root open={open && available} onOpenChange={actions.setOpen}>
-     <Dialog.Portal>
-      <Dialog.Overlay className={cn('attachment-viewer-overlay', 'bg-card fixed inset-0 z-[140]')} />
-      <Dialog.Content
-       className={cn(
-        'attachment-viewer material-viewer',
-        'fixed top-1/2 left-1/2 z-[141] grid max-h-[90dvh] w-fit max-w-[90vw] -translate-x-1/2 -translate-y-1/2 place-items-center',
-        'text-foreground overflow-visible rounded-none border-0 bg-transparent p-0 shadow-none'
-       )}
-       onCloseAutoFocus={event => {
-        event.preventDefault();
-        trigger.current?.focus();
-       }}
+     {open && available && (
+      <AttachmentImageViewer
+       name={attachment.name}
+       authorName={authorName}
+       sentAt={sentAt}
+       items={menuItems}
+       onSelect={selectAction}
+       thumbnail={trigger}
+       canZoom={!!preview && !error}
+       onDismiss={() => actions.setOpen(false)}
+       copyError={copyError}
       >
-       <Dialog.Title className="attachment-visually-hidden">Просмотр изображения</Dialog.Title>
-       <Dialog.Description className="attachment-visually-hidden">
-        Изображение из переписки. Нажмите Escape, чтобы закрыть просмотр.
-       </Dialog.Description>
-       <Dialog.Close asChild>
-        <button type="button" className={viewerCloseButton} aria-label="Закрыть просмотр фото">
-         <X size={20} />
+       {preview && !error ? (
+        <img
+         className="block h-auto max-h-[calc(100dvh-8rem)] w-auto max-w-full object-contain"
+         src={preview}
+         alt="Изображение из переписки"
+         onLoad={event => actions.rememberImageSize(event.currentTarget)}
+         onError={() => actions.setError('Не удалось показать изображение.')}
+        />
+       ) : canRetry ? (
+        <button
+         type="button"
+         className="attachment-image-retry relative aspect-4/3 max-h-[calc(100dvh-8rem)] w-80 max-w-full cursor-pointer overflow-hidden rounded-md border-0 p-0"
+         aria-label={retryImageLabel}
+         onClick={actions.retry}
+        >
+         {placeholder}
         </button>
-       </Dialog.Close>
-       <div
-        className={cn('attachment-viewer-image', 'group relative grid max-h-[80dvh] max-w-[90vw] place-items-center')}
-       >
-        {preview && !error ? (
-         <img
-          className={cn('block h-auto max-h-[80dvh] w-auto max-w-[90vw] object-contain')}
-          src={preview}
-          alt="Изображение из переписки"
-          onError={() => actions.setError('Не удалось показать изображение.')}
-         />
-        ) : (
-         placeholder
-        )}
-        {error && (
-         <button
-          type="button"
-          className={imageRetryButton}
-          aria-label="Повторить загрузку изображения"
-          onClick={actions.retry}
-         >
-          <RotateCw size={18} />
-         </button>
-        )}
-       </div>
-      </Dialog.Content>
-     </Dialog.Portal>
+       ) : (
+        placeholder
+       )}
+      </AttachmentImageViewer>
+     )}
     </Dialog.Root>
    </div>
   );

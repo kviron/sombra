@@ -1,25 +1,23 @@
-import {useEffect, useMemo, useRef} from 'react';
+import {useEffect, useRef, type RefObject} from 'react';
 import type {ChatState} from '@/shared/types';
 import {messageService} from './services/message-service';
 
 /** Long messages use the viewport as denominator, not their entire height. */
 export function sufficientlyVisible(height: number, visible: number, viewport: number) {
- return visible >= Math.min(40, height) && visible >= Math.min(height, viewport) * 0.5;
+ // Aligning a short row to the viewport can clip a fraction of a CSS pixel.
+ const enoughPixels = visible >= 40 || (visible > 0 && height - visible <= 1);
+ return enoughPixels && visible >= Math.min(height, viewport) * 0.5;
 }
 
 export function observeMessageReads({
  root,
- actor,
  channel,
- eligible,
  send,
  onRead,
  active = () => true
 }: {
  root: HTMLElement;
- actor: string;
  channel: string;
- eligible: Set<string>;
  send: (ids: string[]) => Promise<unknown>;
  onRead?: (ids: string[]) => void;
  active?: () => boolean;
@@ -116,9 +114,9 @@ export function observeMessageReads({
   {root, threshold: Array.from({length: 101}, (_, i) => i / 100)}
  );
  const observed = new Set<HTMLElement>();
- const rowSelector = '[data-read-message-id]';
+ const rowSelector = '[data-read-channel]';
  function observeRow(element: HTMLElement) {
-  if (!root.contains(element) || !eligible.has(element.dataset.readMessageId || '') || observed.has(element)) return;
+  if (!root.contains(element) || element.dataset.readChannel !== channel || observed.has(element)) return;
   observed.add(element);
   observer.observe(element);
  }
@@ -176,12 +174,11 @@ export function observeMessageReads({
   document.removeEventListener('visibilitychange', attention);
   window.removeEventListener('focus', attention);
   window.removeEventListener('blur', attention);
-  void actor;
-  void channel;
  };
 }
 
 export function useMessageReadState(
+ viewport: RefObject<HTMLElement | null>,
  state: ChatState | null,
  channel: string,
  blocked: boolean,
@@ -191,26 +188,15 @@ export function useMessageReadState(
  accepted.current = onRead;
  const actor = state?.me.id || '';
  const canRead = state?.readReceiptsSupported && !state.me.bot;
- const messages = state?.messages;
- const ids = useMemo(
-  () =>
-   messages
-    ?.filter(m => m.channel === channel && m.user !== actor)
-    .map(m => m.id)
-    .join('\n') || '',
-  [messages, actor, channel]
- );
  useEffect(() => {
   if (!canRead || !actor || !channel || blocked || typeof IntersectionObserver === 'undefined') return;
-  const root = document.querySelector<HTMLElement>('[data-slot="message-scroller-viewport"]');
+  const root = viewport.current;
   if (!root) return;
   return observeMessageReads({
    root,
-   actor,
    channel,
-   eligible: new Set(ids.split('\n')),
    send: messages => messageService.markRead({channel, messages}),
    onRead: ids => accepted.current?.(ids)
   });
- }, [actor, channel, blocked, canRead, ids]);
+ }, [viewport, actor, channel, blocked, canRead]);
 }

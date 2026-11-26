@@ -6,7 +6,74 @@ use std::io::{Read, Write};
 
 const MAX_BYTES: usize = 10 * 1024 * 1024;
 const MAX_ENCODED: usize = MAX_BYTES.div_ceil(3) * 4;
+const MAX_ATTACHMENTS: usize = 10;
+const STAGING_TTL: u64 = 3600;
+const MAX_PENDING_PER_USER: usize = 40;
+const MAX_PENDING_TOTAL: usize = 256;
+const INVALID: &str = "MESSAGE_ATTACHMENTS_INVALID";
+const UNAVAILABLE: &str = "MESSAGE_ATTACHMENTS_UNAVAILABLE";
 const EXPIRED: &str = "Срок хранения вложения истёк: файл больше недоступен";
+
+pub(super) fn message_attachments(message: &Value) -> &[Value] {
+    match message["attachments"].as_array() {
+        Some(items) => items,
+        None if message["attachment"].is_object() => std::slice::from_ref(&message["attachment"]),
+        None => &[],
+    }
+}
+
+pub(super) fn selected_attachment<'a>(message: &'a Value, id: Option<&Value>) -> Option<&'a Value> {
+    let items = message_attachments(message);
+    match id {
+        None => items.first(),
+        Some(id) => items
+            .iter()
+            .find(|item| id.is_string() && item["id"] == *id),
+    }
+}
+
+pub(super) fn attachment_ids(request: &Value) -> Result<Option<Vec<&str>>, String> {
+    if request.get("attachments").is_some() || request.get("attachment_id").is_some() {
+        return Err(INVALID.into());
+    }
+    let Some(ids) = request.get("attachment_ids") else {
+        return Ok(None);
+    };
+    if request.as_object().unwrap().keys().any(|k| {
+        !matches!(
+            k.as_str(),
+            "op" | "token"
+                | "bot_token"
+                | "channel"
+                | "text"
+                | "mentions"
+                | "replyTo"
+                | "attachment_ids"
+        )
+    }) || request.get("text").is_some_and(|t| !t.is_string())
+        || request.get("replyTo").is_some_and(|id| id.as_str().is_none_or(str::is_empty))
+        || request.get("mentions").is_some_and(|mentions| !mentions.is_array())
+    {
+        return Err(INVALID.into());
+    }
+    let ids = ids
+        .as_array()
+        .filter(|ids| (1..=MAX_ATTACHMENTS).contains(&ids.len()))
+        .ok_or(INVALID)?;
+    let mut unique = Vec::with_capacity(ids.len());
+    for value in ids {
+        let id = value.as_str().ok_or(INVALID)?;
+        if uuid::Uuid::parse_str(id)
+            .ok()
+            .is_none_or(|uuid| uuid.to_string() != id)
+            || unique.contains(&id)
+        {
+            return Err(INVALID.into());
+        }
+        unique.push(id);
+    }
+    Ok(Some(unique))
+}
 
 fn safe_name(name: &str) -> String {
     let leaf = name.rsplit(['/', '\\']).next().unwrap_or("");
@@ -33,6 +100,26 @@ fn sniff(bytes: &[u8]) -> &'static str {
     }
 }
 
+// Read dimensions once on upload, including the orientation used by browsers for phone photos.
+fn display_dimensions(bytes: &[u8], mime: &str) -> Option<(u32, u32)> {
+    use image::{ImageDecoder, ImageFormat, ImageReader};
+    let format = ImageFormat::from_mime_type(mime)?;
+    let reader = ImageReader::with_format(std::io::Cursor::new(bytes), format);
+    let mut decoder = reader.into_decoder().ok()?;
+    let (width, height) = decoder.dimensions();
+    if width == 0 || height == 0 {
+        return None;
+    }
+    let rotated = decoder
+        .orientation()
+        .is_ok_and(|orientation| orientation.to_exif() >= 5);
+    Some(if rotated {
+        (height, width)
+    } else {
+        (width, height)
+    })
+}
+
 fn decode(value: &Value) -> Result<(String, Vec<u8>), String> {
     let object = value.as_object().ok_or("Некорректное вложение")?;
     let name = object
@@ -56,6 +143,135 @@ fn decode(value: &Value) -> Result<(String, Vec<u8>), String> {
 }
 
 impl Backend {
+    pub(super) fn upload_message_attachment(
+        &mut self,
+        v: &Value,
+        uid: &str,
+    ) -> Result<Value, String> {
+        let channel = s(v, "channel");
+        if !self.allowed(uid, channel) {
+            return Err("Нет доступа к чату".into());
+        }
+        if v.as_object().unwrap().keys().any(|k| {
+            !matches!(
+                k.as_str(),
+                "op" | "token" | "bot_token" | "channel" | "attachment"
+            )
+        }) || v["attachment"].as_object().is_none_or(|fields| {
+            fields
+                .keys()
+                .any(|k| !matches!(k.as_str(), "name" | "data" | "mime"))
+        }) || v["attachment"]
+            .get("mime")
+            .is_some_and(|mime| !mime.is_string())
+        {
+            return Err(INVALID.into());
+        }
+        let pending = self.db["pending_attachments"].as_object().unwrap();
+        if pending.len() >= MAX_PENDING_TOTAL
+            || pending.values().filter(|row| row["user"] == uid).count() >= MAX_PENDING_PER_USER
+        {
+            return Err("MESSAGE_ATTACHMENTS_LIMIT".into());
+        }
+        let attachment = self.store_attachment(&v["attachment"])?;
+        let id = s(&attachment, "id");
+        self.db["pending_attachments"][id] = json!({
+            "user":uid, "channel":channel, "expires_at":now() + STAGING_TTL, "attachment":attachment
+        });
+        if let Err(error) = self.save() {
+            let _ = std::fs::remove_file(self.attachment_path(&attachment).unwrap());
+            return Err(error);
+        }
+        Ok(json!({"id": id}))
+    }
+
+    pub(super) fn previous_attachment_message(
+        &self,
+        uid: &str,
+        channel: &str,
+        ids: &[&str],
+        hash: &str,
+    ) -> Result<Option<&Value>, String> {
+        if ids
+            .iter()
+            .all(|id| self.db["pending_attachments"].get(*id).is_some())
+        {
+            return Ok(None);
+        }
+        for message in self.db["messages"].as_array().unwrap().iter().rev() {
+            if message["user"] != uid || message["channel"] != channel {
+                continue;
+            }
+            let Some(items) = message["attachments"].as_array() else {
+                continue;
+            };
+            let previous = items.iter().map(|item| s(item, "id"));
+            if previous.clone().eq(ids.iter().copied())
+                && message["attachment_request_hash"] == hash
+            {
+                return Ok(Some(message));
+            }
+            if previous.into_iter().any(|id| ids.contains(&id)) {
+                return Err("MESSAGE_ATTACHMENTS_CONFLICT".into());
+            }
+        }
+        Ok(None)
+    }
+    pub(super) fn staged_attachments(
+        &self,
+        ids: &[&str],
+        uid: &str,
+        channel: &str,
+    ) -> Result<Vec<Value>, String> {
+        let timestamp = now();
+        ids.iter()
+            .map(|&id| {
+                let row = &self.db["pending_attachments"][id];
+                let attachment = &row["attachment"];
+                if row["user"] != uid
+                    || row["channel"] != channel
+                    || attachment["id"] != id
+                    || row["expires_at"].as_u64().unwrap_or(0) <= timestamp
+                    || self.attachment_expired(attachment)
+                {
+                    return Err(UNAVAILABLE.into());
+                }
+                Ok(attachment.clone())
+            })
+            .collect()
+    }
+
+    pub(super) fn cleanup_staged_attachments(&mut self, timestamp: u64) -> Result<(), String> {
+        let mut removed = Vec::new();
+        for (id, row) in self.db["pending_attachments"].as_object().unwrap() {
+            if row["expires_at"].as_u64().unwrap_or(0) > timestamp {
+                continue;
+            }
+            if let Some(path) = self.attachment_path(&row["attachment"]) {
+                if let Err(error) = std::fs::remove_file(path) {
+                    if error.kind() != std::io::ErrorKind::NotFound {
+                        continue;
+                    }
+                }
+            }
+            removed.push((id.clone(), row.clone()));
+        }
+        if !removed.is_empty() {
+            let pending = self.db["pending_attachments"].as_object_mut().unwrap();
+            for (id, _) in &removed {
+                pending.remove(id);
+            }
+            if let Err(error) = self.save() {
+                self.db["pending_attachments"]
+                    .as_object_mut()
+                    .unwrap()
+                    .extend(removed);
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn attachment_path(&self, attachment: &Value) -> Option<PathBuf> {
         let raw = attachment["id"].as_str()?;
         let uuid = uuid::Uuid::parse_str(raw).ok()?;
@@ -67,7 +283,12 @@ impl Backend {
 
     pub(super) fn store_attachment(&self, value: &Value) -> Result<Value, String> {
         let (name, bytes) = decode(value)?;
-        let metadata = json!({"id":id(),"name":name,"size":bytes.len(),"mime":sniff(&bytes)});
+        let mime = sniff(&bytes);
+        let mut metadata = json!({"id":id(),"name":name,"size":bytes.len(),"mime":mime});
+        if let Some((width, height)) = display_dimensions(&bytes, mime) {
+            metadata["width"] = json!(width);
+            metadata["height"] = json!(height);
+        }
         let path = self
             .attachment_path(&metadata)
             .ok_or("STORAGE_UNAVAILABLE")?;
@@ -109,7 +330,23 @@ impl Backend {
                 message["id"] == value["message"] && self.message_visible(message, s(&user, "id"))
             })
             .ok_or("Сообщение не найдено")?;
-        let metadata = &message["attachment"];
+        let metadata = selected_attachment(message, value.get("attachment_id"))
+            .ok_or("Вложение не найдено")?;
+        if value["metadata_only"].as_bool() == Some(true) {
+            self.attachment_path(metadata)
+                .ok_or("Вложение не найдено")?;
+            return Ok(metadata.clone());
+        }
+        let bytes = self.attachment_bytes(metadata)?;
+        let mut payload =
+            json!({"data":STANDARD.encode(&bytes),"mime":sniff(&bytes),"name":metadata["name"]});
+        if value["with_attachment_id"].as_bool() == Some(true) {
+            payload["id"] = metadata["id"].clone();
+        }
+        Ok(payload)
+    }
+
+    pub(super) fn attachment_bytes(&self, metadata: &Value) -> Result<Vec<u8>, String> {
         let path = self
             .attachment_path(metadata)
             .ok_or("Вложение не найдено")?;
@@ -127,7 +364,7 @@ impl Backend {
         if bytes.len() > MAX_BYTES || metadata["size"].as_u64() != Some(bytes.len() as u64) {
             return Err("STORAGE_UNAVAILABLE".into());
         }
-        Ok(json!({"data":STANDARD.encode(&bytes),"mime":sniff(&bytes),"name":metadata["name"]}))
+        Ok(bytes)
     }
 
     pub(super) fn attachment_expired(&self, attachment: &Value) -> bool {
@@ -135,6 +372,9 @@ impl Backend {
             .is_none_or(|path| !path.is_file())
     }
 }
+
+#[cfg(test)]
+mod album_tests;
 
 #[cfg(test)]
 mod tests {
@@ -165,11 +405,24 @@ mod tests {
             401,
             "JSON token must not bypass cookie auth"
         );
-        let payload = json!({"op":"message","channel":channel,"attachment":{"name":"boundary.bin","data":STANDARD.encode(vec![0;MAX_BYTES])}});
+        let payload = json!({"op":"upload_message_attachment","channel":channel,"attachment":{"name":"boundary.bin","data":STANDARD.encode(vec![0;MAX_BYTES])}});
+        let mut ids = Vec::new();
+        for _ in 0..2 {
+            let response = client
+                .post(&url)
+                .header("cookie", &cookie)
+                .json(&payload)
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(response.status(), 200);
+            let staged: Value = response.json().await.unwrap();
+            ids.push(staged["data"]["id"].clone());
+        }
         let response = client
             .post(&url)
             .header("cookie", &cookie)
-            .json(&payload)
+            .json(&json!({"op":"message","channel":channel,"attachment_ids":ids}))
             .send()
             .await
             .unwrap();
@@ -207,6 +460,23 @@ mod tests {
         assert_eq!(response.status(), 413);
         server.abort();
         let _ = server.await;
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn photo_metadata_uses_uploaded_file_dimensions() {
+        let path = std::env::temp_dir().join(id()).join("db.json");
+        let backend = Backend::open(path.clone()).unwrap();
+        let mut png = std::io::Cursor::new(Vec::new());
+        image::RgbImage::new(3, 7)
+            .write_to(&mut png, image::ImageFormat::Png)
+            .unwrap();
+        let metadata = backend.store_attachment(&json!({"name":"a.png","data":STANDARD.encode(png.into_inner()),"width":7,"height":3})).unwrap();
+        assert_eq!(
+            (metadata["width"].as_u64(), metadata["height"].as_u64()),
+            (Some(3), Some(7))
+        );
+        assert!(display_dimensions(b"broken", "image/jpeg").is_none());
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 
@@ -262,6 +532,16 @@ mod tests {
         b.request(send).unwrap();
         let message = b.db["messages"][0].clone();
         let read = json!({"op":"attachment_file","token":token,"message":message["id"]});
+        let mut identified = read.clone();
+        identified["with_attachment_id"] = json!(true);
+        assert_eq!(b.request(identified).unwrap()["id"], message["attachment"]["id"]);
+        let mut details = read.clone();
+        details["metadata_only"] = json!(true);
+        let header = b.request(details.clone()).unwrap();
+        assert_eq!(header["id"], message["attachment"]["id"]);
+        assert!(header.get("data").is_none());
+        details["token"] = json!(outsider);
+        assert_eq!(b.request(details).unwrap_err(), "Сообщение не найдено");
         let mut unauth = read.clone();
         unauth["token"] = json!("");
         assert_eq!(b.request(unauth).unwrap_err(), "AUTH_REQUIRED");

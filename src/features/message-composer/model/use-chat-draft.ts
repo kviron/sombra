@@ -1,10 +1,17 @@
 import {useState} from 'react';
+import {useStore} from 'zustand';
+import {createStore} from 'zustand/vanilla';
+
+/** Синхронное чтение не даёт двум submit одного события забрать один черновик. */
 export function useChatDraft(destination: string) {
- const [drafts, setDrafts] = useState<Record<string, string>>({});
- const draft = drafts[destination] || '';
- const setDraft = (text: string) =>
-  setDrafts(previous => ((previous[destination] || '') === text ? previous : {...previous, [destination]: text}));
- const clearSent = (id: string, sent: string) =>
-  setDrafts(previous => (sent && previous[id] === sent ? {...previous, [id]: ''} : previous));
- return {draft, setDraft, clearSent};
+ const [store] = useState(() => createStore<Record<string, string>>(() => ({})));
+ const draft = useStore(store, drafts => drafts[destination] || '');
+ const getDraft = () => store.getState()[destination] || '';
+ const setDraft = (text: string) => {
+  if (getDraft() !== text) store.setState({[destination]: text});
+ };
+ const clearSent = (id: string, sent: string) => {
+  if (sent && store.getState()[id] === sent) store.setState({[id]: ''});
+ };
+ return {draft, getDraft, setDraft, clearSent};
 }

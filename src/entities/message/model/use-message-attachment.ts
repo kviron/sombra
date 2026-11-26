@@ -3,7 +3,7 @@ import {useStore} from 'zustand';
 import type {AttachmentFile, MessageAttachmentMetadata} from '@/shared/types';
 import {attachmentCategory} from './conversation-materials';
 import {attachmentPreviews, previewScope, syncPreviewScope} from './attachment-preview';
-import type {AttachmentPreviewCache} from './attachment-preview-cache';
+import {hasImageSize} from './attachment-preview-cache';
 import {createMessageAttachmentModel} from './message-attachment';
 import {
  attachmentAvailable,
@@ -28,14 +28,19 @@ export function useMessageAttachment({messageId, attachment, root}: Options) {
  const [model] = useState(createMessageAttachmentModel);
  const state = useStore(model.store);
  const alive = useRef(true);
- const lease = useRef<ReturnType<AttachmentPreviewCache['acquire']> | undefined>(undefined);
+ const viewportObserver = useRef<IntersectionObserver | undefined>(undefined);
  const isImage = isImageMime(attachment.mime);
  const isAudio = !isImage && attachmentCategory(attachment.name, attachment.mime) === 'audio';
  const available = attachmentAvailable(attachment);
- const previewActive = state.visible || state.open;
  const scope = previewScope();
  const identity = attachmentIdentity(scope, messageId, attachment);
- const shownPreview = state.previewIdentity === identity ? state.preview : undefined;
+ const samePreview = state.previewIdentity === identity;
+ const shownPreview = samePreview ? state.preview : undefined;
+ const imageSize = hasImageSize(attachment)
+  ? attachment
+  : samePreview
+    ? state.imageSize
+    : attachmentPreviews.imageSize(identity);
 
  useEffect(() => {
   alive.current = true;
@@ -43,34 +48,6 @@ export function useMessageAttachment({messageId, attachment, root}: Options) {
    alive.current = false;
   };
  }, []);
-
- // Пока картинка не попала в окно, запрос не отправляется.
- useEffect(() => {
-  if (!isImage || !available) return;
-  const element = root.current;
-  if (!element) return;
-  if (typeof IntersectionObserver === 'undefined') {
-   model.actions.setVisible(true);
-   return;
-  }
-  let scrollRoot: HTMLElement | null = element.parentElement;
-  while (scrollRoot && !/(auto|scroll)/.test(getComputedStyle(scrollRoot).overflowY))
-   scrollRoot = scrollRoot.parentElement;
-  const observer = new IntersectionObserver(
-   entries => model.actions.setVisible(entries.some(entry => entry.isIntersecting)),
-   {root: scrollRoot, rootMargin: '600px 0px'}
-  );
-  const viewportObserver = new IntersectionObserver(
-   entries => model.actions.setInViewport(entries.some(entry => entry.isIntersecting)),
-   {root: scrollRoot}
-  );
-  observer.observe(element);
-  viewportObserver.observe(element);
-  return () => {
-   observer.disconnect();
-   viewportObserver.disconnect();
-  };
- }, [isImage, available, root]);
 
  // Предпросмотр идёт через общий кэш; устаревшие ответы гасит область аккаунта.
  useEffect(() => {
@@ -89,7 +66,7 @@ export function useMessageAttachment({messageId, attachment, root}: Options) {
   const handle = attachmentPreviews.acquire(
    identity,
    owner,
-   () => messageService.attachment<AttachmentFile>({message: messageId}),
+   () => messageService.attachment<AttachmentFile>({message: messageId, attachment_id: attachment.id}),
    value => {
     const file = value as AttachmentFile;
     // Растровый MIME проверяется до кэша: SVG, HTML и внешние ссылки не принимаются.
@@ -98,35 +75,78 @@ export function useMessageAttachment({messageId, attachment, root}: Options) {
    },
    () => previewScope() === scope
   );
-  lease.current = handle;
-  const reset = () => {
+  // Proximity starts loading; a visible row keeps its first frame while the image decodes.
+  let near = false;
+  let visible = false;
+  const update = () => {
+   if (!current) return;
+   const open = model.store.getState().open;
+   handle.update(open || near || visible, open ? 3 : visible ? 2 : 1);
+  };
+  const unsubscribe = model.store.subscribe((next, previous) => {
+   if (next.open !== previous.open) update();
+  });
+  const element = root.current;
+  let preloadObserver: IntersectionObserver | undefined;
+  if (element && typeof IntersectionObserver !== 'undefined') {
+   let scrollRoot: HTMLElement | null = element.parentElement;
+   while (scrollRoot && !/(auto|scroll)/.test(getComputedStyle(scrollRoot).overflowY))
+    scrollRoot = scrollRoot.parentElement;
+   preloadObserver = new IntersectionObserver(
+    entries => {
+     near = entries[entries.length - 1].isIntersecting;
+     update();
+    },
+    {root: scrollRoot, rootMargin: '600px 0px'}
+   );
+   viewportObserver.current = new IntersectionObserver(
+    entries => {
+     if (!current) return;
+     visible = entries[entries.length - 1].isIntersecting;
+     if (!visible) {
+      const size = attachmentPreviews.imageSize(identity);
+      if (size) model.actions.applyImageSize(size);
+     }
+     update();
+    },
+    {root: scrollRoot}
+   );
+   preloadObserver.observe(element);
+   viewportObserver.current.observe(element);
+  } else {
+   near = true;
+  }
+  update();
+  const release = () => {
+   if (!current) return;
    current = false;
+   unsubscribe();
+   preloadObserver?.disconnect();
+   viewportObserver.current?.disconnect();
+   viewportObserver.current = undefined;
    handle.release();
-   model.actions.setPreview(undefined);
+  };
+  const reset = () => {
+   release();
+   model.actions.startPreview('');
    model.actions.setOpen(false);
   };
   window.addEventListener('authchange', reset);
   window.addEventListener('attachmentcachechange', reset);
   return () => {
-   current = false;
-   handle.release();
-   if (lease.current === handle) lease.current = undefined;
+   release();
    window.removeEventListener('authchange', reset);
    window.removeEventListener('attachmentcachechange', reset);
   };
- }, [identity, isImage, available, state.retry]);
-
- // Приоритет загрузки: открытый просмотр важнее прокрутки.
- useEffect(() => {
-  lease.current?.update(previewActive, state.open ? 3 : state.inViewport ? 2 : 1);
- }, [previewActive, state.open, state.inViewport, identity, isImage, available, state.retry]);
+ }, [model, root, identity, scope, messageId, isImage, available, state.retry]);
 
  useEffect(() => {
   if (!available || !isImage) model.actions.setOpen(false);
- }, [available, isImage]);
+ }, [available, isImage, model]);
 
  return {
   isImage,
+  imageSize,
   isAudio,
   available,
   preview: shownPreview,
@@ -136,6 +156,21 @@ export function useMessageAttachment({messageId, attachment, root}: Options) {
   copyError: state.copyError,
   open: state.open,
   actions: {
+   rememberImageSize: (image: HTMLImageElement) => {
+    if (
+     imageSize ||
+     !attachmentPreviews.rememberImageSize(identity, image.currentSrc, {
+      width: image.naturalWidth,
+      height: image.naturalHeight
+     })
+    )
+     return;
+    // Recheck even if the photo finished loading while already outside the viewport.
+    if (root.current && viewportObserver.current) {
+     viewportObserver.current.unobserve(root.current);
+     viewportObserver.current.observe(root.current);
+    }
+   },
    setOpen: model.actions.setOpen,
    setError: model.actions.setError,
    retry: model.actions.retryLoad,
@@ -146,7 +181,8 @@ export function useMessageAttachment({messageId, attachment, root}: Options) {
      mime: attachment.mime,
      isAlive: () => alive.current
     }),
-   download: () => model.actions.download({messageId, available, isAlive: () => alive.current})
+   download: () =>
+    model.actions.download({messageId, attachmentId: attachment.id, available, isAlive: () => alive.current})
   }
  };
 }

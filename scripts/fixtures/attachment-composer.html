@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ru" class="dark">
+ <meta charset="utf-8" />
+ <title>Проверка вложений в поле сообщения Sombra</title>
+ <div id="app" style="width: 480px"></div>
+ <output id="result">Проверка…</output>
+ <script type="module">
+  import '@/app/styles/index.css';
+  import '@/pages/chat/ui/chat.css';
+  import {createElement as h, useRef} from 'react';
+  import {createRoot} from 'react-dom/client';
+  import {useStore} from 'zustand';
+  import {messageService} from '@/entities/message';
+  import {AttachmentDropZone} from '@/features/message-composer';
+  import {useChatMessages} from '@/pages/chat/model/use-chat-messages';
+  import {chatSnapshotActions, chatSnapshotStore} from '@/pages/chat/model/chat-state';
+  import {ChatComposer} from '@/pages/chat/ui/chat-composer';
+
+  const owner = {id: 'a', name: 'Автор'};
+  const channels = [
+   {id: 'one', name: 'Первая', members: ['a', 'b']},
+   {id: 'two', name: 'Вторая', members: ['a', 'b']}
+  ];
+  const state = {
+   me: owner,
+   users: [owner],
+   groups: [],
+   bots: [],
+   stickers: [],
+   dialogs: channels,
+   messages: [],
+   features: {messageReferences: true, messageAttachments: true}
+  };
+  chatSnapshotActions.applyState(state);
+  chatSnapshotActions.refresh = async () => chatSnapshotStore.getState().snapshot;
+  let renderedOwner,
+   model,
+   channel = channels[0],
+   staged = [],
+   published = [],
+   failSecond = true,
+   losePublish = true;
+  let continueUpload;
+  messageService.uploadAttachment = async ({channel, attachment}) => {
+   staged.push({channel, name: attachment.name});
+   if (attachment.name === 'a.pdf' && failSecond) throw Error('Нет соединения');
+   if (attachment.name === 'pause.txt')
+    await new Promise(resolve => {
+     continueUpload = resolve;
+    });
+   return {id: attachment.name};
+  };
+  messageService.send = async payload => {
+   published.push(payload);
+   if (payload.attachment_ids && losePublish) throw Error('Потерян ответ');
+   const snapshot = chatSnapshotStore.getState().snapshot;
+   const id = 'm' + published.length;
+   const message = {
+    id,
+    user: snapshot.me.id,
+    channel: payload.channel,
+    text: payload.text,
+    time: Date.now() / 1000,
+    attachments: payload.attachment_ids?.map(id => ({id, name: id, mime: 'application/octet-stream', size: 1}))
+   };
+   chatSnapshotActions.applyState({...snapshot, messages: [...snapshot.messages, message]});
+   return {ok: true, id};
+  };
+
+  const root = createRoot(document.querySelector('#app'));
+  const panels = {actions: {}};
+  function App() {
+   const snapshot = useStore(chatSnapshotStore, s => s.snapshot);
+   renderedOwner = snapshot.me.id;
+   model = useChatMessages({state: snapshot, channel, home: true, panels, voice: {}, music: {}});
+   return h(
+    AttachmentDropZone,
+    {channel: channel.id, onFiles: model.actions.selectAttachments},
+    h(ChatComposer, {
+     chat: {actions: {}},
+     state: snapshot,
+     nav: {channel, home: true, title: channel.name, userName: () => owner.name},
+     panels,
+     messages: model,
+     composerRef: useRef(null),
+     forwardCommentRef: useRef(null)
+    })
+   );
+  }
+  const render = () => root.render(h(App));
+  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  async function until(check) {
+   const end = performance.now() + 8000;
+   while (!check()) {
+    if (performance.now() > end) throw Error('Тайм-аут ' + String(check));
+    await delay(15);
+   }
+  }
+  function assert(check, reason) {
+   if (!check) throw Error(reason);
+  }
+  const transfer = files => {
+   const data = new DataTransfer();
+   files.forEach(f => data.items.add(f));
+   return data;
+  };
+  const doc = (name, type = 'text/plain') => new File(['hello'], name, {type});
+  const cards = () => [...document.querySelectorAll('[data-slot="attachment-title"]')].map(el => el.textContent);
+  const output = document.querySelector('#result');
+  try {
+   render();
+   await until(() => document.querySelector('input[type=file]'));
+   const input = document.querySelector('input[type=file]');
+   assert(input.multiple, 'Выбор допускает только один файл');
+   const canvas = document.createElement('canvas');
+   canvas.width = 4;
+   canvas.height = 4;
+   const png = new File([await new Promise(resolve => canvas.toBlob(resolve))], 'photo.png', {type: 'image/png'});
+   input.files = transfer([png, doc('remove.txt')]).files;
+   input.dispatchEvent(new Event('change', {bubbles: true}));
+   await until(
+    () => cards().length === 2 && document.querySelector('[data-slot="attachment-media"] img')?.naturalWidth === 4
+   );
+   const image = document.querySelector('[data-slot="attachment-media"] img');
+   const card = image.closest('[data-slot="attachment"]');
+   assert(
+    image.clientWidth >= 90 && image.clientHeight === image.clientWidth && card.clientWidth < 150,
+    'Миниатюра не помещается в компактную квадратную карточку'
+   );
+   document.querySelector('button[aria-label="Убрать remove.txt"]').click();
+   const paste = transfer([doc('a.pdf', 'application/pdf'), doc('b.txt')]);
+   paste.setData('text/plain', 'подпись');
+   const pasteEvent = new ClipboardEvent('paste', {clipboardData: paste, bubbles: true, cancelable: true});
+   document.querySelector('textarea').dispatchEvent(pasteEvent);
+   assert(!pasteEvent.defaultPrevented, 'Вставка потеряла текст буфера обмена');
+   document
+    .querySelector('section')
+    .dispatchEvent(
+     new DragEvent('drop', {dataTransfer: transfer([doc('c.txt'), doc('d.txt')]), bubbles: true, cancelable: true})
+    );
+   await until(() => cards().join(',') === 'photo.png,a.pdf,b.txt,c.txt,d.txt');
+   model.actions.selectAttachments(Array.from({length: 6}, (_, i) => doc(i + '.txt')));
+   model.actions.replyTo({id: 'reply-id', user: owner.id, channel: channel.id, time: 1, text: 'Вопрос'});
+   model.actions.setDraft('подпись');
+   await until(() => model.draft === 'подпись');
+   assert(model.attachments.length === 5, 'Превышен лимит файлов');
+   channel = channels[1];
+   render();
+   await until(() => cards().length === 0 && model.draft === '');
+   channel = channels[0];
+   render();
+   await until(() => cards().length === 5 && model.draft === 'подпись');
+   document.querySelector('button[aria-label="Отправить сообщение"]').click();
+   document.querySelector('form').requestSubmit();
+   await until(() => Object.values(model.outbox)[0]?.status === 'failed');
+   assert(
+    staged.length === 2 && published.length === 0 && cards().length === 0,
+    'Частичная загрузка опубликовала сообщение'
+   );
+   model.actions.selectAttachments([doc('next.txt')]);
+   model.actions.setDraft('следующее');
+   await until(() => model.draft === 'следующее' && cards().length === 1);
+   const id = Object.keys(model.outbox)[0];
+   failSecond = false;
+   await model.actions.retry(id);
+   await until(() => Object.values(model.outbox)[0]?.status === 'failed');
+   assert(published[0].attachment_ids.join(',') === 'photo.png,a.pdf,b.txt,c.txt,d.txt', 'Нарушен порядок файлов');
+   assert(published[0].replyTo === 'reply-id', 'Альбом потерял ссылку на сообщение');
+   assert(published[0].text === 'подпись' && staged.length === 6, 'Повтор потерял текст или повторно загрузил фото');
+   losePublish = false;
+   await Promise.all([model.actions.retry(id), model.actions.retry(id)]);
+   await until(() => Object.keys(model.outbox).length === 0);
+   assert(
+    staged.length === 6 && published.length === 2 && JSON.stringify(published[0]) === JSON.stringify(published[1]),
+    'Повтор публикации создал другую группу'
+   );
+   assert(cards()[0] === 'next.txt' && model.draft === 'следующее', 'Стерт новый черновик');
+   await model.actions.send();
+   await until(() => Object.keys(model.outbox).length === 0);
+   assert(published[2].attachment.name === 'next.txt' && !published[2].attachment_ids, 'Изменён протокол одного файла');
+   model.actions.selectAttachments([doc('pause.txt'), doc('private.txt')]);
+   const pending = model.actions.send();
+   await until(() => continueUpload);
+   chatSnapshotActions.applyState({...state, me: {id: 'b', name: 'Новый'}});
+   await until(() => Object.keys(model.outbox).length === 0);
+   continueUpload();
+   await pending;
+   assert(staged.at(-1).name === 'pause.txt' && published.length === 3, 'Смена аккаунта продолжила отправку');
+   chatSnapshotActions.applyState({...state, features: {}});
+   await until(() => renderedOwner === owner.id);
+   model.actions.selectAttachments([doc('one.txt'), doc('two.txt')]);
+   await model.actions.send();
+   await until(() => cards().length === 2);
+   assert(published.length === 3 && Object.keys(model.outbox).length === 0, 'Старый сервер получил неполное сообщение');
+   chatSnapshotActions.applyState(state);
+   await until(() => renderedOwner === owner.id && model.referencesSupported);
+   document
+    .querySelector('textarea')
+    .dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+   await until(() => published.length === 4 && Object.keys(model.outbox).length === 0);
+   assert(published[3].text === '' && published[3].attachment_ids.length === 2, 'Альбом требует подпись');
+   output.textContent = 'PASS';
+  } catch (error) {
+   output.textContent = 'FAIL ' + error.stack;
+  }
+ </script>
+</html>

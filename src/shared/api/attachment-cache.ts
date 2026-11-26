@@ -1,3 +1,5 @@
+import {getMessageAttachments} from '../lib/message-attachments.ts';
+
 export type CacheInfo = {enabled: boolean; limitMiB: number; bytes: number; files: number};
 export class CacheUnavailable extends Error {
  constructor() {
@@ -5,9 +7,9 @@ export class CacheUnavailable extends Error {
   this.name = 'CacheUnavailable';
  }
 }
-type Metadata = {id: string; name: string; mime: string; size: number};
+type Metadata = {id: string; name: string; mime: string; size: number; cached?: boolean};
 type FilePayload = {data: string; name: string; mime: string; cached?: boolean};
-type Snapshot = {me: {id: string}; messages: Array<{id: string; attachment?: Metadata & {cached?: boolean}}>};
+type Snapshot = {me: {id: string}; messages: Array<{id: string; attachment?: Metadata; attachments?: Metadata[]}>};
 type Entry = {
  key: string;
  account: string;
@@ -33,7 +35,7 @@ export function notifyAttachmentCacheChange() {
 let generation = 0,
  account = '',
  accepted = 0,
- visible = new Map<string, Metadata>(),
+ visible = new Map<string, Metadata[]>(),
  dbPromise: Promise<IDBDatabase> | undefined;
 let queue: Promise<unknown> = Promise.resolve();
 const serial = <T>(run: () => Promise<T>): Promise<T> => {
@@ -130,33 +132,43 @@ export async function acceptAttachmentCacheState<T extends Snapshot>(state: T, e
   resetAttachmentCacheAccess();
   return state;
  }
- const nextVisible = new Map(
-  state.messages.flatMap(message =>
-   message.attachment ? [[message.id, message.attachment] as [string, Metadata]] : []
-  )
- );
+ const nextVisible = new Map<string, Metadata[]>();
+ for (const message of state.messages) {
+  const files = getMessageAttachments(message);
+  if (files.length)
+   nextVisible.set(
+    message.id,
+    files.map(file => ({...file}))
+   );
+ }
  if (
   account &&
   (account !== state.me.id ||
-   [...visible].some(([id, meta]) => {
-    const next = nextVisible.get(id);
-    return (
-     !next || next.id !== meta.id || next.name !== meta.name || next.mime !== meta.mime || next.size !== meta.size
-    );
-   }))
+   [...visible].some(([id, files]) =>
+    files.some((file, i) => {
+     const next = nextVisible.get(id)?.[i];
+     return (
+      !next || next.id !== file.id || next.name !== file.name || next.mime !== file.mime || next.size !== file.size
+     );
+    })
+   ))
  )
   generation++;
  account = state.me.id;
  accepted = Date.now();
- visible = new Map(
-  state.messages.flatMap(message =>
-   message.attachment ? [[message.id, {...message.attachment}] as [string, Metadata]] : []
-  )
- );
+ visible = nextVisible;
  const owner = account,
-  scope = generation,
-  allowed = new Map(visible);
- for (const message of state.messages) if (message.attachment) message.attachment.cached = false;
+  scope = generation;
+ const decorate = (cached?: Set<string>) => {
+  for (const message of state.messages) {
+   const mark = (file: Metadata) => {
+    file.cached = cached?.has(key(owner, message.id, file.id)) ?? false;
+   };
+   message.attachments?.forEach(mark);
+   if (message.attachment) mark(message.attachment);
+  }
+ };
+ decorate();
  try {
   const cached = await serial(() =>
    transaction<Set<string>>('readwrite', (files, _settings, done, payloads) => {
@@ -170,14 +182,8 @@ export async function acceptAttachmentCacheState<T extends Snapshot>(state: T, e
      }
      const entry = cursor.value as Entry;
      if (entry.account === owner) {
-      const meta = allowed.get(entry.message);
-      if (
-       !meta ||
-       entry.attachment !== meta.id ||
-       entry.name !== meta.name ||
-       entry.mime !== meta.mime ||
-       entry.size !== meta.size
-      ) {
+      const meta = nextVisible.get(entry.message)?.find(file => file.id === entry.attachment);
+      if (!meta || entry.name !== meta.name || entry.mime !== meta.mime || entry.size !== meta.size) {
        cursor.delete();
        payloads.delete(entry.key);
       } else found.add(entry.key);
@@ -186,9 +192,7 @@ export async function acceptAttachmentCacheState<T extends Snapshot>(state: T, e
     };
    })
   );
-  if (scope === generation)
-   for (const message of state.messages)
-    if (message.attachment) message.attachment.cached = cached.has(key(owner, message.id, message.attachment.id));
+  if (scope === generation) decorate(cached);
  } catch {
   /* Online history is independent of local storage. */
  }
@@ -198,10 +202,14 @@ export async function acceptAttachmentCacheState<T extends Snapshot>(state: T, e
 export function attachmentCacheNeedsState() {
  return !account || Date.now() - accepted > 5000;
 }
-export async function readAttachmentCache(message: string): Promise<FilePayload | undefined> {
+function visibleAttachment(message: string, id?: string) {
+ const files = visible.get(message);
+ return id === undefined ? files?.[0] : files?.find(file => file.id === id);
+}
+export async function readAttachmentCache(message: string, attachmentId?: string): Promise<FilePayload | undefined> {
  const scope = generation,
   owner = account,
-  meta = visible.get(message);
+  meta = visibleAttachment(message, attachmentId);
  if (!meta || attachmentCacheNeedsState()) return;
  try {
   return await serial(() =>
@@ -215,14 +223,23 @@ export async function readAttachmentCache(message: string): Promise<FilePayload 
      const request = files.get(key(owner, message, meta.id));
      request.onsuccess = () => {
       const entry = request.result as Entry | undefined;
-      if (!entry || scope !== generation || visible.get(message)?.id !== meta.id || attachmentCacheNeedsState()) {
+      if (
+       !entry ||
+       scope !== generation ||
+       visibleAttachment(message, attachmentId)?.id !== meta.id ||
+       attachmentCacheNeedsState()
+      ) {
        done(undefined);
        return;
       }
       const payload = payloads.get(entry.key);
       payload.onsuccess = () => {
        const file = {data: payload.result, name: entry.name, mime: entry.mime};
-       if (scope !== generation || visible.get(message)?.id !== meta.id || attachmentCacheNeedsState()) {
+       if (
+        scope !== generation ||
+        visibleAttachment(message, attachmentId)?.id !== meta.id ||
+        attachmentCacheNeedsState()
+       ) {
         done(undefined);
         return;
        }
@@ -248,10 +265,11 @@ export async function writeAttachmentCache(
  message: string,
  file: FilePayload,
  scope: number,
- epoch = writeEpoch
+ epoch = writeEpoch,
+ attachmentId?: string
 ): Promise<void> {
  const owner = account,
-  meta = visible.get(message);
+  meta = visibleAttachment(message, attachmentId);
  if (epoch !== writeEpoch || scope !== generation || !owner || !meta || !valid(file, meta)) return;
  try {
   await serial(() =>
@@ -259,7 +277,12 @@ export async function writeAttachmentCache(
     const setting = settings.get(key(owner, 'settings', 'limitMiB'));
     setting.onsuccess = () => {
      const limit = setting.result ?? 1024;
-     if (epoch !== writeEpoch || scope !== generation || visible.get(message)?.id !== meta.id || !limit) {
+     if (
+      epoch !== writeEpoch ||
+      scope !== generation ||
+      visibleAttachment(message, attachmentId)?.id !== meta.id ||
+      !limit
+     ) {
       done();
       return;
      }

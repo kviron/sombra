@@ -5,7 +5,6 @@ import {useDirectMessageNotifications, useNotificationActivation} from '@/featur
 import {useRoomMusic, useVoice, VoicePlayback, VoiceStageGradient} from '@/features/voice-room';
 import type {ForwardDestination} from '@/features/message-actions';
 import type {MaterialCategory} from '@/entities/message';
-import {useMessageReadState} from '@/entities/message';
 import {useRenderStorm} from '@/shared/lib';
 import {UserActionsProvider} from '@/shared/lib/user-actions';
 import {useScreenGlitch} from '@/shared/ui/use-screen-glitch';
@@ -121,8 +120,6 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
   onActivate: activateNotification
  });
 
- useMessageReadState(chat.state, nav.channel?.id || '', messages.readsBlocked || !voiceChatOpen);
-
  useLayoutEffect(() => {
   const composer = composerRef.current;
   const main = composer?.closest<HTMLElement>('.chat-main');
@@ -183,7 +180,7 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
   <UserActionsProvider
    value={{
     me: chat.state?.me,
-    openProfile: id => panels.actions.openProfile(id),
+    openProfile: panels.actions.openProfile,
     messageUser: id => void nav.actions.messageUser(id),
     editOwnProfile: panels.actions.openOwnProfile,
     friendStatus: contacts.status,
@@ -231,14 +228,13 @@ export function LiveChat({appearanceSettings}: {appearanceSettings: ReactNode}) 
         !!messages.forwardDraft ||
         !!messages.picker ||
         chat.busy ||
-        messages.readingAttachment ||
         panels.settings ||
         !!panels.modal ||
         !!panels.profileId ||
         panels.infoOpen ||
         !!calls.incoming
        }
-       onFile={file => void messages.actions.selectAttachment(file)}
+       onFiles={messages.actions.selectAttachments}
       >
        <div className={expandedVoice ? 'hidden' : 'contents'}>
         <ChatHeader
