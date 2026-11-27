@@ -36,7 +36,8 @@ export function openRoomMusicStream(
    const ranges = buffer.buffered,
     first = ranges.length ? ranges.start(0) : 0,
     last = ranges.length ? ranges.end(ranges.length - 1) : 0;
-   if (audio.currentTime - first > 40) {
+   // A rejoining listener may seek ahead of every downloaded chunk. Fill to that point before trimming.
+   if (last >= audio.currentTime && audio.currentTime - first > 40) {
     buffer.remove(first, audio.currentTime - 25);
     return;
    }

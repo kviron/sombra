@@ -3,7 +3,7 @@ import {recordDesktopDiagnostic} from '@/shared/api/diagnostics';
 import {voiceService} from './services/voice-service';
 import {captureTrackForJoin, mediaError} from './voice-capture';
 import {setCapturedTrackEnabled, stopCapturedTrack, type MediaPreferences} from './voice-input';
-import {monitorOutgoingMicrophone, stopCall, type Call, type VoiceRuntime} from './voice-call';
+import {stopCall, type Call, type VoiceRuntime} from './voice-call';
 import {otherMembers} from './voice-peers';
 import {playVoiceCue} from './voice-cues';
 import {startVoiceTransport} from './voice-transport';
@@ -78,7 +78,7 @@ export function createVoiceSession(preferences: MediaPreferences) {
    if (runtime.preferredMicVolume !== 100) {
     await media.applyMicVolume(c, runtime.preferredMicVolume);
     if (c.stop) return false;
-   } else monitorOutgoingMicrophone(c, c.microphone);
+   }
    c.members = otherMembers(first.peers, c.client);
    const callbacks = {
     availability,

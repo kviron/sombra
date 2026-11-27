@@ -10,11 +10,7 @@ export type VoiceTransportCategory =
  | 'audio_receive_stalled'
  | 'audio_receive_recovered'
  | 'audio_send_stalled'
- | 'audio_send_recovered'
- | 'audio_send_silent'
- | 'audio_send_silent_recovered'
- | 'audio_receive_silent'
- | 'audio_receive_silent_recovered';
+ | 'audio_send_recovered';
 type Categories = {
  webview: 'js_error' | 'unhandled_rejection' | 'render_error' | 'ui_freeze';
  voice_microphone: 'device_error' | 'device_permission';
@@ -29,9 +25,7 @@ type Categories = {
   | 'output_undeafened'
   | 'playback_failed'
   | 'output_device_failed'
-  | 'input_device_failed'
-  | 'mic_silent'
-  | 'mic_silent_recovered';
+  | 'input_device_failed';
 };
 export const desktopDiagnosticsAvailable = tauri.isTauri;
 const lastReport = new Map<string, number>();

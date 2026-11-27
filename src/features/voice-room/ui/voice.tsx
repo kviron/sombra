@@ -8,7 +8,6 @@ import {Slider} from '@/shared/ui/slider';
 import {OptionsSelect} from '@/shared/ui/select';
 import {AudioDeviceAccess} from './audio-device-access';
 import {Label} from '@/shared/ui/label';
-import {Progress} from '@/shared/ui/progress';
 import {Mic, MicOff, Headphones, HeadphoneOff, Video, VideoOff, PhoneOff, Settings} from 'lucide-react';
 import type {Voice} from '../model/use-voice';
 import type {User, VoicePresence} from '@/shared/types';
@@ -281,7 +280,7 @@ export function VoiceSettings({voice: v}: {voice: Voice}) {
      <Button variant="secondary" disabled={settings.testDisabled} onClick={() => void settings.testMicrophone()}>
       Проверить микрофон
      </Button>
-     <Progress aria-label="Уровень микрофона" value={settings.level} />
+     {settings.preview?.getAudioTracks().some(track => track.readyState === 'live') && <span>Микрофон подключён</span>}
     </div>
    </section>
    <section className="media-settings-panel">

@@ -12,7 +12,6 @@ export * from './model/voice-input';
 export * from './ui/audio-device-access';
 export * from './ui/dialog-calls';
 export * from './ui/room-music';
-export * from './ui/voice-level';
 export * from './ui/voice-participants';
 export {VoiceInviteDialog} from './ui/voice-invite-dialog';
 export {readVoiceInvitation} from './model/voice-invitation-rules';

@@ -1,4 +1,4 @@
-// Чистые правила панели «Голос и видео»: список устройств, уровень проверки и условия кнопок.
+// Чистые правила панели «Голос и видео»: список устройств и условия кнопок.
 // Сети и DOM здесь нет, поэтому правила проверяются тестами.
 import type {MediaPreferences, NoiseSuppression} from './voice-input';
 
@@ -42,13 +42,6 @@ export function deviceOptions(
  if (selected && !options.some(option => option.value === selected))
   options.push({value: selected, label: selectedDeviceLabel(selected, missing)});
  return options;
-}
-
-/** Уровень проверки микрофона: пик отклонения от середины шкалы, приведённый к процентам. */
-export function microphoneLevel(samples: ArrayLike<number>) {
- let peak = 0;
- for (let index = 0; index < samples.length; index++) peak = Math.max(peak, Math.abs(samples[index] - 128));
- return Math.min(100, peak * 3);
 }
 
 /** Проверка устройства недоступна в звонке: она отнимает микрофон у разговора. */

@@ -1,4 +1,4 @@
-import {setCapturedTrackEnabled, stopCapturedTrack, watchMicrophoneSilence} from './voice-input';
+import {setCapturedTrackEnabled, stopCapturedTrack} from './voice-input';
 type MicrophoneGain = {
  context: AudioContext;
  source: MediaStreamAudioSourceNode;
@@ -20,14 +20,8 @@ export type Call = {
  micGain?: MicrophoneGain;
  members?: Set<string>;
  stopInputWatch?: () => void;
- silenceWatch?: () => void;
 };
 export type TrackKind = 'audio' | 'video';
-
-export function monitorOutgoingMicrophone(call: Call, track: MediaStreamTrack | null) {
- call.silenceWatch?.();
- call.silenceWatch = track ? watchMicrophoneSilence(track) : undefined;
-}
 
 export function microphoneSource(context: AudioContext, gain: GainNode, track: MediaStreamTrack) {
  const source = context.createMediaStreamSource(new MediaStream([track]));
@@ -78,7 +72,6 @@ export async function replaceLocalTrack(
   if (track) stopCapturedTrack(track);
   return false;
  }
- if (kind === 'audio') monitorOutgoingMicrophone(c, track);
  onLocal(new MediaStream(c.stream.getTracks()));
  return true;
 }
@@ -88,7 +81,6 @@ export function stopCall(c: Call) {
  c.stop = true;
  c.stopTransport?.();
  c.stopInputWatch?.();
- c.silenceWatch?.();
  c.stream
   .getTracks()
   .filter(track => track !== c.microphone && track !== c.micGain?.track)

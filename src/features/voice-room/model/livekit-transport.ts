@@ -75,7 +75,7 @@ export async function startLiveKitTransport(
  const microphone = new LocalAudioTrack(input, undefined, true);
  if (!input.enabled) await microphone.mute();
  if (call.stop) return;
- await room.localParticipant.publishTrack(microphone, {source: Track.Source.Microphone});
+ await room.localParticipant.publishTrack(microphone, {source: Track.Source.Microphone, dtx: false});
  if (call.stop) return;
  call.replaceTransportTrack = async (kind, track) => {
   if (kind !== 'audio' || !track) return;

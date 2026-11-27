@@ -4,10 +4,8 @@ import {MicOff, HeadphoneOff, LogOut} from 'lucide-react';
 import type {User, VoicePresence} from '@/shared/types';
 import {Slider} from '@/shared/ui/slider';
 import type {Voice} from '../model/use-voice';
-import {VoiceLevel} from './voice-level';
 import {UserRow} from '@/entities/user';
 import {useUserActions} from '@/shared/lib/user-actions';
-import './voice-participants.css';
 
 type Props = {
  voice: Voice;
@@ -23,7 +21,6 @@ type Props = {
 export function VoiceParticipants({voice, room, title, me, users, presence, volumeForUser, setUserVolume}: Props) {
  const actions = useUserActions();
  if (!me) return null;
- const joined = voice.room === room;
  const participants = selectVoiceChannelMembers(voice, room, me.id, presence);
  if (!participants.length) return null;
  return (
@@ -32,7 +29,6 @@ export function VoiceParticipants({voice, room, title, me, users, presence, volu
    aria-label={`Участники — ${title}`}
   >
    {participants.map(({id, self, muted, deaf}) => {
-    const peer = joined && !self ? voice.peers.find(peer => peer.user === id && voice.streams[peer.client]) : undefined;
     const user = id === me.id ? me : users.find(user => user.id === id);
     const name = user?.name || 'Участник';
     const canAdjustVolume = self || id !== me.id;
@@ -59,21 +55,12 @@ export function VoiceParticipants({voice, room, title, me, users, presence, volu
       key={id}
       as="li"
       variant="voice"
-      className="voice-channel-participant [&_svg]:shrink-0"
+      className="rounded-[6px] [&_svg]:shrink-0"
       identity={user ?? {id, name}}
       title={name}
       meta={self ? <small>Вы</small> : null}
       controls={controls}
       actions={actions_}
-      adornment={
-       joined ? (
-        <VoiceLevel
-         stream={self ? voice.local : peer ? voice.streams[peer.client] : undefined}
-         muted={!!(muted || deaf)}
-         name={name}
-        />
-       ) : null
-      }
       trailing={
        <>
         {(muted || deaf) && (

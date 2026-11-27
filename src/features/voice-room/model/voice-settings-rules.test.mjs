@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import {
  deviceOptions,
  deviceSelectDisabled,
- microphoneLevel,
  noiseOption,
  noiseOptions,
  preferenceStopsPreview,
@@ -45,13 +44,6 @@ test('подпись сохранённого устройства различ�
  assert.equal(selectedDeviceLabel('default', false), 'По умолчанию');
  assert.equal(selectedDeviceLabel('communications', false), 'Устройство связи по умолчанию');
  assert.equal(selectedDeviceLabel('mic-1', false), 'Выбранное устройство');
-});
-
-test('уровень микрофона — пик отклонения, ограниченный сотней', () => {
- assert.equal(microphoneLevel(new Uint8Array([128, 128, 128])), 0, 'тишина');
- assert.equal(microphoneLevel(new Uint8Array([128 + 10])), 30);
- assert.equal(microphoneLevel(new Uint8Array([0])), 100, 'пик упирается в предел');
- assert.equal(microphoneLevel(new Uint8Array([])), 0, 'пустой буфер не ломает расчёт');
 });
 
 test('проверка устройства недоступна во время звонка или другой проверки', () => {

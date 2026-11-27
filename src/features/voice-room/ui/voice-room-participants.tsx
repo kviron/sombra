@@ -7,7 +7,6 @@ import {UserContextMenu} from '@/entities/user';
 import {useUserActions} from '@/shared/lib/user-actions';
 import type {User, VoicePresence} from '@/shared/types';
 import {selectRoomParticipants} from '../model/voice-selectors';
-import {useLevelRail} from '../model/use-level-rail';
 import {useMediaPlayback} from '../model/use-media-playback';
 import type {Voice} from '../model/use-voice';
 
@@ -90,7 +89,6 @@ function VoicePeerVisual({
  user,
  onOpen,
  onFocus,
- deaf,
  compact,
  selected
 }: {
@@ -98,17 +96,12 @@ function VoicePeerVisual({
  user: User;
  onOpen: () => void;
  onFocus: () => void;
- deaf: boolean;
  compact: boolean;
  selected: boolean;
 }) {
  const videoVisible = useVisibleVideo(stream);
- const rail = useLevelRail(stream, !deaf);
  return (
   <>
-   <div className="voice-tile-rail" ref={rail} aria-hidden="true">
-    <i />
-   </div>
    <TooltipLabel content={`Профиль ${user.name}`}>
     <button
      type="button"
@@ -203,7 +196,6 @@ export function VoiceRoomParticipants({voice, room, presence, users, meUser, me,
     <VoicePeerVisual
      stream={stream}
      user={identity}
-     deaf={self ? voice.muted || voice.deaf : voice.deaf}
      compact={focused}
      selected={focused && key === selected}
      onOpen={() => {

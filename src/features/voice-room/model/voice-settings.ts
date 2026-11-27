@@ -3,18 +3,16 @@ import {recordDesktopDiagnostic} from '@/shared/api/diagnostics';
 import {mediaError} from './voice-capture';
 import {captureVoiceStream, stopCapturedTrack, type MediaPreferences} from './voice-input';
 
-/** Проверка устройств в панели: поток, ошибка, уровень и признак работы. */
+/** Проверка устройств в панели: поток, ошибка и признак работы. */
 export type VoiceSettingsState = {
  preview: MediaStream | null;
  error: string;
- level: number;
  busy: boolean;
 };
 
 const initialState: VoiceSettingsState = {
  preview: null,
  error: '',
- level: 0,
  busy: false
 };
 
@@ -35,16 +33,13 @@ export const voiceSettingsActions = {
  reset() {
   voiceSettingsStore.setState(initialState, true);
  },
- setLevel(level: number) {
-  voiceSettingsStore.setState({level});
- },
 
  /** Останавливает проверку и освобождает устройство. */
  stop() {
   epoch++;
   const {preview} = voiceSettingsStore.getState();
   if (preview) stopPreview(preview);
-  voiceSettingsStore.setState({preview: null, level: 0});
+  voiceSettingsStore.setState({preview: null});
  },
 
  /**

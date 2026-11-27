@@ -72,15 +72,16 @@ if (globalThis.voiceLiveKitTest) {
 }
 const audio = new AudioContext(),
  calls = [],
- oscillators = [];
+ inputs = [];
 navigator.mediaDevices.getUserMedia = async () => {
  await audio.resume();
  const tone = audio.createOscillator(),
-  out = audio.createMediaStreamDestination();
- tone.frequency.value = oscillators.length ? 880 : 440;
- tone.connect(out);
+  out = audio.createMediaStreamDestination(),
+  gain = audio.createGain();
+ tone.frequency.value = inputs.length ? 880 : 440;
+ tone.connect(gain).connect(out);
  tone.start();
- oscillators.push(tone);
+ inputs.push(gain);
  return out.stream;
 };
 function Output({stream, speaker, muted}) {
@@ -497,6 +498,21 @@ async function checkCancelledNegotiation() {
  }
 }
 async function check() {
+ await until(
+  () => calls.length === 2 && calls.every(call => call?.local?.getAudioTracks().length),
+  'Microphones did not open',
+  500
+ );
+ const microphones = calls.map(call => call.local.getAudioTracks()[0]);
+ for (const input of inputs) input.gain.value = 0;
+ await delay(6000);
+ if (
+  microphones.some(
+   (track, i) => !track.enabled || track.readyState !== 'live' || calls[i].local.getAudioTracks()[0] !== track
+  )
+ )
+  throw new Error('Silence disabled or replaced a microphone');
+ for (const input of inputs) input.gain.value = 1;
  for (let i = 0; i < 100; i++) {
   const elements = [...document.querySelectorAll('audio')];
   if (
